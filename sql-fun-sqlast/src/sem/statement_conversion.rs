@@ -2,68 +2,66 @@
 
 use crate::{
     AstAndContextPair, CacheContext,
-    sem::{
-        AlterSequence as SemAlterSequence, Comment as SemComment, CreateRule as SemCreateRule,
-        DropTable as SemDropTable, VariableSet as SemVariableSet,
+    ast::{
+        AlterSequence, Comment, DropTable, EnumType, Extension, Sequence, StatementNode,
+        VariableSet, View,
     },
-};
-
-use crate::{
     context::ParseContext,
-    names::{TableName, ViewName},
+    names::{FullName, TableName, ViewName},
     sem::{
-        AnalysisError, AnalysisProblem, CreateEnum, CreateExtension, CreateSequence, CreateView,
-        Kind, ParameterConstraints, ScalarAnalysisContext, SemAst, problem::ViewProblem,
+        AlterOwner, AlterSequence as SemAlterSequence, AnalysisError, AnalysisProblem,
+        Comment as SemComment, CreateCompositeType, CreateDomain, CreateEnum, CreateExtension,
+        CreateFunction, CreateIndex, CreateRule, CreateSchema, CreateSequence, CreateTable,
+        CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropRule,
+        DropTable as SemDropTable, DropTrigger, EngineFeatureValidation, InsertStatement, Kind,
+        MergeStatement, ParameterConstraints, RelationAlteration, ScalarAnalysisContext,
+        SelectStatement, SemAst, SemScalarExpr, UpdateStatement, VariableSet as SemVariableSet,
+        ViewCheckOption, ViewColumnLineage, problem::ViewProblem,
     },
 };
 
-use crate::ast::{
-    AlterSequence, Comment, DropTable, EnumType, Extension, Sequence, StatementNode, VariableSet,
-    View,
-};
-use crate::sem::{AstConversion, convert};
-impl AstConversion<'_, StatementNode> {
-    pub(crate) fn resolve(
-        &self,
+impl SemAst {
+    pub(crate) fn from_ast_node(
+        ast: &StatementNode,
         context: &mut impl ParseContext,
         cache: &mut CacheContext,
-    ) -> Result<SemAst, AnalysisError> {
-        if !self.check_engine_features(context)? {
-            return Ok(SemAst::unresolved_statement());
+    ) -> Result<Self, AnalysisError> {
+        if !EngineFeatureValidation::statement(ast, context)? {
+            return Ok(Self::unresolved_statement());
         }
-        match self.ast {
+        match ast {
             StatementNode::DefaultPrivileges(_) => {
                 todo!("ALTER DEFAULT PRIVILEGES interpretation (#955)")
             }
             StatementNode::ForeignTable(_) => {
                 todo!("CREATE FOREIGN TABLE interpretation (#956)")
             }
-            StatementNode::Query(query) => {
-                Ok(SemAst::select(&convert(query).resolve(context, cache)?))
-            }
-            StatementNode::Insert(insert) => Ok(SemAst::from_insert_resolution(
-                convert(insert).resolve(context, cache)?.as_ref(),
+            StatementNode::Query(query) => Ok(Self::select(&SelectStatement::from_ast(
+                query, context, cache,
+            )?)),
+            StatementNode::Insert(insert) => Ok(Self::from_insert_resolution(
+                InsertStatement::from_ast(insert, context, cache)?.as_ref(),
             )),
-            StatementNode::Update(update) => Ok(SemAst::from_update_resolution(
-                convert(update).resolve(context, cache)?.as_ref(),
+            StatementNode::Update(update) => Ok(Self::from_update_resolution(
+                UpdateStatement::from_ast(update, context, cache)?.as_ref(),
             )),
-            StatementNode::Delete(delete) => {
-                Ok(SemAst::delete(&convert(delete).resolve(context, cache)?))
-            }
-            StatementNode::Merge(merge) => {
-                Ok(SemAst::merge(&convert(merge).resolve(context, cache)?))
-            }
-            StatementNode::CreateRule(rule) => Ok(SemAst::from_create_rule_resolution(
-                convert(rule).resolve(context)?.as_ref(),
+            StatementNode::Delete(delete) => Ok(Self::delete(&DeleteStatement::from_ast(
+                delete, context, cache,
+            )?)),
+            StatementNode::Merge(merge) => Ok(Self::merge(&MergeStatement::from_ast(
+                merge, context, cache,
+            )?)),
+            StatementNode::CreateRule(rule) => Ok(Self::from_create_rule_resolution(
+                CreateRule::from_ast(rule, context)?.as_ref(),
             )),
-            StatementNode::DropTrigger(trigger) => Ok(SemAst::from_drop_trigger_resolution(
-                convert(trigger).resolve(context)?.as_ref(),
+            StatementNode::DropTrigger(trigger) => Ok(Self::from_drop_trigger_resolution(
+                DropTrigger::from_ast(trigger, context)?.as_ref(),
             )),
-            StatementNode::CreateTrigger(trigger) => Ok(SemAst::from_create_trigger_resolution(
-                convert(trigger).resolve(context)?.as_ref(),
+            StatementNode::CreateTrigger(trigger) => Ok(Self::from_create_trigger_resolution(
+                CreateTrigger::from_ast(trigger, context)?.as_ref(),
             )),
-            StatementNode::DropRule(rule) => Ok(SemAst::from_drop_rule_resolution(
-                convert(rule).resolve(context)?.as_ref(),
+            StatementNode::DropRule(rule) => Ok(Self::from_drop_rule_resolution(
+                DropRule::from_ast(rule, context)?.as_ref(),
             )),
             StatementNode::View(_) => {
                 AnalysisError::raise_unexpected_input("view requires catalog application")
@@ -89,21 +87,21 @@ impl AstConversion<'_, StatementNode> {
             StatementNode::Comment(_) => {
                 AnalysisError::raise_unexpected_input("comment requires catalog application")
             }
-            StatementNode::AlterOwner(alteration) => {
-                Ok(SemAst::alter_owner(&convert(alteration).resolve(context)?))
-            }
-            StatementNode::CompositeType(composite_type) => Ok(SemAst::create_composite_type(
-                &convert(composite_type).resolve(context)?,
+            StatementNode::AlterOwner(alteration) => Ok(Self::alter_owner(&AlterOwner::from_ast(
+                alteration, context,
+            )?)),
+            StatementNode::CompositeType(composite_type) => Ok(Self::create_composite_type(
+                &CreateCompositeType::from_ast(composite_type, context)?,
             )),
             StatementNode::AlterRelation(_) => {
                 AnalysisError::raise_unexpected_input("statement requires catalog application")
             }
-            StatementNode::Function(function) => Ok(SemAst::create_function(
-                &convert(function).resolve(context)?,
+            StatementNode::Function(function) => Ok(Self::create_function(
+                &CreateFunction::from_ast(function, context)?,
             )),
-            StatementNode::Index(index) => Ok(SemAst::from_index_resolution(
-                &convert(index).resolve(context)?,
-            )),
+            StatementNode::Index(index) => Ok(Self::from_index_resolution(&CreateIndex::from_ast(
+                index, context,
+            )?)),
             StatementNode::TableAs(_) => {
                 AnalysisError::raise_unexpected_input("table as requires catalog application")
             }
@@ -113,13 +111,13 @@ impl AstConversion<'_, StatementNode> {
             StatementNode::Schema(_) => {
                 AnalysisError::raise_unexpected_input("schema requires catalog application")
             }
-            StatementNode::Domain(domain) => {
-                Ok(SemAst::create_domain(&convert(domain).resolve(context)?))
-            }
+            StatementNode::Domain(domain) => Ok(Self::create_domain(&CreateDomain::from_ast(
+                domain, context,
+            )?)),
         }
     }
-    pub(crate) fn resolve_and_apply<TContext>(
-        &self,
+    pub(crate) fn apply_ast_node<TContext>(
+        ast: &StatementNode,
         context: TContext,
         cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
@@ -128,60 +126,78 @@ impl AstConversion<'_, StatementNode> {
     {
         let mut context = context;
         context.set_parameter_constraints(&ParameterConstraints::default());
-        if !self.check_engine_features(&mut context)? {
+        if !EngineFeatureValidation::statement(ast, &mut context)? {
             return Ok(AstAndContextPair::new(
-                SemAst::unresolved_statement(),
+                Self::unresolved_statement(),
                 context,
             ));
         }
-        match self.ast {
-            StatementNode::CreateTrigger(trigger) => convert(trigger).resolve_and_apply(context),
-            StatementNode::DropTrigger(trigger) => convert(trigger).resolve_and_apply(context),
-            StatementNode::CreateRule(rule) => convert(rule).resolve_and_apply(context),
-            StatementNode::DropRule(rule) => convert(rule).resolve_and_apply(context),
-            StatementNode::View(view) => convert(view).resolve_and_apply(context, cache),
-            StatementNode::Extension(extension) => convert(extension).apply(context),
-            StatementNode::VariableSet(variable_set) => {
-                convert(variable_set).resolve_and_apply(context)
+        match ast {
+            StatementNode::CreateTrigger(trigger) => CreateTrigger::apply_ast(trigger, context),
+            StatementNode::DropTrigger(trigger) => DropTrigger::apply_ast(trigger, context),
+            StatementNode::CreateRule(rule) => CreateRule::apply_ast(rule, context),
+            StatementNode::DropRule(rule) => DropRule::apply_ast(rule, context),
+            StatementNode::View(view) => CreateView::from_ast_and_apply(view, context, cache),
+            StatementNode::Extension(extension) => {
+                CreateExtension::from_ast_and_apply(extension, context)
             }
-            StatementNode::EnumType(enum_type) => convert(enum_type).apply(context),
-            StatementNode::Sequence(sequence) => convert(sequence).apply(context),
-            StatementNode::DropTable(drop_table) => convert(drop_table).apply(context),
-            StatementNode::AlterSequence(alter_sequence) => convert(alter_sequence).apply(context),
-            StatementNode::Comment(comment) => convert(comment).apply(context),
-            StatementNode::AlterOwner(alteration) => convert(alteration).resolve_and_apply(context),
+            StatementNode::VariableSet(variable_set) => {
+                SemVariableSet::from_ast_and_apply(variable_set, context)
+            }
+            StatementNode::EnumType(enum_type) => {
+                CreateEnum::from_ast_and_apply(enum_type, context)
+            }
+            StatementNode::Sequence(sequence) => {
+                CreateSequence::from_ast_and_apply(sequence, context)
+            }
+            StatementNode::DropTable(drop_table) => {
+                SemDropTable::from_ast_and_apply(drop_table, context)
+            }
+            StatementNode::AlterSequence(alter_sequence) => {
+                SemAlterSequence::from_ast_and_apply(alter_sequence, context)
+            }
+            StatementNode::Comment(comment) => SemComment::from_ast_and_apply(comment, context),
+            StatementNode::AlterOwner(alteration) => {
+                AlterOwner::from_ast_and_apply(alteration, context)
+            }
             StatementNode::CompositeType(composite_type) => {
-                convert(composite_type).resolve_and_apply(context)
+                CreateCompositeType::from_ast_and_apply(composite_type, context)
             }
             StatementNode::AlterRelation(statement) => {
-                convert(statement).resolve_and_apply(context)
+                RelationAlteration::from_ast_and_apply(statement, context)
             }
-            StatementNode::Domain(domain) => convert(domain).resolve_and_apply(context),
-            StatementNode::Function(function) => convert(function).resolve_and_apply(context),
-            StatementNode::Schema(schema) => convert(schema).resolve_and_apply(context, cache),
-            StatementNode::Index(index) => convert(index).resolve_and_apply(context),
-            StatementNode::TableAs(table_as) => convert(table_as).resolve_and_apply(context, cache),
-            StatementNode::Table(table) => convert(table).resolve_and_apply(context),
+            StatementNode::Domain(domain) => CreateDomain::from_ast_and_apply(domain, context),
+            StatementNode::Function(function) => {
+                CreateFunction::from_ast_and_apply(function, context)
+            }
+            StatementNode::Schema(schema) => {
+                CreateSchema::from_ast_and_apply(schema, context, cache)
+            }
+            StatementNode::Index(index) => CreateIndex::from_ast_and_apply(index, context),
+            StatementNode::TableAs(table_as) => {
+                CreateTableAs::from_ast_and_apply(table_as, context, cache)
+            }
+            StatementNode::Table(table) => CreateTable::from_ast_and_apply(table, context),
             _ => Ok(AstAndContextPair::new(
-                self.resolve(&mut context, cache)?,
+                Self::from_ast_node(ast, &mut context, cache)?,
                 context,
             )),
         }
     }
 }
 
-impl AstConversion<'_, Comment> {
-    pub(crate) fn apply<TContext>(
-        &self,
+impl SemComment {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &Comment,
         context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
-        let target = self
+        let target = ast
             .canonical_target()
             .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
-        let comment = SemComment::new(&target, self.object_kind, &self.text);
+        let comment = Self::new(&target, ast.object_kind, &ast.text);
         let context = context.apply_comment(&comment)?;
         Ok(AstAndContextPair::new(
             SemAst::from_comment(&comment),
@@ -190,30 +206,31 @@ impl AstConversion<'_, Comment> {
     }
 }
 
-impl AstConversion<'_, AlterSequence> {
-    pub(crate) fn apply<TContext>(
-        &self,
+impl SemAlterSequence {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &AlterSequence,
         context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
         let mut context = context;
-        let mut alter_sequence = SemAlterSequence::new(&convert(&self.name).full_name()?, &[]);
-        for option in &self.options {
+        let mut alter_sequence = Self::new(&FullName::from_ast_name(&ast.name)?, &[]);
+        for option in &ast.options {
             if option.name == "owned_by" {
-                let relation = if let Some(requested) = convert(option).owned_relation()? {
-                    if let Some(relation) = context.resolve_table_name(&requested) {
-                        Some(relation)
+                let relation =
+                    if let Some(requested) = CreateSequence::owned_table_from_ast_option(option)? {
+                        if let Some(relation) = context.resolve_table_name(&requested) {
+                            Some(relation)
+                        } else {
+                            context.report_analysis_problem(AnalysisProblem::table_not_found(
+                                &requested,
+                            ))?;
+                            continue;
+                        }
                     } else {
-                        context.report_analysis_problem(AnalysisProblem::table_not_found(
-                            &requested,
-                        ))?;
-                        continue;
-                    }
-                } else {
-                    None
-                };
+                        None
+                    };
                 alter_sequence = alter_sequence.with_owned_by(relation.as_ref());
             }
         }
@@ -225,23 +242,23 @@ impl AstConversion<'_, AlterSequence> {
     }
 }
 
-impl AstConversion<'_, DropTable> {
-    pub(crate) fn apply<TContext>(
-        &self,
+impl SemDropTable {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &DropTable,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
         let mut names = Vec::new();
-        for name in &self.names {
-            let table_name = TableName::from(convert(name).full_name()?);
+        for name in &ast.names {
+            let table_name = TableName::from(FullName::from_ast_name(name)?);
             if context.get_table(&table_name).is_none() {
                 context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
             }
             names.push(table_name);
         }
-        let drop_table = SemDropTable::new(&names, self.if_exists, self.cascade);
+        let drop_table = Self::new(&names, ast.if_exists, ast.cascade);
         context = context.apply_drop_table(&drop_table)?;
         Ok(AstAndContextPair::new(
             SemAst::from_drop_table(&drop_table),
@@ -250,19 +267,19 @@ impl AstConversion<'_, DropTable> {
     }
 }
 
-impl AstConversion<'_, Sequence> {
-    pub(crate) fn apply<TContext>(
-        &self,
+impl CreateSequence {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &Sequence,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
-        let mut sequence = CreateSequence::new(&convert(&self.name).full_name()?)
-            .with_if_not_exists(self.if_not_exists)
-            .with_temporary(self.temporary);
-        for option in &self.options {
-            if let Some(table) = convert(option).owned_relation()? {
+        let mut sequence = Self::new(&FullName::from_ast_name(&ast.name)?)
+            .with_if_not_exists(ast.if_not_exists)
+            .with_temporary(ast.temporary);
+        for option in &ast.options {
+            if let Some(table) = Self::owned_table_from_ast_option(option)? {
                 let Some(resolved) = context.resolve_table_name(&table) else {
                     context.report_analysis_problem(AnalysisProblem::table_not_found(&table))?;
                     continue;
@@ -279,15 +296,15 @@ impl AstConversion<'_, Sequence> {
     }
 }
 
-impl AstConversion<'_, EnumType> {
-    pub(crate) fn apply<TContext>(
-        &self,
+impl CreateEnum {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &EnumType,
         context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
-        let enum_type = CreateEnum::new(&convert(&self.name).full_name()?, &self.values);
+        let enum_type = Self::new(&FullName::from_ast_name(&ast.name)?, &ast.values);
         let context = context.apply_create_enum(&enum_type)?;
         Ok(AstAndContextPair::new(
             SemAst::from_create_enum(&enum_type),
@@ -296,20 +313,21 @@ impl AstConversion<'_, EnumType> {
     }
 }
 
-impl AstConversion<'_, VariableSet> {
-    pub(crate) fn resolve_and_apply<TContext>(
-        &self,
+impl SemVariableSet {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &VariableSet,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
-        let [argument] = self.arguments.as_slice() else {
+        let [argument] = ast.arguments.as_slice() else {
             return AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1");
         };
-        let outcome = convert(argument).resolve(&mut context, &ScalarAnalysisContext::default());
+        let outcome =
+            SemScalarExpr::from_ast(argument, &mut context, &ScalarAnalysisContext::default());
         let value = outcome?;
-        let variable_set = SemVariableSet::new(&self.name, &value);
+        let variable_set = Self::new(&ast.name, &value);
         let context = context.apply_variable_set(&variable_set)?;
         Ok(AstAndContextPair::new(
             SemAst::from_variable_set(&variable_set),
@@ -318,16 +336,15 @@ impl AstConversion<'_, VariableSet> {
     }
 }
 
-impl AstConversion<'_, Extension> {
-    pub(crate) fn apply<TContext>(
-        &self,
+impl CreateExtension {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &Extension,
         context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
-        let extension =
-            CreateExtension::from_name(&self.name).with_if_not_exists(self.if_not_exists);
+        let extension = Self::from_name(&ast.name).with_if_not_exists(ast.if_not_exists);
         let context = context.apply_create_extension(&extension)?;
         Ok(AstAndContextPair::new(
             SemAst::from_create_extension(&extension),
@@ -336,9 +353,9 @@ impl AstConversion<'_, Extension> {
     }
 }
 
-impl AstConversion<'_, View> {
-    pub(crate) fn resolve_and_apply<TContext>(
-        &self,
+impl CreateView {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &View,
         context: TContext,
         cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
@@ -346,8 +363,8 @@ impl AstConversion<'_, View> {
         TContext: ParseContext,
     {
         let mut context = context;
-        let requested = convert(&self.name).full_name()?;
-        if requested.schema().is_none() && !self.temporary && context.get_default_schema().is_none()
+        let requested = FullName::from_ast_name(&ast.name)?;
+        if requested.schema().is_none() && !ast.temporary && context.get_default_schema().is_none()
         {
             context.report_analysis_problem(AnalysisProblem::view(
                 &ViewProblem::invalid_target(&requested),
@@ -357,36 +374,36 @@ impl AstConversion<'_, View> {
                 context,
             ));
         }
-        let name = context.creation_name(&requested, self.temporary)?;
-        let kind = if self.materialized {
+        let name = context.creation_name(&requested, ast.temporary)?;
+        let kind = if ast.materialized {
             Kind::materialized_view()
         } else {
             Kind::view()
         };
-        if !context.permits_relation_creation(&name, kind, self.if_not_exists, self.replace)? {
+        if !context.permits_relation_creation(&name, kind, ast.if_not_exists, ast.replace)? {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         }
-        let outcome = convert(&self.query).resolve(&mut context, cache);
+        let outcome = SelectStatement::from_ast(&ast.query, &mut context, cache);
         let mut query = outcome?;
-        query.rename_columns(&self.aliases);
-        let lineage = convert(&self.query).view_lineage(&context, &query)?;
-        let options = self.semantic_options(&mut context)?;
-        let mut view = CreateView::new(&name, &query, &[], &None, self.materialized)
-            .with_if_not_exists(self.if_not_exists)
-            .with_replace(self.replace)
-            .with_temporary(self.temporary)
+        query.rename_columns(&ast.aliases);
+        let lineage = ViewColumnLineage::from_ast_query(&ast.query, &context, &query)?;
+        let options = Self::from_ast_options(ast, &mut context)?;
+        let mut view = Self::new(&name, &query, &[], &None, ast.materialized)
+            .with_if_not_exists(ast.if_not_exists)
+            .with_replace(ast.replace)
+            .with_temporary(ast.temporary)
             .with_column_lineage(&lineage)
-            .with_options(&options, convert(&self.check_option).semantic());
-        let replacement_rule = if self.replace {
+            .with_options(&options, ViewCheckOption::from_ast(&ast.check_option));
+        let replacement_rule = if ast.replace {
             if let Some(existing) = context.get_view(&ViewName::from_full_name(&name))
                 && let Some(references) = existing.rules()
             {
                 view.retain_rule_references(references);
             }
-            SemCreateRule::replace_view_definition(&context, &name, &query)?
+            CreateRule::replace_view_definition(&context, &name, &query)?
         } else {
             None
         };
@@ -431,7 +448,7 @@ impl SemAst {
         cache_context: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         AnalysisError::check_dialect(statement.dialect(), context.dialect())?;
-        convert(&statement.node).resolve_and_apply(context, cache_context)
+        Self::apply_ast_node(&statement.node, context, cache_context)
     }
 }
 #[cfg(test)]
@@ -922,10 +939,6 @@ mod test_parameter_casts {
         );
     }
 }
-use crate::sem::{
-    CreateCompositeType, CreateRule, CreateTrigger, DropRule, DropTrigger, InsertStatement,
-    UpdateStatement,
-};
 impl SemAst {
     fn from_insert_resolution(value: Option<&InsertStatement>) -> Self {
         value.map_or_else(Self::unresolved_statement, Self::insert)

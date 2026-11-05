@@ -1,10 +1,11 @@
 //! Location-checked wildcard projection replacement in the owning common AST.
 
+mod error;
 mod rows_source;
 mod source;
 
+pub use self::error::WildcardRewriteError;
 use self::source::{SourcePlans, ordinal_reference, typed_record_reference};
-use crate::wildcard_rewrite_error::WildcardRewriteError;
 use crate::{
     names::FullName,
     sem::{
@@ -22,29 +23,31 @@ use crate::{
     sem::{SemScalarExpr, WildcardExpansion},
 };
 
-/// Replace table-dependent wildcard projections using one semantic analysis.
-/// Returns the number of replaced projection items.
-///
-/// Expansions must originate from this same, unmodified statement. Lexical
-/// locations are relative to the PostgreSQL parser input. All lookups
-/// and replacement expressions are checked before any edit is committed;
-/// an error leaves the complete statement unchanged and allows retry.
-/// Unrelated wildcard expansions are ignored. An empty expansion removes its
-/// projection item, including the final item in a zero-column SELECT.
-///
-/// # Errors
-/// Rejects missing/ambiguous locations, non-wildcard destinations, and
-/// unresolved expressions that cannot represent an executable projection.
-pub fn rewrite_wildcards(
-    statement: &mut Statement,
-    expansions: &[WildcardExpansion],
-) -> Result<usize, WildcardRewriteError> {
-    let mut staged = statement.clone();
-    let mut plan = WildcardRewritePlan::new(expansions);
-    plan.prepare(&mut staged)?;
-    let count = plan.apply(&mut staged)?;
-    *statement = staged;
-    Ok(count)
+impl WildcardExpansion {
+    /// Replace table-dependent wildcard projections using one semantic analysis.
+    /// Returns the number of replaced projection items.
+    ///
+    /// Expansions must originate from this same, unmodified statement. Lexical
+    /// locations are relative to the PostgreSQL parser input. All lookups
+    /// and replacement expressions are checked before any edit is committed;
+    /// an error leaves the complete statement unchanged and allows retry.
+    /// Unrelated wildcard expansions are ignored. An empty expansion removes its
+    /// projection item, including the final item in a zero-column SELECT.
+    ///
+    /// # Errors
+    /// Rejects missing/ambiguous locations, non-wildcard destinations, and
+    /// unresolved expressions that cannot represent an executable projection.
+    pub fn rewrite(
+        expansions: &[Self],
+        statement: &mut Statement,
+    ) -> Result<usize, WildcardRewriteError> {
+        let mut staged = statement.clone();
+        let mut plan = WildcardRewritePlan::new(expansions);
+        plan.prepare(&mut staged)?;
+        let count = plan.apply(&mut staged)?;
+        *statement = staged;
+        Ok(count)
+    }
 }
 
 struct WildcardRewritePlan<'a> {
@@ -69,8 +72,8 @@ impl<'a> WildcardRewritePlan<'a> {
             let Some(location) = expansion.location() else {
                 return Err(WildcardRewriteError::missing_location());
             };
-            rewrite(expansion).prepare_sources(&scopes, &mut self.sources)?;
-            let targets = rewrite(expansion).rewrite_targets()?;
+            expansion.prepare_sources(&scopes, &mut self.sources)?;
+            let targets = expansion.rewrite_targets()?;
             self.targets
                 .add(location, &targets)
                 .map_err(WildcardRewriteError::from)?;
@@ -90,16 +93,16 @@ impl<'a> WildcardRewritePlan<'a> {
 #[cfg(test)]
 mod tests;
 
-impl Rewrite<'_, SemScalarExpr> {
+impl SemScalarExpr {
     fn projection_expression(
         &self,
         bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
-        with_stack(|| match self.value {
-            SemScalarExpr::ColumnRef(value) => rewrite(value).projection_expression(bindings),
-            SemScalarExpr::Coalesce(value) => rewrite(value).projection_expression(bindings),
-            SemScalarExpr::ImplicitCast(value) => rewrite(value).projection_expression(bindings),
-            SemScalarExpr::TypeCast(value) => rewrite(value).projection_expression(bindings),
+        with_stack(|| match self {
+            Self::ColumnRef(value) => value.projection_expression(bindings),
+            Self::Coalesce(value) => value.projection_expression(bindings),
+            Self::ImplicitCast(value) => value.projection_expression(bindings),
+            Self::TypeCast(value) => value.projection_expression(bindings),
             _ => Err(WildcardRewriteError::invalid(
                 "resolved wildcard expression has no executable projection representation",
             )),
@@ -117,18 +120,17 @@ impl Rewrite<'_, SemScalarExpr> {
         }
         let expression = self.projection_expression(bindings)?;
         let target = TypeName::projection(
-            &rewrite(
+            &projection_name(
                 target
                     .full_name()
                     .expect("owned cast targets rejected above"),
-            )
-            .projection_name(),
+            ),
             target.is_array() == Some(true),
         );
         Ok(Expr::projection_cast(&expression, &target))
     }
 }
-impl Rewrite<'_, ColumnReferenceExpr> {
+impl ColumnReferenceExpr {
     fn projection_expression(
         &self,
         bindings: &WildcardQualifiers,
@@ -153,40 +155,40 @@ impl Rewrite<'_, ColumnReferenceExpr> {
         Ok(Expr::projection_column(&Name::from_parts(&parts)))
     }
 }
-impl Rewrite<'_, CoalesceExpr> {
+impl CoalesceExpr {
     fn projection_expression(
         &self,
         bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         let mut arguments = Vec::new();
         for argument in self.arguments() {
-            arguments.push(rewrite(argument).projection_expression(bindings)?);
+            arguments.push(argument.projection_expression(bindings)?);
         }
         Ok(Expr::projection_call(&Call::coalesce_projection(
             &arguments,
         )))
     }
 }
-impl Rewrite<'_, ImplicitCastExpr> {
+impl ImplicitCastExpr {
     fn projection_expression(
         &self,
         bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         let (argument, target) = self.projection_operand();
-        rewrite(argument).projection_cast(target, bindings)
+        argument.projection_cast(target, bindings)
     }
 }
-impl Rewrite<'_, TypeCastExpr> {
+impl TypeCastExpr {
     fn projection_expression(
         &self,
         bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         let (argument, target) = self.projection_operand();
-        rewrite(argument).projection_cast(target, bindings)
+        argument.projection_cast(target, bindings)
     }
 }
 
-impl Rewrite<'_, WildcardExpansion> {
+impl WildcardExpansion {
     fn rewrite_targets(&self) -> Result<Vec<Target>, WildcardRewriteError> {
         let bindings = self.qualifiers();
         let mut targets = Vec::new();
@@ -203,7 +205,7 @@ impl Rewrite<'_, WildcardExpansion> {
                         "wildcard result has no resolved expression",
                     ));
                 };
-                rewrite(expression).projection_expression(bindings)?
+                expression.projection_expression(bindings)?
             };
             let Some(alias) = column.column_name() else {
                 return Err(WildcardRewriteError::invalid(
@@ -216,29 +218,14 @@ impl Rewrite<'_, WildcardExpansion> {
     }
 }
 
-impl Rewrite<'_, FullName> {
-    pub(super) fn projection_name(&self) -> Name {
-        let mut parts = Vec::new();
-        if let Some(catalog) = self.catalog() {
-            parts.push(catalog.to_string());
-        }
-        if let Some(schema) = self.schema() {
-            parts.push(schema.to_string());
-        }
-        parts.push(self.local_name());
-        Name::from_parts(&parts)
+fn projection_name(name: &FullName) -> Name {
+    let mut parts = Vec::new();
+    if let Some(catalog) = name.catalog() {
+        parts.push(catalog.to_string());
     }
-}
-
-struct Rewrite<'a, T: ?Sized> {
-    value: &'a T,
-}
-const fn rewrite<T: ?Sized>(value: &T) -> Rewrite<'_, T> {
-    Rewrite { value }
-}
-impl<T: ?Sized> std::ops::Deref for Rewrite<'_, T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        self.value
+    if let Some(schema) = name.schema() {
+        parts.push(schema.to_string());
     }
+    parts.push(name.local_name());
+    Name::from_parts(&parts)
 }

@@ -1,4 +1,4 @@
-//! Errors for checked projection edits and location synchronization.
+//! Errors for checked semantic wildcard projection edits.
 use crate::ast::projection::ProjectionError;
 /// A rejected wildcard rewrite. The statement remains unchanged on failure.
 #[derive(Debug, thiserror::Error)]

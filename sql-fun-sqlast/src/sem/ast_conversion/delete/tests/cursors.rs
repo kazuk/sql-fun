@@ -6,7 +6,7 @@ use crate::names::FullName;
 use crate::names::TableName;
 use crate::parse_statements;
 use crate::sem::CursorInfo;
-use crate::sem::convert;
+use crate::sem::SemAst;
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::delete::catalog;
 use crate::test_helpers::statements::resolve_cursor as resolve;
@@ -183,9 +183,8 @@ fn retains_unsupported_procedural_cursor_parameter() {
         panic!("CURRENT OF")
     };
     cursor.parameter = 3;
-    let result = convert(&statement.node)
-        .resolve(&mut context, &mut create_cache_context())
-        .unwrap();
+    let result =
+        SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context()).unwrap();
     assert_eq!(
         result
             .as_delete()

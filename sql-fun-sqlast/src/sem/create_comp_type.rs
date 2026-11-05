@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{
     ast::{CompositeType, postgres::required},
     context::ParseContext,
@@ -150,11 +149,10 @@ impl CreateCompositeType {
         TParseContext: ParseContext,
     {
         use crate::ast::TryFromWithTokens;
-        convert(&CompositeType::try_from_with_tokens(
-            &syn,
-            &sql_fun_core::IVec::default(),
-        )?)
-        .resolve_and_apply(context)
+        Self::from_ast_and_apply(
+            &CompositeType::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?,
+            context,
+        )
     }
 }
 

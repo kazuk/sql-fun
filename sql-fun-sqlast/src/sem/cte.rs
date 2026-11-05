@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{
     ast::{Dialect, TryFromWithTokens, With},
     context::ParseContext,
@@ -314,7 +313,7 @@ impl WithClause {
         TParseContext: ParseContext,
     {
         let syntax = With::try_from_with_tokens(syn, tokens)?;
-        let result = convert(&syntax).resolve_with(&mut context);
+        let result = Self::from_ast_top_level(&syntax, &mut context);
         Ok((result?, context))
     }
 }

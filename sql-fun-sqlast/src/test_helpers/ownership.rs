@@ -1,6 +1,6 @@
 //! Explicit catalog fixtures for ownership semantics.
 
-use crate::sem::convert;
+use crate::sem::SemAst;
 use crate::{
     ast::{StatementNode, TryFromWithTokens},
     context::{MutSourcePathWithSpan, ParseContext, SchemaFileContext},
@@ -37,7 +37,11 @@ pub(crate) fn apply_ownership_sql<C: ParseContext>(
     context: C,
     sql: &str,
 ) -> Result<AstAndContextPair<C>, AnalysisError> {
-    convert(&ownership_statement(sql)?).resolve_and_apply(context, &mut create_cache_context())
+    SemAst::apply_ast_node(
+        &ownership_statement(sql)?,
+        context,
+        &mut create_cache_context(),
+    )
 }
 
 pub(crate) fn known_owner_count(definitions: &[OwnedObjectDefinition]) -> usize {

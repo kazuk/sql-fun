@@ -1,5 +1,4 @@
 use crate::sem::SemAst;
-use crate::sem::convert;
 mod join_and_key_semantics;
 mod views;
 
@@ -108,9 +107,12 @@ fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
         .unwrap()
         .into_context();
     let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
-    let result = convert(&statement.node)
-        .resolve(&mut context, &mut test_helpers_create_cache_context())
-        .unwrap();
+    let result = SemAst::from_ast_node(
+        &statement.node,
+        &mut context,
+        &mut test_helpers_create_cache_context(),
+    )
+    .unwrap();
     assert!(result.as_insert().is_some());
     assert_eq!(
         context.reported_problem_count(),
@@ -246,8 +248,11 @@ fn fails_without_fabricated_bindings(#[case] sql: &str, #[case] fatal: bool) {
         .unwrap()
         .unwrap();
     let mut context = test_helpers::catalog(Dialect::postgres());
-    let result =
-        convert(&statement.node).resolve(&mut context, &mut test_helpers_create_cache_context());
+    let result = SemAst::from_ast_node(
+        &statement.node,
+        &mut context,
+        &mut test_helpers_create_cache_context(),
+    );
     if fatal {
         assert!(result.is_err());
     } else {
@@ -328,9 +333,12 @@ fn assignment_casts_do_not_become_overload_implicit_casts(#[case] sql: &str) {
         .next()
         .unwrap()
         .unwrap();
-    convert(&statement.node)
-        .resolve(&mut context, &mut test_helpers_create_cache_context())
-        .unwrap();
+    SemAst::from_ast_node(
+        &statement.node,
+        &mut context,
+        &mut test_helpers_create_cache_context(),
+    )
+    .unwrap();
     assert!(
         context
             .parameter_constraints()
@@ -448,9 +456,12 @@ fn validates_conflict_index(#[case] index: &str, #[case] target: &str, #[case] a
     assert_eq!(context.reported_problem_count(), 0);
     let sql = format!("INSERT INTO items(id) VALUES(1) ON CONFLICT {target} DO NOTHING");
     let statement = parse_statements(&sql, dialect).next().unwrap().unwrap();
-    let result = convert(&statement.node)
-        .resolve(&mut context, &mut test_helpers_create_cache_context())
-        .unwrap();
+    let result = SemAst::from_ast_node(
+        &statement.node,
+        &mut context,
+        &mut test_helpers_create_cache_context(),
+    )
+    .unwrap();
     assert_eq!(
         context.reported_problem_count() == 0,
         accepted,
@@ -613,15 +624,14 @@ fn preserves_modifier_positions_and_looks_up_both_names() {
             "public", "both",
         ))],
     );
-    let result = convert(&parse_statements(
+    let result = SemAst::from_ast_node(&parse_statements(
         r#"INSERT INTO items VALUES(1,'x') ON CONFLICT(id, label COLLATE "C" text_ops) DO NOTHING"#,
         dialect,
     )
     .next()
     .unwrap()
     .unwrap()
-    .node)
-    .resolve(&mut context, &mut test_helpers_create_cache_context())
+    .node, &mut context, &mut test_helpers_create_cache_context())
     .unwrap();
     assert_eq!(context.reported_problem_count(), 0);
     assert_eq!(
@@ -643,10 +653,10 @@ fn retains_failed_inner_collation_even_when_outer_collation_is_bound() {
     context.set_collation_lookup(&outer, &outer_lookup);
     // Any attempt to infer an arbiter from these failed bindings is a bug.
     context.expect_conflict_modifiers(&[], &[]);
-    let result = convert(&parse_statements(
+    let result = SemAst::from_ast_node(&parse_statements(
         r#"INSERT INTO items VALUES(1,'x') ON CONFLICT ((label COLLATE absent579) COLLATE "C") DO NOTHING"#,
         dialect,
-    ).next().unwrap().unwrap().node).resolve(&mut context, &mut test_helpers_create_cache_context()).unwrap();
+    ).next().unwrap().unwrap().node, &mut context, &mut test_helpers_create_cache_context()).unwrap();
     let conflict = &result.as_insert().unwrap().conflicts()[0];
     assert_eq!(
         conflict.modifiers()[0].collation_references(),
@@ -709,9 +719,12 @@ fn resolves_named_constraint_identity(
     .next()
     .unwrap()
     .unwrap();
-    let result = convert(&statement.node)
-        .resolve(&mut context, &mut test_helpers_create_cache_context())
-        .unwrap();
+    let result = SemAst::from_ast_node(
+        &statement.node,
+        &mut context,
+        &mut test_helpers_create_cache_context(),
+    )
+    .unwrap();
     assert_eq!(
         context.reported_problem_count(),
         0,
@@ -725,14 +738,15 @@ fn resolves_named_constraint_identity(
     assert_eq!(lookup.kind(), expected);
     assert_eq!(lookup.name(), "key473");
     assert_eq!(lookup.table().to_string(), "public.keyed");
-    let returning = convert(
+    let returning = SemAst::from_ast_node(
         &parse_statements("INSERT INTO keyed VALUES(2) RETURNING id", dialect)
             .next()
             .unwrap()
             .unwrap()
             .node,
+        &mut context,
+        &mut test_helpers_create_cache_context(),
     )
-    .resolve(&mut context, &mut test_helpers_create_cache_context())
     .unwrap();
     let nullability = returning
         .as_insert()
@@ -791,9 +805,12 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
     .next()
     .unwrap()
     .unwrap();
-    let result = convert(&statement.node)
-        .resolve(&mut context, &mut test_helpers_create_cache_context())
-        .unwrap();
+    let result = SemAst::from_ast_node(
+        &statement.node,
+        &mut context,
+        &mut test_helpers_create_cache_context(),
+    )
+    .unwrap();
     assert_eq!(
         context.reported_problem_count(),
         0,
@@ -818,12 +835,12 @@ fn nested_insert_cte_reports_a_query_problem() {
     let mut context = test_helpers::catalog(Dialect::postgres());
     let statement = parse_statements("SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s", Dialect::postgres()).next().unwrap().unwrap();
     assert!(
-        convert(&statement.node)
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context()
-            )
-            .is_ok()
+        SemAst::from_ast_node(
+            &statement.node,
+            &mut context,
+            &mut crate::test_helpers::create_cache_context()
+        )
+        .is_ok()
     );
     assert!(context.reported_problem_count() > 0);
 }

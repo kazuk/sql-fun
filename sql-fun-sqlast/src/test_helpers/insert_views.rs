@@ -1,7 +1,6 @@
 use crate::context::{BaseParseContext as _, ParseContext as _};
 use crate::names::{SchemaName, TableName};
 use crate::parse_statements;
-use crate::sem::convert;
 use crate::sem::{CreateView, InsertArbiter, InsertInferenceModifiers};
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::insert::catalog;
@@ -25,14 +24,15 @@ pub(crate) fn analyze(
     all_columns: bool,
 ) -> (Result<SemAst, AnalysisError>, TestParseContext) {
     let mut context = catalog(dialect);
-    let view = convert(
+    let view = SemAst::from_ast_node(
         &parse_statements("SELECT id, label FROM items", dialect)
             .next()
             .unwrap()
             .unwrap()
             .into_test_node(),
+        &mut context,
+        &mut create_cache_context(),
     )
-    .resolve(&mut context, &mut create_cache_context())
     .unwrap();
     let query = view.into_select_statemtnt().unwrap();
     let name = FullName::with_schema("public", "writable_items");
@@ -96,13 +96,14 @@ pub(crate) fn analyze(
             ))],
         );
     }
-    let result = convert(
+    let result = SemAst::from_ast_node(
         &parse_statements(sql, dialect)
             .next()
             .unwrap()
             .unwrap()
             .into_test_node(),
-    )
-    .resolve(&mut context, &mut create_cache_context());
+        &mut context,
+        &mut create_cache_context(),
+    );
     (result, context)
 }

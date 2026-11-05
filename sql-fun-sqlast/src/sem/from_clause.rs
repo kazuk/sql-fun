@@ -1,4 +1,3 @@
-use crate::sem::AstConversion;
 use crate::{
     ast::{FromItem, TryCollectFromWithTokens},
     context::ParseContext,
@@ -261,7 +260,7 @@ impl FromClause {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::try_collect_from_with_tokens(syn, tokens)?;
-        let result = AstConversion::<FromItem>::resolve_list(&syntax, &mut context, with_clause);
+        let result = DataSource::from_ast_list(&syntax, &mut context, with_clause);
         Ok((result?, context))
     }
 

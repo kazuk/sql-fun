@@ -1,6 +1,5 @@
 //! Parser and catalog fixtures for operator identity contracts.
 
-use crate::sem::convert;
 use crate::{
     context::ParseContext,
     names::{OperatorName, SchemaName},
@@ -48,7 +47,7 @@ pub(crate) fn analyze(
     mut context: TestParseContext,
 ) -> Result<(SelectStatement, TestParseContext), AnalysisError> {
     context.begin_parameter_type_analysis();
-    let query = convert(&postgres(sql)?).resolve_test_in(&mut context, None);
+    let query = SelectStatement::from_ast_test_in(&postgres(sql)?, &mut context, None);
     let query = context.infer_query_parameter_types(query, &mut create_cache_context());
     let query = context.finish_analysis(query)?;
     Ok((query, context))

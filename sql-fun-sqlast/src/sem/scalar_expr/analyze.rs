@@ -1,6 +1,5 @@
 #[cfg(feature = "sqlite")]
 use crate::SqliteToken;
-use crate::sem::convert;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::Expr as SqliteExpr;
 #[cfg(feature = "sqlite")]
@@ -37,7 +36,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from_with_tokens(&syn, tokens)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -199,7 +198,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(syn)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -215,7 +214,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(expr_unary)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -231,7 +230,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(expr_is_null)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -247,7 +246,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(expr_not_null)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -263,7 +262,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(expr_binary)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -279,7 +278,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(expr_collate)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -295,7 +294,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(expr_between)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }
@@ -311,7 +310,7 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(syn)?;
-        let outcome = convert(&syntax).resolve(&mut context, scalar_context);
+        let outcome = Self::from_ast(&syntax, &mut context, scalar_context);
         let expression = outcome?;
         Ok((expression, context))
     }

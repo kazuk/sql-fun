@@ -57,6 +57,7 @@ pub use self::{
     },
     mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut},
     public::{CommonTableExpression, Statement, StatementKind, WithClause},
+    wildcard::TargetLocationError,
 };
 
 use crate::syn::ScanToken;

@@ -1,7 +1,6 @@
 use crate::ast::Dialect;
 use crate::names::{ColumnName, FullName};
 use crate::parse_statements;
-use crate::sem::convert;
 use crate::sem::{
     ColumnDefinition, CreateTableAs, CreateView, PgBuiltInType, SemAst, ViewLike, ViewMergeSupport,
     ViewMergeTriggers,
@@ -17,14 +16,15 @@ pub(crate) fn view_catalog(version: u32, support: &ViewMergeSupport) -> TestPars
 }
 
 pub(crate) fn install_view(context: &mut TestParseContext, materialized: bool) {
-    let query = convert(
+    let query = SemAst::from_ast_node(
         &parse_statements("SELECT id,label FROM items", Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .into_test_node(),
+        context,
+        &mut create_cache_context(),
     )
-    .resolve(context, &mut create_cache_context())
     .unwrap()
     .into_select_statemtnt()
     .unwrap();

@@ -1,4 +1,4 @@
-use crate::sem::convert;
+use crate::sem::SemAst;
 use crate::test_helpers::heavy::drop_trigger_sqlite as heavy;
 use crate::{
     context::{ParseContext, TriggerInfoRead},
@@ -53,12 +53,12 @@ fn absent_if_exists_is_an_explicit_noop(#[case] sql: &str) -> testresult::TestRe
     assert_eq!(test_helpers::active_count(&pair.into_context().freeze()), 2);
     let mut context = test_helpers::layer(&parent);
     assert!(
-        convert(&test_helpers::statement("DROP TRIGGER absent").node)
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context()
-            )
-            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
+        SemAst::from_ast_node(
+            &test_helpers::statement("DROP TRIGGER absent").node,
+            &mut context,
+            &mut crate::test_helpers::create_cache_context()
+        )
+        .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
     );
     assert_eq!(test_helpers::active_count(&context.freeze()), 2);
     Ok(())

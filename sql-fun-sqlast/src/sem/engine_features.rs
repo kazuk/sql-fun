@@ -1,12 +1,9 @@
 //! Validate engine feature gates before semantic interpretation and catalog changes.
 
-use crate::ast::ddl::Domain;
 use crate::ast::{
     AlterRelation, Column, CteBody, DefaultPrivileges, Delete, ForeignTable, Insert, Merge,
     PrivilegeObject, StatementNode, Table, TableConstraint, Update, With,
 };
-use crate::sem::{AstConversion, convert};
-
 use crate::{
     ast::{ColumnConstraint, ConstraintExtras, Dialect, Query, ReturningOption},
     context::ParseContext,
@@ -14,8 +11,11 @@ use crate::{
     sem::{AnalysisError, GeneratedColumnMode},
 };
 
-impl AstConversion<'_, ReturningOption> {
-    pub(crate) fn check_features(
+/// Validates engine feature availability before semantic interpretation.
+pub(crate) struct EngineFeatureValidation;
+
+impl EngineFeatureValidation {
+    pub(crate) fn returning_options(
         options: &[ReturningOption],
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
@@ -29,41 +29,25 @@ impl AstConversion<'_, ReturningOption> {
         }
         todo!("RETURNING row-image aliases (#621)")
     }
-}
 
-impl AstConversion<'_, StatementNode> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn statement(
+        ast: &StatementNode,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         if context.dialect() != Dialect::postgres() {
             return Ok(true);
         }
-        match self.ast {
-            StatementNode::DefaultPrivileges(value) => {
-                convert::<DefaultPrivileges>(value).check_engine_features(context)
-            }
-            StatementNode::ForeignTable(value) => {
-                convert::<ForeignTable>(value).check_engine_features(context)
-            }
-            StatementNode::Query(query) => convert::<Query>(query).check_engine_features(context),
-            StatementNode::Insert(insert) => {
-                convert::<Insert>(insert).check_engine_features(context)
-            }
-            StatementNode::Update(update) => {
-                convert::<Update>(update).check_engine_features(context)
-            }
-            StatementNode::Delete(delete) => {
-                convert::<Delete>(delete).check_engine_features(context)
-            }
-            StatementNode::Merge(merge) => convert::<Merge>(merge).check_engine_features(context),
-            StatementNode::Table(table) => convert::<Table>(table).check_engine_features(context),
-            StatementNode::Domain(domain) => {
-                convert::<Domain>(domain).check_engine_features(context)
-            }
-            StatementNode::AlterRelation(alter) => {
-                convert::<AlterRelation>(alter).check_engine_features(context)
-            }
+        match ast {
+            StatementNode::DefaultPrivileges(value) => Self::default_privileges(value, context),
+            StatementNode::ForeignTable(value) => Self::foreign_table(value, context),
+            StatementNode::Query(query) => Self::query(query, context),
+            StatementNode::Insert(insert) => Self::insert(insert, context),
+            StatementNode::Update(update) => Self::update(update, context),
+            StatementNode::Delete(delete) => Self::delete(delete, context),
+            StatementNode::Merge(merge) => Self::merge(merge, context),
+            StatementNode::Table(table) => Self::table(table, context),
+            StatementNode::Domain(domain) => Self::domain(domain, context),
+            StatementNode::AlterRelation(alter) => Self::alter_relation(alter, context),
             _ => Ok(true),
         }
     }
@@ -71,9 +55,10 @@ impl AstConversion<'_, StatementNode> {
 
 #[cfg(test)]
 mod utility_version_tests {
+    use crate::sem::EngineFeatureValidation;
+
     use crate::sem::SemAst;
 
-    use crate::sem::convert;
     use crate::{
         ast::Dialect,
         parse_statements,
@@ -99,9 +84,7 @@ mod utility_version_tests {
             .unwrap();
         let mut context = TestParseContext::default().with_postgres_version(version);
         assert_eq!(
-            convert(&statement.node)
-                .check_engine_features(&mut context)
-                .unwrap(),
+            EngineFeatureValidation::statement(&statement.node, &mut context).unwrap(),
             !requires_18 || version == "18"
         );
         assert_eq!(
@@ -147,7 +130,8 @@ mod utility_version_tests {
 
 #[cfg(test)]
 mod unimplemented_analysis_tests {
-    use crate::sem::convert;
+    use crate::sem::EngineFeatureValidation;
+
     use crate::{ast::Dialect, parse_statements, test_helpers::TestParseContext};
 
     #[rstest::rstest]
@@ -171,75 +155,63 @@ mod unimplemented_analysis_tests {
             .next()
             .unwrap()
             .unwrap();
-        let _ = convert(&statement.node).check_engine_features(&mut context);
+        let _ = EngineFeatureValidation::statement(&statement.node, &mut context);
     }
 }
 
-impl AstConversion<'_, With> {
-    pub(crate) fn check_engine_features(
-        &self,
+impl EngineFeatureValidation {
+    pub(crate) fn with_clause(
+        ast: &With,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for entry in &self.ast.entries {
-            valid &= convert(&entry.body).check_engine_features(context)?;
+        for entry in &ast.entries {
+            valid &= Self::cte_body(&entry.body, context)?;
         }
         Ok(valid)
     }
-}
 
-impl AstConversion<'_, CteBody> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn cte_body(
+        ast: &CteBody,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        match self.ast {
-            CteBody::Query(query) => convert::<Query>(query).check_engine_features(context),
-            CteBody::Insert(insert) => convert::<Insert>(insert).check_engine_features(context),
-            CteBody::Update(update) => convert::<Update>(update).check_engine_features(context),
-            CteBody::Delete(delete) => convert::<Delete>(delete).check_engine_features(context),
-            CteBody::Merge(merge) => convert::<Merge>(merge).check_engine_features(context),
+        match ast {
+            CteBody::Query(query) => Self::query(query, context),
+            CteBody::Insert(insert) => Self::insert(insert, context),
+            CteBody::Update(update) => Self::update(update, context),
+            CteBody::Delete(delete) => Self::delete(delete, context),
+            CteBody::Merge(merge) => Self::merge(merge, context),
         }
     }
-}
 
-impl AstConversion<'_, Query> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn query(
+        ast: &Query,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        convert(&self.ast.with).check_engine_features(context)
+        Self::with_clause(&ast.with, context)
     }
-}
 
-impl AstConversion<'_, TableConstraint> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn table_constraint(
+        ast: &TableConstraint,
         context: &mut impl ParseContext,
         column: bool,
     ) -> Result<bool, AnalysisError> {
         if context.dialect() != Dialect::postgres() {
             return Ok(true);
         }
-        let mut valid = self.check_temporal_features(context)?;
-        if let Some(enforced) = self.ast.extras.enforced {
-            valid &= AstConversion::<ColumnConstraint>::check_enforcement(context, enforced)?;
+        let mut valid = Self::temporal_constraint(ast, context)?;
+        if let Some(enforced) = ast.extras.enforced {
+            valid &= Self::enforcement(context, enforced)?;
         }
-        valid &= convert(&self.ast.constraint).check_engine_features(
-            context,
-            &self.ast.extras,
-            column,
-        )?;
+        valid &= Self::column_constraint(&ast.constraint, context, &ast.extras, column)?;
         Ok(valid)
     }
 
-    pub(crate) fn check_temporal_features(
-        &self,
+    pub(crate) fn temporal_constraint(
+        ast: &TableConstraint,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if !self.ast.extras.without_overlaps
-            && !self.ast.extras.fk_with_period
-            && !self.ast.extras.pk_with_period
+        if !ast.extras.without_overlaps && !ast.extras.fk_with_period && !ast.extras.pk_with_period
         {
             return Ok(true);
         }
@@ -248,30 +220,28 @@ impl AstConversion<'_, TableConstraint> {
         }
         todo!("temporal constraint analysis (#887)")
     }
-}
 
-impl AstConversion<'_, ColumnConstraint> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn column_constraint(
+        ast: &ColumnConstraint,
         context: &mut impl ParseContext,
         extras: &ConstraintExtras,
         column: bool,
     ) -> Result<bool, AnalysisError> {
-        match self.ast {
-            ColumnConstraint::Enforcement(enforced) => Self::check_enforcement(context, *enforced),
+        match ast {
+            ColumnConstraint::Enforcement(enforced) => Self::enforcement(context, *enforced),
             ColumnConstraint::Generated(_, Some(mode)) if *mode == GeneratedColumnMode::Virtual => {
                 context.postgres18_syntax_used(Postgres18Syntax::VirtualGeneratedColumn)
             }
             ColumnConstraint::Nullability(true, _, _)
                 if !column || extras.no_inherit || extras.skip_validation =>
             {
-                Self::check_not_null(context)
+                Self::not_null(context)
             }
             _ => Ok(true),
         }
     }
 
-    pub(crate) fn check_enforcement(
+    pub(crate) fn enforcement(
         context: &mut impl ParseContext,
         enforced: bool,
     ) -> Result<bool, AnalysisError> {
@@ -284,38 +254,34 @@ impl AstConversion<'_, ColumnConstraint> {
         Ok(true)
     }
 
-    pub(crate) fn check_not_null(context: &mut impl ParseContext) -> Result<bool, AnalysisError> {
+    pub(crate) fn not_null(context: &mut impl ParseContext) -> Result<bool, AnalysisError> {
         if !context.postgres18_syntax_used(Postgres18Syntax::NotNullConstraint)? {
             return Ok(false);
         }
         todo!("PostgreSQL 18 NOT NULL constraint analysis (#887)")
     }
-}
 
-impl AstConversion<'_, Column> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn column(
+        ast: &Column,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for constraint in &self.ast.constraints {
-            valid &= convert(constraint).check_engine_features(context, true)?;
+        for constraint in &ast.constraints {
+            valid &= Self::table_constraint(constraint, context, true)?;
         }
         Ok(valid)
     }
-}
 
-impl AstConversion<'_, Table> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn table(
+        ast: &Table,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for column in &self.ast.columns {
-            valid &= convert(column).check_engine_features(context)?;
+        for column in &ast.columns {
+            valid &= Self::column(column, context)?;
         }
-        for constraint in &self.ast.constraints {
-            valid &= convert(constraint).check_engine_features(context, false)?;
+        for constraint in &ast.constraints {
+            valid &= Self::table_constraint(constraint, context, false)?;
         }
         Ok(valid)
     }
@@ -323,7 +289,7 @@ impl AstConversion<'_, Table> {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod sqlite_feature_tests {
-    use crate::sem::convert;
+    use crate::sem::EngineFeatureValidation;
     use crate::{
         ast::{Dialect, Table},
         test_helpers::{SynBuilder, TestParseContext},
@@ -341,47 +307,42 @@ mod sqlite_feature_tests {
         )
         .unwrap();
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
-        assert!(convert(&table).check_engine_features(&mut context).unwrap());
+        assert!(EngineFeatureValidation::table(&table, &mut context).unwrap());
         assert_eq!(context.reported_problem_count(), 0);
     }
 }
 
-impl AstConversion<'_, AlterRelation> {
-    pub(crate) fn check_engine_features(
-        &self,
+impl EngineFeatureValidation {
+    pub(crate) fn alter_relation(
+        ast: &AlterRelation,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         if context.dialect() != Dialect::postgres() {
             return Ok(true);
         }
         let mut valid = true;
-        for command in &self.ast.commands {
-            valid &= convert(command).check_engine_features(context)?;
+        for command in &ast.commands {
+            valid &= Self::alter_command(command, context)?;
         }
         Ok(valid)
     }
-}
 
-impl AstConversion<'_, DefaultPrivileges> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn default_privileges(
+        ast: &DefaultPrivileges,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if self.ast.object() == PrivilegeObject::large_objects() {
+        if ast.object() == PrivilegeObject::large_objects() {
             context.postgres18_syntax_used(Postgres18Syntax::LargeObjectDefaultPrivileges)
         } else {
             Ok(true)
         }
     }
-}
 
-impl AstConversion<'_, ForeignTable> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn foreign_table(
+        ast: &ForeignTable,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if self
-            .ast
+        if ast
             .elements()
             .iter()
             .any(|value| value.like_clause().is_some())
@@ -391,41 +352,33 @@ impl AstConversion<'_, ForeignTable> {
             Ok(true)
         }
     }
-}
 
-impl AstConversion<'_, Insert> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn insert(
+        ast: &Insert,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &self.ast.with, &self.ast.returning_options)
+        check_dml_features(context, &ast.with, &ast.returning_options)
     }
-}
 
-impl AstConversion<'_, Update> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn update(
+        ast: &Update,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &self.ast.with, &self.ast.returning_options)
+        check_dml_features(context, &ast.with, &ast.returning_options)
     }
-}
 
-impl AstConversion<'_, Delete> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn delete(
+        ast: &Delete,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &self.ast.with, &self.ast.returning_options)
+        check_dml_features(context, &ast.with, &ast.returning_options)
     }
-}
 
-impl AstConversion<'_, Merge> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn merge(
+        ast: &Merge,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &self.ast.with_clause, &self.ast.returning_options)
+        check_dml_features(context, &ast.with_clause, &ast.returning_options)
     }
 }
 
@@ -434,6 +387,6 @@ fn check_dml_features(
     with: &With,
     returning: &[ReturningOption],
 ) -> Result<bool, AnalysisError> {
-    Ok(convert(with).check_engine_features(context)?
-        & AstConversion::<ReturningOption>::check_features(returning, context)?)
+    Ok(EngineFeatureValidation::with_clause(with, context)?
+        & EngineFeatureValidation::returning_options(returning, context)?)
 }

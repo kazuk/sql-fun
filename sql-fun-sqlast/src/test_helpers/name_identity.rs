@@ -1,5 +1,5 @@
 use crate::ast::TryFromWithTokens;
-use crate::sem::convert;
+use crate::sem::SemAst;
 use crate::test_helpers::{create_cache_context, source_span};
 use crate::{
     context::{MutSourcePathWithSpan, ParseContext},
@@ -52,9 +52,7 @@ pub(crate) fn apply_sql(
         &SynBuilder::new().parse(sql),
         &::sql_fun_core::IVec::default(),
     )?;
-    Ok(convert(&statement)
-        .resolve_and_apply(context, &mut create_cache_context())?
-        .into_context())
+    Ok(SemAst::apply_ast_node(&statement, context, &mut create_cache_context())?.into_context())
 }
 
 pub(crate) fn assert_definition(

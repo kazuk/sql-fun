@@ -1,3 +1,4 @@
+use crate::sem::FunctionModifiers;
 mod delete;
 mod document;
 mod drop_rule;
@@ -34,68 +35,82 @@ use crate::{
     },
 };
 
-/// Borrows common syntax while semantic conversion owns its interpretation.
-pub(crate) struct AstConversion<'a, T: ?Sized> {
-    pub(crate) ast: &'a T,
-}
-
-pub(crate) const fn convert<T: ?Sized>(ast: &T) -> AstConversion<'_, T> {
-    AstConversion { ast }
-}
-
-impl<T: ?Sized> std::ops::Deref for AstConversion<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.ast
-    }
-}
-
-impl AstConversion<'_, Name> {
-    pub(crate) fn optional_full_name(&self) -> Result<Option<FullName>, AnalysisError> {
-        if self.ast.0.is_empty() {
+impl FullName {
+    pub(crate) fn from_optional_ast_name(ast: &Name) -> Result<Option<Self>, AnalysisError> {
+        if ast.0.is_empty() {
             Ok(None)
         } else {
-            self.full_name().map(Some)
+            Self::from_ast_name(ast).map(Some)
         }
     }
+}
 
-    pub(crate) fn star_qualifier(&self) -> Result<Option<AliasName>, AnalysisError> {
-        match self.ast.0.as_slice() {
+impl AliasName {
+    pub(crate) fn from_ast_star_qualifier(ast: &Name) -> Result<Option<Self>, AnalysisError> {
+        match ast.0.as_slice() {
             [] => Ok(None),
-            [alias] => Ok(Some(AliasName::from(alias.as_str()))),
+            [alias] => Ok(Some(Self::from(alias.as_str()))),
             _ => AnalysisError::raise_unexpected_input("star qualification"),
         }
     }
+}
 
-    pub(crate) fn star_relation(&self) -> Result<Option<FullName>, AnalysisError> {
-        if self.ast.0.len() < 2 {
+impl FullName {
+    pub(crate) fn from_ast_star_relation(ast: &Name) -> Result<Option<Self>, AnalysisError> {
+        if ast.0.len() < 2 {
             Ok(None)
         } else {
-            self.full_name().map(Some)
+            Self::from_ast_name(ast).map(Some)
         }
     }
+}
 
-    pub(crate) fn full_name(&self) -> Result<FullName, AnalysisError> {
-        match self.ast.0.as_slice() {
-            [local] => Ok(FullName::from_local_name(local)),
-            [schema, local] => Ok(FullName::with_schema(schema, local)),
-            [catalog, schema, local] => Ok(FullName::with_catalog(catalog, schema, local)),
+impl FullName {
+    pub(crate) fn from_ast_name(ast: &Name) -> Result<Self, AnalysisError> {
+        match ast.0.as_slice() {
+            [local] => Ok(Self::from_local_name(local)),
+            [schema, local] => Ok(Self::with_schema(schema, local)),
+            [catalog, schema, local] => Ok(Self::with_catalog(catalog, schema, local)),
             _ => AnalysisError::raise_unexpected_input("qualified name component count"),
         }
     }
+}
 
-    pub(crate) fn operator_name(&self) -> Result<OperatorName, ProblemLikeError> {
-        ValidOperatorName::try_from_components(&self.ast.0)
-            .map(|name| OperatorName::from_valid(&name))
+impl OperatorName {
+    pub(crate) fn from_ast_name(ast: &Name) -> Result<Self, ProblemLikeError> {
+        ValidOperatorName::try_from_components(&ast.0).map(|name| Self::from_valid(&name))
     }
+}
 
-    pub(crate) fn resolve_column(
-        &self,
+#[cfg(test)]
+mod operator_name_validation_tests {
+    use crate::names::OperatorName;
+
+    use crate::ast::Name;
+
+    #[rstest::rstest]
+    #[case(&[], "operator_name_syntax")]
+    #[case(&[""], "operator_name_syntax")]
+    #[case(&["schema", ""], "operator_name_syntax")]
+    #[case(&["a", "b", "+"], "cross_database_operator_reference")]
+    #[case(&["a", "b", "c", "+"], "cross_database_operator_reference")]
+    fn common_names_classify_invalid_components(#[case] parts: &[&str], #[case] code: &str) {
+        let parts: Vec<_> = parts.iter().map(|part| (*part).to_owned()).collect();
+        let problem = OperatorName::from_ast_name(&Name::from_parts(&parts))
+            .unwrap_err()
+            .into_problem();
+        assert_eq!(problem.code(), code);
+        assert!(problem.render_metadata().is_some());
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn from_ast_column(
+        ast: &Name,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let (alias, column) = match self.ast.0.as_slice() {
+    ) -> Result<Self, AnalysisError> {
+        let (alias, column) = match ast.0.as_slice() {
             [column] => (None, column),
             [alias, column] => (Some(AliasName::from(alias.as_str())), column),
             [schema, table, column] => {
@@ -129,42 +144,19 @@ impl AstConversion<'_, Name> {
     }
 }
 
-#[cfg(test)]
-mod operator_name_validation_tests {
-    use crate::sem::convert;
-
-    use crate::ast::Name;
-
-    #[rstest::rstest]
-    #[case(&[], "operator_name_syntax")]
-    #[case(&[""], "operator_name_syntax")]
-    #[case(&["schema", ""], "operator_name_syntax")]
-    #[case(&["a", "b", "+"], "cross_database_operator_reference")]
-    #[case(&["a", "b", "c", "+"], "cross_database_operator_reference")]
-    fn common_names_classify_invalid_components(#[case] parts: &[&str], #[case] code: &str) {
-        let parts: Vec<_> = parts.iter().map(|part| (*part).to_owned()).collect();
-        let problem = convert(&Name::from_parts(&parts))
-            .operator_name()
-            .unwrap_err()
-            .into_problem();
-        assert_eq!(problem.code(), code);
-        assert!(problem.render_metadata().is_some());
-    }
-}
-
-impl AstConversion<'_, Name> {
-    pub(crate) fn append_row_projection(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn append_ast_row_projection(
+        ast: &Name,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-        fields: &mut Vec<SemScalarExpr>,
+        fields: &mut Vec<Self>,
     ) -> Result<bool, AnalysisError> {
-        if self.ast.is_empty() || context.dialect() != Dialect::postgres() {
+        if ast.is_empty() || context.dialect() != Dialect::postgres() {
             return Ok(false);
         }
-        let projection = if let Some(relation) = self.star_relation()? {
+        let projection = if let Some(relation) = FullName::from_ast_star_relation(ast)? {
             scope.relation_projection_names(context, &relation)?
-        } else if let Some(qualifier) = self.star_qualifier()? {
+        } else if let Some(qualifier) = AliasName::from_ast_star_qualifier(ast)? {
             scope.projection_names(context, &qualifier)?
         } else {
             return Ok(false);
@@ -173,89 +165,104 @@ impl AstConversion<'_, Name> {
     }
 }
 
-impl AstConversion<'_, Expr> {
-    pub(crate) fn projection_base(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn ast_projection_base(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        match self.ast {
+    ) -> Result<Option<Self>, AnalysisError> {
+        match ast {
             Expr::Indirection(indirection) => {
-                convert(indirection.as_ref()).projection_base(context, scope)
+                Self::ast_indirection_projection_base(indirection.as_ref(), context, scope)
             }
             _ => Ok(None),
         }
     }
+}
 
-    pub(crate) fn negated_literal(&self) -> Option<SemScalarExpr> {
-        match self.ast {
-            Expr::Literal(literal) => convert(literal).negate(),
+impl SemScalarExpr {
+    pub(crate) fn negated_ast_literal(ast: &Expr) -> Option<Self> {
+        match ast {
+            Expr::Literal(literal) => Self::negate_ast_literal(literal),
             _ => None,
         }
     }
-    pub(crate) fn resolve(
-        &self,
+}
+
+impl SemScalarExpr {
+    pub(crate) fn from_ast(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, scope);
+        let result = Self::from_ast_in(ast, context, scope);
         let result = context.infer_expression_parameter_types(result, &mut CacheContext::new());
         context.finish_analysis(result)
     }
+}
 
-    pub(crate) fn resolve_scalar_in(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_scalar_in(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let value = self.resolve_in(context, scope)?;
+    ) -> Result<Self, AnalysisError> {
+        let value = Self::from_ast_in(ast, context, scope)?;
         value.validate_scalar_value(context)?;
         Ok(value)
     }
+}
 
-    pub(crate) fn resolve_in(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_in(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        with_stack(|| self.resolve_in_body(context, scope))
+    ) -> Result<Self, AnalysisError> {
+        with_stack(|| Self::from_ast_in_body(ast, context, scope))
     }
+}
 
+impl SemScalarExpr {
     #[inline(never)]
-    pub(crate) fn resolve_in_body(
-        &self,
+    pub(crate) fn from_ast_in_body(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        match self.ast {
+    ) -> Result<Self, AnalysisError> {
+        match ast {
             Expr::Parameter(parameter) => Ok(context.parameter(parameter.position)),
-            Expr::Literal(value) => Ok(convert(value).resolve()),
-            Expr::Column(name) => convert(name).resolve_column(context, scope),
+            Expr::Literal(value) => Ok(Self::from_ast_literal(value)),
+            Expr::Column(name) => Self::from_ast_column(name, context, scope),
             Expr::Star(name) if context.dialect() == Dialect::postgres() && !name.is_empty() => {
-                scope.resolve_whole_row(context, &convert(name).full_name()?)
+                scope.resolve_whole_row(context, &FullName::from_ast_name(name)?)
             }
-            Expr::Star(_) => Self::invalid_star_projection(context),
-            Expr::Operator(operator) => convert(operator.as_ref()).resolve(context, scope),
-            Expr::Boolean(boolean) => convert(boolean.as_ref()).resolve(context, scope),
-            Expr::NullTest(test) => convert(test.as_ref()).resolve(context, scope),
-            Expr::TruthTest(test) => convert(test.as_ref()).resolve(context, scope),
-            Expr::Cast(cast) => convert(cast.as_ref()).resolve(context, scope),
-            Expr::Call(call) => convert(call.as_ref()).resolve(context, scope),
-            Expr::NamedArgument(argument) => convert(argument.as_ref()).resolve(context, scope),
-            Expr::Grouping(arguments) => Self::resolve_grouping(arguments, context, scope),
-            Expr::Case(case) => convert(case.as_ref()).resolve(context, scope),
-            Expr::Subquery(query) => convert(query.as_ref()).resolve(context, scope),
-            Expr::Array(items) => Self::resolve_array(items, context, scope, None),
-            Expr::Row(items) => Self::resolve_row(items, context, scope),
-            Expr::List(items) => Ok(SemScalarExpr::list(&Self::resolve_list(
-                items, context, scope,
-            )?)),
-            Expr::Parenthesized(items) => Self::resolve_parenthesized(items, context, scope),
-            Expr::Indirection(indirection) => convert(indirection.as_ref()).resolve(context, scope),
-            Expr::SqlValue(value) => convert(value).resolve(),
-            Expr::MergeAction => Self::resolve_merge_action(scope),
-            Expr::Collate(collate) => convert(collate.as_ref()).resolve(context, scope),
+            Expr::Star(_) => Self::ast_invalid_star_projection(context),
+            Expr::Operator(operator) => {
+                Self::from_ast_operator_expr(operator.as_ref(), context, scope)
+            }
+            Expr::Boolean(boolean) => Self::from_ast_boolean_expr(boolean.as_ref(), context, scope),
+            Expr::NullTest(test) => Self::from_ast_null_test(test.as_ref(), context, scope),
+            Expr::TruthTest(test) => Self::from_ast_truth_test(test.as_ref(), context, scope),
+            Expr::Cast(cast) => Self::from_ast_cast(cast.as_ref(), context, scope),
+            Expr::Call(call) => Self::from_ast_call(call.as_ref(), context, scope),
+            Expr::NamedArgument(argument) => {
+                Self::from_ast_named_argument(argument.as_ref(), context, scope)
+            }
+            Expr::Grouping(arguments) => Self::from_ast_grouping(arguments, context, scope),
+            Expr::Case(case) => Self::from_ast_case(case.as_ref(), context, scope),
+            Expr::Subquery(query) => Self::from_ast_subquery(query.as_ref(), context, scope),
+            Expr::Array(items) => Self::from_ast_array(items, context, scope, None),
+            Expr::Row(items) => Self::from_ast_row(items, context, scope),
+            Expr::List(items) => Ok(Self::list(&Self::from_ast_list(items, context, scope)?)),
+            Expr::Parenthesized(items) => Self::from_ast_parenthesized(items, context, scope),
+            Expr::Indirection(indirection) => {
+                Self::from_ast_indirection(indirection.as_ref(), context, scope)
+            }
+            Expr::SqlValue(value) => Self::from_ast_sql_value(value),
+            Expr::MergeAction => Self::from_ast_merge_action(scope),
+            Expr::Collate(collate) => Self::from_ast_collate(collate.as_ref(), context, scope),
             // Retain the legacy rejection of raw PostgreSQL syntax that was not
             // accepted by the scalar dispatcher, independently of its conversion.
             Expr::Document(_) | Expr::CurrentOf(_) => {
@@ -270,149 +277,163 @@ impl AstConversion<'_, Expr> {
             }
         }
     }
+}
 
-    pub(crate) fn invalid_star_projection(
+impl SemScalarExpr {
+    pub(crate) fn ast_invalid_star_projection(
         context: &mut impl ParseContext,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         context.report_analysis_problem(AnalysisProblem::query(
             QueryProblem::invalid_star_projection_placement(),
         ))?;
-        Ok(SemScalarExpr::Unexpected(
+        Ok(Self::Unexpected(
             "invalid star projection placement".to_owned(),
         ))
     }
+}
 
-    fn resolve_parenthesized(
+impl SemScalarExpr {
+    fn from_ast_parenthesized(
         items: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         match items {
-            [expression] => convert(expression).resolve_in(context, scope),
-            _ => Self::resolve_row(items, context, scope),
+            [expression] => Self::from_ast_in(expression, context, scope),
+            _ => Self::from_ast_row(items, context, scope),
         }
     }
+}
 
-    pub(crate) fn resolve_row(
+impl SemScalarExpr {
+    pub(crate) fn from_ast_row(
         items: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let mut fields = Vec::new();
         for item in items {
             if let Expr::Star(name) = item
-                && convert(name).append_row_projection(context, scope, &mut fields)?
+                && Self::append_ast_row_projection(name, context, scope, &mut fields)?
             {
                 continue;
             }
-            fields.push(convert(item).resolve_scalar_in(context, scope)?);
+            fields.push(Self::from_ast_scalar_in(item, context, scope)?);
         }
-        Ok(SemScalarExpr::row(&fields))
+        Ok(Self::row(&fields))
     }
+}
 
-    pub(crate) fn resolve_array(
+impl SemScalarExpr {
+    pub(crate) fn from_ast_array(
         items: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         target: Option<&TypeReference>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let mut values = Vec::with_capacity(items.len());
         for item in items {
-            values.push(convert(item).resolve_array_target(context, scope, target)?);
+            values.push(Self::from_ast_array_target(item, context, scope, target)?);
         }
         ArrayExpr::resolve(context, &values, target)
     }
+}
 
-    pub(crate) fn resolve_array_target(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_array_target(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         target: Option<&TypeReference>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         with_stack(|| {
-            if let Expr::Array(items) = self.ast {
-                Self::resolve_array(items, context, scope, target)
-            } else if let Expr::Parenthesized(items) = self.ast
+            if let Expr::Array(items) = ast {
+                Self::from_ast_array(items, context, scope, target)
+            } else if let Expr::Parenthesized(items) = ast
                 && let [item] = items.as_slice()
             {
-                convert(item).resolve_array_target(context, scope, target)
+                Self::from_ast_array_target(item, context, scope, target)
             } else {
-                self.resolve_in(context, scope)
+                Self::from_ast_in(ast, context, scope)
             }
         })
     }
+}
 
-    pub(crate) fn resolve_merge_action(
+impl SemScalarExpr {
+    pub(crate) fn from_ast_merge_action(
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         if !scope.merge_action_available() {
             return Err(AnalysisError::unexpected_input_error(
                 "merge_action() is only permitted in MERGE RETURNING",
             ));
         }
-        Ok(SemScalarExpr::merge_action())
+        Ok(Self::merge_action())
     }
+}
 
-    pub(crate) fn resolve_list(
+impl SemScalarExpr {
+    pub(crate) fn from_ast_list(
         expressions: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<SemScalarExpr>, AnalysisError> {
+    ) -> Result<Vec<Self>, AnalysisError> {
         let mut values = Vec::new();
         for expression in expressions {
-            values.push(convert(expression).resolve_in(context, scope)?);
+            values.push(Self::from_ast_in(expression, context, scope)?);
         }
         Ok(values)
     }
+}
 
-    pub(crate) fn resolve_scalar_list(
+impl SemScalarExpr {
+    pub(crate) fn from_ast_scalar_list(
         expressions: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<SemScalarExpr>, AnalysisError> {
+    ) -> Result<Vec<Self>, AnalysisError> {
         let mut values = Vec::new();
         for expression in expressions {
-            values.push(convert(expression).resolve_scalar_in(context, scope)?);
+            values.push(Self::from_ast_scalar_in(expression, context, scope)?);
         }
         Ok(values)
     }
+}
 
-    pub(crate) fn resolve_optional(
+impl SemScalarExpr {
+    pub(crate) fn from_ast_optional(
         expression: &Option<Expr>,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         expression
             .as_ref()
-            .map(|expression| convert(expression).resolve_in(context, scope))
+            .map(|expression| Self::from_ast_in(expression, context, scope))
             .transpose()
     }
 }
 
-impl AstConversion<'_, Expr> {
-    pub(crate) const fn is_named_argument(&self) -> bool {
-        matches!(self.ast, Expr::NamedArgument(_))
+impl SemScalarExpr {
+    pub(crate) const fn ast_is_named_argument(ast: &Expr) -> bool {
+        matches!(ast, Expr::NamedArgument(_))
     }
 }
 
-impl AstConversion<'_, NamedArgument> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_named_argument(
+        ast: &NamedArgument,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let value = convert(&self.ast.argument).resolve_scalar_in(context, scope)?;
-        Ok(SemScalarExpr::named_argument(
-            &self.ast.name,
-            &value,
-            &self.ast.location,
-        ))
+    ) -> Result<Self, AnalysisError> {
+        let value = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
+        Ok(Self::named_argument(&ast.name, &value, &ast.location))
     }
 }
 
-impl AstConversion<'_, Literal> {
-    pub(crate) fn resolve(&self) -> SemScalarExpr {
-        let value = match self.ast {
+impl SemScalarExpr {
+    pub(crate) fn from_ast_literal(ast: &Literal) -> Self {
+        let value = match ast {
             Literal::Null => return ScalarConstExpr::null(),
             Literal::Integer(value) => ScalarConstExpr::new_integer(*value),
             Literal::Numeric(value) => ScalarConstExpr::numeric(value),
@@ -421,128 +442,134 @@ impl AstConversion<'_, Literal> {
             Literal::BitString(value) => ScalarConstExpr::bit_string(value),
             Literal::Blob(_) | Literal::Keyword(_) => todo!("literal semantic analysis"),
         };
-        SemScalarExpr::literal(&value)
+        Self::literal(&value)
     }
+}
 
-    pub(crate) fn negate(&self) -> Option<SemScalarExpr> {
-        match self.ast {
+impl SemScalarExpr {
+    pub(crate) fn negate_ast_literal(ast: &Literal) -> Option<Self> {
+        match ast {
             Literal::Integer(value) => value
                 .checked_neg()
-                .map(|value| SemScalarExpr::literal(&ScalarConstExpr::new_integer(value))),
-            Literal::Numeric(value) => Some(SemScalarExpr::literal(&ScalarConstExpr::numeric(
-                &format!("-{value}"),
-            ))),
+                .map(|value| Self::literal(&ScalarConstExpr::new_integer(value))),
+            Literal::Numeric(value) => Some(Self::literal(&ScalarConstExpr::numeric(&format!(
+                "-{value}"
+            )))),
             _ => None,
         }
     }
 }
 
-impl AstConversion<'_, BooleanExpr> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_boolean_expr(
+        ast: &BooleanExpr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let arguments =
-            AstConversion::<Expr>::resolve_scalar_list(&self.ast.arguments, context, scope)?;
-        convert(&self.ast.operator).resolve(&arguments)
+    ) -> Result<Self, AnalysisError> {
+        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
+        Self::from_ast_boolean_operator(&ast.operator, &arguments)
     }
 }
 
-impl AstConversion<'_, TruthTest> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_truth_test(
+        ast: &TruthTest,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let argument = convert(&self.ast.argument).resolve_scalar_in(context, scope)?;
-        let value = TruthTestExpr::resolve(context, &argument, self.ast.value, self.ast.negated)?;
-        Ok(SemScalarExpr::truth_test(&value))
+    ) -> Result<Self, AnalysisError> {
+        let argument = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
+        let value = TruthTestExpr::resolve(context, &argument, ast.value, ast.negated)?;
+        Ok(Self::truth_test(&value))
     }
 }
 
-impl AstConversion<'_, NullTest> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_null_test(
+        ast: &NullTest,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let argument = convert(&self.ast.argument).resolve_scalar_in(context, scope)?;
-        Ok(SemScalarExpr::null_test(&argument, self.ast.negated))
+    ) -> Result<Self, AnalysisError> {
+        let argument = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
+        Ok(Self::null_test(&argument, ast.negated))
     }
 }
 
-impl AstConversion<'_, BooleanOperator> {
-    pub(crate) fn resolve(
-        &self,
-        arguments: &[SemScalarExpr],
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        match self.ast {
-            BooleanOperator::And => Ok(SemScalarExpr::logical_and(arguments)),
-            BooleanOperator::Or => Ok(SemScalarExpr::logical_or(arguments)),
-            BooleanOperator::Not => Self::resolve_not(arguments),
+impl SemScalarExpr {
+    pub(crate) fn from_ast_boolean_operator(
+        ast: &BooleanOperator,
+        arguments: &[Self],
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            BooleanOperator::And => Ok(Self::logical_and(arguments)),
+            BooleanOperator::Or => Ok(Self::logical_or(arguments)),
+            BooleanOperator::Not => Self::from_ast_not(arguments),
         }
     }
 }
 
-impl AstConversion<'_, BooleanOperator> {
-    fn resolve_not(arguments: &[SemScalarExpr]) -> Result<SemScalarExpr, AnalysisError> {
+impl SemScalarExpr {
+    fn from_ast_not(arguments: &[Self]) -> Result<Self, AnalysisError> {
         match arguments {
-            [value] => Ok(SemScalarExpr::logical_not(value)),
+            [value] => Ok(Self::logical_not(value)),
             _ => AnalysisError::raise_unexpected_input("NOT argument count"),
         }
     }
 }
 
-impl AstConversion<'_, OperatorExpr> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_operator_expr(
+        ast: &OperatorExpr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        if context.dialect() == Dialect::sqlite() && self.ast.left.is_none() {
-            if self.ast.name.0.as_slice() == ["+"] {
-                return convert(self.ast.right.as_ref().expect("unary argument"))
-                    .resolve_scalar_in(context, scope);
+    ) -> Result<Self, AnalysisError> {
+        if context.dialect() == Dialect::sqlite() && ast.left.is_none() {
+            if ast.name.0.as_slice() == ["+"] {
+                return Self::from_ast_scalar_in(
+                    ast.right.as_ref().expect("unary argument"),
+                    context,
+                    scope,
+                );
             }
-            if self.ast.name.0.as_slice() == ["-"]
-                && let Some(right) = self.ast.right.as_ref()
-                && let Some(value) = convert(right).negated_literal()
+            if ast.name.0.as_slice() == ["-"]
+                && let Some(right) = ast.right.as_ref()
+                && let Some(value) = Self::negated_ast_literal(right)
             {
                 return Ok(value);
             }
         }
-        let left = AstConversion::<Expr>::resolve_optional(&self.ast.left, context, scope)?;
-        let right = AstConversion::<Expr>::resolve_optional(&self.ast.right, context, scope)?;
-        if let Some(negated) = convert(&self.ast.kind).membership_negated(&self.ast.name) {
+        let left = Self::from_ast_optional(&ast.left, context, scope)?;
+        let right = Self::from_ast_optional(&ast.right, context, scope)?;
+        if let Some(negated) = ArithExpr::ast_membership_negated(&ast.kind, &ast.name) {
             let left = left.expect("IN left operand");
             let values = right.expect("IN right operand").into_list_values()?;
-            return Ok(SemScalarExpr::membership(MembershipExpr::list(
+            return Ok(Self::membership(MembershipExpr::list(
                 context, &left, &values, negated,
             )?));
         }
-        if let Some(negated) = self.distinctness(context) {
+        if let Some(negated) = Self::ast_expression_distinctness(ast, context) {
             let (Some(left), Some(right)) = (left, right) else {
                 return AnalysisError::raise_unexpected_input("distinctness operands");
             };
-            return Ok(SemScalarExpr::distinct(DistinctExpr::resolve(
+            return Ok(Self::distinct(DistinctExpr::resolve(
                 context, left, right, negated,
             )?));
         }
-        if context.dialect() == Dialect::sqlite() && convert(&self.ast.kind).is_pattern() {
-            return self.resolve_sqlite_pattern(context, scope, left, right);
+        if context.dialect() == Dialect::sqlite() && ArithExpr::ast_is_pattern(&ast.kind) {
+            return Self::from_ast_sqlite_pattern(ast, context, scope, left, right);
         }
-        self.resolve_operator(context, left, right)
+        Self::from_ast_operator_operands(ast, context, left, right)
     }
+}
 
-    pub(crate) fn resolve_operator(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_operator_operands(
+        ast: &OperatorExpr,
         context: &mut impl ParseContext,
-        left: Option<SemScalarExpr>,
-        right: Option<SemScalarExpr>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let name = if convert(&self.ast.kind).has_named_operator() {
-            match convert(&self.ast.name).operator_name() {
+        left: Option<Self>,
+        right: Option<Self>,
+    ) -> Result<Self, AnalysisError> {
+        let name = if ArithExpr::ast_has_named_operator(&ast.kind) {
+            match OperatorName::from_ast_name(&ast.name) {
                 Ok(name) => name,
                 Err(problem) => {
                     problem.report_problem_to(context)?;
@@ -557,7 +584,7 @@ impl AstConversion<'_, OperatorExpr> {
             OperatorName::invalid()
         };
         if context.dialect() == Dialect::sqlite()
-            && !convert(&self.ast.kind).without_catalog_operator()
+            && !ArithExpr::ast_without_catalog_operator(&ast.kind)
         {
             if left
                 .as_ref()
@@ -570,94 +597,19 @@ impl AstConversion<'_, OperatorExpr> {
             }
             todo!("SQLite operator semantics");
         }
-        let binding = convert(&self.ast.kind).resolve_operator_name(
+        let binding = ResolvedOperator::from_ast_operator_name(
+            &ast.kind,
             context,
             &name,
             left.is_some(),
             right.is_some(),
         );
-        let mut expression = convert(&self.ast.kind).resolve(context, &name, left, right)?;
+        let mut expression =
+            ArithExpr::from_ast_operator_kind(&ast.kind, context, &name, left, right)?;
         if let Some(binding) = binding {
             expression.set_operator_binding(binding);
         }
         Ok(expression)
-    }
-
-    pub(crate) fn resolve_sqlite_pattern(
-        &self,
-        context: &mut impl ParseContext,
-        scope: &ScalarAnalysisContext<'_>,
-        left: Option<SemScalarExpr>,
-        right: Option<SemScalarExpr>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        match self.ast.name.0.as_slice() {
-            [name] if name == "like" => {
-                let (Some(left), Some(right)) = (left, right) else {
-                    return AnalysisError::raise_unexpected_input("LIKE operands");
-                };
-                let escape =
-                    AstConversion::<Expr>::resolve_optional(&self.ast.escape, context, scope)?;
-                ArithExpr::sqlite_like(
-                    context,
-                    &left,
-                    &right,
-                    escape.as_ref(),
-                    convert(&self.ast.kind).is_not_like(),
-                )
-            }
-            [name] if name == "glob" => todo!("SQLite GLOB semantics (#907)"),
-            [name] if name == "match" => todo!("SQLite MATCH semantics (#908)"),
-            [name] if name == "regexp" => todo!("SQLite REGEXP semantics (#909)"),
-            _ => AnalysisError::raise_unexpected_input("SQLite pattern operator"),
-        }
-    }
-
-    pub(crate) fn distinctness(&self, context: &impl ParseContext) -> Option<bool> {
-        if let Some(negated) = convert(&self.ast.kind).distinctness() {
-            return Some(negated);
-        }
-        if context.dialect() == Dialect::sqlite() {
-            return match self.ast.name.0.as_slice() {
-                [name] if name == "is" => Some(true),
-                [name] if name == "is not" => Some(false),
-                _ => None,
-            };
-        }
-        None
-    }
-}
-
-#[cfg(all(test, feature = "sqlite"))]
-mod test_sqlite_pattern_resolution {
-    use crate::{ast::Dialect, test_helpers::membership::context_for};
-
-    use crate::test_helpers::pattern::query;
-
-    #[rstest::rstest]
-    #[case::glob("GLOB")]
-    #[case::match_operator("MATCH")]
-    #[case::regexp("REGEXP")]
-    fn sqlite_deferred_patterns_remain_explicitly_unsupported(
-        #[case] operator: &str,
-        #[values("", "NOT ")] negation: &str,
-        #[values("'a'", "$1")] value: &str,
-    ) {
-        let failure = std::panic::catch_unwind(|| {
-            let _ = query(
-                &format!("SELECT {value} {negation}{operator} 'a'"),
-                context_for(Dialect::sqlite()),
-            );
-        })
-        .expect_err("deferred semantics must not return success");
-        let message = if let Some(message) = failure.downcast_ref::<String>() {
-            message.as_str()
-        } else {
-            failure.downcast_ref::<&str>().unwrap()
-        };
-        assert!(
-            message.contains(operator),
-            "unexpected unsupported path: {message}"
-        );
     }
 }
 
@@ -738,39 +690,131 @@ mod operator_resolution_tests {
     }
 }
 
-impl AstConversion<'_, OperatorKind> {
-    pub(crate) const fn is_pattern(&self) -> bool {
+impl SemScalarExpr {
+    pub(crate) fn from_ast_sqlite_pattern(
+        ast: &OperatorExpr,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        left: Option<Self>,
+        right: Option<Self>,
+    ) -> Result<Self, AnalysisError> {
+        match ast.name.0.as_slice() {
+            [name] if name == "like" => {
+                let (Some(left), Some(right)) = (left, right) else {
+                    return AnalysisError::raise_unexpected_input("LIKE operands");
+                };
+                let escape = Self::from_ast_optional(&ast.escape, context, scope)?;
+                ArithExpr::sqlite_like(
+                    context,
+                    &left,
+                    &right,
+                    escape.as_ref(),
+                    ArithExpr::ast_is_not_like(&ast.kind),
+                )
+            }
+            [name] if name == "glob" => todo!("SQLite GLOB semantics (#907)"),
+            [name] if name == "match" => todo!("SQLite MATCH semantics (#908)"),
+            [name] if name == "regexp" => todo!("SQLite REGEXP semantics (#909)"),
+            _ => AnalysisError::raise_unexpected_input("SQLite pattern operator"),
+        }
+    }
+}
+
+#[cfg(all(test, feature = "sqlite"))]
+mod test_sqlite_pattern_resolution {
+    use crate::{ast::Dialect, test_helpers::membership::context_for};
+
+    use crate::test_helpers::pattern::query;
+
+    #[rstest::rstest]
+    #[case::glob("GLOB")]
+    #[case::match_operator("MATCH")]
+    #[case::regexp("REGEXP")]
+    fn sqlite_deferred_patterns_remain_explicitly_unsupported(
+        #[case] operator: &str,
+        #[values("", "NOT ")] negation: &str,
+        #[values("'a'", "$1")] value: &str,
+    ) {
+        let failure = std::panic::catch_unwind(|| {
+            let _ = query(
+                &format!("SELECT {value} {negation}{operator} 'a'"),
+                context_for(Dialect::sqlite()),
+            );
+        })
+        .expect_err("deferred semantics must not return success");
+        let message = if let Some(message) = failure.downcast_ref::<String>() {
+            message.as_str()
+        } else {
+            failure.downcast_ref::<&str>().unwrap()
+        };
+        assert!(
+            message.contains(operator),
+            "unexpected unsupported path: {message}"
+        );
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn ast_expression_distinctness(
+        ast: &OperatorExpr,
+        context: &impl ParseContext,
+    ) -> Option<bool> {
+        if let Some(negated) = ArithExpr::ast_operator_distinctness(&ast.kind) {
+            return Some(negated);
+        }
+        if context.dialect() == Dialect::sqlite() {
+            return match ast.name.0.as_slice() {
+                [name] if name == "is" => Some(true),
+                [name] if name == "is not" => Some(false),
+                _ => None,
+            };
+        }
+        None
+    }
+}
+
+impl ArithExpr {
+    pub(crate) const fn ast_is_pattern(ast: &OperatorKind) -> bool {
         matches!(
-            self.ast,
+            ast,
             OperatorKind::Like
                 | OperatorKind::NotLike
                 | OperatorKind::ILike
                 | OperatorKind::Similar
         )
     }
+}
 
-    pub(crate) const fn is_not_like(&self) -> bool {
-        matches!(self.ast, OperatorKind::NotLike)
+impl ArithExpr {
+    pub(crate) const fn ast_is_not_like(ast: &OperatorKind) -> bool {
+        matches!(ast, OperatorKind::NotLike)
     }
+}
 
-    pub(crate) fn membership_negated(&self, name: &Name) -> Option<bool> {
-        match self.ast {
+impl ArithExpr {
+    pub(crate) fn ast_membership_negated(ast: &OperatorKind, name: &Name) -> Option<bool> {
+        match ast {
             OperatorKind::In => Some(name.0.as_slice() == ["<>"]),
             OperatorKind::NotIn => Some(true),
             _ => None,
         }
     }
-    pub(crate) const fn distinctness(&self) -> Option<bool> {
-        match self.ast {
+}
+
+impl ArithExpr {
+    pub(crate) const fn ast_operator_distinctness(ast: &OperatorKind) -> Option<bool> {
+        match ast {
             OperatorKind::Distinct => Some(false),
             OperatorKind::NotDistinct => Some(true),
             _ => None,
         }
     }
+}
 
-    pub(crate) const fn has_named_operator(&self) -> bool {
+impl ArithExpr {
+    pub(crate) const fn ast_has_named_operator(ast: &OperatorKind) -> bool {
         matches!(
-            self.ast,
+            ast,
             OperatorKind::Ordinary
                 | OperatorKind::Any
                 | OperatorKind::All
@@ -780,55 +824,61 @@ impl AstConversion<'_, OperatorKind> {
                 | OperatorKind::Similar
         )
     }
+}
 
-    pub(crate) fn resolve_operator_name(
-        &self,
+impl ResolvedOperator {
+    pub(crate) fn from_ast_operator_name(
+        ast: &OperatorKind,
         context: &impl ParseContext,
         name: &OperatorName,
         left: bool,
         right: bool,
-    ) -> Option<ResolvedOperator> {
-        if self.has_named_operator() {
-            Some(ResolvedOperator::resolve(context, name, left, right))
+    ) -> Option<Self> {
+        if ArithExpr::ast_has_named_operator(ast) {
+            Some(Self::resolve(context, name, left, right))
         } else {
             None
         }
     }
+}
 
-    pub(crate) const fn without_catalog_operator(&self) -> bool {
-        matches!(self.ast, OperatorKind::Between | OperatorKind::NotBetween)
+impl ArithExpr {
+    pub(crate) const fn ast_without_catalog_operator(ast: &OperatorKind) -> bool {
+        matches!(ast, OperatorKind::Between | OperatorKind::NotBetween)
     }
-    pub(crate) fn resolve(
-        &self,
+}
+
+impl ArithExpr {
+    pub(crate) fn from_ast_operator_kind(
+        ast: &OperatorKind,
         context: &mut impl ParseContext,
         name: &OperatorName,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        match self.ast {
-            OperatorKind::Ordinary => Ok(ArithExpr::build_op(context, name, left, right)?.0),
+        match ast {
+            OperatorKind::Ordinary => Ok(Self::build_op(context, name, left, right)?.0),
             OperatorKind::Like
             | OperatorKind::NotLike
             | OperatorKind::ILike
-            | OperatorKind::Similar => ArithExpr::pattern(context, name, left, right),
-            OperatorKind::Any => {
-                Ok(ArithExpr::build_op_any_resolved(context, name, left, right)?.0)
-            }
-            OperatorKind::All => {
-                Ok(ArithExpr::build_op_all_resolved(context, name, left, right)?.0)
-            }
-            OperatorKind::NullIf => Ok(ArithExpr::build_null_if(context, left, right)?.0),
+            | OperatorKind::Similar => Self::pattern(context, name, left, right),
+            OperatorKind::Any => Ok(Self::build_op_any_resolved(context, name, left, right)?.0),
+            OperatorKind::All => Ok(Self::build_op_all_resolved(context, name, left, right)?.0),
+            OperatorKind::NullIf => Ok(Self::build_null_if(context, left, right)?.0),
             OperatorKind::Between | OperatorKind::NotBetween => {
-                self.resolve_between(context, left, right)
+                Self::from_ast_between(ast, context, left, right)
             }
             OperatorKind::BetweenSymmetric | OperatorKind::NotBetweenSymmetric => {
-                self.resolve_symmetric_between(context, left, right)
+                Self::from_ast_symmetric_between(ast, context, left, right)
             }
             _ => todo!("operator semantic analysis"),
         }
     }
-    pub(crate) fn resolve_between(
-        &self,
+}
+
+impl ArithExpr {
+    pub(crate) fn from_ast_between(
+        ast: &OperatorKind,
         context: &mut impl ParseContext,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
@@ -839,23 +889,25 @@ impl AstConversion<'_, OperatorKind> {
             return AnalysisError::raise_unexpected_input("BETWEEN bounds");
         };
         if context.dialect() == Dialect::postgres() {
-            return ArithExpr::ordinary_between(
+            return Self::ordinary_between(
                 context,
                 &left,
                 &start,
                 &end,
-                matches!(self.ast, OperatorKind::NotBetween),
+                matches!(ast, OperatorKind::NotBetween),
             );
         }
-        Ok(if matches!(self.ast, OperatorKind::NotBetween) {
-            ArithExpr::not_between(left, (start, end))
+        Ok(if matches!(ast, OperatorKind::NotBetween) {
+            Self::not_between(left, (start, end))
         } else {
-            ArithExpr::between(left, (start, end))
+            Self::between(left, (start, end))
         })
     }
+}
 
-    pub(crate) fn resolve_symmetric_between(
-        &self,
+impl ArithExpr {
+    pub(crate) fn from_ast_symmetric_between(
+        ast: &OperatorKind,
         context: &mut impl ParseContext,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
@@ -867,18 +919,19 @@ impl AstConversion<'_, OperatorKind> {
         let Ok([start, end]): Result<[SemScalarExpr; 2], _> = values.try_into() else {
             return AnalysisError::raise_unexpected_input("BETWEEN SYMMETRIC bounds");
         };
-        ArithExpr::symmetric_between(
+        Self::symmetric_between(
             context,
             &left,
             &start,
             &end,
-            matches!(self.ast, OperatorKind::NotBetweenSymmetric),
+            matches!(ast, OperatorKind::NotBetweenSymmetric),
         )
     }
 }
 
 #[cfg(test)]
 mod test_pattern_resolution {
+
     use crate::{
         sem::TypeReference as SemTypeReference,
         test_helpers::membership::context as membership_context,
@@ -1066,22 +1119,22 @@ mod test_pattern_resolution {
     }
 }
 
-impl AstConversion<'_, TypeName> {
-    pub(crate) fn reference(&self) -> Result<TypeReference, AnalysisError> {
-        Ok(TypeReference::concrete_type_ref(
-            &convert(&self.ast.name).full_name()?,
-            !self.ast.array_bounds.is_empty(),
+impl TypeReference {
+    pub(crate) fn from_ast(ast: &TypeName) -> Result<Self, AnalysisError> {
+        Ok(Self::concrete_type_ref(
+            &FullName::from_ast_name(&ast.name)?,
+            !ast.array_bounds.is_empty(),
         ))
     }
 }
 
-impl AstConversion<'_, Cast> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_cast(
+        ast: &Cast,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let target = convert(&self.ast.target).reference()?;
+    ) -> Result<Self, AnalysisError> {
+        let target = TypeReference::from_ast(&ast.target)?;
         let mut resolution = QueryNameResolution::affinity(&target.to_string());
         let target = if context.dialect() == Dialect::postgres() {
             if let Some(canonical) = context.canonicalize_type_ref(&target) {
@@ -1102,9 +1155,9 @@ impl AstConversion<'_, Cast> {
             && resolution.is_resolved()
             && expected.is_array() == Some(true)
         {
-            convert(&self.ast.argument).resolve_array_target(context, scope, Some(&expected))?
+            Self::from_ast_array_target(&ast.argument, context, scope, Some(&expected))?
         } else {
-            convert(&self.ast.argument).resolve_scalar_in(context, scope)?
+            Self::from_ast_scalar_in(&ast.argument, context, scope)?
         };
         if context.dialect() == Dialect::postgres()
             && let Some(source) = argument.get_type()
@@ -1123,21 +1176,21 @@ impl AstConversion<'_, Cast> {
                 ))?;
             }
         }
-        let mut expression = SemScalarExpr::explicit_cast(&argument, &target);
+        let mut expression = Self::explicit_cast(&argument, &target);
         expression.set_cast_resolution(resolution);
         Ok(expression)
     }
 }
 
-impl AstConversion<'_, Call> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_call(
+        ast: &Call,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let aggregate = if convert(&self.ast.kind).is_ordinary() && self.ast.over.is_none() {
+    ) -> Result<Self, AnalysisError> {
+        let aggregate = if Self::ast_is_ordinary(&ast.kind) && ast.over.is_none() {
             let name = context
-                .resolve_function_name_with_search_path(&convert(&self.ast.name).full_name()?);
+                .resolve_function_name_with_search_path(&FullName::from_ast_name(&ast.name)?);
             context.is_aggregate_impl(&name)
         } else {
             false
@@ -1156,13 +1209,13 @@ impl AstConversion<'_, Call> {
         } else {
             scope
         };
-        let mut expression = convert(&self.ast.kind).resolve(self.ast, context, argument_scope)?;
-        let modifiers = self.resolve_modifiers(context, argument_scope)?;
+        let mut expression = Self::from_ast_call_kind(&ast.kind, ast, context, argument_scope)?;
+        let modifiers = FunctionModifiers::from_ast_modifiers(ast, context, argument_scope)?;
         if let Some(capture) = &capture {
             let (owner, levels_up, placement) = capture.owner(scope.grouping_scope());
             SamplingInput::validate_aggregate_placement(context, &placement)?;
             scope.grouping_scope().aggregate(owner, levels_up);
-        } else if self.ast.over.is_some() {
+        } else if ast.over.is_some() {
             scope.grouping_scope().window();
         }
         expression.set_function_modifiers(modifiers);
@@ -1170,120 +1223,121 @@ impl AstConversion<'_, Call> {
     }
 }
 
-impl AstConversion<'_, CallKind> {
-    pub(crate) const fn is_ordinary(&self) -> bool {
-        matches!(self.ast, CallKind::Ordinary)
+impl SemScalarExpr {
+    pub(crate) const fn ast_is_ordinary(ast: &CallKind) -> bool {
+        matches!(ast, CallKind::Ordinary)
     }
+}
 
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_call_kind(
+        ast: &CallKind,
         call: &Call,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         if context.dialect() == Dialect::sqlite() {
             if call.name.0.len() == 1 && call.name.0[0].eq_ignore_ascii_case("coalesce") {
-                return convert(call).resolve_coalesce(context, scope);
+                return Self::from_ast_coalesce_call(call, context, scope);
             }
             todo!("SQLite function affinity and overload semantics");
         }
-        match self.ast {
-            CallKind::Coalesce => convert(call).resolve_coalesce(context, scope),
-            CallKind::MinMax => convert(call).resolve_min_max(context, scope),
-            CallKind::Ordinary => convert(call).resolve_ordinary(context, scope),
+        match ast {
+            CallKind::Coalesce => Self::from_ast_coalesce_call(call, context, scope),
+            CallKind::MinMax => Self::from_ast_min_max_call(call, context, scope),
+            CallKind::Ordinary => Self::from_ast_ordinary_call(call, context, scope),
         }
     }
 }
 
-impl AstConversion<'_, Call> {
-    pub(crate) fn uses_supplied_binding(&self) -> bool {
-        self.ast.variadic
-            || self
-                .ast
-                .arguments
-                .iter()
-                .any(|value| convert(value).is_named_argument())
+impl SemScalarExpr {
+    pub(crate) fn ast_uses_supplied_binding(ast: &Call) -> bool {
+        ast.variadic || ast.arguments.iter().any(Self::ast_is_named_argument)
     }
+}
 
-    pub(crate) fn resolve_supplied_call(
-        &self,
+impl FuncCallExpr {
+    pub(crate) fn from_ast_supplied_call(
+        ast: &Call,
         context: &mut impl ParseContext,
         arguments: &[SemScalarExpr],
-    ) -> Result<FuncCallExpr, AnalysisError> {
-        FuncCallExpr::resolve_supplied(
+    ) -> Result<Self, AnalysisError> {
+        Self::resolve_supplied(
             context,
-            &convert(&self.ast.name).full_name()?,
+            &FullName::from_ast_name(&ast.name)?,
             arguments,
-            &self.ast.argument_locations,
-            &self.ast.location,
-            self.ast.variadic,
-            self.ast.over.is_some(),
+            &ast.argument_locations,
+            &ast.location,
+            ast.variadic,
+            ast.over.is_some(),
         )
     }
+}
 
-    fn resolve_min_max(
-        &self,
+impl SemScalarExpr {
+    fn from_ast_min_max_call(
+        ast: &Call,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let arguments =
-            AstConversion::<Expr>::resolve_scalar_list(&self.ast.arguments, context, scope)?;
+    ) -> Result<Self, AnalysisError> {
+        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
         MinMaxExpr::resolve(
             context,
-            convert(&self.ast.name).full_name()?.name().as_str(),
+            FullName::from_ast_name(&ast.name)?.name().as_str(),
             &arguments,
         )
     }
+}
 
-    pub(crate) fn resolve_coalesce(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_coalesce_call(
+        ast: &Call,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let arguments =
-            AstConversion::<Expr>::resolve_scalar_list(&self.ast.arguments, context, scope)?;
+    ) -> Result<Self, AnalysisError> {
+        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
         CoalesceExpr::resolve(context, &arguments)
     }
+}
 
-    pub(crate) fn resolve_ordinary(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_ordinary_call(
+        ast: &Call,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let arguments =
-            AstConversion::<Expr>::resolve_scalar_list(&self.ast.arguments, context, scope)?;
-        if self.uses_supplied_binding() {
-            return Ok(SemScalarExpr::function_call(
-                &self.resolve_supplied_call(context, &arguments)?,
-            ));
+    ) -> Result<Self, AnalysisError> {
+        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
+        if Self::ast_uses_supplied_binding(ast) {
+            return Ok(Self::function_call(&FuncCallExpr::from_ast_supplied_call(
+                ast, context, &arguments,
+            )?));
         }
         FuncCallExpr::resolve_common(
             context,
-            &convert(&self.ast.name).full_name()?,
+            &FullName::from_ast_name(&ast.name)?,
             &arguments,
-            &self.ast.location.unwrap_or_else(|| StringSpan::new(0, 0)),
+            &ast.location.unwrap_or_else(|| StringSpan::new(0, 0)),
         )
     }
 }
 
-impl AstConversion<'_, Case> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_case(
+        ast: &Case,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let argument = AstConversion::<Expr>::resolve_optional(&self.ast.argument, context, scope)?;
+    ) -> Result<Self, AnalysisError> {
+        let argument = Self::from_ast_optional(&ast.argument, context, scope)?;
         if let Some(value) = &argument {
             value.validate_scalar_value(context)?;
         }
         let mut arms = Vec::new();
-        for arm in &self.ast.arms {
-            let condition = convert(&arm.condition).resolve_scalar_in(context, scope)?;
-            let result = convert(&arm.result).resolve_scalar_in(context, scope)?;
+        for arm in &ast.arms {
+            let condition = Self::from_ast_scalar_in(&arm.condition, context, scope)?;
+            let result = Self::from_ast_scalar_in(&arm.result, context, scope)?;
             arms.push((condition, result));
         }
-        let otherwise =
-            AstConversion::<Expr>::resolve_optional(&self.ast.otherwise, context, scope)?;
+        let otherwise = Self::from_ast_optional(&ast.otherwise, context, scope)?;
         if let Some(value) = &otherwise {
             value.validate_scalar_value(context)?;
         }
@@ -1302,83 +1356,88 @@ impl AstConversion<'_, Case> {
     }
 }
 
-impl AstConversion<'_, Subquery> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_subquery(
+        ast: &Subquery,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         if let Some(identity) = scope.rule_identity()
-            && let Some(detail) = convert(&self.ast.kind).pending_rule_semantics()
+            && let Some(detail) = Self::ast_pending_rule_semantics(&ast.kind)
         {
             context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::definition(
                 identity, detail,
             )))?;
         }
-        if convert(&self.ast.kind).is_membership(&self.ast.operator) {
-            let test = convert(self.ast.test.as_ref().expect("IN test operand"))
-                .resolve_in(context, scope)?;
-            let query = convert(&self.ast.query).resolve_in(context, Some(scope))?;
-            return Ok(SemScalarExpr::membership(MembershipExpr::query(
+        if Self::ast_is_membership(&ast.kind, &ast.operator) {
+            let test =
+                Self::from_ast_in(ast.test.as_ref().expect("IN test operand"), context, scope)?;
+            let query = SelectStatement::from_ast_in(&ast.query, context, Some(scope))?;
+            return Ok(Self::membership(MembershipExpr::query(
                 context, &test, &query,
             )?));
         }
-        let query = convert(&self.ast.query).resolve_in(context, Some(scope))?;
-        convert(&self.ast.kind).resolve(context, &query)
+        let query = SelectStatement::from_ast_in(&ast.query, context, Some(scope))?;
+        Self::from_ast_subquery_kind(&ast.kind, context, &query)
     }
 }
 
-impl AstConversion<'_, SubqueryKind> {
-    pub(crate) fn is_membership(&self, operator: &Name) -> bool {
-        matches!(self.ast, SubqueryKind::Any)
+impl SemScalarExpr {
+    pub(crate) fn ast_is_membership(ast: &SubqueryKind, operator: &Name) -> bool {
+        matches!(ast, SubqueryKind::Any)
             && (operator.0.is_empty() || operator.0.as_slice() == ["="])
     }
-    pub(crate) fn resolve(
-        &self,
+}
+
+impl SemScalarExpr {
+    pub(crate) fn from_ast_subquery_kind(
+        ast: &SubqueryKind,
         context: &mut impl ParseContext,
         query: &SelectStatement,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        match self.ast {
-            SubqueryKind::Exists => Ok(SemScalarExpr::exists(query)),
-            SubqueryKind::Array => SemScalarExpr::array_subquery(context, query),
-            _ => SemScalarExpr::subquery(query),
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            SubqueryKind::Exists => Ok(Self::exists(query)),
+            SubqueryKind::Array => Self::array_subquery(context, query),
+            _ => Self::subquery(query),
         }
     }
 }
 
-impl AstConversion<'_, SqlValue> {
-    pub(crate) fn resolve(&self) -> Result<SemScalarExpr, AnalysisError> {
-        SqlValueExpr::from_common(&self.ast.name, self.ast.precision)
+impl SemScalarExpr {
+    pub(crate) fn from_ast_sql_value(ast: &SqlValue) -> Result<Self, AnalysisError> {
+        SqlValueExpr::from_common(&ast.name, ast.precision)
     }
 }
 
-impl AstConversion<'_, Indirection> {
-    pub(crate) fn projection_base(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn ast_indirection_projection_base(
+        ast: &Indirection,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        let Some((Access::Star, preceding)) = self.ast.items.split_last() else {
+    ) -> Result<Option<Self>, AnalysisError> {
+        let Some((Access::Star, preceding)) = ast.items.split_last() else {
             return Ok(None);
         };
-        let base = convert(&self.ast.argument).resolve_in(context, scope)?;
-        Ok(Some(AstConversion::<Access>::resolve_sequence(
+        let base = Self::from_ast_in(&ast.argument, context, scope)?;
+        Ok(Some(IndirectionExpr::from_ast_sequence(
             preceding, context, scope, base,
         )?))
     }
+}
 
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_indirection(
+        ast: &Indirection,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let value = convert(&self.ast.argument).resolve_in(context, scope)?;
-        AstConversion::<Access>::resolve_sequence(&self.ast.items, context, scope, value)
+    ) -> Result<Self, AnalysisError> {
+        let value = Self::from_ast_in(&ast.argument, context, scope)?;
+        IndirectionExpr::from_ast_sequence(&ast.items, context, scope, value)
     }
 }
 
-impl AstConversion<'_, Access> {
-    pub(crate) fn resolve_sequence(
+impl IndirectionExpr {
+    pub(crate) fn from_ast_sequence(
         items: &[Access],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
@@ -1387,7 +1446,7 @@ impl AstConversion<'_, Access> {
         let mut remaining = items;
         while let Some((first, rest)) = remaining.split_first() {
             let count = if context.dialect() == Dialect::postgres() {
-                Self::subscript_prefix_length(remaining)
+                Self::ast_subscript_prefix_length(remaining)
             } else {
                 0
             };
@@ -1395,56 +1454,64 @@ impl AstConversion<'_, Access> {
                 let (group, rest) = remaining.split_at(count);
                 let mut subscripts = Vec::with_capacity(count);
                 for access in group {
-                    subscripts.push(convert(access).resolve_subscript(context, scope)?);
+                    subscripts.push(ArraySubscript::from_ast_access(access, context, scope)?);
                 }
-                base = IndirectionExpr::resolved_subscripts(context, &base, &subscripts)?;
+                base = Self::resolved_subscripts(context, &base, &subscripts)?;
                 remaining = rest;
             } else {
-                base = convert(first).resolve(context, scope, base)?;
+                base = Self::from_ast_access(first, context, scope, base)?;
                 remaining = rest;
             }
         }
         Ok(base)
     }
+}
 
-    pub(crate) fn subscript_prefix_length(items: &[Access]) -> usize {
+impl IndirectionExpr {
+    pub(crate) fn ast_subscript_prefix_length(items: &[Access]) -> usize {
         let mut count = 0;
         for access in items {
-            if !convert(access).is_subscript() {
+            if !Self::ast_is_subscript(access) {
                 break;
             }
             count += 1;
         }
         count
     }
+}
 
-    pub(crate) const fn is_subscript(&self) -> bool {
-        matches!(self.ast, Access::Index(_) | Access::Slice(_))
+impl IndirectionExpr {
+    pub(crate) const fn ast_is_subscript(ast: &Access) -> bool {
+        matches!(ast, Access::Index(_) | Access::Slice(_))
     }
+}
 
-    pub(crate) fn resolve_subscript(
-        &self,
+impl ArraySubscript {
+    pub(crate) fn from_ast_access(
+        ast: &Access,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<ArraySubscript, AnalysisError> {
-        match self.ast {
-            Access::Index(index) => ArraySubscript::from_ast_index(index, context, scope),
-            Access::Slice(slice) => ArraySubscript::from_ast_slice(slice, context, scope),
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            Access::Index(index) => Self::from_ast_index(index, context, scope),
+            Access::Slice(slice) => Self::from_ast_slice(slice, context, scope),
             _ => AnalysisError::raise_unexpected_input("array subscript"),
         }
     }
+}
 
-    pub(crate) fn resolve(
-        &self,
+impl IndirectionExpr {
+    pub(crate) fn from_ast_access(
+        ast: &Access,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         base: SemScalarExpr,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        match self.ast {
-            Access::Field(name) => IndirectionExpr::resolved_member(context, base, name),
-            Access::Index(index) => IndirectionExpr::from_ast_index(index, context, scope, base),
-            Access::Slice(slice) => IndirectionExpr::from_ast_slice(slice, context, scope, base),
-            Access::Star => AstConversion::<Expr>::invalid_star_projection(context),
+        match ast {
+            Access::Field(name) => Self::resolved_member(context, base, name),
+            Access::Index(index) => Self::from_ast_index(index, context, scope, base),
+            Access::Slice(slice) => Self::from_ast_slice(slice, context, scope, base),
+            Access::Star => SemScalarExpr::ast_invalid_star_projection(context),
         }
     }
 }
@@ -1455,7 +1522,7 @@ impl ArraySubscript {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let index = convert(index).resolve_in(context, scope)?;
+        let index = SemScalarExpr::from_ast_in(index, context, scope)?;
         Ok(Self::index(&index))
     }
 
@@ -1464,8 +1531,8 @@ impl ArraySubscript {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let lower = AstConversion::<Expr>::resolve_optional(&slice.lower, context, scope)?;
-        let upper = AstConversion::<Expr>::resolve_optional(&slice.upper, context, scope)?;
+        let lower = SemScalarExpr::from_ast_optional(&slice.lower, context, scope)?;
+        let upper = SemScalarExpr::from_ast_optional(&slice.upper, context, scope)?;
         Ok(Self::slice(lower.as_ref(), upper.as_ref()))
     }
 }
@@ -1477,7 +1544,7 @@ impl IndirectionExpr {
         scope: &ScalarAnalysisContext<'_>,
         base: SemScalarExpr,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let index = convert(index).resolve_in(context, scope)?;
+        let index = SemScalarExpr::from_ast_in(index, context, scope)?;
         Self::resolved_index(context, base, index)
     }
 
@@ -1497,12 +1564,12 @@ impl IndirectionExpr {
     }
 }
 
-impl AstConversion<'_, Expr> {
-    pub(crate) fn resolve_grouping(
+impl SemScalarExpr {
+    pub(crate) fn from_ast_grouping(
         arguments: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         context
             .analysis_state_mut()
             .grouping_mut()
@@ -1511,7 +1578,7 @@ impl AstConversion<'_, Expr> {
         let argument_scope = scope
             .with_grouping_capture(&capture)
             .with_grouping_placement("GROUPING argument");
-        let arguments = Self::resolve_list(arguments, context, &argument_scope)?;
+        let arguments = Self::from_ast_list(arguments, context, &argument_scope)?;
         let (owner, levels_up, placement) = capture.owner(scope.grouping_scope());
         let mut valid = true;
         if capture.invalid_nesting(owner, scope.grouping_scope()) {
@@ -1539,33 +1606,36 @@ impl AstConversion<'_, Expr> {
                 QueryProblem::too_many_grouping_arguments(),
             ))?;
         }
-        Ok(SemScalarExpr::grouping(&arguments, owner, levels_up, valid))
+        Ok(Self::grouping(&arguments, owner, levels_up, valid))
     }
 }
 
-impl AstConversion<'_, Collate> {
-    pub(crate) fn resolve(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_collate(
+        ast: &Collate,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let argument = convert(&self.ast.argument).resolve_scalar_in(context, scope)?;
+    ) -> Result<Self, AnalysisError> {
+        let argument = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
         let value = CollateExpr::resolve(
             context,
             &argument,
-            &convert(&self.ast.name).full_name()?,
-            &self.ast.location,
+            &FullName::from_ast_name(&ast.name)?,
+            &ast.location,
         )?;
-        Ok(SemScalarExpr::collate(value))
+        Ok(Self::collate(value))
     }
 }
 
-impl AstConversion<'_, TypeName> {
-    pub(crate) fn declaration_type(
-        &self,
+impl WithTypmod<TypeReference> {
+    pub(crate) fn from_ast_declaration(
+        ast: &TypeName,
         resolved: Option<&TypeReference>,
-    ) -> Result<WithTypmod<TypeReference>, AnalysisError> {
-        let mut declaration = WithTypmod::new(&self.reference()?, &self.modifier_arguments()?);
+    ) -> Result<Self, AnalysisError> {
+        let mut declaration = Self::new(
+            &TypeReference::from_ast(ast)?,
+            &Self::ast_modifier_arguments(ast)?,
+        );
         if let Some(resolved) = resolved {
             declaration.interpret_postgres(resolved);
         }
@@ -1573,11 +1643,11 @@ impl AstConversion<'_, TypeName> {
     }
 }
 
-impl AstConversion<'_, TypeName> {
-    pub(crate) fn modifier_arguments(&self) -> Result<Vec<String>, AnalysisError> {
+impl WithTypmod<TypeReference> {
+    pub(crate) fn ast_modifier_arguments(ast: &TypeName) -> Result<Vec<String>, AnalysisError> {
         use crate::ast::deparse::{SqlEmit, SqlWriter};
         let mut arguments = Vec::new();
-        for modifier in &self.ast.modifiers {
+        for modifier in &ast.modifiers {
             let mut writer = SqlWriter::new(Dialect::postgres());
             modifier
                 .emit(&mut writer)

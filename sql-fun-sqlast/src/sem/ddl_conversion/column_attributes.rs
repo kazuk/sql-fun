@@ -1,6 +1,7 @@
 use crate::ast::ddl::{AlterOperation, PostgresAlterCommand};
 use crate::ast::{AlterCommand, AlterRelation, Expr, Literal};
-use crate::sem::{AstConversion, convert};
+use crate::names::FullName;
+use crate::sem::RelationAlteration;
 
 use crate::{
     ast::{SyntaxOption, SyntaxValue, ddl::AlterDefinition},
@@ -14,33 +15,33 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, AlterRelation> {
-    pub(crate) fn has_column_attributes(&self) -> bool {
-        self.ast
-            .commands
+impl RelationAlteration {
+    pub(crate) fn has_ast_column_attributes(ast: &AlterRelation) -> bool {
+        ast.commands
             .iter()
-            .any(|command| convert(command).column_attribute_phase().is_some())
+            .any(|command| ColumnAttributeAction::phase_from_ast_command(command).is_some())
     }
-    pub(crate) fn resolve_column_attributes(
-        &self,
+
+    pub(crate) fn from_ast_column_attributes(
+        ast: &AlterRelation,
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
         // Other relation kinds retain their own dispatch boundary.
-        if !self.ast.kind.supports_table_column_attributes() {
+        if !ast.kind.supports_table_column_attributes() {
             todo!("column attributes on non-table relations");
         }
-        if !self
+        if !ast
             .commands
             .iter()
-            .all(|command| convert(command).column_attribute_phase().is_some())
+            .all(|command| ColumnAttributeAction::phase_from_ast_command(command).is_some())
         {
             todo!("column attributes mixed with other ALTER operations");
         }
         let Some(source) = source else {
             return AnalysisError::raise_unexpected_none("ALTER COLUMN source");
         };
-        let requested = TableName::from(convert(&self.ast.name).full_name()?);
+        let requested = TableName::from(FullName::from_ast_name(&ast.name)?);
         let target = context.resolve_table_name(&requested);
         let mut staged = if let Some(name) = &target {
             context.get_table_impl(name.full_name()).cloned()
@@ -48,10 +49,10 @@ impl AstConversion<'_, AlterRelation> {
             None
         };
         let table = target.as_ref().unwrap_or(&requested);
-        let mut ordered: Vec<_> = self.ast.commands.iter().collect();
+        let mut ordered: Vec<_> = ast.commands.iter().collect();
         // PostgreSQL AT_PASS_DROP, AT_PASS_COL_ATTRS, AT_PASS_MISC. Stable sort
         // preserves the supplied order within a pass, including repeated changes.
-        ordered.sort_by_key(|command| convert(*command).column_attribute_phase());
+        ordered.sort_by_key(|command| ColumnAttributeAction::phase_from_ast_command(command));
         let existing_relation =
             expand_relation_search_path(context, requested.full_name(), |name| {
                 context.object_kind(name)
@@ -61,10 +62,11 @@ impl AstConversion<'_, AlterRelation> {
         {
             todo!("column attributes on materialized views and indexes");
         }
-        let skip_missing = self.ast.if_exists && existing_relation.is_none() && target.is_none();
+        let skip_missing = ast.if_exists && existing_relation.is_none() && target.is_none();
         let mut commands = Vec::new();
         for command in ordered {
-            commands.push(convert(command).resolve_column_attribute(
+            commands.push(AlterObjSubCommand::from_ast_column_attribute(
+                command,
                 context,
                 table,
                 &mut staged,
@@ -82,7 +84,8 @@ impl AstConversion<'_, AlterRelation> {
 
 #[cfg(test)]
 mod test_applicability {
-    use crate::sem::convert;
+    use crate::sem::RelationAlteration;
+
     use crate::{
         ast::StatementNode,
         names::{ColumnName, FullName, TableName},
@@ -105,8 +108,11 @@ mod test_applicability {
         };
         let mut context = context;
         context.begin_parameter_type_analysis();
-        let statement =
-            convert(&relation).resolve_column_attributes(&mut context, Some(&source_span()))?;
+        let statement = RelationAlteration::from_ast_column_attributes(
+            &relation,
+            &mut context,
+            Some(&source_span()),
+        )?;
         // Simulate a diagnostic policy that suppresses delivery after analysis.
         let problems = context.analysis_state_mut().take_problems();
         assert_eq!(problems.len(), 1);
@@ -131,66 +137,70 @@ mod test_applicability {
     }
 }
 
-impl AstConversion<'_, AlterCommand> {
-    pub(crate) fn column_attribute_phase(&self) -> Option<u8> {
-        if let AlterCommand::Postgres(command) = self.ast {
-            convert(&command.operation).column_attribute_phase()
+impl ColumnAttributeAction {
+    pub(crate) fn phase_from_ast_command(ast: &AlterCommand) -> Option<u8> {
+        if let AlterCommand::Postgres(command) = ast {
+            Self::phase_from_ast_operation(&command.operation)
         } else {
             None
         }
     }
-    pub(crate) fn resolve_column_attribute(
-        &self,
+}
+
+impl AlterObjSubCommand {
+    pub(crate) fn from_ast_column_attribute(
+        ast: &AlterCommand,
         context: &mut impl ParseContext,
         table: &TableName,
         staged: &mut Option<CreateTable>,
         if_exists: bool,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        let AlterCommand::Postgres(command) = self.ast else {
+    ) -> Result<Self, AnalysisError> {
+        let AlterCommand::Postgres(command) = ast else {
             unreachable!("checked attribute command");
         };
-        convert::<PostgresAlterCommand>(command)
-            .resolve_column_attribute(context, table, staged, if_exists)
+        Self::from_ast_postgres_column_attribute(command, context, table, staged, if_exists)
     }
 }
 
-impl AstConversion<'_, AlterOperation> {
-    pub(crate) const fn drops_not_null(self) -> bool {
-        matches!(self.ast, AlterOperation::DropNotNull)
+impl ColumnAttributeAction {
+    pub(crate) const fn ast_operation_drops_not_null(ast: &AlterOperation) -> bool {
+        matches!(ast, AlterOperation::DropNotNull)
     }
-    pub(crate) const fn drops_expression(self) -> bool {
-        matches!(self.ast, AlterOperation::DropExpression)
+
+    pub(crate) const fn ast_operation_drops_expression(ast: &AlterOperation) -> bool {
+        matches!(ast, AlterOperation::DropExpression)
     }
-    pub(crate) const fn sets_statistics(self) -> bool {
-        matches!(self.ast, AlterOperation::SetStatistics)
+
+    pub(crate) const fn ast_operation_sets_statistics(ast: &AlterOperation) -> bool {
+        matches!(ast, AlterOperation::SetStatistics)
     }
-    pub(crate) fn column_attribute_action(
-        self,
+
+    pub(crate) fn from_ast_operation(
+        ast: &AlterOperation,
         definition: &AlterDefinition,
         missing_ok: bool,
-    ) -> Result<ColumnAttributeAction, AnalysisError> {
-        match self.ast {
-            AlterOperation::SetNotNull => Ok(ColumnAttributeAction::not_null(true)),
-            AlterOperation::DropNotNull => Ok(ColumnAttributeAction::not_null(false)),
-            AlterOperation::DropExpression => {
-                Ok(ColumnAttributeAction::drop_expression(missing_ok))
-            }
-            AlterOperation::SetStatistics => Ok(ColumnAttributeAction::statistics(
-                convert(definition).statistics_request()?,
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            AlterOperation::SetNotNull => Ok(Self::not_null(true)),
+            AlterOperation::DropNotNull => Ok(Self::not_null(false)),
+            AlterOperation::DropExpression => Ok(Self::drop_expression(missing_ok)),
+            AlterOperation::SetStatistics => Ok(Self::statistics(
+                Self::statistics_from_ast_definition(definition)?,
             )),
-            AlterOperation::SetOptions => Ok(ColumnAttributeAction::options(
-                &convert(definition).column_options()?,
+            AlterOperation::SetOptions => Ok(Self::options(
+                &ColumnAttributeOption::from_ast_definition_list(definition)?,
                 false,
             )),
-            AlterOperation::ResetOptions => Ok(ColumnAttributeAction::options(
-                &convert(definition).column_options()?,
+            AlterOperation::ResetOptions => Ok(Self::options(
+                &ColumnAttributeOption::from_ast_definition_list(definition)?,
                 true,
             )),
             _ => unreachable!("checked attribute operation"),
         }
     }
-    pub(crate) const fn column_attribute_phase(self) -> Option<u8> {
-        match self.ast {
+
+    pub(crate) const fn phase_from_ast_operation(ast: &AlterOperation) -> Option<u8> {
+        match ast {
             AlterOperation::DropNotNull | AlterOperation::DropExpression => Some(0),
             AlterOperation::SetNotNull => Some(1),
             AlterOperation::SetStatistics
@@ -201,12 +211,12 @@ impl AstConversion<'_, AlterOperation> {
     }
 }
 
-impl AstConversion<'_, PostgresAlterCommand> {
-    pub(crate) fn resolve_single_column_attribute(
-        &self,
+impl AlterObjSubCommand {
+    pub(crate) fn from_ast_single_column_attribute(
+        ast: &PostgresAlterCommand,
         context: &mut impl ParseContext,
         table: &TableName,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let resolved = context.resolve_table_name(table);
         let table = resolved.as_ref().unwrap_or(table);
         let mut staged = if let Some(name) = &resolved {
@@ -214,18 +224,22 @@ impl AstConversion<'_, PostgresAlterCommand> {
         } else {
             None
         };
-        self.resolve_column_attribute(context, table, &mut staged, false)
+        Self::from_ast_postgres_column_attribute(ast, context, table, &mut staged, false)
     }
-    pub(crate) fn resolve_column_attribute(
-        &self,
+
+    pub(crate) fn from_ast_postgres_column_attribute(
+        ast: &PostgresAlterCommand,
         context: &mut impl ParseContext,
         table: &TableName,
         staged: &mut Option<CreateTable>,
         if_exists: bool,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        let column = ColumnName::from(self.ast.name.as_str());
-        let action = convert(&self.ast.operation)
-            .column_attribute_action(&self.ast.definition, self.ast.missing_ok)?;
+    ) -> Result<Self, AnalysisError> {
+        let column = ColumnName::from(ast.name.as_str());
+        let action = ColumnAttributeAction::from_ast_operation(
+            &ast.operation,
+            &ast.definition,
+            ast.missing_ok,
+        )?;
         let mut problems = Vec::new();
         let binding = match staged.as_ref() {
             None => {
@@ -243,7 +257,7 @@ impl AstConversion<'_, PostgresAlterCommand> {
             },
         };
         if let Some(definition) = binding.definition() {
-            if convert(&self.ast.operation).drops_not_null() {
+            if ColumnAttributeAction::ast_operation_drops_not_null(&ast.operation) {
                 if definition.has_inline_primary_key()
                     || staged
                         .as_ref()
@@ -255,18 +269,22 @@ impl AstConversion<'_, PostgresAlterCommand> {
                     problems.push(AlterColumnProblem::identity());
                 }
             }
-            if convert(&self.ast.operation).drops_expression() {
+            if ColumnAttributeAction::ast_operation_drops_expression(&ast.operation) {
                 if definition.has_virtual_generation() {
                     problems.push(AlterColumnProblem::virtual_generated());
-                } else if !definition.has_stored_generation() && !self.ast.missing_ok {
+                } else if !definition.has_stored_generation() && !ast.missing_ok {
                     problems.push(AlterColumnProblem::not_stored_generated());
                 }
             }
-            if convert(&self.ast.operation).sets_statistics() {
+            if ColumnAttributeAction::ast_operation_sets_statistics(&ast.operation) {
                 if definition.has_virtual_generation() {
                     problems.push(AlterColumnProblem::virtual_generated());
                 }
-                convert(&self.ast.definition).validate_statistics(context, &mut problems)?;
+                ColumnAttributeAction::validate_ast_statistics(
+                    &ast.definition,
+                    context,
+                    &mut problems,
+                )?;
             }
             problems.extend(action.validate_options());
         }
@@ -278,37 +296,43 @@ impl AstConversion<'_, PostgresAlterCommand> {
         if let Some(staged) = staged {
             change.apply(staged);
         }
-        Ok(AlterObjSubCommand::column_attributes(&change))
+        Ok(Self::column_attributes(&change))
     }
 }
 
-impl AstConversion<'_, AlterDefinition> {
-    pub(crate) fn statistics_request(&self) -> Result<Option<i32>, AnalysisError> {
-        match self.ast {
+impl ColumnAttributeAction {
+    pub(crate) fn statistics_from_ast_definition(
+        ast: &AlterDefinition,
+    ) -> Result<Option<i32>, AnalysisError> {
+        match ast {
             AlterDefinition::None => Ok(None),
-            AlterDefinition::Expression(expr) => convert(expr)
-                .statistics_integer()
+            AlterDefinition::Expression(expr) => Self::statistics_integer_from_ast_expression(expr)
                 .map(Some)
                 .ok_or_else(|| AnalysisError::unexpected_input_error("statistics integer")),
             _ => AnalysisError::raise_unexpected_input("statistics definition"),
         }
     }
-    pub(crate) fn column_options(&self) -> Result<Vec<ColumnAttributeOption>, AnalysisError> {
-        if let AlterDefinition::Options(options) = self.ast {
-            options
-                .iter()
-                .map(|syntax| convert::<SyntaxOption>(syntax).column_attribute_option())
-                .collect()
+}
+
+impl ColumnAttributeOption {
+    pub(crate) fn from_ast_definition_list(
+        ast: &AlterDefinition,
+    ) -> Result<Vec<Self>, AnalysisError> {
+        if let AlterDefinition::Options(options) = ast {
+            options.iter().map(Self::from_ast).collect()
         } else {
             AnalysisError::raise_unexpected_input("column attribute options")
         }
     }
-    pub(crate) fn validate_statistics(
-        &self,
+}
+
+impl ColumnAttributeAction {
+    pub(crate) fn validate_ast_statistics(
+        ast: &AlterDefinition,
         context: &impl ParseContext,
         problems: &mut Vec<AlterColumnProblem>,
     ) -> Result<(), AnalysisError> {
-        match self.statistics_request()? {
+        match Self::statistics_from_ast_definition(ast)? {
             Some(value) if value < -1 => {
                 problems.push(AlterColumnProblem::statistics_too_low(value))
             }
@@ -331,35 +355,39 @@ impl AstConversion<'_, AlterDefinition> {
         }
         Ok(())
     }
-}
 
-impl AstConversion<'_, Expr> {
-    pub(crate) const fn statistics_integer(&self) -> Option<i32> {
-        if let Expr::Literal(value) = self.ast {
-            convert(value).statistics_integer()
+    pub(crate) const fn statistics_integer_from_ast_expression(ast: &Expr) -> Option<i32> {
+        if let Expr::Literal(value) = ast {
+            Self::statistics_integer_from_ast_literal(value)
         } else {
             None
         }
     }
-    pub(crate) fn column_option_text(&self) -> Result<String, AnalysisError> {
-        if let Expr::Literal(value) = self.ast {
-            convert(value).column_option_text()
+}
+
+impl ColumnAttributeOption {
+    pub(crate) fn value_from_ast_expression(ast: &Expr) -> Result<String, AnalysisError> {
+        if let Expr::Literal(value) = ast {
+            Self::value_from_ast_literal(value)
         } else {
             AnalysisError::raise_unexpected_input("column option constant")
         }
     }
 }
 
-impl AstConversion<'_, Literal> {
-    pub(crate) const fn statistics_integer(&self) -> Option<i32> {
-        if let Literal::Integer(value) = self.ast {
+impl ColumnAttributeAction {
+    pub(crate) const fn statistics_integer_from_ast_literal(ast: &Literal) -> Option<i32> {
+        if let Literal::Integer(value) = ast {
             Some(*value)
         } else {
             None
         }
     }
-    pub(crate) fn column_option_text(&self) -> Result<String, AnalysisError> {
-        match self.ast {
+}
+
+impl ColumnAttributeOption {
+    pub(crate) fn value_from_ast_literal(ast: &Literal) -> Result<String, AnalysisError> {
+        match ast {
             Literal::Integer(value) => Ok(value.to_string()),
             Literal::String(value) | Literal::Numeric(value) | Literal::Keyword(value) => {
                 Ok(value.clone())
@@ -368,29 +396,21 @@ impl AstConversion<'_, Literal> {
             _ => AnalysisError::raise_unexpected_input("column option literal"),
         }
     }
-}
 
-impl AstConversion<'_, SyntaxOption> {
-    pub(crate) fn column_attribute_option(&self) -> Result<ColumnAttributeOption, AnalysisError> {
-        let name = if let Some(namespace) = &self.ast.namespace {
-            format!("{namespace}.{}", self.ast.name)
+    pub(crate) fn from_ast(ast: &SyntaxOption) -> Result<Self, AnalysisError> {
+        let name = if let Some(namespace) = &ast.namespace {
+            format!("{namespace}.{}", ast.name)
         } else {
-            self.ast.name.clone()
+            ast.name.clone()
         };
-        let value = self
-            .value
-            .as_ref()
-            .map(|syntax| convert::<SyntaxValue>(syntax).column_option_text())
-            .transpose()?;
-        Ok(ColumnAttributeOption::new(&name, value.as_deref()))
+        let value = ast.value.as_ref().map(Self::value_from_ast).transpose()?;
+        Ok(Self::new(&name, value.as_deref()))
     }
-}
 
-impl AstConversion<'_, SyntaxValue> {
-    pub(crate) fn column_option_text(&self) -> Result<String, AnalysisError> {
-        match self.ast {
-            SyntaxValue::Expression(value) => convert(value).column_option_text(),
-            SyntaxValue::Type(value) => Ok(convert(&value.name).full_name()?.to_string()),
+    pub(crate) fn value_from_ast(ast: &SyntaxValue) -> Result<String, AnalysisError> {
+        match ast {
+            SyntaxValue::Expression(value) => Self::value_from_ast_expression(value),
+            SyntaxValue::Type(value) => Ok(FullName::from_ast_name(&value.name)?.to_string()),
         }
     }
 }

@@ -6,7 +6,7 @@ use crate::context::MutSourcePathWithSpan as _;
 use crate::context::ParseContext as _;
 #[cfg(feature = "sqlite")]
 use crate::names::SchemaName;
-use crate::sem::convert;
+use crate::sem::SemAst;
 use crate::syn::Node;
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::SqliteSynBuilder;
@@ -42,9 +42,8 @@ pub(crate) fn apply(
     for raw in parsed.protobuf.stmts {
         let node = Node::from(raw.stmt.expect("statement").as_ref().clone());
         let syntax = StatementNode::try_from_with_tokens(&node, &::sql_fun_core::IVec::default())?;
-        context = convert(&syntax)
-            .resolve_and_apply(context, &mut create_cache_context())?
-            .into_context();
+        context =
+            SemAst::apply_ast_node(&syntax, context, &mut create_cache_context())?.into_context();
     }
     Ok(context)
 }
@@ -66,7 +65,10 @@ pub(crate) fn apply_sqlite(
     sql: &str,
 ) -> Result<SchemaFileContext, AnalysisError> {
     let statement = SqliteSynBuilder.parse_as_stmt(sql);
-    Ok(convert(&StatementNode::try_from(&statement)?)
-        .resolve_and_apply(context, &mut create_cache_context())?
-        .into_context())
+    Ok(SemAst::apply_ast_node(
+        &StatementNode::try_from(&statement)?,
+        context,
+        &mut create_cache_context(),
+    )?
+    .into_context())
 }

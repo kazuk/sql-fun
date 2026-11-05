@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{
     ast::{FromItem, Relation},
     sem::{AnalysisError, DataSource, FromClause as SemFromClause, ParseContext, WithClause},
@@ -15,8 +14,12 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::relation(Relation::try_from(&range_var)?);
-        let outcome =
-            convert(&syntax).resolve_source(&mut context, with_clause, &SemFromClause::default());
+        let outcome = Self::from_ast_source(
+            &syntax,
+            &mut context,
+            with_clause,
+            &SemFromClause::default(),
+        );
         Ok((outcome?, context))
     }
 }

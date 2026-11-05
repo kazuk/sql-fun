@@ -1,11 +1,13 @@
 use crate::ast::{Column, TypeName};
-use crate::sem::{AstConversion, convert};
 
 use crate::{
     ast::{ColumnConstraint, Dialect},
     context::ParseContext,
     names::{ColumnName, FullName, LocalName, TableName},
-    sem::{AnalysisError, AnalysisProblem, ColumnDefinition, CreateSequence},
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnConstraint as SemColumnConstraint, ColumnDefinition,
+        CreateSequence,
+    },
 };
 use ::sql_fun_core::analysis_problem::SerialProblem;
 
@@ -104,51 +106,56 @@ mod serial_name_tests {
     }
 }
 
-impl AstConversion<'_, Column> {
-    pub(crate) fn resolve_serial(
-        &self,
+impl ColumnDefinition {
+    pub(crate) fn from_ast_serial(
+        ast: &Column,
         context: &mut impl ParseContext,
         table: &TableName,
         temporary: bool,
         sequences: &mut SerialSequences,
-    ) -> Result<ColumnDefinition, AnalysisError> {
-        let Some(integer) = self.serial_integer(context) else {
-            return self.resolve(context, table);
+    ) -> Result<Self, AnalysisError> {
+        let Some(integer) = SerialSequences::integer_for_ast_column(ast, context) else {
+            return Self::from_ast(ast, context, table);
         };
-        let expanded = self.ast.serial_expansion(integer);
-        let valid = self.validate_serial(context)?;
-        let mut column = convert(&expanded).resolve(context, table)?;
+        let expanded = ast.serial_expansion(integer);
+        let valid = SerialSequences::validate_ast_column(ast, context)?;
+        let mut column = Self::from_ast(&expanded, context, table)?;
         if !valid {
             column.reject_declaration();
             return Ok(column);
         }
         let owner = TableName::from(context.creation_name(table.full_name(), temporary)?);
-        let sequence_name = sequences.stage(context, &owner, &self.ast.name, temporary);
-        let name = ColumnName::from(self.ast.name.as_str());
+        let sequence_name = sequences.stage(context, &owner, &ast.name, temporary);
+        let name = ColumnName::from(ast.name.as_str());
         let not_null = ColumnConstraint::serial_not_null();
-        column.push_constraint(convert(&not_null).resolve(context, table, &name)?);
+        column.push_constraint(SemColumnConstraint::from_ast(
+            &not_null, context, table, &name,
+        )?);
         column.set_not_null(Some(true));
         let default = ColumnConstraint::serial_default(&sequence_name);
-        column.push_constraint(convert(&default).resolve(context, table, &name)?);
+        column.push_constraint(SemColumnConstraint::from_ast(
+            &default, context, table, &name,
+        )?);
         Ok(column)
     }
+}
 
-    pub(crate) fn serial_integer(&self, context: &impl ParseContext) -> Option<&'static str> {
+impl SerialSequences {
+    pub(crate) fn integer_for_ast_column(
+        ast: &Column,
+        context: &impl ParseContext,
+    ) -> Option<&'static str> {
         if context.dialect() != Dialect::postgres() {
             return None;
         }
-        convert(self.ast.type_name.as_ref()?).serial_integer()
+        Self::integer_for_ast_type(ast.type_name.as_ref()?)
     }
 
-    pub(crate) fn validate_serial(
-        &self,
+    pub(crate) fn validate_ast_column(
+        ast: &Column,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        let syntax = self
-            .ast
-            .type_name
-            .as_ref()
-            .expect("serial declaration type");
+        let syntax = ast.type_name.as_ref().expect("serial declaration type");
         let mut problems = Vec::new();
         if !syntax.array_bounds.is_empty() {
             problems.push(SerialProblem::array());
@@ -156,8 +163,8 @@ impl AstConversion<'_, Column> {
         if !syntax.modifiers.is_empty() {
             problems.push(SerialProblem::modifier());
         }
-        for constraint in &self.ast.constraints {
-            if let Some(problem) = convert(&constraint.constraint).serial_conflict() {
+        for constraint in &ast.constraints {
+            if let Some(problem) = Self::conflict_from_ast_constraint(&constraint.constraint) {
                 problems.push(problem);
             }
         }
@@ -321,12 +328,12 @@ mod serial_catalog_tests {
     }
 }
 
-impl AstConversion<'_, TypeName> {
-    pub(crate) fn serial_integer(&self) -> Option<&'static str> {
-        if self.ast.percent_type || self.ast.set_of {
+impl SerialSequences {
+    pub(crate) fn integer_for_ast_type(ast: &TypeName) -> Option<&'static str> {
+        if ast.percent_type || ast.set_of {
             return None;
         }
-        let [name] = self.ast.name.0.as_slice() else {
+        let [name] = ast.name.0.as_slice() else {
             return None;
         };
         match name.as_str() {
@@ -336,11 +343,11 @@ impl AstConversion<'_, TypeName> {
             _ => None,
         }
     }
-}
 
-impl AstConversion<'_, ColumnConstraint> {
-    pub(crate) const fn serial_conflict(&self) -> Option<SerialProblem> {
-        match self.ast {
+    pub(crate) const fn conflict_from_ast_constraint(
+        ast: &ColumnConstraint,
+    ) -> Option<SerialProblem> {
+        match ast {
             ColumnConstraint::Nullability(false, _, _) => Some(SerialProblem::nullable()),
             ColumnConstraint::Default(_) => Some(SerialProblem::default_conflict()),
             ColumnConstraint::Identity(_) => Some(SerialProblem::identity()),

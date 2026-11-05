@@ -1,5 +1,4 @@
-use crate::rewrite_wildcards;
-use crate::sem::SemAst;
+use crate::sem::{SemAst, WildcardExpansion};
 use crate::test_helpers::wildcard as test_helpers;
 
 use crate::test_helpers::create_cache_context;
@@ -103,13 +102,16 @@ fn missing_location_preserves_owner_and_allows_retry() {
     let mut owner = statement("(SELECT * FROM t)");
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        rewrite_wildcards(&mut owner, &groups)
+        WildcardExpansion::rewrite(&groups, &mut owner)
             .unwrap_err()
             .is_not_found()
     );
     assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
     let own_groups = expansions(&owner);
-    assert_eq!(rewrite_wildcards(&mut owner, &own_groups).unwrap(), 1);
+    assert_eq!(
+        WildcardExpansion::rewrite(&own_groups, &mut owner).unwrap(),
+        1
+    );
 }
 
 #[test]
@@ -119,7 +121,7 @@ fn duplicate_group_rejection_preserves_owner() {
     groups.push(groups[0].clone());
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        rewrite_wildcards(&mut owner, &groups)
+        WildcardExpansion::rewrite(&groups, &mut owner)
             .unwrap_err()
             .is_duplicate_location()
     );
@@ -132,7 +134,7 @@ fn wrong_node_kind_is_rejected_without_edit() {
     let mut owner = statement("SELECT 1 FROM t");
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        rewrite_wildcards(&mut owner, &groups)
+        WildcardExpansion::rewrite(&groups, &mut owner)
             .unwrap_err()
             .is_wrong_node_kind()
     );
@@ -165,7 +167,7 @@ fn ambiguous_target_locations_preserve_owner() {
         .unwrap();
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        rewrite_wildcards(&mut owner, &groups)
+        WildcardExpansion::rewrite(&groups, &mut owner)
             .unwrap_err()
             .is_ambiguous()
     );
@@ -179,7 +181,7 @@ fn missing_parser_location_is_rejected_without_edit() {
     let group = WildcardExpansion::new(None, &ResultColumnCollection::default(), 0, true, &[]);
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        rewrite_wildcards(&mut owner, &[group])
+        WildcardExpansion::rewrite(&[group], &mut owner)
             .unwrap_err()
             .is_missing_location()
     );
@@ -192,7 +194,7 @@ fn empty_returning_is_rejected_without_edit() {
     let groups = expansions(&owner);
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        rewrite_wildcards(&mut owner, &groups)
+        WildcardExpansion::rewrite(&groups, &mut owner)
             .unwrap_err()
             .is_empty_returning()
     );
@@ -212,9 +214,9 @@ fn returning_row_image_qualification_is_preserved(#[case] sql: &str, #[case] qua
     let mut owner = statement(sql);
     let analyzed = SemAst::from_ast(&owner, context(), &mut cache_context).unwrap();
     assert!(analyzed.context().reported_problems().is_empty());
-    rewrite_wildcards(
-        &mut owner,
+    WildcardExpansion::rewrite(
         analyzed.context().analysis_state().wildcard_expansions(),
+        &mut owner,
     )
     .unwrap();
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
@@ -251,9 +253,9 @@ fn rows_from_expansion_keeps_duplicate_outputs_stable(#[case] sql: &str) {
         "{:?}",
         original.context().reported_problems()
     );
-    rewrite_wildcards(
-        &mut owner,
+    WildcardExpansion::rewrite(
         original.context().analysis_state().wildcard_expansions(),
+        &mut owner,
     )
     .unwrap();
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
@@ -291,7 +293,7 @@ fn target_location_synchronization_disambiguates_imported_statements() {
     let groups = expansions(&owner);
     assert_eq!(groups.len(), 2);
     assert_ne!(groups[0].location(), groups[1].location());
-    assert_eq!(rewrite_wildcards(&mut owner, &groups).unwrap(), 2);
+    assert_eq!(WildcardExpansion::rewrite(&groups, &mut owner).unwrap(), 2);
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(!emitted.contains('*'), "{emitted}");
     assert!(
@@ -329,7 +331,7 @@ fn target_location_synchronization_rejects_a_different_statement_atomically() {
         .synchronize_target_locations(statement(&before))
         .unwrap();
     let groups = expansions(&owner);
-    assert_eq!(rewrite_wildcards(&mut owner, &groups).unwrap(), 1);
+    assert_eq!(WildcardExpansion::rewrite(&groups, &mut owner).unwrap(), 1);
 }
 
 #[test]
@@ -366,7 +368,7 @@ fn target_location_synchronization_rejects_colliding_source_locations_atomically
         .synchronize_target_locations(statement(&rendered))
         .unwrap();
     let groups = expansions(&owner);
-    assert_eq!(rewrite_wildcards(&mut owner, &groups).unwrap(), 2);
+    assert_eq!(WildcardExpansion::rewrite(&groups, &mut owner).unwrap(), 2);
 }
 
 #[rstest::rstest]
@@ -394,9 +396,9 @@ fn merge_returning_fixes_its_source_projection(
         original.context().reported_problems()
     );
     assert_eq!(
-        rewrite_wildcards(
-            &mut owner,
-            original.context().analysis_state().wildcard_expansions()
+        WildcardExpansion::rewrite(
+            original.context().analysis_state().wildcard_expansions(),
+            &mut owner
         )
         .unwrap(),
         1
@@ -420,13 +422,16 @@ fn a_late_invalid_target_preserves_sources_and_allows_retry() {
     let mut owner = statement("SELECT j.*, 1   FROM (t CROSS JOIN u) j");
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        rewrite_wildcards(&mut owner, &groups)
+        WildcardExpansion::rewrite(&groups, &mut owner)
             .unwrap_err()
             .is_wrong_node_kind()
     );
     assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
     let own_groups = expansions(&owner);
-    assert_eq!(rewrite_wildcards(&mut owner, &own_groups).unwrap(), 1);
+    assert_eq!(
+        WildcardExpansion::rewrite(&own_groups, &mut owner).unwrap(),
+        1
+    );
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
         SemAst::from_ast(&statement(&emitted), catalog(), &mut cache_context)

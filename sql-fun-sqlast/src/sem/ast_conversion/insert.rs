@@ -1,10 +1,11 @@
 use crate::ast::document::OverridingKind;
-use crate::sem::{AstConversion, convert};
+use crate::names::FullName;
+use crate::sem::IndirectionExpr;
 use crate::{
     CacheContext,
     ast::{
-        Access, Assignment, Collate, Conflict, ConflictAction, Dialect, Expr, IndexExpression,
-        Insert, Name, Query, QueryBody,
+        Assignment, Collate, Conflict, ConflictAction, Dialect, Expr, IndexExpression, Insert,
+        Name, Query, QueryBody,
     },
     context::ParseContext,
     names::{ColumnName, TableName, ViewName},
@@ -19,19 +20,19 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, Insert> {
-    pub(crate) fn resolve(
-        &self,
+impl InsertStatement {
+    pub(crate) fn from_ast(
+        ast: &Insert,
         context: &mut impl ParseContext,
         cache: &mut CacheContext,
-    ) -> Result<Option<InsertStatement>, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, None).and_then(|value| {
+        let result = Self::from_ast_in(ast, context, None).and_then(|value| {
             let Some(mut statement) = value else {
                 return Ok(None);
             };
             let implicit_targets =
-                self.ast.columns.is_empty() && context.dialect() == Dialect::postgres();
+                ast.columns.is_empty() && context.dialect() == Dialect::postgres();
             let expanded = if context.parameter_inference_needed() {
                 let (constraints, changed) = ParameterResolution::infer_insert(
                     &mut statement,
@@ -50,7 +51,7 @@ impl AstConversion<'_, Insert> {
             };
             if expanded {
                 if ResolutionFailure::finish(
-                    self.validate_expanded_source(&statement, context),
+                    Self::validate_ast_expanded_source(ast, &statement, context),
                     context,
                 )?
                 .is_none()
@@ -63,10 +64,12 @@ impl AstConversion<'_, Insert> {
         });
         context.finish_analysis(result)
     }
+}
 
-    pub(crate) fn validate_expanded_source(
-        &self,
-        statement: &InsertStatement,
+impl InsertStatement {
+    pub(crate) fn validate_ast_expanded_source(
+        ast: &Insert,
+        statement: &Self,
         context: &mut impl ParseContext,
     ) -> Result<(), ResolutionFailure> {
         let source = statement.source();
@@ -79,10 +82,9 @@ impl AstConversion<'_, Insert> {
             target.validate_value(
                 context,
                 defaults_only,
-                self.ast
-                    .overriding
+                ast.overriding
                     .as_ref()
-                    .is_some_and(|value| convert(value).overrides_identity()),
+                    .is_some_and(InsertClauseSemantics::ast_overrides_identity),
             )?;
             if let Some(name) = target.column().name()
                 && statement
@@ -95,7 +97,7 @@ impl AstConversion<'_, Insert> {
                 ))?;
             }
         }
-        if self.ast.columns.is_empty()
+        if ast.columns.is_empty()
             && context.dialect() == Dialect::postgres()
             && let Some(support) = statement.view_support()
         {
@@ -114,23 +116,29 @@ impl AstConversion<'_, Insert> {
         }
         Ok(())
     }
-    pub(crate) fn resolve_in(
-        &self,
+}
+
+impl InsertStatement {
+    pub(crate) fn from_ast_in(
+        ast: &Insert,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<Option<InsertStatement>, AnalysisError> {
-        let result = self.resolve_definition(context, outer);
+    ) -> Result<Option<Self>, AnalysisError> {
+        let result = Self::from_ast_definition(ast, context, outer);
         ResolutionFailure::finish(result, context)
     }
-    pub(crate) fn resolve_definition(
-        &self,
+}
+
+impl InsertStatement {
+    pub(crate) fn from_ast_definition(
+        ast: &Insert,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<InsertStatement, ResolutionFailure> {
-        if let Some(conflict) = &self.ast.conflict {
-            convert(conflict).require_insert_action();
+    ) -> Result<Self, ResolutionFailure> {
+        if let Some(conflict) = &ast.conflict {
+            InsertConflict::require_ast_conflict_action(conflict);
         }
-        let name = convert(&self.ast.relation.name).full_name()?;
+        let name = FullName::from_ast_name(&ast.relation.name)?;
         let name = if let Some(scope) = outer {
             scope.trigger_relation_name(context, &name)?
         } else {
@@ -159,14 +167,14 @@ impl AstConversion<'_, Insert> {
             return Err(ResolutionFailure::reported());
         }
         if let Some(support) = table.view_support() {
-            if !self.ast.returning.is_empty() && !support.supports_returning() {
+            if !ast.returning.is_empty() && !support.supports_returning() {
                 context.report_analysis_problem(AnalysisProblem::insert(
                     InsertProblemKind::view_operation(),
                     "destination view does not support INSERT RETURNING",
                 ))?;
                 return Err(ResolutionFailure::reported());
             }
-            if self.ast.conflict.is_some() && !support.supports_on_conflict() {
+            if ast.conflict.is_some() && !support.supports_on_conflict() {
                 context.report_analysis_problem(AnalysisProblem::insert(
                     InsertProblemKind::view_operation(),
                     "destination view does not support ON CONFLICT",
@@ -175,26 +183,23 @@ impl AstConversion<'_, Insert> {
             }
         }
         let name = table.name().clone();
-        let with = convert(&self.ast.with).resolve(context, outer)?;
+        let with = WithClause::from_ast(&ast.with, context, outer)?;
         let empty = FromClause::default();
         let source_scope = ScalarAnalysisContext::rule_action_source(&with, &empty, outer);
-        let source = self
-            .ast
+        let source = ast
             .source
             .as_ref()
-            .map(|query| convert(query).resolve_insert_source(context, &source_scope))
+            .map(|query| InsertSource::from_ast(query, context, &source_scope))
             .transpose()?
             .unwrap_or_else(InsertSource::default_values);
-        let alias = self
-            .ast
+        let alias = ast
             .relation
             .alias
             .as_ref()
-            .map(|value| convert(value).resolve())
+            .map(AliasSpec::from_ast)
             .unwrap_or_else(|| {
                 AliasSpec::from_local_name(
-                    &convert(&self.ast.relation.name)
-                        .full_name()
+                    &FullName::from_ast_name(&ast.relation.name)
                         .expect("target name")
                         .local_name(),
                 )
@@ -211,7 +216,7 @@ impl AstConversion<'_, Insert> {
         }
         let scope = ScalarAnalysisContext::nested(&with, &from, outer);
         let implicit_width = if context.dialect() == Dialect::postgres() {
-            if self.ast.source.is_some() {
+            if ast.source.is_some() {
                 if source
                     .as_query()
                     .is_some_and(SelectStatement::has_pending_stars)
@@ -231,19 +236,19 @@ impl AstConversion<'_, Insert> {
             .is_some_and(SelectStatement::has_pending_stars);
         let columns = InsertTargetCollection::resolve(
             context,
-            &self.ast.columns,
+            &ast.columns,
             &InsertTargetBinding::new(&table, &alias, &scope),
             &scope,
-            InsertTargetMode::new(self.ast.source.is_some(), implicit_width, pending_source),
+            InsertTargetMode::new(ast.source.is_some(), implicit_width, pending_source),
         )?;
         columns.validate_source(
             context,
             &source,
-            self.ast.source.is_some(),
-            self.ast.overriding.as_ref(),
+            ast.source.is_some(),
+            ast.overriding.as_ref(),
         )?;
         let returning_alias = if context.dialect() == Dialect::sqlite() {
-            AliasSpec::from_local_name(&convert(&self.ast.relation.name).full_name()?.local_name())
+            AliasSpec::from_local_name(&FullName::from_ast_name(&ast.relation.name)?.local_name())
         } else {
             alias.clone()
         };
@@ -263,33 +268,34 @@ impl AstConversion<'_, Insert> {
             ScalarAnalysisContext::nested(&with, &returning_from, rule_returning.as_ref());
         returning_scope.set_postgres_returning(context);
         let returning = ResultColumnCollection::resolve_for_insert(
-            &self.ast.returning,
+            &ast.returning,
             context,
             &returning_scope,
             &table,
             &returning_alias,
         )?;
-        let conflicts = self
-            .ast
+        let conflicts = ast
             .conflict
             .as_ref()
-            .map(|conflict| convert(conflict).resolve_insert(context, &scope, &table, &name))
+            .map(|conflict| {
+                InsertConflict::from_ast_insert(conflict, context, &scope, &table, &name)
+            })
             .transpose()?
             .unwrap_or_default();
-        let mut insert = InsertStatement::new(
+        let mut insert = Self::new(
             &name,
             &columns,
             &source,
-            &convert(&self.ast.with).local_definitions(with),
+            &WithClause::ast_local_definitions(&ast.with, with),
             &returning,
         );
-        let overriding = if let Some(mode) = &self.ast.overriding {
-            convert(mode).insert_mode()
+        let overriding = if let Some(mode) = &ast.overriding {
+            InsertClauseSemantics::ast_insert_mode(mode)
         } else {
             None
         };
         insert.set_view_support(table.view_support());
-        insert.set_modifiers(conflicts, overriding, self.ast.or_conflict.clone());
+        insert.set_modifiers(conflicts, overriding, ast.or_conflict.clone());
         if !insert.source_has_pending_stars() {
             insert.validate_assignments(context)?;
         }
@@ -439,7 +445,7 @@ impl InsertTargetCollection {
             for assignment in assignments {
                 if context.dialect() == Dialect::postgres()
                     && seen.iter().any(|previous| {
-                        convert(assignment).overlaps_mapped(previous, |name| {
+                        Self::ast_overlaps_mapped(assignment, previous, |name| {
                             table.view_support().map_or_else(
                                 || name.clone(),
                                 |support| support.assignment_column(name).clone(),
@@ -464,7 +470,7 @@ impl InsertTargetCollection {
                 let destination = scope
                     .resolve_column(context, Some(alias.name()), &column_name)?
                     .0;
-                let destination = AstConversion::<Access>::resolve_sequence(
+                let destination = IndirectionExpr::from_ast_sequence(
                     &assignment.indirection,
                     context,
                     expression_scope,
@@ -507,7 +513,7 @@ impl InsertTargetCollection {
                     .as_slice()
                     .get(index)
                     .is_some_and(InsertValue::is_default),
-                overriding.is_some_and(|value| convert(value).overrides_identity()),
+                overriding.is_some_and(InsertClauseSemantics::ast_overrides_identity),
             )?;
         }
         Ok(())
@@ -538,7 +544,7 @@ impl InsertTargetCollection {
             target.validate_value(
                 context,
                 defaults_only,
-                overriding.is_some_and(|value| convert(value).overrides_identity()),
+                overriding.is_some_and(InsertClauseSemantics::ast_overrides_identity),
             )?;
         }
         Ok(())
@@ -553,7 +559,7 @@ impl InsertValueCollection {
     ) -> Result<Self, ResolutionFailure> {
         let mut values = Self::default();
         for expression in expressions {
-            values.push(convert(expression).resolve_insert_value(context, scope)?);
+            values.push(InsertValue::from_ast(expression, context, scope)?);
         }
         Ok(values)
     }
@@ -642,78 +648,89 @@ fn validate_insert_width(
     Ok(())
 }
 
-impl AstConversion<'_, Query> {
-    pub(crate) fn resolve_insert_source(
-        &self,
+impl InsertSource {
+    pub(crate) fn from_ast(
+        ast: &Query,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<InsertSource, ResolutionFailure> {
-        if let QueryBody::Values(rows) = &self.ast.body
-            && self.ast.with.entries.is_empty()
-            && self.ast.order.is_empty()
-            && self.ast.limit.is_none()
-            && self.ast.offset.is_none()
-            && self.ast.locks.is_empty()
+    ) -> Result<Self, ResolutionFailure> {
+        if let QueryBody::Values(rows) = &ast.body
+            && ast.with.entries.is_empty()
+            && ast.order.is_empty()
+            && ast.limit.is_none()
+            && ast.offset.is_none()
+            && ast.locks.is_empty()
         {
-            let mut source = InsertSource::empty_values();
+            let mut source = Self::empty_values();
             for row in rows {
                 let values = InsertValueCollection::resolve(row, context, scope)?;
                 source.push_values(&values);
             }
             return Ok(source);
         }
-        Ok(InsertSource::query(self.resolve_in(context, Some(scope))?))
+        Ok(Self::query(SelectStatement::from_ast_in(
+            ast,
+            context,
+            Some(scope),
+        )?))
     }
 }
-impl<'ast> AstConversion<'ast, Expr> {
-    pub(crate) fn resolve_insert_value(
-        &self,
+
+impl InsertValue {
+    pub(crate) fn from_ast(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<InsertValue, ResolutionFailure> {
-        match self.ast {
-            Expr::Default => Ok(InsertValue::default_value()),
-            _ => Ok(InsertValue::expression(self.resolve_in(context, scope)?)),
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
+            Expr::Default => Ok(Self::default_value()),
+            _ => Ok(Self::expression(SemScalarExpr::from_ast_in(
+                ast, context, scope,
+            )?)),
         }
     }
 }
-impl AstConversion<'_, Assignment> {
-    pub(crate) fn overlaps_mapped(
-        &self,
+
+impl InsertTargetCollection {
+    pub(crate) fn ast_overlaps_mapped(
+        ast: &Assignment,
         other: &Assignment,
         map: impl Fn(&ColumnName) -> ColumnName,
     ) -> bool {
-        let same = map(&ColumnName::from(self.ast.name.as_str()))
+        let same = map(&ColumnName::from(ast.name.as_str()))
             == map(&ColumnName::from(other.name.as_str()));
-        same && (self.ast.indirection.is_empty() || other.indirection.is_empty())
+        same && (ast.indirection.is_empty() || other.indirection.is_empty())
     }
 }
-impl AstConversion<'_, ConflictAction> {
-    pub(crate) fn require_insert_action(&self) {
-        if matches!(self.ast, ConflictAction::Update) {
+
+impl InsertConflict {
+    pub(crate) fn require_ast_action(ast: &ConflictAction) {
+        if matches!(ast, ConflictAction::Update) {
             todo!("ON CONFLICT DO UPDATE semantics are tracked in #474");
         }
     }
 }
-impl AstConversion<'_, Conflict> {
-    pub(crate) fn require_insert_action(&self) {
-        if let Some(action) = &self.ast.action {
-            convert(action).require_insert_action();
+
+impl InsertConflict {
+    pub(crate) fn require_ast_conflict_action(ast: &Conflict) {
+        if let Some(action) = &ast.action {
+            Self::require_ast_action(action);
         }
-        if let Some(next) = &self.ast.next {
-            convert(next.as_ref()).require_insert_action();
+        if let Some(next) = &ast.next {
+            Self::require_ast_conflict_action(next.as_ref());
         }
     }
-    pub(crate) fn resolve_insert(
-        &self,
+}
+
+impl InsertConflict {
+    pub(crate) fn from_ast_insert(
+        ast: &Conflict,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         table: &InsertDestination,
         name: &TableName,
-    ) -> Result<Vec<InsertConflict>, ResolutionFailure> {
-        if context.dialect() == Dialect::sqlite()
-            && self.ast.next.is_some()
-            && self.ast.inference.is_empty()
+    ) -> Result<Vec<Self>, ResolutionFailure> {
+        if context.dialect() == Dialect::sqlite() && ast.next.is_some() && ast.inference.is_empty()
         {
             context.report_analysis_problem(AnalysisProblem::insert(
                 InsertProblemKind::conflict_chain(),
@@ -721,7 +738,7 @@ impl AstConversion<'_, Conflict> {
             ))?;
         }
         let mut inference = Vec::new();
-        for item in &self.ast.inference {
+        for item in &ast.inference {
             if let Some(name) = &item.name {
                 inference.push(
                     scope
@@ -731,11 +748,12 @@ impl AstConversion<'_, Conflict> {
                 );
             }
             if let Some(expression) = &item.expression {
-                inference.push(convert(expression).resolve_insert_inference(context, scope)?);
+                inference.push(SemScalarExpr::from_ast_insert_inference(
+                    expression, context, scope,
+                )?);
             }
         }
-        let predicate =
-            AstConversion::<Expr>::resolve_optional(&self.ast.inference_predicate, context, scope)?;
+        let predicate = SemScalarExpr::from_ast_optional(&ast.inference_predicate, context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
@@ -753,14 +771,15 @@ impl AstConversion<'_, Conflict> {
             ))?;
         }
 
-        let mut conflict =
-            InsertConflict::new(inference, predicate, self.ast.constraint.as_deref());
+        let mut conflict = Self::new(inference, predicate, ast.constraint.as_deref());
         let mut modifiers = Vec::new();
-        for item in &self.ast.inference {
-            modifiers.push(convert(item).resolve_insert_modifiers(context)?);
+        for item in &ast.inference {
+            modifiers.push(InsertInferenceModifiers::from_ast_insert_modifiers(
+                item, context,
+            )?);
         }
         conflict.set_modifiers(modifiers);
-        if let Some(constraint) = &self.ast.constraint {
+        if let Some(constraint) = &ast.constraint {
             let lookup =
                 InsertConstraintLookup::new(name, constraint, table.constraint(constraint));
             if !lookup.is_usable() {
@@ -771,7 +790,7 @@ impl AstConversion<'_, Conflict> {
             }
             conflict.set_arbiter(InsertArbiterLookup::named(&lookup));
         }
-        if !self.ast.inference.is_empty() {
+        if !ast.inference.is_empty() {
             let arbiters = if conflict.modifiers_are_bound() {
                 match if context
                     .get_view(&ViewName::from_full_name(name.full_name()))
@@ -803,108 +822,122 @@ impl AstConversion<'_, Conflict> {
             }
         }
         let mut conflicts = vec![conflict];
-        if let Some(next) = &self.ast.next {
-            conflicts.extend(convert(next.as_ref()).resolve_insert(context, scope, table, name)?);
+        if let Some(next) = &ast.next {
+            conflicts.extend(Self::from_ast_insert(
+                next.as_ref(),
+                context,
+                scope,
+                table,
+                name,
+            )?);
         }
         Ok(conflicts)
     }
 }
-impl AstConversion<'_, OverridingKind> {
-    pub(crate) fn insert_mode(&self) -> Option<String> {
-        match self.ast {
+
+impl InsertClauseSemantics {
+    pub(crate) fn ast_insert_mode(ast: &OverridingKind) -> Option<String> {
+        match ast {
             OverridingKind::UserValue => Some("user".to_owned()),
             OverridingKind::SystemValue => Some("system".to_owned()),
             _ => None,
         }
     }
-    pub(crate) const fn overrides_identity(&self) -> bool {
-        matches!(
-            self.ast,
-            OverridingKind::UserValue | OverridingKind::SystemValue
-        )
+}
+
+impl InsertClauseSemantics {
+    pub(crate) const fn ast_overrides_identity(ast: &OverridingKind) -> bool {
+        matches!(ast, OverridingKind::UserValue | OverridingKind::SystemValue)
     }
 }
 
-impl AstConversion<'_, IndexExpression> {
-    pub(crate) fn resolve_insert_modifiers(
-        &self,
+impl InsertInferenceModifiers {
+    pub(crate) fn from_ast_insert_modifiers(
+        ast: &IndexExpression,
         context: &mut impl ParseContext,
-    ) -> Result<InsertInferenceModifiers, ResolutionFailure> {
+    ) -> Result<Self, ResolutionFailure> {
         let mut names = Vec::new();
-        if let Some(expression) = &self.ast.expression {
-            convert(expression).collect_insert_collations(&mut names);
+        if let Some(expression) = &ast.expression {
+            Self::collect_ast_collations(expression, &mut names);
         }
-        if !self.ast.collation.0.is_empty() {
-            names.push(&self.ast.collation);
+        if !ast.collation.0.is_empty() {
+            names.push(&ast.collation);
         }
         let mut collations = Vec::new();
         for name in names {
-            let lookup = context.lookup_collation(&convert(name).full_name()?);
+            let lookup = context.lookup_collation(&FullName::from_ast_name(name)?);
             lookup.report_insert_problem(context)?;
             collations.push(lookup);
         }
-        let operator_class = if self.ast.operator_class.0.is_empty() {
+        let operator_class = if ast.operator_class.0.is_empty() {
             None
         } else {
             let lookup = context
-                .lookup_operator_class(&convert(&self.ast.operator_class).full_name()?, "btree");
+                .lookup_operator_class(&FullName::from_ast_name(&ast.operator_class)?, "btree");
             lookup.report_insert_problem(context)?;
             Some(lookup)
         };
-        Ok(InsertInferenceModifiers::from_lookups(
-            collations,
-            operator_class,
-        ))
+        Ok(Self::from_lookups(collations, operator_class))
     }
 }
-impl<'ast> AstConversion<'ast, Expr> {
-    pub(crate) fn collect_insert_collations(&self, names: &mut Vec<&'ast Name>) {
-        match self.ast {
-            Expr::Collate(collate) => convert(collate.as_ref()).collect_insert_collations(names),
-            Expr::Parenthesized(items) => {
-                Self::collect_parenthesized_insert_collations(items, names)
-            }
+
+impl InsertInferenceModifiers {
+    pub(crate) fn collect_ast_collations<'ast>(ast: &'ast Expr, names: &mut Vec<&'ast Name>) {
+        match ast {
+            Expr::Collate(collate) => Self::collect_ast_collate_names(collate.as_ref(), names),
+            Expr::Parenthesized(items) => Self::collect_ast_parenthesized_collations(items, names),
             _ => {}
         }
     }
-    fn collect_parenthesized_insert_collations(items: &'ast [Expr], names: &mut Vec<&'ast Name>) {
+}
+
+impl InsertInferenceModifiers {
+    fn collect_ast_parenthesized_collations<'ast>(
+        items: &'ast [Expr],
+        names: &mut Vec<&'ast Name>,
+    ) {
         if let [expression] = items {
-            convert(expression).collect_insert_collations(names);
-        }
-    }
-
-    fn resolve_parenthesized_insert_inference(
-        &self,
-        items: &[Expr],
-        context: &mut impl ParseContext,
-        scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, ResolutionFailure> {
-        match items {
-            [expression] => convert(expression).resolve_insert_inference(context, scope),
-            _ => self.resolve_in(context, scope).map_err(Into::into),
-        }
-    }
-
-    pub(crate) fn resolve_insert_inference(
-        &self,
-        context: &mut impl ParseContext,
-        scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, ResolutionFailure> {
-        match self.ast {
-            Expr::Collate(collate) => {
-                convert(&collate.argument).resolve_insert_inference(context, scope)
-            }
-            Expr::Parenthesized(items) => {
-                self.resolve_parenthesized_insert_inference(items, context, scope)
-            }
-            _ => self.resolve_in(context, scope).map_err(Into::into),
+            Self::collect_ast_collations(expression, names);
         }
     }
 }
-impl<'ast> AstConversion<'ast, Collate> {
-    fn collect_insert_collations(&self, names: &mut Vec<&'ast Name>) {
-        convert(&self.ast.argument).collect_insert_collations(names);
-        names.push(&self.ast.name);
+
+impl SemScalarExpr {
+    fn from_ast_parenthesized_insert_inference(
+        ast: &Expr,
+        items: &[Expr],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Self, ResolutionFailure> {
+        match items {
+            [expression] => Self::from_ast_insert_inference(expression, context, scope),
+            _ => Self::from_ast_in(ast, context, scope).map_err(Into::into),
+        }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn from_ast_insert_inference(
+        ast: &Expr,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
+            Expr::Collate(collate) => {
+                Self::from_ast_insert_inference(&collate.argument, context, scope)
+            }
+            Expr::Parenthesized(items) => {
+                Self::from_ast_parenthesized_insert_inference(ast, items, context, scope)
+            }
+            _ => Self::from_ast_in(ast, context, scope).map_err(Into::into),
+        }
+    }
+}
+
+impl InsertInferenceModifiers {
+    fn collect_ast_collate_names<'ast>(ast: &'ast Collate, names: &mut Vec<&'ast Name>) {
+        Self::collect_ast_collations(&ast.argument, names);
+        names.push(&ast.name);
     }
 }
 

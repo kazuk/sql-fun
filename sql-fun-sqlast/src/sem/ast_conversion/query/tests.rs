@@ -1,7 +1,5 @@
 //! Semantic behavior at the query-analysis boundary. All fixtures use a small catalog.
 
-use crate::sem::convert;
-
 mod array_subquery;
 mod call_arguments;
 mod column_scope;
@@ -188,7 +186,9 @@ fn records_window_resolution(
         fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::FuncCall(call) = expression {
                 self.0.push(
-                    convert(&call.modifiers().over().unwrap())
+                    call.modifiers()
+                        .over()
+                        .unwrap()
                         .reference()
                         .unwrap()
                         .resolution()

@@ -2,7 +2,7 @@ use crate::ast::{CreateRule, StatementKind, StatementNode};
 use crate::context::{BaseParseContext as _, MutSourcePathWithSpan};
 use crate::names::OperatorName;
 use crate::parse_statements;
-use crate::sem::convert;
+use crate::sem::SemAst;
 use crate::sem::{
     BinaryOperatorDefinition, CastContext, CastDefinition, CreateView, OperatorDefinition, ViewLike,
 };
@@ -88,14 +88,15 @@ pub(crate) fn apply(
     sql: &str,
     context: SchemaFileContext,
 ) -> Result<SchemaFileContext, AnalysisError> {
-    Ok(convert(
+    Ok(SemAst::apply_ast_node(
         &parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .into_test_node(),
-    )
-    .resolve_and_apply(context, &mut create_cache_context())?
+        context,
+        &mut create_cache_context(),
+    )?
     .into_context())
 }
 

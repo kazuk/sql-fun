@@ -1,6 +1,9 @@
 //! CREATE TRIGGER resolution consumes only the common syntax tree.
 
-use crate::sem::{AstConversion, convert};
+use crate::sem::DeleteStatement;
+use crate::sem::InsertStatement;
+use crate::sem::SelectStatement;
+use crate::sem::UpdateStatement;
 
 use crate::{
     AstAndContextPair,
@@ -23,22 +26,22 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, CreateTrigger> {
-    pub(crate) fn resolve(
-        &self,
+impl SemCreateTrigger {
+    pub(crate) fn from_ast(
+        ast: &CreateTrigger,
         context: &mut impl ParseContext,
-    ) -> Result<Option<SemCreateTrigger>, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context).and_then(|definition| {
+        let result = Self::from_ast_in(ast, context).and_then(|definition| {
             if context.parameter_inference_needed() {
-                return Self::invalid(
-                    &convert(&self.ast.relation.name).full_name()?,
+                return Self::ast_invalid(
+                    &FullName::from_ast_name(&ast.relation.name)?,
                     "trigger definitions cannot contain bind parameters",
                 );
             }
             if context.analysis_state().has_problems() {
-                return Self::invalid(
-                    &convert(&self.ast.relation.name).full_name()?,
+                return Self::ast_invalid(
+                    &FullName::from_ast_name(&ast.relation.name)?,
                     "trigger contains unresolved or invalid expressions",
                 );
             }
@@ -47,11 +50,14 @@ impl AstConversion<'_, CreateTrigger> {
         let result = ResolutionFailure::finish(result, context);
         context.finish_analysis(result)
     }
-    pub(crate) fn resolve_and_apply<C: ParseContext>(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn apply_ast<C: ParseContext>(
+        ast: &CreateTrigger,
         mut context: C,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        let Some(definition) = self.resolve(&mut context)? else {
+        let Some(definition) = Self::from_ast(ast, &mut context)? else {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
@@ -63,42 +69,45 @@ impl AstConversion<'_, CreateTrigger> {
             context,
         ))
     }
-    pub(crate) fn resolve_in(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn from_ast_in(
+        ast: &CreateTrigger,
         context: &mut impl ParseContext,
-    ) -> Result<SemCreateTrigger, ResolutionFailure> {
-        let target = self.resolve_target(context)?;
+    ) -> Result<Self, ResolutionFailure> {
+        let target = Self::from_ast_target(ast, context)?;
         let sqlite = context.dialect() == Dialect::sqlite();
-        let timing = self.ast.timing.unwrap_or(TriggerTiming::Before);
-        let granularity = self.ast.granularity.unwrap_or(if sqlite {
+        let timing = ast.timing.unwrap_or(TriggerTiming::Before);
+        let granularity = ast.granularity.unwrap_or(if sqlite {
             TriggerGranularity::Row
         } else {
             TriggerGranularity::Statement
         });
-        self.validate(context, &target, timing, granularity)?;
-        let identity = self.resolve_identity(context, &target)?;
-        self.validate_identity(context, &identity)?;
-        let events = self.resolve_events(context, &target)?;
+        Self::ast_validate(ast, context, &target, timing, granularity)?;
+        let identity = Self::from_ast_identity(ast, context, &target)?;
+        Self::validate_ast_identity(ast, context, &identity)?;
+        let events = Self::from_ast_events(ast, context, &target)?;
         let with = WithClause::default();
-        let from = self.resolve_row_bindings(context, &target, granularity, &with)?;
-        let scope = self.analysis_scope(context, &target, &with, &from);
-        let predicate = self.resolve_predicate(context, &scope, &target)?;
-        let constraint = self
-            .ast
+        let from = Self::from_ast_row_bindings(ast, context, &target, granularity, &with)?;
+        let scope = Self::ast_analysis_scope(ast, context, &target, &with, &from);
+        let predicate = Self::from_ast_predicate(ast, context, &scope, &target)?;
+        let constraint = ast
             .constraint
             .as_ref()
-            .map(|constraint| convert(constraint).resolve(context))
+            .map(|constraint| SemTriggerConstraint::from_ast(constraint, context))
             .transpose()?;
-        let transitions = self.resolve_transitions(context, &target);
-        let body = convert(&self.ast.body).resolve(context, &scope)?;
-        let definition = SemCreateTrigger::new(
+        let transitions = Self::from_ast_transitions(ast, context, &target);
+        let body = SemTriggerBody::from_ast(&ast.body, context, &scope)?;
+        let definition = Self::new(
             &identity,
             &target,
-            convert(&timing).semantic(),
-            convert(&granularity).semantic(),
+            SemTriggerTiming::ast_semantic(&timing),
+            SemTriggerGranularity::ast_semantic(&granularity),
             &body,
         );
-        self.finish_definition(
+        Self::ast_finish_definition(
+            ast,
             context,
             definition,
             &events,
@@ -107,19 +116,25 @@ impl AstConversion<'_, CreateTrigger> {
             &transitions,
         )
     }
-    pub(crate) fn resolve_events(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn from_ast_events(
+        ast: &CreateTrigger,
         context: &impl ParseContext,
         target: &FullName,
     ) -> Result<Vec<SemTriggerEvent>, ResolutionFailure> {
         let mut events = Vec::new();
-        for event in &self.ast.events {
-            events.push(convert(event).resolve(context, target)?);
+        for event in &ast.events {
+            events.push(SemTriggerEvent::from_ast(event, context, target)?);
         }
         Ok(events)
     }
-    pub(crate) fn resolve_row_bindings(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn from_ast_row_bindings(
+        ast: &CreateTrigger,
         context: &mut impl ParseContext,
         target: &FullName,
         granularity: TriggerGranularity,
@@ -127,7 +142,7 @@ impl AstConversion<'_, CreateTrigger> {
     ) -> Result<FromClause, ResolutionFailure> {
         let mut from = FromClause::default();
         if granularity == TriggerGranularity::Row {
-            if self.has_old() {
+            if Self::ast_has_old(ast) {
                 from.push(DataSource::resolve_relation(
                     context,
                     target,
@@ -135,7 +150,7 @@ impl AstConversion<'_, CreateTrigger> {
                     with,
                 )?);
             }
-            if self.has_new() {
+            if Self::ast_has_new(ast) {
                 from.push(DataSource::resolve_relation(
                     context,
                     target,
@@ -146,39 +161,43 @@ impl AstConversion<'_, CreateTrigger> {
         }
         Ok(from)
     }
-    pub(crate) fn analysis_scope<'a>(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn ast_analysis_scope<'a>(
+        ast: &CreateTrigger,
         context: &impl ParseContext,
         target: &FullName,
         with: &'a WithClause,
         from: &'a FromClause,
     ) -> ScalarAnalysisContext<'a> {
         let mut scope = ScalarAnalysisContext::trigger(with, from);
-        if context.dialect() == Dialect::sqlite() && !self.ast.temporary {
+        if context.dialect() == Dialect::sqlite() && !ast.temporary {
             scope.set_trigger_namespace(target.schema());
         }
         scope
     }
-    pub(crate) fn resolve_predicate(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn from_ast_predicate(
+        ast: &CreateTrigger,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         target: &FullName,
     ) -> Result<Option<SemScalarExpr>, ResolutionFailure> {
-        let mut predicate = self
-            .ast
+        let mut predicate = ast
             .predicate
             .as_ref()
-            .map(|expression| convert(expression).resolve_in(context, scope))
+            .map(|expression| SemScalarExpr::from_ast_in(expression, context, scope))
             .transpose()?;
         if context.dialect() != Dialect::sqlite()
             && let Some(predicate) = &mut predicate
         {
-            if self
-                .ast
+            if ast
                 .predicate
                 .as_ref()
-                .is_some_and(|value| convert(value).untyped_trigger_predicate())
+                .is_some_and(SemScalarExpr::ast_is_untyped_trigger_predicate)
             {
                 *predicate = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::bool(), predicate);
             } else {
@@ -188,7 +207,7 @@ impl AstConversion<'_, CreateTrigger> {
                 .get_type()
                 .is_none_or(|ty| ty != PgBuiltInType::bool())
             {
-                return Self::invalid(target, "WHEN must have boolean type");
+                return Self::ast_invalid(target, "WHEN must have boolean type");
             }
             let mut inspected = predicate.clone();
             let mut validator = WhenValidator {
@@ -197,7 +216,7 @@ impl AstConversion<'_, CreateTrigger> {
             };
             inspected.walk(&mut validator)?;
             if validator.invalid {
-                return Self::invalid(
+                return Self::ast_invalid(
                     target,
                     "PostgreSQL WHEN cannot contain subqueries, aggregates, windows or set-returning functions",
                 );
@@ -205,13 +224,16 @@ impl AstConversion<'_, CreateTrigger> {
         }
         Ok(predicate)
     }
-    pub(crate) fn resolve_transitions(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn from_ast_transitions(
+        ast: &CreateTrigger,
         _context: &impl ParseContext,
         target: &FullName,
     ) -> Vec<TriggerTransition> {
         let mut transitions = Vec::new();
-        for transition in &self.ast.transitions {
+        for transition in &ast.transitions {
             transitions.push(TriggerTransition::new(
                 &transition.name,
                 transition.new,
@@ -220,29 +242,35 @@ impl AstConversion<'_, CreateTrigger> {
         }
         transitions
     }
-    pub(crate) fn finish_definition(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn ast_finish_definition(
+        ast: &CreateTrigger,
         context: &impl ParseContext,
-        mut definition: SemCreateTrigger,
+        mut definition: Self,
         events: &[SemTriggerEvent],
         predicate: &Option<SemScalarExpr>,
         constraint: &Option<SemTriggerConstraint>,
         transitions: &[TriggerTransition],
-    ) -> Result<SemCreateTrigger, ResolutionFailure> {
+    ) -> Result<Self, ResolutionFailure> {
         definition.set_event_semantics(events, predicate, constraint, transitions);
-        definition.set_creation_mode(self.ast.replace, self.ast.if_not_exists, self.ast.temporary);
+        definition.set_creation_mode(ast.replace, ast.if_not_exists, ast.temporary);
         definition.retain_dependencies(context)?;
         Ok(definition)
     }
-    pub(crate) fn resolve_target(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn from_ast_target(
+        ast: &CreateTrigger,
         context: &impl ParseContext,
     ) -> Result<FullName, ResolutionFailure> {
-        let mut name = convert(&self.ast.relation.name).full_name()?;
+        let mut name = FullName::from_ast_name(&ast.relation.name)?;
         // Non-TEMP SQLite triggers belong to the selected trigger schema and
         // cannot attach to a relation in another database.
-        if context.dialect() == Dialect::sqlite() && !self.ast.temporary {
-            let trigger = convert(&self.ast.name).full_name()?;
+        if context.dialect() == Dialect::sqlite() && !ast.temporary {
+            let trigger = FullName::from_ast_name(&ast.name)?;
             let schema = trigger
                 .schema()
                 .cloned()
@@ -251,9 +279,12 @@ impl AstConversion<'_, CreateTrigger> {
                 name = name.set_schema(schema);
             }
         }
-        Self::relation(context, &name)
+        Self::ast_relation(context, &name)
     }
-    pub(crate) fn relation(
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn ast_relation(
         context: &impl ParseContext,
         name: &FullName,
     ) -> Result<FullName, ResolutionFailure> {
@@ -269,15 +300,18 @@ impl AstConversion<'_, CreateTrigger> {
         })
         .ok_or_else(|| ResolutionFailure::trigger(&TriggerProblem::target(name)))
     }
-    pub(crate) fn resolve_identity(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn from_ast_identity(
+        ast: &CreateTrigger,
         context: &impl ParseContext,
         target: &FullName,
     ) -> Result<TriggerIdentity, ResolutionFailure> {
-        let supplied = convert(&self.ast.name).full_name()?;
+        let supplied = FullName::from_ast_name(&ast.name)?;
         if context.dialect() == Dialect::postgres() {
             if supplied.schema().is_some() || supplied.catalog().is_some() {
-                return Self::invalid(
+                return Self::ast_invalid(
                     target,
                     "PostgreSQL trigger names cannot be schema qualified",
                 );
@@ -289,7 +323,7 @@ impl AstConversion<'_, CreateTrigger> {
             );
             Ok(TriggerIdentity::postgres(target, &name))
         } else {
-            let schema = if self.ast.temporary {
+            let schema = if ast.temporary {
                 SchemaName::from("temp")
             } else {
                 supplied
@@ -297,29 +331,33 @@ impl AstConversion<'_, CreateTrigger> {
                     .cloned()
                     .unwrap_or_else(|| SchemaName::from("main"))
             };
-            if self.ast.temporary && supplied.schema().is_some() {
-                return Self::invalid(target, "TEMP trigger name cannot be schema qualified");
+            if ast.temporary && supplied.schema().is_some() {
+                return Self::ast_invalid(target, "TEMP trigger name cannot be schema qualified");
             }
-            if !self.ast.temporary
+            if !ast.temporary
                 && target.schema().is_some_and(|target_schema| {
                     !target_schema.as_str().eq_ignore_ascii_case(schema.as_str())
                 })
             {
-                return Self::invalid(target, "trigger and target must use the same SQLite schema");
+                return Self::ast_invalid(
+                    target,
+                    "trigger and target must use the same SQLite schema",
+                );
             }
             Ok(TriggerIdentity::sqlite(&supplied.set_schema(schema)))
         }
     }
-    pub(crate) fn validate_identity(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn validate_ast_identity(
+        ast: &CreateTrigger,
         context: &impl ParseContext,
         identity: &TriggerIdentity,
     ) -> Result<(), ResolutionFailure> {
         if let Some(existing) = context.trigger(identity)
-            && !self.ast.if_not_exists
-            && (!self.ast.replace
-                || existing.constraint().is_some()
-                || self.ast.constraint.is_some())
+            && !ast.if_not_exists
+            && (!ast.replace || existing.constraint().is_some() || ast.constraint.is_some())
         {
             return Err(ResolutionFailure::trigger(&TriggerProblem::duplicate(
                 identity,
@@ -327,14 +365,23 @@ impl AstConversion<'_, CreateTrigger> {
         }
         Ok(())
     }
-    pub(crate) fn has_old(&self) -> bool {
-        self.ast.events.iter().all(|value| convert(value).has_old())
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn ast_has_old(ast: &CreateTrigger) -> bool {
+        ast.events.iter().all(SemTriggerEvent::ast_has_old)
     }
-    pub(crate) fn has_new(&self) -> bool {
-        self.ast.events.iter().all(|value| convert(value).has_new())
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn ast_has_new(ast: &CreateTrigger) -> bool {
+        ast.events.iter().all(SemTriggerEvent::ast_has_new)
     }
-    pub(crate) fn validate(
-        &self,
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn ast_validate(
+        ast: &CreateTrigger,
         context: &impl ParseContext,
         target: &FullName,
         timing: TriggerTiming,
@@ -342,35 +389,31 @@ impl AstConversion<'_, CreateTrigger> {
     ) -> Result<(), ResolutionFailure> {
         let view = context.get_view_impl(target);
         if view.is_some_and(ViewLike::is_materialized) {
-            return Self::invalid(target, "materialized views cannot own triggers");
+            return Self::ast_invalid(target, "materialized views cannot own triggers");
         }
-        if self.ast.events.is_empty() {
-            return Self::invalid(target, "at least one event is required");
+        if ast.events.is_empty() {
+            return Self::ast_invalid(target, "at least one event is required");
         }
         if context.dialect() == Dialect::sqlite() {
-            if self.ast.replace
-                || self.ast.constraint.is_some()
-                || !self.ast.transitions.is_empty()
+            if ast.replace
+                || ast.constraint.is_some()
+                || !ast.transitions.is_empty()
                 || granularity != TriggerGranularity::Row
-                || self.ast.events.len() != 1
-                || self
-                    .ast
-                    .events
-                    .iter()
-                    .any(|value| convert(value).is_truncate())
+                || ast.events.len() != 1
+                || ast.events.iter().any(SemTriggerEvent::ast_is_truncate)
             {
-                return Self::invalid(target, "unsupported SQLite trigger option combination");
+                return Self::ast_invalid(target, "unsupported SQLite trigger option combination");
             }
             if (timing == TriggerTiming::InsteadOf) != view.is_some() {
-                return Self::invalid(
+                return Self::ast_invalid(
                     target,
                     "SQLite views require INSTEAD OF triggers; tables require BEFORE or AFTER",
                 );
             }
             return Ok(());
         }
-        if self.ast.temporary || self.ast.if_not_exists {
-            return Self::invalid(
+        if ast.temporary || ast.if_not_exists {
+            return Self::ast_invalid(
                 target,
                 "PostgreSQL has no TEMP or IF NOT EXISTS trigger option",
             );
@@ -378,14 +421,10 @@ impl AstConversion<'_, CreateTrigger> {
         if timing == TriggerTiming::InsteadOf
             && (view.is_none()
                 || granularity != TriggerGranularity::Row
-                || self.ast.predicate.is_some()
-                || self
-                    .ast
-                    .events
-                    .iter()
-                    .any(|value| convert(value).has_columns()))
+                || ast.predicate.is_some()
+                || ast.events.iter().any(SemTriggerEvent::ast_has_columns))
         {
-            return Self::invalid(
+            return Self::ast_invalid(
                 target,
                 "INSTEAD OF requires a row trigger on a view without WHEN or UPDATE OF",
             );
@@ -394,63 +433,57 @@ impl AstConversion<'_, CreateTrigger> {
             && timing != TriggerTiming::InsteadOf
             && granularity != TriggerGranularity::Statement
         {
-            return Self::invalid(target, "BEFORE/AFTER view triggers must be statement-level");
+            return Self::ast_invalid(target, "BEFORE/AFTER view triggers must be statement-level");
         }
-        if self
-            .ast
-            .events
-            .iter()
-            .any(|value| convert(value).is_truncate())
+        if ast.events.iter().any(SemTriggerEvent::ast_is_truncate)
             && (granularity != TriggerGranularity::Statement || view.is_some())
         {
-            return Self::invalid(target, "TRUNCATE requires a statement trigger on a table");
+            return Self::ast_invalid(target, "TRUNCATE requires a statement trigger on a table");
         }
-        if let Some(constraint) = &self.ast.constraint
+        if let Some(constraint) = &ast.constraint
             && (timing != TriggerTiming::After
                 || granularity != TriggerGranularity::Row
                 || view.is_some()
                 || (constraint.initially_deferred && !constraint.deferrable)
-                || self.ast.replace)
+                || ast.replace)
         {
-            return Self::invalid(
+            return Self::ast_invalid(
                 target,
                 "invalid constraint trigger timing, target, deferrability or replacement",
             );
         }
-        if !self.ast.transitions.is_empty() {
+        if !ast.transitions.is_empty() {
             if timing != TriggerTiming::After
                 || view.is_some()
-                || self.ast.constraint.is_some()
-                || self.ast.events.len() != 1
-                || self
-                    .ast
-                    .events
-                    .iter()
-                    .any(|value| convert(value).has_columns())
-                || self
-                    .ast
-                    .events
-                    .iter()
-                    .any(|value| convert(value).is_truncate())
+                || ast.constraint.is_some()
+                || ast.events.len() != 1
+                || ast.events.iter().any(SemTriggerEvent::ast_has_columns)
+                || ast.events.iter().any(SemTriggerEvent::ast_is_truncate)
             {
-                return Self::invalid(target, "invalid transition-table combination");
+                return Self::ast_invalid(target, "invalid transition-table combination");
             }
             let mut names = std::collections::HashSet::new();
             let mut kinds = std::collections::HashSet::new();
-            for transition in &self.ast.transitions {
+            for transition in &ast.transitions {
                 if !transition.table
                     || !names.insert(&transition.name)
                     || !kinds.insert(transition.new)
-                    || (transition.new && !self.has_new())
-                    || (!transition.new && !self.has_old())
+                    || (transition.new && !Self::ast_has_new(ast))
+                    || (!transition.new && !Self::ast_has_old(ast))
                 {
-                    return Self::invalid(target, "invalid or duplicate transition-table binding");
+                    return Self::ast_invalid(
+                        target,
+                        "invalid or duplicate transition-table binding",
+                    );
                 }
             }
         }
         Ok(())
     }
-    pub(crate) fn invalid<T>(target: &FullName, rule: &str) -> Result<T, ResolutionFailure> {
+}
+
+impl SemCreateTrigger {
+    pub(crate) fn ast_invalid<T>(target: &FullName, rule: &str) -> Result<T, ResolutionFailure> {
         Err(ResolutionFailure::trigger(&TriggerProblem::options(
             target, rule,
         )))
@@ -460,51 +493,64 @@ impl AstConversion<'_, CreateTrigger> {
 #[cfg(test)]
 mod tests;
 
-impl AstConversion<'_, TriggerTiming> {
-    pub(crate) const fn semantic(self) -> SemTriggerTiming {
-        match self.ast {
-            TriggerTiming::Before => SemTriggerTiming::before(),
-            TriggerTiming::After => SemTriggerTiming::after(),
-            TriggerTiming::InsteadOf => SemTriggerTiming::instead_of(),
+impl SemTriggerTiming {
+    pub(crate) const fn ast_semantic(ast: &TriggerTiming) -> Self {
+        match ast {
+            TriggerTiming::Before => Self::before(),
+            TriggerTiming::After => Self::after(),
+            TriggerTiming::InsteadOf => Self::instead_of(),
         }
     }
 }
-impl AstConversion<'_, TriggerGranularity> {
-    pub(crate) const fn semantic(self) -> SemTriggerGranularity {
-        match self.ast {
-            TriggerGranularity::Row => SemTriggerGranularity::row(),
-            TriggerGranularity::Statement => SemTriggerGranularity::statement(),
+
+impl SemTriggerGranularity {
+    pub(crate) const fn ast_semantic(ast: &TriggerGranularity) -> Self {
+        match ast {
+            TriggerGranularity::Row => Self::row(),
+            TriggerGranularity::Statement => Self::statement(),
         }
     }
 }
-impl AstConversion<'_, TriggerEvent> {
-    pub(crate) const fn has_old(&self) -> bool {
-        matches!(self.ast, TriggerEvent::Update(_) | TriggerEvent::Delete)
+
+impl SemTriggerEvent {
+    pub(crate) const fn ast_has_old(ast: &TriggerEvent) -> bool {
+        matches!(ast, TriggerEvent::Update(_) | TriggerEvent::Delete)
     }
-    pub(crate) const fn has_new(&self) -> bool {
-        matches!(self.ast, TriggerEvent::Update(_) | TriggerEvent::Insert)
+}
+
+impl SemTriggerEvent {
+    pub(crate) const fn ast_has_new(ast: &TriggerEvent) -> bool {
+        matches!(ast, TriggerEvent::Update(_) | TriggerEvent::Insert)
     }
-    pub(crate) const fn is_truncate(&self) -> bool {
-        matches!(self.ast, TriggerEvent::Truncate)
+}
+
+impl SemTriggerEvent {
+    pub(crate) const fn ast_is_truncate(ast: &TriggerEvent) -> bool {
+        matches!(ast, TriggerEvent::Truncate)
     }
-    pub(crate) const fn has_columns(&self) -> bool {
-        matches!(self.ast, TriggerEvent::Update(columns) if !columns.is_empty())
+}
+
+impl SemTriggerEvent {
+    pub(crate) const fn ast_has_columns(ast: &TriggerEvent) -> bool {
+        matches!(ast, TriggerEvent::Update(columns) if !columns.is_empty())
     }
-    pub(crate) fn resolve(
-        &self,
+}
+
+impl SemTriggerEvent {
+    pub(crate) fn from_ast(
+        ast: &TriggerEvent,
         context: &impl ParseContext,
         target: &FullName,
-    ) -> Result<SemTriggerEvent, ResolutionFailure> {
-        match self.ast {
-            TriggerEvent::Insert => Ok(SemTriggerEvent::insert()),
-            TriggerEvent::Delete => Ok(SemTriggerEvent::delete()),
-            TriggerEvent::Truncate => Ok(SemTriggerEvent::truncate()),
-            TriggerEvent::Update(columns) => {
-                SemTriggerEvent::from_ast_update(columns, context, target)
-            }
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
+            TriggerEvent::Insert => Ok(Self::insert()),
+            TriggerEvent::Delete => Ok(Self::delete()),
+            TriggerEvent::Truncate => Ok(Self::truncate()),
+            TriggerEvent::Update(columns) => Self::from_ast_update(columns, context, target),
         }
     }
 }
+
 impl SemTriggerEvent {
     fn from_ast_update(
         columns: &[String],
@@ -526,45 +572,37 @@ impl SemTriggerEvent {
     }
 }
 
-impl AstConversion<'_, TriggerConstraint> {
-    pub(crate) fn resolve(
-        &self,
+impl SemTriggerConstraint {
+    pub(crate) fn from_ast(
+        ast: &TriggerConstraint,
         context: &impl ParseContext,
-    ) -> Result<SemTriggerConstraint, ResolutionFailure> {
-        let relation = self
-            .ast
+    ) -> Result<Self, ResolutionFailure> {
+        let relation = ast
             .relation
             .as_ref()
             .map(|relation| {
-                AstConversion::<CreateTrigger>::relation(
-                    context,
-                    &convert(&relation.name).full_name()?,
-                )
+                SemCreateTrigger::ast_relation(context, &FullName::from_ast_name(&relation.name)?)
             })
             .transpose()?;
-        Ok(SemTriggerConstraint::new(
-            &relation,
-            self.ast.deferrable,
-            self.ast.initially_deferred,
-        ))
+        Ok(Self::new(&relation, ast.deferrable, ast.initially_deferred))
     }
 }
-impl AstConversion<'_, TriggerBody> {
-    pub(crate) fn resolve(
-        &self,
+
+impl SemTriggerBody {
+    pub(crate) fn from_ast(
+        ast: &TriggerBody,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemTriggerBody, ResolutionFailure> {
-        match self.ast {
-            TriggerBody::Function(function) => Ok(SemTriggerBody::function(
-                &convert(function).resolve(context)?,
-            )),
-            TriggerBody::Commands(commands) => {
-                SemTriggerBody::from_ast_commands(commands, context, scope)
-            }
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
+            TriggerBody::Function(function) => Ok(Self::function(&SemTriggerFunction::from_ast(
+                function, context,
+            )?)),
+            TriggerBody::Commands(commands) => Self::from_ast_commands(commands, context, scope),
         }
     }
 }
+
 impl SemTriggerBody {
     fn from_ast_commands(
         commands: &[StatementNode],
@@ -573,18 +611,18 @@ impl SemTriggerBody {
     ) -> Result<Self, ResolutionFailure> {
         let mut resolved = Vec::new();
         for command in commands {
-            resolved.push(convert(command).resolve_trigger_command(context, scope)?);
+            resolved.push(SemAst::from_ast_trigger_command(command, context, scope)?);
         }
         Ok(Self::commands(&resolved))
     }
 }
 
-impl AstConversion<'_, TriggerFunction> {
-    pub(crate) fn resolve(
-        &self,
+impl SemTriggerFunction {
+    pub(crate) fn from_ast(
+        ast: &TriggerFunction,
         context: &impl ParseContext,
-    ) -> Result<SemTriggerFunction, ResolutionFailure> {
-        let requested = convert(&self.ast.name).full_name()?;
+    ) -> Result<Self, ResolutionFailure> {
+        let requested = FullName::from_ast_name(&ast.name)?;
         let name = context.resolve_function_name_with_search_path(&requested);
         let overloads = context
             .get_function_impl(&name)
@@ -604,47 +642,45 @@ impl AstConversion<'_, TriggerFunction> {
         let Some(return_type) = candidate.ret_type() else {
             return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         };
-        if convert(return_type).full_name() != Some(&FullName::with_schema("pg_catalog", "trigger"))
-        {
+        if return_type.full_name() != Some(&FullName::with_schema("pg_catalog", "trigger")) {
             return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         }
         if !context.function_preserves_view_rows(&name, candidate) {
             return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         }
-        Ok(SemTriggerFunction::new(
-            &name,
-            &self.ast.arguments,
-            return_type,
-        ))
+        Ok(Self::new(&name, &ast.arguments, return_type))
     }
 }
-impl AstConversion<'_, StatementNode> {
-    pub(crate) fn resolve_trigger_command(
-        &self,
+
+impl SemAst {
+    pub(crate) fn from_ast_trigger_command(
+        ast: &StatementNode,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemAst, ResolutionFailure> {
-        match self.ast {
-            StatementNode::Query(query) => convert(query)
-                .resolve_in(context, Some(scope))
-                .map(|statement| SemAst::select(&statement))
-                .map_err(Into::into),
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
+            StatementNode::Query(query) => {
+                SelectStatement::from_ast_in(query, context, Some(scope))
+                    .map(|statement| Self::select(&statement))
+                    .map_err(Into::into)
+            }
             StatementNode::Insert(insert) => {
-                convert(insert).resolve_trigger_command(context, scope)
+                InsertStatement::from_ast_trigger_command(insert, context, scope)
             }
             StatementNode::Update(update) => {
-                convert(update).resolve_trigger_command(context, scope)
+                UpdateStatement::from_ast_trigger_command(update, context, scope)
             }
             StatementNode::Delete(delete) => {
-                convert(delete).resolve_trigger_command(context, scope)
+                DeleteStatement::from_ast_trigger_command(delete, context, scope)
             }
-            _ => AstConversion::<CreateTrigger>::invalid(
+            _ => SemCreateTrigger::ast_invalid(
                 &FullName::from_local_name("trigger"),
                 "illegal SQLite trigger body command",
             ),
         }
     }
 }
+
 struct WhenValidator<'a, C> {
     context: &'a C,
     invalid: bool,
@@ -661,31 +697,32 @@ impl<C: ParseContext> SemanticVisitorMut for WhenValidator<'_, C> {
     }
 }
 
-impl AstConversion<'_, Relation> {
-    fn validate_trigger_command(&self) -> Result<(), ResolutionFailure> {
-        if self.ast.name.0.len() != 1 || self.ast.indexed.is_some() || self.ast.not_indexed {
-            return AstConversion::<CreateTrigger>::invalid(
-                &convert(&self.ast.name).full_name()?,
+impl DataSource {
+    fn validate_ast_trigger_command(ast: &Relation) -> Result<(), ResolutionFailure> {
+        if ast.name.0.len() != 1 || ast.indexed.is_some() || ast.not_indexed {
+            return SemCreateTrigger::ast_invalid(
+                &FullName::from_ast_name(&ast.name)?,
                 "SQLite trigger DML requires an unqualified target without an index hint",
             );
         }
         Ok(())
     }
 }
-impl AstConversion<'_, Insert> {
-    pub(crate) fn resolve_trigger_command(
-        &self,
+
+impl InsertStatement {
+    pub(crate) fn from_ast_trigger_command(
+        ast: &Insert,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemAst, ResolutionFailure> {
-        convert(&self.ast.relation).validate_trigger_command()?;
-        if !self.ast.returning.is_empty() || self.ast.source.is_none() {
-            return AstConversion::<CreateTrigger>::invalid(
-                &convert(&self.ast.relation.name).full_name()?,
+        DataSource::validate_ast_trigger_command(&ast.relation)?;
+        if !ast.returning.is_empty() || ast.source.is_none() {
+            return SemCreateTrigger::ast_invalid(
+                &FullName::from_ast_name(&ast.relation.name)?,
                 "SQLite trigger INSERT does not support RETURNING or DEFAULT VALUES",
             );
         }
-        self.resolve_in(context, Some(scope))
+        Self::from_ast_in(ast, context, Some(scope))
             .map(|statement| {
                 statement
                     .as_ref()
@@ -694,20 +731,21 @@ impl AstConversion<'_, Insert> {
             .map_err(Into::into)
     }
 }
-impl AstConversion<'_, Update> {
-    pub(crate) fn resolve_trigger_command(
-        &self,
+
+impl UpdateStatement {
+    pub(crate) fn from_ast_trigger_command(
+        ast: &Update,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemAst, ResolutionFailure> {
-        convert(&self.ast.relation).validate_trigger_command()?;
-        if !self.ast.returning.is_empty() {
-            return AstConversion::<CreateTrigger>::invalid(
-                &convert(&self.ast.relation.name).full_name()?,
+        DataSource::validate_ast_trigger_command(&ast.relation)?;
+        if !ast.returning.is_empty() {
+            return SemCreateTrigger::ast_invalid(
+                &FullName::from_ast_name(&ast.relation.name)?,
                 "SQLite trigger UPDATE does not support RETURNING",
             );
         }
-        self.resolve_in(context, Some(scope))
+        Self::from_ast_in(ast, context, Some(scope))
             .map(|statement| {
                 statement
                     .as_ref()
@@ -716,35 +754,37 @@ impl AstConversion<'_, Update> {
             .map_err(Into::into)
     }
 }
-impl AstConversion<'_, Delete> {
-    pub(crate) fn resolve_trigger_command(
-        &self,
+
+impl DeleteStatement {
+    pub(crate) fn from_ast_trigger_command(
+        ast: &Delete,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemAst, ResolutionFailure> {
-        convert(&self.ast.relation).validate_trigger_command()?;
-        if !self.ast.returning.is_empty() {
-            return AstConversion::<CreateTrigger>::invalid(
-                &convert(&self.ast.relation.name).full_name()?,
+        DataSource::validate_ast_trigger_command(&ast.relation)?;
+        if !ast.returning.is_empty() {
+            return SemCreateTrigger::ast_invalid(
+                &FullName::from_ast_name(&ast.relation.name)?,
                 "SQLite trigger DELETE does not support RETURNING",
             );
         }
-        self.resolve_in(context, Some(scope))
+        Self::from_ast_in(ast, context, Some(scope))
             .map(|statement| SemAst::delete(&statement))
             .map_err(Into::into)
     }
 }
 
-impl AstConversion<'_, Expr> {
-    pub(crate) const fn untyped_trigger_predicate(&self) -> bool {
-        match self.ast {
-            Expr::Literal(literal) => convert(literal).untyped_trigger_predicate(),
+impl SemScalarExpr {
+    pub(crate) const fn ast_is_untyped_trigger_predicate(ast: &Expr) -> bool {
+        match ast {
+            Expr::Literal(literal) => Self::ast_literal_is_untyped_trigger_predicate(literal),
             _ => false,
         }
     }
 }
-impl AstConversion<'_, Literal> {
-    pub(crate) const fn untyped_trigger_predicate(&self) -> bool {
-        matches!(self.ast, Literal::Null | Literal::String(_))
+
+impl SemScalarExpr {
+    pub(crate) const fn ast_literal_is_untyped_trigger_predicate(ast: &Literal) -> bool {
+        matches!(ast, Literal::Null | Literal::String(_))
     }
 }

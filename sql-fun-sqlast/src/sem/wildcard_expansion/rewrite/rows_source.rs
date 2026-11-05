@@ -1,4 +1,4 @@
-use crate::wildcard_rewrite_error::WildcardRewriteError;
+use crate::sem::WildcardRewriteError;
 // Freeze a combined function source without changing its zip or row interface.
 
 use crate::sem::WildcardRowsProjection;
@@ -35,7 +35,7 @@ pub(super) fn freeze(
 
 #[cfg(test)]
 mod test_freeze {
-    use crate::wildcard_rewrite::rows_source::freeze;
+    use crate::sem::wildcard_expansion::rewrite::rows_source::freeze;
 
     use crate::test_helpers::wildcard_rows_source::invocation;
 
@@ -255,7 +255,7 @@ impl PrivateNames {
 
 #[cfg(test)]
 mod test_private_names {
-    use crate::wildcard_rewrite::rows_source::PrivateNames;
+    use crate::sem::wildcard_expansion::rewrite::rows_source::PrivateNames;
 
     use crate::test_helpers::wildcard_rows_source::invocation;
 

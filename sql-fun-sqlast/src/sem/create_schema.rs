@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{CacheContext, ast::Schema, sem::OwnerSpecification, syn::CreateSchemaStmt};
 use sql_fun_core::IVec;
 
@@ -58,7 +57,10 @@ impl CreateSchema {
     where
         TParseContext: ParseContext,
     {
-        convert(&Schema::try_from_with_tokens(&syn, tokens)?)
-            .resolve_and_apply(context, &mut CacheContext::new())
+        Self::from_ast_and_apply(
+            &Schema::try_from_with_tokens(&syn, tokens)?,
+            context,
+            &mut CacheContext::new(),
+        )
     }
 }

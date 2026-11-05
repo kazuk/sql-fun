@@ -34,8 +34,6 @@ pub use self::{
 
 #[cfg(any(test, feature = "sqlite"))]
 use crate::ast::ColumnConstraint as AstColumnConstraint;
-#[cfg(any(test, feature = "sqlite"))]
-use crate::sem::convert;
 use crate::sem::{ColumnRename, traversal::SemanticVisitorMut};
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::ColumnConstraint as SqliteColumnConstraint;
@@ -581,7 +579,8 @@ impl ColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        convert(&AstColumnConstraint::try_from_with_tokens(syn, tokens)?).resolve_and_report(
+        Self::from_ast_and_report(
+            &AstColumnConstraint::try_from_with_tokens(syn, tokens)?,
             context,
             table_name,
             column_name,
@@ -710,7 +709,8 @@ impl ColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        convert(&AstColumnConstraint::try_from(syn)?).resolve_and_report(
+        Self::from_ast_and_report(
+            &AstColumnConstraint::try_from(syn)?,
             context,
             table_name,
             column_name,

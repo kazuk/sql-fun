@@ -1,8 +1,11 @@
-use crate::sem::{AstConversion, convert};
-use crate::{CacheContext, ast::Access};
+use crate::CacheContext;
+use crate::sem::IndirectionExpr;
+use crate::sem::InsertTargetCollection;
+use crate::sem::SelectStatement;
+use crate::sem::SemScalarExpr;
 
 use crate::{
-    ast::{Assignment, CurrentOf, Dialect, Expr, FromItem, Subquery, Update},
+    ast::{Assignment, CurrentOf, Dialect, Expr, Subquery, Update},
     context::ParseContext,
     names::{ColumnName, FullName, TableName},
     sem::{
@@ -14,14 +17,14 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, Update> {
-    pub(crate) fn resolve(
-        &self,
+impl UpdateStatement {
+    pub(crate) fn from_ast(
+        ast: &Update,
         context: &mut impl ParseContext,
         cache: &mut CacheContext,
-    ) -> Result<Option<UpdateStatement>, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, None).and_then(|value| {
+        let result = Self::from_ast_in(ast, context, None).and_then(|value| {
             let Some(mut statement) = value else {
                 return Ok(None);
             };
@@ -34,14 +37,16 @@ impl AstConversion<'_, Update> {
         });
         context.finish_analysis(result)
     }
-    pub(crate) fn validate_view_trigger(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn validate_ast_view_trigger(
+        ast: &Update,
         context: &mut impl ParseContext,
         table: &UpdateDestination,
     ) -> Result<(), ResolutionFailure> {
         if let Some(support) = table.view_support() {
-            let columns: Vec<_> = self
-                .ast
+            let columns: Vec<_> = ast
                 .assignments
                 .iter()
                 .map(|assignment| ColumnName::from(assignment.name.as_str()))
@@ -56,47 +61,53 @@ impl AstConversion<'_, Update> {
         }
         Ok(())
     }
-    pub(crate) fn resolve_in(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn from_ast_in(
+        ast: &Update,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<Option<UpdateStatement>, AnalysisError> {
-        let result = self.resolve_definition(context, outer);
+    ) -> Result<Option<Self>, AnalysisError> {
+        let result = Self::from_ast_definition(ast, context, outer);
         ResolutionFailure::finish(result, context)
     }
-    pub(crate) fn resolve_definition(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn from_ast_definition(
+        ast: &Update,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<UpdateStatement, ResolutionFailure> {
+    ) -> Result<Self, ResolutionFailure> {
         let trigger_outer = if let Some(scope) = outer {
             scope.trigger_scope()
         } else {
             None
         };
-        let name = convert(&self.ast.relation.name).full_name()?;
+        let name = FullName::from_ast_name(&ast.relation.name)?;
         let name = if let Some(scope) = outer {
             scope.trigger_relation_name(context, &name)?
         } else {
             name
         };
         let requested = TableName::from(name);
-        let table = self.resolve_destination(
+        let table = Self::from_ast_destination(
+            ast,
             context,
             &requested,
             outer.is_some_and(ScalarAnalysisContext::in_rule_definition),
         )?;
-        self.validate_index_hint(context, &table)?;
-        self.validate_view_trigger(context, &table)?;
-        let with = convert(&self.ast.with).resolve(context, outer)?;
-        let alias = self
-            .ast
+        Self::validate_ast_index_hint(ast, context, &table)?;
+        Self::validate_ast_view_trigger(ast, context, &table)?;
+        let with = WithClause::from_ast(&ast.with, context, outer)?;
+        let alias = ast
             .relation
             .alias
             .as_ref()
-            .map(|value| convert(value).resolve())
+            .map(AliasSpec::from_ast)
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
-        let from = self.resolve_sources(context, &table, &alias, &with, trigger_outer)?;
+        let from = Self::from_ast_sources(ast, context, &table, &alias, &with, trigger_outer)?;
         if let Some(outer) = outer {
             outer.validate_rule_sources(context, &from)?;
         }
@@ -104,41 +115,44 @@ impl AstConversion<'_, Update> {
         let mut target_from = FromClause::default();
         target_from.push(DataSource::resolve_relation(
             context,
-            convert(&table.name()).full_name(),
+            table.name().full_name(),
             &alias,
             &WithClause::default(),
         )?);
         let target_scope = ScalarAnalysisContext::nested(&with, &target_from, None);
         let assignments = UpdateAssignmentCollection::resolve(
             context,
-            &self.ast.assignments,
+            &ast.assignments,
             &table,
             &alias,
             &target_scope,
             &scope,
         )?;
-        let predicate = self.resolve_predicate(context, table.name(), &scope)?;
-        let returning = self.resolve_returning_scope(context, &requested, &table, &scope)?;
-        let mut update = UpdateStatement::new(
+        let predicate = Self::from_ast_predicate(ast, context, table.name(), &scope)?;
+        let returning = Self::from_ast_returning_scope(ast, context, &requested, &table, &scope)?;
+        let mut update = Self::new(
             table.name(),
             &assignments,
-            &convert(&self.ast.with).local_definitions(with),
+            &WithClause::ast_local_definitions(&ast.with, with),
             &from,
             &predicate,
             &returning,
         );
         update.set_modifiers(
             table.view_support(),
-            &self.ast.or_conflict,
-            &self.ast.relation.indexed,
-            self.ast.relation.not_indexed,
-            self.ast.relation.inherit,
+            &ast.or_conflict,
+            &ast.relation.indexed,
+            ast.relation.not_indexed,
+            ast.relation.inherit,
         );
         update.validate_assignments(context)?;
         Ok(update)
     }
-    pub(crate) fn resolve_destination(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn from_ast_destination(
+        ast: &Update,
         context: &mut impl ParseContext,
         requested: &TableName,
         rule_definition: bool,
@@ -164,7 +178,7 @@ impl AstConversion<'_, Update> {
             ))?;
             return Err(ResolutionFailure::reported());
         }
-        if !self.ast.returning.is_empty()
+        if !ast.returning.is_empty()
             && table
                 .view_support()
                 .is_some_and(|s| !s.supports_returning())
@@ -176,14 +190,18 @@ impl AstConversion<'_, Update> {
         }
         Ok(table)
     }
-    pub(crate) fn validate_index_hint(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn validate_ast_index_hint(
+        ast: &Update,
         context: &mut impl ParseContext,
         table: &UpdateDestination,
     ) -> Result<(), ResolutionFailure> {
-        if let Some(index) = &self.ast.relation.indexed {
+        if let Some(index) = &ast.relation.indexed {
             let name = FullName::with_schema(
-                convert(&table.name())
+                table
+                    .name()
                     .full_name()
                     .schema()
                     .map(|schema| schema.as_str())
@@ -202,8 +220,11 @@ impl AstConversion<'_, Update> {
         }
         Ok(())
     }
-    pub(crate) fn resolve_sources(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn from_ast_sources(
+        ast: &Update,
         context: &mut impl ParseContext,
         table: &UpdateDestination,
         alias: &AliasSpec,
@@ -212,11 +233,10 @@ impl AstConversion<'_, Update> {
     ) -> Result<FromClause, ResolutionFailure> {
         // FROM subqueries cannot implicitly see the UPDATE target. Correlation
         // within RHS expressions uses the complete scope assembled below.
-        let mut from =
-            AstConversion::<FromItem>::resolve_list_in(&self.ast.from, context, with, outer)?;
+        let mut from = DataSource::from_ast_list_in(&ast.from, context, with, outer)?;
         let source = DataSource::resolve_relation(
             context,
-            convert(&table.name()).full_name(),
+            table.name().full_name(),
             alias,
             &WithClause::default(),
         )?;
@@ -224,19 +244,21 @@ impl AstConversion<'_, Update> {
         from.push(source);
         Ok(from)
     }
-    pub(crate) fn resolve_predicate(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn from_ast_predicate(
+        ast: &Update,
         context: &mut impl ParseContext,
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Option<UpdatePredicate>, ResolutionFailure> {
-        if let Some(expression) = &self.ast.predicate
-            && let Some(cursor) = convert(expression).resolve_current_of(context, target)?
+        if let Some(expression) = &ast.predicate
+            && let Some(cursor) = UpdateCursor::from_ast_current_of(expression, context, target)?
         {
             return Ok(Some(UpdatePredicate::current_of(&cursor)));
         }
-        let predicate =
-            AstConversion::<Expr>::resolve_optional(&self.ast.predicate, context, scope)?;
+        let predicate = SemScalarExpr::from_ast_optional(&ast.predicate, context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
@@ -255,8 +277,11 @@ impl AstConversion<'_, Update> {
         }
         Ok(predicate.as_ref().map(UpdatePredicate::expression))
     }
-    pub(crate) fn resolve_returning_scope(
-        &self,
+}
+
+impl UpdateStatement {
+    pub(crate) fn from_ast_returning_scope(
+        ast: &Update,
         context: &mut impl ParseContext,
         requested: &TableName,
         table: &UpdateDestination,
@@ -269,13 +294,13 @@ impl AstConversion<'_, Update> {
             let mut returning_from = FromClause::default();
             returning_from.push(DataSource::resolve_relation(
                 context,
-                convert(&table.name()).full_name(),
+                table.name().full_name(),
                 &returning_alias,
                 &WithClause::default(),
             )?);
             let scope = ScalarAnalysisContext::nested(with, &returning_from, None);
             ResultColumnCollection::resolve_for_update(
-                &self.ast.returning,
+                &ast.returning,
                 context,
                 &returning_from,
                 &scope,
@@ -284,7 +309,7 @@ impl AstConversion<'_, Update> {
         } else {
             let mut scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             scope.set_postgres_returning(context);
-            ResultColumnCollection::resolve_for_update(&self.ast.returning, context, from, &scope)
+            ResultColumnCollection::resolve_for_update(&ast.returning, context, from, &scope)
                 .map_err(Into::into)
         }
     }
@@ -307,7 +332,7 @@ impl UpdateAssignmentCollection {
         for assignment in assignments {
             if context.dialect() == Dialect::postgres()
                 && seen.iter().any(|previous| {
-                    convert(assignment).overlaps_mapped(previous, |name| {
+                    InsertTargetCollection::ast_overlaps_mapped(assignment, previous, |name| {
                         table.view_support().map_or_else(
                             || name.clone(),
                             |support| support.assignment_column(name).clone(),
@@ -338,13 +363,13 @@ impl UpdateAssignmentCollection {
             let destination = target_scope
                 .resolve_column(context, Some(alias.name()), &column_name)?
                 .0;
-            let destination = AstConversion::<Access>::resolve_sequence(
+            let destination = IndirectionExpr::from_ast_sequence(
                 &assignment.indirection,
                 context,
                 rhs_scope,
                 destination,
             )?;
-            let value = convert(assignment).resolve_update_value(context, rhs_scope)?;
+            let value = UpdateValue::from_ast_assignment(assignment, context, rhs_scope)?;
             if value.is_default()
                 && table
                     .view_support()
@@ -355,20 +380,20 @@ impl UpdateAssignmentCollection {
                     "view rewriting expands DEFAULT before the base generated/identity assignment check",
                 ))?;
             }
-            convert(assignment).validate_update_value(context, column, &value)?;
+            UpdateValue::validate_ast_update_value(assignment, context, column, &value)?;
             resolved.push(UpdateAssignment::new(column, &destination, &value));
         }
         Ok(resolved)
     }
 }
-impl AstConversion<'_, Assignment> {
-    pub(crate) fn validate_update_value(
-        &self,
+impl UpdateValue {
+    pub(crate) fn validate_ast_update_value(
+        ast: &Assignment,
         context: &mut impl ParseContext,
         column: &ColumnDefinition,
-        value: &UpdateValue,
+        value: &Self,
     ) -> Result<(), ResolutionFailure> {
-        if value.is_default() && !self.ast.indirection.is_empty() {
+        if value.is_default() && !ast.indirection.is_empty() {
             context.report_analysis_problem(AnalysisProblem::update(
                 UpdateProblemKind::default_target(),
                 "DEFAULT requires a whole-column destination",
@@ -396,46 +421,53 @@ impl AstConversion<'_, Assignment> {
         }
         Ok(())
     }
-    pub(crate) fn resolve_update_value(
-        &self,
+}
+
+impl UpdateValue {
+    pub(crate) fn from_ast_assignment(
+        ast: &Assignment,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<UpdateValue, ResolutionFailure> {
-        let Some(value) = &self.ast.value else {
+    ) -> Result<Self, ResolutionFailure> {
+        let Some(value) = &ast.value else {
             return AnalysisError::raise_unexpected_input("missing UPDATE RHS").map_err(Into::into);
         };
         if let Some((source, position, width)) = value.multi_assignment_data() {
             let index = usize::try_from(position - 1)
                 .map_err(|_| AnalysisError::unexpected_input_error("row assignment position"))?;
-            return convert(source).resolve_update_row(context, scope, index, width as usize);
+            return Self::from_ast_row(source, context, scope, index, width as usize);
         }
-        convert(value).resolve_update_value(context, scope)
+        Self::from_ast_expr(value, context, scope)
     }
 }
-impl AstConversion<'_, Expr> {
-    pub(crate) fn resolve_current_of(
-        &self,
+
+impl UpdateCursor {
+    pub(crate) fn from_ast_current_of(
+        ast: &Expr,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<Option<UpdateCursor>, ResolutionFailure> {
-        match self.ast {
-            Expr::CurrentOf(cursor) => convert(cursor).resolve_update(context, target).map(Some),
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        match ast {
+            Expr::CurrentOf(cursor) => Self::from_ast(cursor, context, target).map(Some),
             _ => Ok(None),
         }
     }
-    pub(crate) fn resolve_update_row(
-        &self,
+}
+
+impl UpdateValue {
+    pub(crate) fn from_ast_row(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         index: usize,
         width: usize,
-    ) -> Result<UpdateValue, ResolutionFailure> {
-        match self.ast {
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
             Expr::Row(values) | Expr::Parenthesized(values) | Expr::List(values) => {
-                Self::resolve_update_row_values(values, context, scope, index, width)
+                Self::from_ast_update_row_values(values, context, scope, index, width)
             }
             Expr::Subquery(query) => {
-                convert(query.as_ref()).resolve_update_row(context, scope, index, width)
+                SemScalarExpr::from_ast_subquery_row(query.as_ref(), context, scope, index, width)
             }
             _ => Err(AnalysisError::unexpected_input_error(
                 "row assignment requires row or subquery",
@@ -443,47 +475,55 @@ impl AstConversion<'_, Expr> {
             .into()),
         }
     }
-    pub(crate) fn resolve_update_row_values(
+}
+
+impl UpdateValue {
+    pub(crate) fn from_ast_update_row_values(
         values: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         index: usize,
         width: usize,
-    ) -> Result<UpdateValue, ResolutionFailure> {
+    ) -> Result<Self, ResolutionFailure> {
         if values.len() != width {
             return Err(
                 AnalysisError::unexpected_input_error("row assignment width mismatch").into(),
             );
         }
-        convert(
+        Self::from_ast_expr(
             values
                 .get(index)
                 .ok_or_else(|| AnalysisError::unexpected_input_error("row assignment index"))?,
+            context,
+            scope,
         )
-        .resolve_update_value(context, scope)
     }
+}
 
-    pub(crate) fn resolve_update_value(
-        &self,
+impl UpdateValue {
+    pub(crate) fn from_ast_expr(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<UpdateValue, ResolutionFailure> {
-        match self.ast {
-            Expr::Default => Ok(UpdateValue::default_value()),
-            _ => Ok(UpdateValue::expression(&self.resolve_in(context, scope)?)),
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
+            Expr::Default => Ok(Self::default_value()),
+            _ => Ok(Self::expression(&SemScalarExpr::from_ast_in(
+                ast, context, scope,
+            )?)),
         }
     }
 }
 
-impl AstConversion<'_, Subquery> {
-    pub(crate) fn resolve_update_row(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_subquery_row(
+        ast: &Subquery,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         index: usize,
         width: usize,
     ) -> Result<UpdateValue, ResolutionFailure> {
-        let query = convert(&self.ast.query).resolve_in(context, Some(scope))?;
+        let query = SelectStatement::from_ast_in(&ast.query, context, Some(scope))?;
         if !query.has_width(width) {
             return Err(
                 AnalysisError::unexpected_input_error("row subquery width mismatch").into(),
@@ -493,32 +533,32 @@ impl AstConversion<'_, Subquery> {
     }
 }
 
-impl AstConversion<'_, CurrentOf> {
-    pub(crate) fn resolve_update(
-        &self,
+impl UpdateCursor {
+    pub(crate) fn from_ast(
+        ast: &CurrentOf,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<UpdateCursor, ResolutionFailure> {
-        if self.ast.parameter != 0 {
+    ) -> Result<Self, ResolutionFailure> {
+        if ast.parameter != 0 {
             return Err(AnalysisError::unexpected_input_error(
                 "CURRENT OF cursor parameters require a procedural variable resolver",
             )
             .into());
         }
-        let cursor = UpdateCursor::new(&self.ast.name, context.resolve_cursor(&self.ast.name));
+        let cursor = Self::new(&ast.name, context.resolve_cursor(&ast.name));
         let problem = match cursor.binding() {
             None => Some(format!(
                 "cursor {} does not exist in the current session scope",
-                crate::identifier::QuotedIdentifier::from(self.ast.name.as_str())
+                crate::identifier::QuotedIdentifier::from(ast.name.as_str())
             )),
             Some(info) if info.updatable() == Some(false) => Some(format!(
                 "cursor {} is not statically updatable",
-                crate::identifier::QuotedIdentifier::from(self.ast.name.as_str())
+                crate::identifier::QuotedIdentifier::from(ast.name.as_str())
             )),
             Some(info) if info.target().is_some_and(|relation| relation != target) => {
                 Some(format!(
                     "cursor {} does not target {}",
-                    crate::identifier::QuotedIdentifier::from(self.ast.name.as_str()),
+                    crate::identifier::QuotedIdentifier::from(ast.name.as_str()),
                     target
                 ))
             }

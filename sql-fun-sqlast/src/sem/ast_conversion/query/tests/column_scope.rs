@@ -3,7 +3,6 @@ use crate::sem::AnalysisError;
 use crate::sem::ColumnReferenceExpr;
 use crate::sem::PgBuiltInType;
 use crate::sem::SemScalarExpr;
-use crate::sem::convert;
 use crate::test_helpers::query::column_scope_query;
 
 #[rstest::rstest]
@@ -180,7 +179,7 @@ impl crate::sem::traversal::SemanticVisitorMut for Bindings {
         if let SemScalarExpr::ColumnRef(reference) = expression {
             if let Some(table) = reference.table_column_reference() {
                 self.tables
-                    .push(convert(&table).relation().local_name().as_str().to_owned());
+                    .push(table.relation().local_name().as_str().to_owned());
                 assert_eq!(expression.get_type(), Some(PgBuiltInType::int4()));
             } else if matches!(reference, ColumnReferenceExpr::AmbiguousColumnRef(_)) {
                 self.ambiguous += 1;

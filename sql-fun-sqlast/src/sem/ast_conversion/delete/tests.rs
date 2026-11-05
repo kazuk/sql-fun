@@ -1,5 +1,5 @@
 #[cfg(feature = "sqlite")]
-use crate::sem::convert;
+use crate::sem::SemAst;
 mod cursors;
 mod sql_driven;
 mod versions;
@@ -447,12 +447,12 @@ fn sqlite_delete_cte_reports_an_unsupported_operation() {
     .unwrap()
     .unwrap();
     assert!(
-        convert(&statement.node)
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context()
-            )
-            .is_ok()
+        SemAst::from_ast_node(
+            &statement.node,
+            &mut context,
+            &mut crate::test_helpers::create_cache_context()
+        )
+        .is_ok()
     );
     assert!(context.reported_problems().iter().any(|problem| {
         problem.delete_problem().is_some_and(|problem| {

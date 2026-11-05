@@ -17,8 +17,7 @@ use ::sql_fun_server_api::{
         TypeReference,
     },
 };
-use ::sql_fun_sqlast::rewrite_wildcards;
-use ::sql_fun_sqlast::sem::SemAst;
+use ::sql_fun_sqlast::sem::{SemAst, WildcardExpansion};
 use ::sql_fun_sqlast::{
     CacheContext,
     ast::{Dialect, Statement},
@@ -517,9 +516,9 @@ fn prepare_output_statement(
 /// Render executable SQL only after the checked mutation has completed.
 fn rewrite_executable_sql(
     statement: &mut Statement,
-    expansions: &[::sql_fun_sqlast::sem::WildcardExpansion],
+    expansions: &[WildcardExpansion],
 ) -> Result<String, String> {
-    rewrite_wildcards(statement, expansions).map_err(|error| error.to_string())?;
+    WildcardExpansion::rewrite(expansions, statement).map_err(|error| error.to_string())?;
     statement
         .deparse_sql(statement.dialect())
         .map_err(|error| error.to_string())

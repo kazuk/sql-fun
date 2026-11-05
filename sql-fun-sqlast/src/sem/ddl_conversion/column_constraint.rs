@@ -1,4 +1,5 @@
 //! Payload-owned conversion of column constraint syntax.
+use crate::sem::SemScalarExpr;
 use crate::{
     ast::Expr,
     context::ParseContext,
@@ -8,7 +9,7 @@ use crate::{
         AttrDeferredColumnConstraint, AttrImmediateColumnConstraint, CollateColumnConstraint,
         ColumnNullabilityConstraint, DefaultColumnConstraint, ExclusionColumnConstraint,
         GeneratedColumnConstraint, IdentityColumnConstraint, PrimaryKeyColumnConstraint,
-        ScalarAnalysisContext, UniqueColumnConstraint, convert,
+        ScalarAnalysisContext, UniqueColumnConstraint,
     },
     syntax_options::{
         ConflictClause, Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity,
@@ -38,7 +39,7 @@ impl DefaultColumnConstraint {
         Ok(Self::new(
             table,
             column,
-            convert(expression).resolve_in(context, &ScalarAnalysisContext::default())?,
+            SemScalarExpr::from_ast_in(expression, context, &ScalarAnalysisContext::default())?,
         ))
     }
 }
@@ -88,7 +89,7 @@ impl GeneratedColumnConstraint {
         Ok(Self::new(
             table,
             column,
-            convert(expression).resolve_in(context, &ScalarAnalysisContext::default())?,
+            SemScalarExpr::from_ast_in(expression, context, &ScalarAnalysisContext::default())?,
             mode.clone(),
         ))
     }

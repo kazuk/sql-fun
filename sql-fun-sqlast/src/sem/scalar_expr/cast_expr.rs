@@ -5,8 +5,6 @@ use crate::ast::Expr;
 #[cfg(feature = "sqlite")]
 use crate::sem::ScalarAnalysisContext;
 #[cfg(feature = "sqlite")]
-use crate::sem::convert;
-#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::ExprCast;
 use crate::{
     ast::Dialect,
@@ -157,7 +155,7 @@ impl TypeCastExpr {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from(syn)?;
-        let result = convert(&syntax).resolve(&mut context, scalar_context);
+        let result = SemScalarExpr::from_ast(&syntax, &mut context, scalar_context);
         Ok((result?, context))
     }
 }

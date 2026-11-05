@@ -2,7 +2,6 @@ use crate::StringSpan;
 use crate::context::{MutSourcePathWithSpan, ParseContext as _, SchemaFileContext};
 use crate::parse_statements;
 use crate::sem::SemAst;
-use crate::sem::convert;
 use crate::sem::{AnalysisError, CastContext, CastDefinition, SourcePathWithSpan};
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::query::catalog;
@@ -115,7 +114,7 @@ fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, SchemaFileContext) {
         panic!("query fixture");
     };
     context.begin_parameter_type_analysis();
-    let result = convert(&query).resolve_test_in(&mut context, None);
+    let result = SelectStatement::from_ast_test_in(&query, &mut context, None);
     let result = context.infer_query_parameter_types(result, &mut create_cache_context());
     let query = context.finish_analysis(result).unwrap();
     (query, context)
@@ -206,7 +205,7 @@ pub(crate) fn catalog_query(sql: &str) -> (SelectStatement, TestParseContext) {
         panic!("query fixture");
     };
     context.begin_parameter_type_analysis();
-    let result = convert(&query).resolve_test_in(&mut context, None);
+    let result = SelectStatement::from_ast_test_in(&query, &mut context, None);
     let result = context.infer_query_parameter_types(result, &mut create_cache_context());
     let query = context.finish_analysis(result).unwrap();
     (query, context)

@@ -1,6 +1,5 @@
 use crate::parse_statements;
 use crate::sem::SemAst;
-use crate::sem::convert;
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::scalar_catalog::items_catalog;
 
@@ -22,8 +21,11 @@ pub(crate) fn catalog(dialect: Dialect) -> TestParseContext {
 pub(crate) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
     let mut context = catalog(dialect);
     let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
-    let result = convert(&statement.into_test_node())
-        .resolve(&mut context, &mut create_cache_context())
-        .unwrap();
+    let result = SemAst::from_ast_node(
+        &statement.into_test_node(),
+        &mut context,
+        &mut create_cache_context(),
+    )
+    .unwrap();
     (result, context)
 }

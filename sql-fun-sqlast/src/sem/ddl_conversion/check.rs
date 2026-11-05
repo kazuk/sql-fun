@@ -1,5 +1,6 @@
 use crate::ast::Table;
-use crate::sem::{AstConversion, convert};
+use crate::sem::EngineFeatureValidation;
+use crate::sem::SemScalarExpr;
 use crate::{
     ast::{Column, ColumnConstraint, TableConstraint, TryFromWithTokens},
     context::ParseContext,
@@ -13,13 +14,13 @@ use crate::{
 };
 use ::sql_fun_core::IVec;
 
-impl AstConversion<'_, TableConstraint> {
-    pub(crate) fn resolve_legacy_inline_check<TContext: ParseContext>(
-        &self,
+impl CheckColumnConstraint {
+    pub(crate) fn from_ast_legacy_inline<TContext: ParseContext>(
+        ast: &TableConstraint,
         mut context: TContext,
         target: &TableName,
         column: &ColumnName,
-    ) -> Result<(CheckColumnConstraint, TContext), AnalysisError> {
+    ) -> Result<(Self, TContext), AnalysisError> {
         context.begin_parameter_type_analysis();
         let canonical = context
             .resolve_table_name(target)
@@ -30,31 +31,31 @@ impl AstConversion<'_, TableConstraint> {
         } else {
             ScalarAnalysisContext::default()
         };
-        let valid = self.check_engine_features(&mut context, true)?;
-        let result = self.resolve_check_expression(&mut context, &canonical, &scope, false);
+        let valid = EngineFeatureValidation::table_constraint(ast, &mut context, true)?;
+        let result =
+            CheckConstraint::from_ast_expression(ast, &mut context, &canonical, &scope, false);
         let mut check = context.finish_analysis(result)?;
         if !valid {
             check.disallow();
         }
-        Ok((
-            CheckColumnConstraint::from_analyzed(&canonical, column, &check),
-            context,
-        ))
+        Ok((Self::from_analyzed(&canonical, column, &check), context))
     }
+}
 
-    pub(crate) fn resolve_check(
-        &self,
+impl CheckConstraint {
+    pub(crate) fn from_ast_table_constraint(
+        ast: &TableConstraint,
         context: &mut impl ParseContext,
         target: &TableName,
         table: Option<&CreateTable>,
         alter: bool,
-    ) -> Result<CheckConstraint, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let scope = if let Some(table) = table {
             ScalarAnalysisContext::declared_table(table, target)
         } else {
             ScalarAnalysisContext::default()
         };
-        let mut check = self.resolve_check_expression(context, target, &scope, alter)?;
+        let mut check = Self::from_ast_expression(ast, context, target, &scope, alter)?;
         let name = check.name().to_owned();
         if table.is_none() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(target))?;
@@ -66,36 +67,36 @@ impl AstConversion<'_, TableConstraint> {
         Ok(check)
     }
 
-    pub(crate) fn resolve_check_expression(
-        &self,
+    pub(crate) fn from_ast_expression(
+        ast: &TableConstraint,
         context: &mut impl ParseContext,
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
         alter: bool,
-    ) -> Result<CheckConstraint, AnalysisError> {
-        let ColumnConstraint::Check(syntax) = &self.ast.constraint else {
+    ) -> Result<Self, AnalysisError> {
+        let ColumnConstraint::Check(syntax) = &ast.constraint else {
             return AnalysisError::raise_unexpected_input("expected CHECK");
         };
-        let expression = convert(syntax).resolve_in(context, scope)?;
-        let mut check = CheckConstraint::analyze(
+        let expression = SemScalarExpr::from_ast_in(syntax, context, scope)?;
+        let mut check = Self::analyze(
             context,
             target,
-            self.ast.name.as_deref().unwrap_or_default(),
+            ast.name.as_deref().unwrap_or_default(),
             &expression,
         )?;
         check.retain_options(
-            self.ast.extras.no_inherit,
-            self.ast.extras.skip_validation,
-            self.ast.extras.enforced,
+            ast.extras.no_inherit,
+            ast.extras.skip_validation,
+            ast.extras.enforced,
         );
-        if self.ast.extras.deferrable || self.ast.extras.initially_deferred {
+        if ast.extras.deferrable || ast.extras.initially_deferred {
             check.reject(context, CheckProblem::Deferrability)?;
         }
-        check.set_validated(!alter || !self.ast.extras.skip_validation);
+        check.set_validated(!alter || !ast.extras.skip_validation);
         Ok(check)
     }
 
-    pub(crate) fn analyze_legacy_check(
+    pub(crate) fn from_legacy_syntax(
         context: &mut impl ParseContext,
         target: Option<&TableName>,
         syntax: &SynConstraint,
@@ -108,9 +109,9 @@ impl AstConversion<'_, TableConstraint> {
             .unwrap_or_else(|| target.clone());
         let table = context.get_table(&canonical).cloned();
         let common = TableConstraint::try_from_with_tokens(syntax, &IVec::<ScanToken>::default())?;
-        let valid = convert(&common).check_engine_features(context, false)?;
+        let valid = EngineFeatureValidation::table_constraint(&common, context, false)?;
         let mut check =
-            convert(&common).resolve_check(context, &canonical, table.as_ref(), true)?;
+            Self::from_ast_table_constraint(&common, context, &canonical, table.as_ref(), true)?;
         if !valid {
             check.disallow();
         }
@@ -118,25 +119,24 @@ impl AstConversion<'_, TableConstraint> {
     }
 }
 
-impl AstConversion<'_, Table> {
-    pub(crate) fn resolve_inline_checks(
-        &self,
+impl CreateTable {
+    pub(crate) fn resolve_ast_inline_checks(
+        ast: &Table,
         context: &mut impl ParseContext,
-        table: &mut CreateTable,
+        table: &mut Self,
         names: &mut ConstraintNames,
     ) -> Result<(), AnalysisError> {
-        if !self
-            .ast
+        if !ast
             .columns
             .iter()
-            .any(|syntax| convert::<Column>(syntax).has_inline_checks())
+            .any(CheckColumnConstraint::has_ast_column_checks)
         {
             return Ok(());
         }
         let target =
-            TableName::from(context.creation_name(table.name().full_name(), self.ast.temporary)?);
-        for syntax in &self.ast.columns {
-            if !convert(syntax).has_inline_checks() {
+            TableName::from(context.creation_name(table.name().full_name(), ast.temporary)?);
+        for syntax in &ast.columns {
+            if !CheckColumnConstraint::has_ast_column_checks(syntax) {
                 continue;
             }
             let name = ColumnName::from(syntax.name.as_str());
@@ -144,7 +144,8 @@ impl AstConversion<'_, Table> {
                 .get_column_def(&name)
                 .expect("declared column")
                 .clone();
-            convert(syntax).resolve_inline_checks(
+            ColumnDefinition::resolve_ast_inline_checks(
+                syntax,
                 context,
                 &target,
                 Some(table),
@@ -156,21 +157,22 @@ impl AstConversion<'_, Table> {
         Ok(())
     }
 
-    pub(crate) fn resolve_checks(
-        &self,
+    pub(crate) fn resolve_ast_checks(
+        ast: &Table,
         context: &mut impl ParseContext,
-        table: &mut CreateTable,
+        table: &mut Self,
         names: &mut ConstraintNames,
     ) -> Result<(), AnalysisError> {
-        if !self.ast.constraints.iter().any(TableConstraint::is_check) {
+        if !ast.constraints.iter().any(TableConstraint::is_check) {
             return Ok(());
         }
-        let target = context.creation_name(table.name().full_name(), self.ast.temporary)?;
-        for definition in &self.ast.constraints {
+        let target = context.creation_name(table.name().full_name(), ast.temporary)?;
+        for definition in &ast.constraints {
             if definition.is_check() {
                 let scope =
                     ScalarAnalysisContext::declared_table(table, &TableName::from(target.clone()));
-                let mut check = convert(definition).resolve_check_expression(
+                let mut check = CheckConstraint::from_ast_expression(
+                    definition,
                     context,
                     &TableName::from(target.clone()),
                     &scope,
@@ -186,32 +188,34 @@ impl AstConversion<'_, Table> {
     }
 }
 
-impl AstConversion<'_, Column> {
-    pub(crate) fn reserve_constraint_names(
-        &self,
-        context: &impl ParseContext,
-        names: &mut ConstraintNames,
-    ) {
-        for definition in &self.ast.constraints {
-            if !definition.is_check() && convert(&definition.constraint).has_catalog_name(context) {
+impl ConstraintNames {
+    pub(crate) fn reserve_ast_column(ast: &Column, context: &impl ParseContext, names: &mut Self) {
+        for definition in &ast.constraints {
+            if !definition.is_check()
+                && Self::ast_constraint_has_catalog_name(&definition.constraint, context)
+            {
                 names.reserve(definition.name.as_deref().unwrap_or_default());
             }
         }
     }
+}
 
-    pub(crate) fn has_inline_checks(&self) -> bool {
-        self.ast.constraints.iter().any(TableConstraint::is_check)
+impl CheckColumnConstraint {
+    pub(crate) fn has_ast_column_checks(ast: &Column) -> bool {
+        ast.constraints.iter().any(TableConstraint::is_check)
     }
+}
 
-    pub(crate) fn resolve_inline_checks(
-        &self,
+impl ColumnDefinition {
+    pub(crate) fn resolve_ast_inline_checks(
+        ast: &Column,
         context: &mut impl ParseContext,
         target: &TableName,
         table: Option<&CreateTable>,
         names: &mut ConstraintNames,
-        column: &mut ColumnDefinition,
+        column: &mut Self,
     ) -> Result<(), AnalysisError> {
-        if !self.has_inline_checks() {
+        if !CheckColumnConstraint::has_ast_column_checks(ast) {
             return Ok(());
         }
         let scope = if let Some(table) = table {
@@ -219,12 +223,13 @@ impl AstConversion<'_, Column> {
         } else {
             ScalarAnalysisContext::column_declaration(context, target, column)
         };
-        let name = ColumnName::from(self.ast.name.as_str());
+        let name = ColumnName::from(ast.name.as_str());
         let mut index = 0;
-        for definition in &self.ast.constraints {
+        for definition in &ast.constraints {
             if definition.is_check() {
-                let mut check =
-                    convert(definition).resolve_check_expression(context, target, &scope, false)?;
+                let mut check = CheckConstraint::from_ast_expression(
+                    definition, context, target, &scope, false,
+                )?;
                 if !names.reserve(check.name()) {
                     check.reject_duplicate_name(context)?;
                 }
@@ -239,13 +244,13 @@ impl AstConversion<'_, Column> {
     }
 }
 
-impl AstConversion<'_, ColumnConstraint> {
-    pub(crate) fn resolve_standalone_check(
-        &self,
+impl SemColumnConstraint {
+    pub(crate) fn from_ast_standalone_check(
+        ast: &ColumnConstraint,
         context: &mut impl ParseContext,
         target: &TableName,
         column: &ColumnName,
-    ) -> Result<SemColumnConstraint, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let canonical = context
             .resolve_table_name(target)
             .unwrap_or_else(|| target.clone());
@@ -255,11 +260,11 @@ impl AstConversion<'_, ColumnConstraint> {
         } else {
             ScalarAnalysisContext::default()
         };
-        let syntax = TableConstraint::unnamed_check(self.ast);
+        let syntax = TableConstraint::unnamed_check(ast);
         let check =
-            convert(&syntax).resolve_check_expression(context, &canonical, &scope, false)?;
-        Ok(SemColumnConstraint::check(
-            CheckColumnConstraint::from_analyzed(&canonical, column, &check),
-        ))
+            CheckConstraint::from_ast_expression(&syntax, context, &canonical, &scope, false)?;
+        Ok(Self::check(CheckColumnConstraint::from_analyzed(
+            &canonical, column, &check,
+        )))
     }
 }

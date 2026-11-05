@@ -2,7 +2,6 @@ use crate::ast::{Dialect, Statement};
 use crate::context::ParseContext as _;
 use crate::names::{ColumnName, FullName, OperatorName, SchemaName, TableName};
 use crate::parse_statements;
-use crate::rewrite_wildcards;
 use crate::sem::SemAst;
 use crate::sem::{
     BinaryOperatorDefinition, ColumnDefinition, FunctionOverloadCollection, FunctionParam,
@@ -77,7 +76,7 @@ pub(crate) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {
 pub(crate) fn rewritten(sql: &str) -> (Statement, usize) {
     let mut statement = statement(sql);
     let groups = expansions(&statement);
-    let count = rewrite_wildcards(&mut statement, &groups).unwrap();
+    let count = WildcardExpansion::rewrite(&groups, &mut statement).unwrap();
     (statement, count)
 }
 

@@ -151,6 +151,13 @@ During review, ask:
 An increase in source-file length alone is not sufficient justification for
 retaining a module boundary.
 
+### Visibility and module interfaces
+
+Choose visibility based on the intended module interface and the complete
+visibility path, not on the apparent restrictiveness of individual visibility
+modifiers. In particular, `pub(super)` is not inherently better encapsulation
+than `pub` inside a private module.
+
 ### Implementation ownership
 
 - Place inherent implementations in the module defining the type or its

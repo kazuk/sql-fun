@@ -1,6 +1,7 @@
 use crate::analysis_problem::{
-    AliasName, AnalysisProblem, ColumnName, CteName, DiagnosticMessage, DiagnosticMetadata,
-    FullName, StringSpan, TableName, TypeName, TypeReference, ViewName, values::Problem,
+    AliasName, AnalysisProblem, ColumnName, CteName, DiagnosticMessage, DiagnosticMessageFragment,
+    DiagnosticMetadata, FullName, StringSpan, TableName, TypeName, TypeReference, ViewName,
+    fragments_text, values::Problem,
 };
 
 /// Domain base type name not found
@@ -101,7 +102,11 @@ impl Problem for FunctionNotFound {
 
 impl DiagnosticMessage for FunctionNotFound {
     fn diagnostic_message(&self) -> String {
-        format!("function not found: {}", self.function_name())
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        vec!["function not found: ".into(), self.function_name().into()]
     }
 }
 
@@ -181,48 +186,92 @@ pub enum NameResolution {
 
 impl DiagnosticMessage for NameResolution {
     fn diagnostic_message(&self) -> String {
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
         match self {
-            Self::DomainTypeNameNotFound(problem) => problem.diagnostic_message(),
-            Self::FunctionNotFound(problem) => problem.diagnostic_message(),
-            Self::TableFunctionNotFound(name) => format!("table function not found: {name}"),
-            Self::UndefinedColumn(name) => format!("column not found: {name}"),
-            Self::ColumnTypeNotFound(table, column, ty) => {
-                format!("type {ty} of column {table}.{column} not found")
+            Self::DomainTypeNameNotFound(problem) => problem.diagnostic_fragments(),
+            Self::FunctionNotFound(problem) => problem.diagnostic_fragments(),
+            Self::TableFunctionNotFound(name) => {
+                vec!["table function not found: ".into(), name.into()]
             }
-            Self::ColumnNotFoundInTableFunction(alias, column) => {
-                format!("column {column} not found in table function {alias}")
+            Self::UndefinedColumn(name) => vec![format!("column not found: {name}").into()],
+            Self::ColumnTypeNotFound(table, column, ty) => vec![
+                "type ".into(),
+                ty.into(),
+                " of column ".into(),
+                table.into(),
+                ".".into(),
+                column.into(),
+                " not found".into(),
+            ],
+            Self::ColumnNotFoundInTableFunction(alias, column) => vec![
+                "column ".into(),
+                column.into(),
+                " not found in table function ".into(),
+                alias.into(),
+            ],
+            Self::ColumnNotFoundInTable(table, column) => vec![
+                "column ".into(),
+                column.into(),
+                " not found in table ".into(),
+                table.into(),
+            ],
+            Self::ColumnAlreadyExists(table, column) => vec![
+                "column ".into(),
+                column.into(),
+                " already exists in table ".into(),
+                table.into(),
+            ],
+            Self::ColumnNotFoundInCte(cte, column) => vec![
+                "column ".into(),
+                column.into(),
+                " not found in CTE ".into(),
+                cte.into(),
+            ],
+            Self::ColumnNotFoundInSubQuery(alias, column) => vec![
+                "column ".into(),
+                column.into(),
+                " not found in subquery ".into(),
+                alias.into(),
+            ],
+            Self::ColumnNotFoundInSource(column) => vec![
+                "column ".into(),
+                column.into(),
+                " not found in query source".into(),
+            ],
+            Self::ColumnNotFoundInView(view, column) => vec![
+                "column ".into(),
+                column.into(),
+                " not found in view ".into(),
+                view.into(),
+            ],
+            Self::AmbiguousColumn(column) => vec![
+                "column reference ".into(),
+                column.into(),
+                " is ambiguous".into(),
+            ],
+            Self::DuplicateAlias(alias) => vec![
+                "alias ".into(),
+                alias.into(),
+                " is defined more than once".into(),
+            ],
+            Self::UndefinedAlias(alias) => {
+                vec![format!("alias {alias} is not defined in FROM").into()]
             }
-            Self::ColumnNotFoundInTable(table, column) => {
-                format!("column {column} not found in table {table}")
+            Self::RelationNotFound(name) => vec![format!("relation not found: {name}").into()],
+            Self::RelationAlreadyExists(name) => {
+                vec![format!("relation already exists: {name}").into()]
             }
-            Self::ColumnAlreadyExists(table, column) => {
-                format!("column {column} already exists in table {table}")
-            }
-            Self::ColumnNotFoundInCte(cte, column) => {
-                format!("column {column} not found in CTE {cte}")
-            }
-            Self::ColumnNotFoundInSubQuery(alias, column) => {
-                format!("column {column} not found in subquery {alias}")
-            }
-            Self::ColumnNotFoundInSource(column) => {
-                format!("column {column} not found in query source")
-            }
-            Self::ColumnNotFoundInView(view, column) => {
-                format!("column {column} not found in view {view}")
-            }
-            Self::AmbiguousColumn(column) => format!("column reference {column} is ambiguous"),
-            Self::DuplicateAlias(alias) => format!("alias {alias} is defined more than once"),
-            Self::UndefinedAlias(alias) => format!("alias {alias} is not defined in FROM"),
-            Self::RelationNotFound(name) => format!("relation not found: {name}"),
-            Self::RelationAlreadyExists(name) => format!("relation already exists: {name}"),
-            Self::ViewNotFound(name) => format!("view not found: {name}"),
-            Self::IndexNotFound(name) => format!("index not found: {name}"),
-            Self::SequenceNotFound(name) => format!("sequence not found: {name}"),
-            Self::TableNotFound(name) => format!("table not found: {name}"),
+            Self::ViewNotFound(name) => vec!["view not found: ".into(), name.into()],
+            Self::IndexNotFound(name) => vec![format!("index not found: {name}").into()],
+            Self::SequenceNotFound(name) => vec!["sequence not found: ".into(), name.into()],
+            Self::TableNotFound(name) => vec!["table not found: ".into(), name.into()],
             Self::CompositeTypeFieldNotFound(ty, field) => {
-                format!("field {field} not found in composite type {ty}")
+                vec![format!("field {field} not found in composite type {ty}").into()]
             }
-            Self::CollationNotFound(name) => format!("collation not found: {name}"),
+            Self::CollationNotFound(name) => vec![format!("collation not found: {name}").into()],
         }
     }
 }

@@ -173,7 +173,7 @@ def match_arms(body):
 # and constructor calls require a source review; unrelated edits do not.
 SOURCE_WITNESS = {
     "sql-fun-core/src/analysis_problem.rs": {
-        "ArgumentTypeMismatch": 4,
+        "ArgumentTypeMismatch": 5,
         "CaseWhenExprTypeUnknown": 4,
         "ExtensionNotFound": 4,
         "NullabilityUnknown": 4,

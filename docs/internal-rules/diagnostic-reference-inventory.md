@@ -239,6 +239,10 @@ import binding (direct or grouped) as well as the conversion body. Its witness
 count increases from three to four solely because of the new import; no emitter
 or diagnostic classification is added.
 
+The #1000 message-fragment formatter adds one `ArgumentTypeMismatch` match in
+`analysis_problem.rs`. It only describes an existing payload and does not
+construct or emit the excluded diagnostic; its witness count increases by one.
+
 Production entry points come from the root/workspace Cargo manifests, including
 explicit binary paths and nested workspace members. The scanner follows ordinary
 modules and explicit path attributes, excluding test-only modules. Unsupported

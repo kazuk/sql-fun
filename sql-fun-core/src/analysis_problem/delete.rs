@@ -1,4 +1,6 @@
-use crate::analysis_problem::{DiagnosticMetadata, TableName};
+use crate::analysis_problem::{
+    DiagnosticMessageFragment, DiagnosticMetadata, TableName, fragments_text,
+};
 
 /// A normalized portal name retained by a cursor diagnostic.
 #[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
@@ -43,12 +45,31 @@ impl CursorTargetMismatchProblem {
         }
     }
     fn message(&self) -> String {
-        format!(
-            "cursor \"{}\" targets {}, not DELETE destination {}",
-            self.name.replace('"', "\"\""),
-            self.actual,
-            self.expected
-        )
+        fragments_text(&self.fragments())
+    }
+
+    fn fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        vec![
+            format!("cursor \"{}\" targets ", self.name.replace('"', "\"\"")).into(),
+            (&self.actual).into(),
+            ", not DELETE destination ".into(),
+            (&self.expected).into(),
+        ]
+    }
+}
+
+#[cfg(test)]
+mod cursor_target_mismatch_message_tests {
+    use crate::analysis_problem::delete::CursorTargetMismatchProblem;
+
+    #[test]
+    fn cursor_name_uses_sql_identifier_quoting() {
+        let problem =
+            CursorTargetMismatchProblem::new(r#"a"b\c"#, "public.expected", "public.actual");
+        assert_eq!(
+            problem.message(),
+            r#"cursor "a""b\c" targets public.actual, not DELETE destination public.expected"#
+        );
     }
 }
 
@@ -185,10 +206,6 @@ mod cursor_message_tests {
         DeleteProblemKind::non_updatable_cursor(r#"a"b\c"#),
         r#"cursor "a""b\c" is not statically updatable"#
     )]
-    #[case::mismatch(
-        DeleteProblemKind::cursor_target_mismatch(r#"a"b\c"#, "public.expected", "public.actual"),
-        r#"cursor "a""b\c" targets public.actual, not DELETE destination public.expected"#
-    )]
     fn cursor_names_use_sql_identifier_quoting(
         #[case] problem: DeleteProblemKind,
         #[case] expected: &str,
@@ -221,6 +238,13 @@ impl DeleteProblem {
     #[must_use]
     pub fn message(&self) -> String {
         self.kind.message()
+    }
+
+    pub(super) fn fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        match &self.kind {
+            DeleteProblemKind::CursorTargetMismatch(problem) => problem.fragments(),
+            _ => vec![self.message().into()],
+        }
     }
 
     /// Diagnostic presentation data.

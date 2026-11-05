@@ -1,6 +1,6 @@
 use crate::analysis_problem::{
-    AnalysisProblem, ArgumentBindingCollection, DiagnosticMessage, FullName, OperatorDefinition,
-    TypeReference,
+    AnalysisProblem, ArgumentBindingCollection, DiagnosticMessage, DiagnosticMessageFragment,
+    FullName, OperatorDefinition, TypeReference, fragments_text,
 };
 
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -26,8 +26,8 @@ pub enum OverloadResolution {
 impl DiagnosticMessage for OverloadResolution {
     fn diagnostic_message(&self) -> String {
         match self {
-            Self::FunctionOverloadResolutionFailed(name, args) => {
-                format!("no matching overload for function {name} with {args}")
+            Self::FunctionOverloadResolutionFailed(..) => {
+                fragments_text(&self.diagnostic_fragments())
             }
             Self::BinaryOperatorOverloadResolutionFailed(operator, left, right) => {
                 format!("no matching overload for operator {operator} with {left} and {right}")
@@ -41,6 +41,17 @@ impl DiagnosticMessage for OverloadResolution {
             Self::UnaryOperatorOverloadAmbiguous(operator, ty) => {
                 format!("ambiguous overload for unary operator {operator} with {ty}")
             }
+        }
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        match self {
+            Self::FunctionOverloadResolutionFailed(name, args) => vec![
+                "no matching overload for function ".into(),
+                name.into(),
+                format!(" with {args}").into(),
+            ],
+            _ => vec![self.diagnostic_message().into()],
         }
     }
 }

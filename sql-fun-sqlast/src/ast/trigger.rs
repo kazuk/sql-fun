@@ -2,17 +2,14 @@
 
 #[cfg(feature = "sqlite")]
 use crate::ast::StatementNode as AstStatementNode;
-use crate::ast::{DropBehavior, DropTrigger, postgres::required};
-
 use crate::{
     ast::{
-        CreateTrigger, Expr, Name, Relation, TriggerBody, TriggerConstraint, TriggerEvent,
-        TriggerFunction, TriggerGranularity, TriggerTiming, TriggerTransition, TryFromWithTokens,
-        TryFromWithTokensOpt,
+        CreateTrigger, DropBehavior, DropTrigger, Expr, Name, Relation, TriggerBody,
+        TriggerConstraint, TriggerEvent, TriggerFunction, TriggerGranularity, TriggerTiming,
+        TriggerTransition, TryFromWithTokens, TryFromWithTokensOpt, postgres::required,
     },
     error::AnalysisError,
-    syn,
-    syn::{ListOpt, Opt},
+    syn::{self, ListOpt, Opt},
 };
 
 use ::sql_fun_core::IVec;
@@ -57,9 +54,10 @@ impl TryFromWithTokens<&syn::CreateTrigStmt> for CreateTrigger {
 
 #[cfg(test)]
 mod test_postgres_trigger_conversion {
-    use crate::test_helpers::trigger::trigger;
-
-    use crate::ast::{Dialect, Expr, TriggerBody, TriggerEvent, TriggerGranularity, TriggerTiming};
+    use crate::{
+        ast::{Dialect, Expr, TriggerBody, TriggerEvent, TriggerGranularity, TriggerTiming},
+        test_helpers::trigger::trigger,
+    };
 
     #[test]
     fn postgres_preserves_identity_flags_and_function_arguments() {
@@ -341,9 +339,10 @@ impl TryFrom<&syn::sqlite::CreateTriggerStatement> for CreateTrigger {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_sqlite_trigger_conversion {
-    use crate::test_helpers::trigger::trigger;
-
-    use crate::ast::{Dialect, TriggerEvent, TriggerGranularity, TriggerTiming};
+    use crate::{
+        ast::{Dialect, TriggerEvent, TriggerGranularity, TriggerTiming},
+        test_helpers::trigger::trigger,
+    };
 
     #[cfg(feature = "sqlite")]
     #[rstest::rstest]
@@ -470,13 +469,11 @@ impl TryFrom<&syn::DropStmt> for DropTrigger {
 
 #[cfg(test)]
 mod test_postgres_drop_conversion {
-    use crate::ast::{Dialect, DropBehavior, DropTrigger};
-
-    use crate::syn;
-
-    use crate::test_helpers::drop_syntax::postgres_drop_syntax;
-
-    use crate::test_helpers::drop_trigger_syntax::drop_trigger;
+    use crate::{
+        ast::{Dialect, DropBehavior, DropTrigger},
+        syn,
+        test_helpers::{drop_syntax::postgres_drop_syntax, drop_trigger_syntax::drop_trigger},
+    };
 
     #[rstest::rstest]
     #[case::bare("DROP TRIGGER TriggerName ON Items", &["items"], "triggername")]
@@ -589,11 +586,11 @@ impl TryFrom<&syn::sqlite::DropTriggerStatement> for DropTrigger {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_sqlite_drop_conversion {
-    use crate::ast::{Dialect, DropBehavior, DropTrigger};
-
-    use crate::syn;
-
-    use crate::test_helpers::drop_trigger_syntax::drop_trigger;
+    use crate::{
+        ast::{Dialect, DropBehavior, DropTrigger},
+        syn,
+        test_helpers::drop_trigger_syntax::drop_trigger,
+    };
 
     #[cfg(feature = "sqlite")]
     #[rstest::rstest]

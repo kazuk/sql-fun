@@ -1,12 +1,13 @@
-use crate::ast::Dialect;
-use crate::names::{ColumnName, FullName};
-use crate::parse_statements;
-use crate::sem::{
-    ColumnDefinition, CreateTableAs, CreateView, PgBuiltInType, SemAst, ViewLike, ViewMergeSupport,
-    ViewMergeTriggers,
+use crate::{
+    ast::Dialect,
+    names::{ColumnName, FullName},
+    parse_statements,
+    sem::{
+        ColumnDefinition, CreateTableAs, CreateView, PgBuiltInType, SemAst, ViewLike,
+        ViewMergeSupport, ViewMergeTriggers,
+    },
+    test_helpers::{TestParseContext, create_cache_context, document_merge::catalog},
 };
-use crate::test_helpers::document_merge::catalog;
-use crate::test_helpers::{TestParseContext, create_cache_context};
 
 pub(crate) fn view_catalog(version: u32, support: &ViewMergeSupport) -> TestParseContext {
     let mut context = catalog(version);

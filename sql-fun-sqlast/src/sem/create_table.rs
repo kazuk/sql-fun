@@ -1,43 +1,33 @@
-pub use crate::syntax_options::CreateTableMode;
-mod column_def;
-
+mod ddl;
+mod serial;
 pub use self::column_def::ColumnDefinition;
-
 #[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ColumnsAndConstraint;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::CreateTableStatement;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::DropTableStatement;
 use crate::{
-    ast::{Dialect, Table},
+    SqliteToken,
+    syn::sqlite::{
+        ColumnsAndConstraint, CreateTableBody, CreateTableStatement, DropTableStatement,
+    },
+};
+use crate::{
+    ast::{CreateTableMode, Dialect, Table, TryFromWithTokens},
+    context::{GetSourcePathWithSpan, ParseContext},
+    names::{ColumnName, FullName, TableName},
     sem::{
-        CheckConstraint, ColumnAttributeAction, ColumnRename, CreateIndex, CreateSequence,
-        ForeignKeyConstraint, IndirectionExpr, SemScalarExpr, TypeReference,
+        AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, CheckConstraint,
+        ColumnAttributeAction, ColumnRename, Constraint, CreateIndex, CreateSequence,
+        ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
+        OwnerSpecification, RuleIdentity, RuleReferences, SemAst, SemScalarExpr,
+        SourcePathWithSpan, TriggerReferences, TypeReference,
+        alter_table::AlterObjSubCommand,
+        problem::CreationProblem,
         traversal::{RelationRenamer, SemanticVisitorMut},
     },
-    syn::{CreateStmt, DropStmt},
+    syn::{CreateStmt, DropStmt, ListOpt, Opt, ScanToken},
 };
-
-use crate::names::{ColumnName, TableName};
 use sql_fun_core::IVec;
 use std::collections::HashMap;
 
-use crate::{
-    ast::TryFromWithTokens,
-    context::{GetSourcePathWithSpan, ParseContext},
-    names::FullName,
-    sem::{
-        AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, ImplicitChange,
-        InsertArbiter, Kind, OwnerSpecification, RuleIdentity, RuleReferences, SemAst,
-        SourcePathWithSpan, TriggerReferences, alter_table::AlterObjSubCommand,
-        problem::CreationProblem,
-    },
-    syn::{ListOpt, Opt, ScanToken},
-};
-
-#[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::CreateTableBody};
+mod column_def;
 
 /// columns in table
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -345,13 +335,11 @@ pub struct CreateTable {
 
 #[cfg(test)]
 mod test_create_table_clone {
-    use crate::test_helpers::schema_layer;
-    use crate::test_helpers::table_clone as test_helpers;
     use crate::{
         context::{BaseParseContext, TableInfoWrite},
         names::ColumnName,
         sem::ParseContext,
-        test_helpers::TestParseContext,
+        test_helpers::{TestParseContext, schema_layer, table_clone as test_helpers},
     };
     use std::path::Path;
 
@@ -884,11 +872,10 @@ impl CreateTable {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_columns_and_constraint {
-    use crate::sem::create_table::CreateTable;
-
     use crate::{
+        ast::CreateTableMode,
         names::SchemaName,
-        sem::{CreateTableMode, SourcePathWithSpan},
+        sem::{SourcePathWithSpan, create_table::CreateTable},
         syn::sqlite::{CreateTableBody, Stmt},
         test_helpers::{
             SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
@@ -978,21 +965,19 @@ impl CreateTable {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_create_table {
-    use crate::{ast::Dialect, sem::create_table::CreateTable as CreateTableCreateTable};
-
-    use assert_matches::assert_matches;
-    use testresult::TestResult;
-
     use crate::{
         AstAndContextPair,
+        ast::{CreateTableMode, Dialect},
         context::BaseParseContext,
         names::{FullName, SchemaName, TableName},
-        sem::{CreateTableMode, SemAst, SourcePathWithSpan},
+        sem::{SemAst, SourcePathWithSpan, create_table::CreateTable as CreateTableCreateTable},
         syn::sqlite::Stmt,
         test_helpers::{
             SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
         },
     };
+    use assert_matches::assert_matches;
+    use testresult::TestResult;
 
     #[rstest::rstest]
     #[case(
@@ -1149,14 +1134,13 @@ impl DropTable {
 
 #[cfg(test)]
 mod test_drop_table_analyze_drop_stmt {
-    use testresult::TestResult;
-
     use crate::{
         AstAndContextPair,
         sem::DropTable,
         syn::Opt,
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
+    use testresult::TestResult;
 
     #[rstest::rstest]
     #[case("drop table table_one", false, false)]
@@ -1214,10 +1198,9 @@ impl DropTable {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_drop_table_analyze_drop_table {
-    use crate::sem::create_table::DropTable;
-
     use crate::{
         AstAndContextPair,
+        sem::create_table::DropTable,
         syn::sqlite::DropTableStatement,
         test_helpers::{SqliteSynBuilder, TestParseContext, sqlite_syn, test_context},
     };
@@ -1296,9 +1279,10 @@ impl CreateTable {
 
 #[cfg(test)]
 mod test_foreign_key_reference_columns {
-    use crate::test_helpers::ownership::apply_ownership_sql;
-
-    use crate::{context::TableInfoRead, test_helpers::foreign_keys as fk};
+    use crate::{
+        context::TableInfoRead,
+        test_helpers::{foreign_keys as fk, ownership::apply_ownership_sql},
+    };
 
     #[test]
     fn omitted_reference_columns_require_a_postgres_primary_key() -> testresult::TestResult {

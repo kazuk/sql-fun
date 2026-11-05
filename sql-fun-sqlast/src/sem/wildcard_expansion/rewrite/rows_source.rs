@@ -1,15 +1,11 @@
-use crate::sem::WildcardRewriteError;
-// Freeze a combined function source without changing its zip or row interface.
-
-use crate::sem::WildcardRowsProjection;
-
 use crate::{
     ast::{
         Call, Cte, DerivedTable, Expr, FromItem, Join, Name, Query, Relation, TableFunctions,
         Target,
     },
-    sem::WildcardRowsSource,
+    sem::{WildcardRewriteError, WildcardRowsProjection, WildcardRowsSource},
 };
+// Freeze a combined function source without changing its zip or row interface.
 
 /// Keep each invocation once, number its rows, and zip the fixed outputs by row.
 /// All helper fields stay inside the returned derived source.
@@ -35,13 +31,10 @@ pub(super) fn freeze(
 
 #[cfg(test)]
 mod test_freeze {
-    use crate::sem::wildcard_expansion::rewrite::rows_source::freeze;
-
-    use crate::test_helpers::wildcard_rows_source::invocation;
-
-    use crate::test_helpers::wildcard_rows_source::layout;
-
-    use crate::test_helpers::wildcard_rows_source::rendered;
+    use crate::{
+        sem::wildcard_expansion::rewrite::rows_source::freeze,
+        test_helpers::wildcard_rows_source::{invocation, layout, rendered},
+    };
 
     #[rstest::rstest]
     #[case::plain(false)]
@@ -255,11 +248,10 @@ impl PrivateNames {
 
 #[cfg(test)]
 mod test_private_names {
-    use crate::sem::wildcard_expansion::rewrite::rows_source::PrivateNames;
-
-    use crate::test_helpers::wildcard_rows_source::invocation;
-
-    use crate::test_helpers::wildcard_rows_source::layout;
+    use crate::{
+        sem::wildcard_expansion::rewrite::rows_source::PrivateNames,
+        test_helpers::wildcard_rows_source::{invocation, layout},
+    };
 
     #[test]
     fn private_names_do_not_shadow_correlated_bindings_or_output_columns() {

@@ -1,13 +1,15 @@
-use crate::AstAndContextPair;
-use crate::ast::{Dialect, Statement};
-use crate::names::{FullName, OperatorName};
-use crate::parse_statements;
-use crate::sem::SemAst;
-use crate::sem::{
-    AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition,
-    FunctionOverloadCollection, FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType,
+use crate::{
+    AstAndContextPair,
+    ast::{Dialect, Statement},
+    names::{FullName, OperatorName},
+    parse_statements,
+    sem::{
+        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition,
+        FunctionOverloadCollection, FunctionParam, OperatorDefinition, OverloadVariant,
+        PgBuiltInType, SemAst,
+    },
+    test_helpers::{TestParseContext, create_cache_context},
 };
-use crate::test_helpers::{TestParseContext, create_cache_context};
 
 pub(crate) fn statement(sql: &str, dialect: Dialect) -> Statement {
     parse_statements(sql, dialect).next().unwrap().unwrap()

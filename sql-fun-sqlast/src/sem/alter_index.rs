@@ -1,3 +1,4 @@
+mod ddl;
 use crate::{
     names::FullName,
     sem::{
@@ -316,13 +317,14 @@ impl AlterIndex {
 mod test_resolve_applicability {
     //! Enduring parser-to-semantics and schema-chain coverage without database dependencies.
 
-    use crate::sem::{
-        ParseContext,
-        alter_index::{AlterIndex, IndexAlteration, IndexStorageParameter},
-        problem::IndexProblemKind,
+    use crate::{
+        sem::{
+            ParseContext,
+            alter_index::{AlterIndex, IndexAlteration, IndexStorageParameter},
+            problem::IndexProblemKind,
+        },
+        test_helpers::alter_index as test_helpers,
     };
-
-    use crate::test_helpers::alter_index as test_helpers;
 
     #[test]
     fn rejected_alteration_is_inapplicable_even_when_diagnostics_are_suppressed()

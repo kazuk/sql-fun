@@ -1,16 +1,17 @@
-use crate::AstAndContextPair;
-use crate::ast::{Dialect, StatementNode};
-use crate::context::{MutSourcePathWithSpan as _, ParseContext as _};
-use crate::names::{ColumnName, FullName, OperatorName, SchemaName, TableName};
-use crate::parse_statements;
-use crate::sem::SemAst;
-use crate::sem::{
-    AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, CatalogNameLookup,
-    CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType, CreateView,
-    FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType, SelectStatement,
-    SemScalarExpr, TypeCategory, TypeDefinition, TypeReference, ViewLike,
+use crate::{
+    AstAndContextPair,
+    ast::{Dialect, StatementNode},
+    context::{MutSourcePathWithSpan as _, ParseContext as _},
+    names::{ColumnName, FullName, OperatorName, SchemaName, TableName},
+    parse_statements,
+    sem::{
+        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, CatalogNameLookup,
+        CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType, CreateView,
+        FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType, SelectStatement, SemAst,
+        SemScalarExpr, TypeCategory, TypeDefinition, TypeReference, ViewLike,
+    },
+    test_helpers::{TestParseContext, create_cache_context, source_span},
 };
-use crate::test_helpers::{TestParseContext, create_cache_context, source_span};
 
 pub(crate) fn catalog() -> TestParseContext {
     let mut context = TestParseContext::default();

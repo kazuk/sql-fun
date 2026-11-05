@@ -1,12 +1,11 @@
+mod ddl;
 use crate::{
-    names::TableName,
-    sem::{AlterSequence, AstAndContextPair, OwnerSpecification},
+    names::{FullName, TableName},
+    sem::{
+        AlterSequence, AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst,
+        alter_table::AlterObjSubCommand,
+    },
     syn::{CreateSeqStmt, Opt},
-};
-
-use crate::{
-    names::FullName,
-    sem::{AnalysisError, ParseContext, SemAst, alter_table::AlterObjSubCommand},
 };
 
 /// analyzed [`crate::syn::CreateSeqStmt`]

@@ -1,10 +1,11 @@
-use crate::sem::SemAst;
 pub(crate) use crate::test_helpers::query::expression;
 use crate::{
     ast::Dialect,
     names::FullName,
     parse_statements,
-    sem::{AnalysisError, CatalogNameLookup, PgBuiltInType, SelectStatement, TypeDefinition},
+    sem::{
+        AnalysisError, CatalogNameLookup, PgBuiltInType, SelectStatement, SemAst, TypeDefinition,
+    },
     test_helpers::{TestParseContext, create_cache_context},
 };
 

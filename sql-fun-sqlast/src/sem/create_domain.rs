@@ -1,19 +1,15 @@
+mod ddl;
 use crate::{
-    ast::Domain,
-    names::TableName,
-    sem::{CatalogNameLookup, DeclarationCollation, OwnerSpecification, TypeCategory, WithTypmod},
-    syn::CreateDomainStmt,
+    ast::{Domain, TryFromWithTokens},
+    context::ParseContext,
+    names::{FullName, TableName},
+    sem::{
+        AnalysisError, AstAndContextPair, CatalogNameLookup, DeclarationCollation,
+        OwnerSpecification, TypeCategory, TypeReference, WithTypmod,
+    },
+    syn::{CreateDomainStmt, ScanToken},
 };
 use sql_fun_core::IVec;
-
-use crate::{
-    ast::TryFromWithTokens,
-    context::ParseContext,
-    sem::{AstAndContextPair, TypeReference},
-    syn::ScanToken,
-};
-
-use crate::{names::FullName, sem::AnalysisError};
 
 /// analyzed [`crate::syn::CreateDomainStmt`]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

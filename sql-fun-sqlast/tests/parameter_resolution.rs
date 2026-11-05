@@ -1,13 +1,17 @@
 //! SQL input constraints are independent of parameter hints and Rust code generation.
 
-use ::sql_fun_sqlast::sem::SemAst;
+use ::sql_fun_sqlast::{
+    ast::Dialect,
+    context::ParseContext,
+    parse_statements,
+    sem::{PgBuiltInType, SemAst},
+};
 // Shared support lives below tests/ to avoid an extra Cargo test target.
 #[path = "test_helpers/shared.rs"]
 mod test_helpers;
 
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::heavy;
-use ::sql_fun_sqlast::{ast::Dialect, context::ParseContext, parse_statements, sem::PgBuiltInType};
+use crate::test_helpers::{create_cache_context, heavy};
+
 use std::collections::BTreeMap;
 
 // Removed real_postgres_catalog_preserves_numeric_source_types after a standard timeout;

@@ -17,14 +17,14 @@ use ::sql_fun_server_api::{
         TypeReference,
     },
 };
-use ::sql_fun_sqlast::sem::{SemAst, WildcardExpansion};
 use ::sql_fun_sqlast::{
     CacheContext,
     ast::{Dialect, Statement},
     context::{BaseParseContext, ParameterTypeHintWrite, ParseContext, SchemaFileContext},
     parse_statements,
-    sem::{AnalysisProblem, QueryMetadata, TypeReference as SqlType},
+    sem::{AnalysisProblem, QueryMetadata, SemAst, TypeReference as SqlType, WildcardExpansion},
 };
+
 use std::path::{Path, PathBuf};
 
 struct QuerySource {

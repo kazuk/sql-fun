@@ -2,13 +2,12 @@
 
 use crate::{
     StringSpan,
-    ast::{Alias, Select},
-};
-
-use crate::ast::{
-    Call, CallKind, Cte, CteBody, DeparseError, Dialect, Expr, FromItem, Join, JoinKind, Literal,
-    Name, OperatorExpr, OperatorKind, Order, Query, QueryBody, Relation, Statement, StatementNode,
-    Subquery, SubqueryKind, TableFunction, TableFunctions, Target, TypedColumn, Window, With,
+    ast::{
+        Alias, Call, CallKind, Cte, CteBody, DeparseError, Dialect, Expr, FromItem, Join, JoinKind,
+        Literal, Name, OperatorExpr, OperatorKind, Order, Query, QueryBody, Relation, Select,
+        Statement, StatementNode, Subquery, SubqueryKind, TableFunction, TableFunctions, Target,
+        TypedColumn, Window, With,
+    },
 };
 
 impl TableFunctions {

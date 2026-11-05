@@ -1,12 +1,15 @@
-use crate::ast::{
-    Alias, Assignment, Conflict, ConflictAction, Delete, Expr, FromItem, FromOpt, IndexExpression,
-    Insert, Name, Query, Relation, StatementNode, Target, TryFromList, TryFromOpt, Update, With,
+use crate::{
+    ast::{
+        Alias, Assignment, Conflict, ConflictAction, ConflictClause, Delete, Expr, FromItem,
+        FromOpt, IndexExpression, Insert, Name, Query, Relation, StatementNode, Target,
+        TryFromList, TryFromOpt, Update, With,
+    },
+    error::AnalysisError,
+    stack::with_stack,
 };
-use crate::error::AnalysisError;
-use crate::stack::with_stack;
+
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite as syn;
-use crate::syntax_options::ConflictClause;
 
 impl TryFrom<&syn::InsertStatement> for Insert {
     type Error = AnalysisError;
@@ -387,9 +390,10 @@ impl TryFrom<&syn::TriggerCmdInsert> for Insert {
 mod test_trigger_insert {
     use crate::ast::Insert;
     #[cfg(feature = "sqlite")]
-    use crate::syn::sqlite::{InsertBody, Stmt, TriggerCmdInsert};
-    #[cfg(feature = "sqlite")]
-    use crate::test_helpers::SqliteSynBuilder;
+    use crate::{
+        syn::sqlite::{InsertBody, Stmt, TriggerCmdInsert},
+        test_helpers::SqliteSynBuilder,
+    };
 
     #[test]
     fn retains_adapter_returning_field_even_though_sql_parser_rejects_clause() {

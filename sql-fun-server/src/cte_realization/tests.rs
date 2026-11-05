@@ -1,20 +1,21 @@
-use ::sql_fun_sqlast::sem::SemAst;
-#[path = "test_helpers.rs"]
-mod test_helpers;
-
-use crate::{
-    cte_realization::ParameterHintConflict, schema_cache::test_helpers::SchemaProject,
-    test_helpers::create_cache_context,
-};
-
-use self::test_helpers::resolved;
-use crate::cte_realization::realize_cte_catalog;
-use ::sql_fun_core::PlaceholderedSql;
 use ::sql_fun_sqlast::{
     ParseStatementError, PlaceholderedSqlRenderError,
     ast::{AstMutationError, Dialect},
     context::ParseContext,
+    sem::SemAst,
 };
+#[path = "test_helpers.rs"]
+mod test_helpers;
+
+use crate::{
+    cte_realization::{ParameterHintConflict, realize_cte_catalog},
+    schema_cache::test_helpers::SchemaProject,
+    test_helpers::create_cache_context,
+};
+
+use self::test_helpers::resolved;
+
+use ::sql_fun_core::PlaceholderedSql;
 
 #[rstest::rstest]
 #[case::no_ctes("select 1", &[], &[])]

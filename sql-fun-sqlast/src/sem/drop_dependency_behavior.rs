@@ -1,3 +1,5 @@
+mod ast;
+
 /// Requested dependency behavior for a resolved DROP statement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DropDependencyBehavior {

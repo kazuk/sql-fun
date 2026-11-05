@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::{
     context::ParseContext,
     names::{ColumnName, FullName},

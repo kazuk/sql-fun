@@ -1,16 +1,16 @@
 use crate::{
     Api,
-    schema_cache::{SchemaCacheService, SchemaContextKey, SchemaSelection},
+    schema_cache::{
+        SchemaCacheService, SchemaContextKey, SchemaSelection, test_helpers::SchemaProject,
+    },
     test_helpers::create_cache_context,
 };
-use ::sql_fun_sqlast::sem::SemAst;
 use ::sql_fun_sqlast::{
     context::BaseParseContext,
     names::{FullName, TableName},
+    sem::SemAst,
 };
 use std::sync::Arc;
-
-use crate::schema_cache::test_helpers::SchemaProject;
 
 #[tokio::test]
 async fn new_analysis_uses_selected_environment_over_shared_normalized_catalog() {
@@ -535,8 +535,9 @@ fn configured_roles_bind_and_apply_through_direct_context(
     #[case] expected: &str,
 ) {
     use ::sql_fun_sqlast::{
+        ast::ObjectKind,
         context::{OwnershipInfoRead, ParseContext, RoleInfoRead},
-        sem::{ObjectKind, Role},
+        sem::Role,
     };
     let project = SchemaProject::new();
     project.configure_roles(

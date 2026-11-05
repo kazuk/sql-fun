@@ -2,17 +2,21 @@ use crate::{
     ast::{
         AlterCommand as AstAlterCommand, AlterRelation, AlterRelationKind as AstAlterRelationKind,
         Column as AstColumn, ColumnConstraint, CommitAction, CompositeType, ConstraintExtras,
-        ExclusionElement, ForeignReference, Index, IndexExpression as AstIndexExpression,
-        PartitionBound, PartitionDatum, PartitionSpec, Relation as AstRelation, Role, Table,
-        TableAs, TableConstraint as AstTableConstraint, TableExtras, TryFromOpt, VariableSet,
+        CreateTableMode, ExclusionElement, Expr, ForeignReference, Index,
+        IndexExpression as AstIndexExpression, Name, PartitionBound, PartitionDatum, PartitionSpec,
+        Relation as AstRelation, Role, StatementNode, SyntaxOption, Table, TableAs,
+        TableConstraint as AstTableConstraint, TableExtras, TryCollectFromWithTokens, TryFromOpt,
+        TryFromWithTokens, TryFromWithTokensOpt, TypeName, VariableSet,
         ddl::{
-            AlterColumnType, AlterConstraintFlags, AlterDefinition, AlterIdentity, AlterOperation,
-            AlterPartition, CompositeField, GenericAction, GenericOption, PostgresAlterCommand,
-            ReplicaIdentity,
+            AlterColumnType, AlterConstraintFlags, AlterIdentity, AlterOperation, AlterPartition,
+            CompositeField, Function, FunctionBody, FunctionBodyStatement, FunctionOption,
+            FunctionParameter, GenericAction, GenericOption, ParameterMode, PostgresAlterCommand,
+            ReplicaIdentity, Schema,
         },
         postgres::{nonempty, required},
     },
-    syntax_options::CreateTableMode,
+    error::AnalysisError,
+    syn::{self, ListOpt, Opt},
 };
 
 impl TryFrom<syn::ObjectType> for AstAlterRelationKind {
@@ -261,7 +265,7 @@ impl TryFromWithTokens<&syn::Constraint> for ColumnConstraint {
     ) -> Result<Self, Self::Error> {
         use crate::{
             ast::ForeignReference,
-            syntax_options::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity},
+            ast::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity},
         };
         let kind = required(value.get_contype().as_inner(), "constraint.contype")?;
         Ok(match kind {
@@ -315,7 +319,7 @@ impl TryFrom<&syn::Constraint> for ForeignReference {
     fn try_from(value: &syn::Constraint) -> Result<Self, Self::Error> {
         use crate::{
             ast::Relation,
-            syntax_options::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
+            ast::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
         };
         let table = required(value.get_pktable().as_inner(), "constraint.pktable")?;
         Ok(Self {
@@ -333,18 +337,7 @@ impl TryFrom<&syn::Constraint> for ForeignReference {
         })
     }
 }
-use crate::{
-    ast::{
-        Expr, Name, StatementNode, SyntaxOption, TryCollectFromWithTokens, TryFromWithTokens,
-        TryFromWithTokensOpt, TypeName,
-        ddl::{
-            Function, FunctionBody, FunctionBodyStatement, FunctionOption, FunctionParameter,
-            ParameterMode, Schema,
-        },
-    },
-    error::AnalysisError,
-    syn::{self, ListOpt, Opt},
-};
+
 use ::sql_fun_core::IVec;
 
 impl TryFromWithTokens<&syn::CreateTableAsStmt> for TableAs {
@@ -564,39 +557,6 @@ impl TryFromWithTokens<&syn::DefElem> for FunctionOption {
     }
 }
 
-impl FunctionOption {
-    fn boolean_argument(node: &syn::NodeOpt) -> Result<bool, AnalysisError> {
-        required(node.as_boolean().get_boolval(), "function Boolean option")
-    }
-
-    fn string_list(node: syn::NodeOpt, description: &str) -> Result<Vec<String>, AnalysisError> {
-        let items = required(node.as_list().get_items().as_inner(), description)?;
-        let mut values = Vec::new();
-        for item in items {
-            values.push(required(item.as_string().get_sval(), description)?);
-        }
-        Ok(values)
-    }
-
-    fn type_list(
-        node: syn::NodeOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<TypeName>, AnalysisError> {
-        let items = required(
-            node.as_list().get_items().as_inner(),
-            "function TRANSFORM types",
-        )?;
-        let mut values = Vec::new();
-        for item in items {
-            values.push(TypeName::try_from_with_tokens(
-                &required(item.as_type_name().as_inner(), "function TRANSFORM type")?,
-                tokens,
-            )?);
-        }
-        Ok(values)
-    }
-}
-
 impl TryFromWithTokens<&syn::Node> for FunctionBody {
     type Error = AnalysisError;
     fn try_from_with_tokens(
@@ -778,103 +738,6 @@ impl TryFromWithTokens<&syn::AlterTableCmd> for PostgresAlterCommand {
             ),
             AstAlterCommand::postgres_legacy(value, tokens)?.as_ref(),
         ))
-    }
-}
-
-impl AlterOperation {
-    fn convert_definition(
-        &self,
-        value: &syn::AlterTableCmd,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<AlterDefinition, AnalysisError> {
-        use crate::ast::ddl::AlterDefinition;
-        let definition = value.get_def();
-        Ok(match self {
-            Self::AddColumn => AlterDefinition::column(AstColumn::try_from_with_tokens(
-                &required(definition.as_column_def().as_inner(), "added column")?,
-                tokens,
-            )?),
-            Self::AlterColumnType => {
-                AlterDefinition::column_type(AlterColumnType::try_from_with_tokens(
-                    &required(definition.as_column_def().as_inner(), "altered column type")?,
-                    tokens,
-                )?)
-            }
-            Self::ColumnDefault | Self::SetStatistics | Self::SetExpression => {
-                if definition.as_inner().is_some() {
-                    AlterDefinition::expression(Expr::try_from_with_tokens(&definition, tokens)?)
-                } else {
-                    AlterDefinition::none()
-                }
-            }
-            Self::SetStorage | Self::SetCompression => AlterDefinition::text(&required(
-                definition.as_string().get_sval(),
-                "column storage option",
-            )?),
-            Self::SetOptions
-            | Self::ResetOptions
-            | Self::SetRelOptions
-            | Self::ResetRelOptions
-            | Self::SetIdentity => {
-                AlterDefinition::options(SyntaxOption::try_collect_from_with_tokens(
-                    definition.as_list().get_items(),
-                    tokens,
-                )?)
-            }
-            Self::GenericOptions | Self::AlterColumnGenericOptions => {
-                AlterDefinition::generic_options(GenericOption::try_collect_from_with_tokens(
-                    definition.as_list().get_items(),
-                    tokens,
-                )?)
-            }
-            Self::AddConstraint => {
-                AlterDefinition::constraint(AstTableConstraint::try_from_with_tokens(
-                    &required(definition.as_constraint().as_inner(), "added constraint")?,
-                    tokens,
-                )?)
-            }
-            Self::AlterConstraint => {
-                AlterDefinition::constraint_flags(AlterConstraintFlags::try_from(&required(
-                    definition.as_atalter_constraint().as_inner(),
-                    "altered constraint",
-                )?)?)
-            }
-            Self::Owner => AlterDefinition::role(Role::try_from(&required(
-                value.get_newowner().as_inner(),
-                "new owner",
-            )?)?),
-            Self::AddInherit | Self::DropInherit => AlterDefinition::relation(
-                AstRelation::try_from(&required(
-                    definition.as_range_var().as_inner(),
-                    "inheritance parent",
-                )?)?
-                .name,
-            ),
-            Self::AddOf => AlterDefinition::type_name(TypeName::try_from_with_tokens(
-                &required(definition.as_type_name().as_inner(), "typed table type")?,
-                tokens,
-            )?),
-            Self::ReplicaIdentity => {
-                AlterDefinition::replica(ReplicaIdentity::try_from(&required(
-                    definition.as_replica_identity_stmt().as_inner(),
-                    "replica identity",
-                )?)?)
-            }
-            Self::AttachPartition | Self::DetachPartition | Self::DetachPartitionFinalize => {
-                AlterDefinition::partition(AlterPartition::try_from_with_tokens(
-                    &required(
-                        definition.as_partition_cmd().as_inner(),
-                        "partition command",
-                    )?,
-                    tokens,
-                )?)
-            }
-            Self::AddIdentity => AlterDefinition::identity(AlterIdentity::try_from_with_tokens(
-                &required(definition.as_constraint().as_inner(), "identity constraint")?,
-                tokens,
-            )?),
-            _ => AlterDefinition::none(),
-        })
     }
 }
 

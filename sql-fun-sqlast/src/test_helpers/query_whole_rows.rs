@@ -1,17 +1,15 @@
-use crate::StringSpan;
-use crate::context::{MutSourcePathWithSpan, ParseContext as _, SchemaFileContext};
-use crate::parse_statements;
-use crate::sem::SemAst;
-use crate::sem::{AnalysisError, CastContext, CastDefinition, SourcePathWithSpan};
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::query::catalog;
-
-use crate::ast::{Dialect, StatementNode};
-use crate::names::FullName;
-use crate::sem::{
-    FunctionParam, OverloadVariant, PgBuiltInType, SelectStatement, SemScalarExpr, TypeReference,
+use crate::{
+    StringSpan,
+    ast::{Dialect, StatementNode},
+    context::{MutSourcePathWithSpan, ParseContext as _, SchemaFileContext},
+    names::FullName,
+    parse_statements,
+    sem::{
+        AnalysisError, CastContext, CastDefinition, FunctionParam, OverloadVariant, PgBuiltInType,
+        SelectStatement, SemAst, SemScalarExpr, SourcePathWithSpan, TypeReference,
+    },
+    test_helpers::{TestParseContext, create_cache_context, query::catalog},
 };
-use crate::test_helpers::TestParseContext;
 
 pub(crate) fn assert_problem(context: &TestParseContext, code: &str) {
     for problem in context.reported_problems() {

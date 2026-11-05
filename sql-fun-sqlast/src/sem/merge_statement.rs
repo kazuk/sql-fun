@@ -1,3 +1,6 @@
+mod ast;
+mod cte;
+
 mod destination;
 mod view_support;
 
@@ -7,19 +10,14 @@ pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
 use crate::{
     CacheContext,
     ast::{Dialect, Merge, StatementNode},
-    sem::{
-        AccessKind, SemAst, ViewMergeSupport as SemViewMergeSupport, traversal::SemanticVisitor,
-    },
-    syn::MergeStmt,
-};
-
-use crate::{
     names::TableName,
     sem::{
-        AnalysisError, FromClause, InsertClauseSemantics, InsertTarget, InsertValue, ParseContext,
-        QueryCte, ResultColumnCollection, SemScalarExpr, UpdateAssignment,
-        UpdateAssignmentCollection, traversal::SemanticVisitorMut,
+        AccessKind, AnalysisError, FromClause, InsertClauseSemantics, InsertTarget, InsertValue,
+        ParseContext, QueryCte, ResultColumnCollection, SemAst, SemScalarExpr, UpdateAssignment,
+        UpdateAssignmentCollection, ViewMergeSupport as SemViewMergeSupport,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
+    syn::MergeStmt,
 };
 
 /// The rows for which a MERGE action is eligible.

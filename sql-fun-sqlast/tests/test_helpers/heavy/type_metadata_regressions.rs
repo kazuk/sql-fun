@@ -1,12 +1,12 @@
 use crate::test_helpers::{create_cache_context, heavy};
-use ::sql_fun_sqlast::sem::SemAst;
-
 use ::sql_fun_sqlast::{
     AstAndContextPair, PostgresDialect,
     ast::Dialect,
     context::{BaseContext, FrozenBaseContext, SchemaFileContext},
     parse_statements,
+    sem::SemAst,
 };
+
 use std::path::Path;
 
 /// Loads the full builtin catalog and schema to verify context forwarding.

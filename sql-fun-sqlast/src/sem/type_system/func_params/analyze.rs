@@ -1,12 +1,10 @@
-use crate::{ast::FunctionParameter as AstFunctionParameter, syn::FunctionParameter};
-use sql_fun_core::IVec;
-
 use crate::{
-    ast::TryFromWithTokens,
+    ast::{FunctionParameter as AstFunctionParameter, TryFromWithTokens},
     names::{ColumnName, FullName},
     sem::{AnalysisError, ColumnDefinition, FunctionParam, ParseContext, TypeReference},
-    syn::{FunctionParameterMode, Opt, ScanToken},
+    syn::{FunctionParameter, FunctionParameterMode, Opt, ScanToken},
 };
+use sql_fun_core::IVec;
 
 impl FunctionParam {
     /// analyze syntax node

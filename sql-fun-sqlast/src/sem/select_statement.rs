@@ -1,3 +1,6 @@
+mod ast;
+mod cte;
+
 mod result_column;
 mod set_operation;
 
@@ -7,22 +10,16 @@ pub use self::set_operation::{SetOperationKind, SetOperationQuery};
 
 use crate::{
     CacheContext,
-    ast::Query as AstQuery,
-    sem::{
-        AccessKind, InsertTarget, SelectClauses, SemanticQuery, SemanticValues,
-        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
-    },
-    syn::SelectStmt,
-};
-
-use crate::{
-    ast::TryFromWithTokens,
+    ast::{Query as AstQuery, TryFromWithTokens},
     names::ColumnName,
     sem::{
-        AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext, SemAst,
-        SemScalarExpr, TypeDefinition, TypeReference, WithClause, create_table::ColumnDefinition,
+        AccessKind, AnalysisError, AstAndContextPair, CreateCompositeType, FromClause,
+        InsertTarget, ParseContext, SelectClauses, SemAst, SemScalarExpr, SemanticQuery,
+        SemanticValues, TypeDefinition, TypeReference, WithClause,
+        create_table::ColumnDefinition,
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
     },
-    syn::ScanToken,
+    syn::{ScanToken, SelectStmt},
 };
 
 use ::sql_fun_core::IVec;
@@ -272,12 +269,10 @@ impl SelectStatementNode {
 
 #[cfg(test)]
 mod test_scalar_scope {
-    use crate::sem::select_statement::SelectStatementNode;
-
     use crate::{
         context::MutSourcePathWithSpan,
         names::ColumnName,
-        sem::{PgBuiltInType, SourcePathWithSpan},
+        sem::{PgBuiltInType, SourcePathWithSpan, select_statement::SelectStatementNode},
         syn::Opt,
         test_helpers::{SynBuilder, TestParseContext, source_span},
     };

@@ -1,10 +1,12 @@
+mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::NotNullColumnConstraint;
 use crate::{
+    ast::{ConflictClause, Validity},
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ConflictClause, ParseContext, Validity,
+        ParseContext,
     },
     syn::{ConstrType, Constraint, Opt},
 };

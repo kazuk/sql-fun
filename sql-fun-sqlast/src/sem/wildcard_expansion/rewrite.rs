@@ -7,20 +7,11 @@ mod source;
 pub use self::error::WildcardRewriteError;
 use self::source::{SourcePlans, ordinal_reference, typed_record_reference};
 use crate::{
-    names::FullName,
-    sem::{
-        CoalesceExpr, ColumnReferenceExpr, ImplicitCastExpr, TypeCastExpr, TypeReference,
-        WildcardQualifiers,
-    },
-    stack::with_stack,
-};
-
-use crate::{
     ast::{
-        Call, Expr, Name, Statement, Target, TypeName,
+        Expr, Name, Statement, Target,
         projection::{ProjectionReplacements, ProjectionScopes},
     },
-    sem::{SemScalarExpr, WildcardExpansion},
+    sem::WildcardExpansion,
 };
 
 impl WildcardExpansion {
@@ -47,6 +38,357 @@ impl WildcardExpansion {
         let count = plan.apply(&mut staged)?;
         *statement = staged;
         Ok(count)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        sem::{SemAst, WildcardExpansion},
+        test_helpers::{
+            create_cache_context, wildcard as test_helpers,
+            wildcard::{ResultShapeAssertions, catalog, expansions, rewritten, statement},
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::repeated("SELECT t.*, *, t.* FROM t", 3)]
+    #[case::nested("SELECT * FROM (SELECT * FROM t) q", 1)]
+    #[case::cte("WITH q AS (SELECT * FROM t) SELECT * FROM q", 1)]
+    #[case::scalar("SELECT (SELECT id FROM (SELECT * FROM t) q) FROM t", 1)]
+    #[case::set("SELECT * FROM t UNION ALL SELECT * FROM t", 2)]
+    #[case::insert("INSERT INTO t VALUES (1, 2) RETURNING *", 1)]
+    #[case::update("UPDATE t SET name = 1 RETURNING *", 1)]
+    #[case::delete("DELETE FROM t RETURNING *", 1)]
+    #[case::zero_columns("SELECT * FROM empty", 1)]
+    #[case::correlated_order("SELECT 1 FROM (t CROSS JOIN u) j ORDER BY EXISTS(SELECT j.*)", 1)]
+    #[case::correlated("SELECT EXISTS(SELECT j.*) FROM (t CROSS JOIN u) j", 1)]
+    #[case::correlated_set(
+        "SELECT EXISTS(SELECT j.* UNION ALL SELECT j.*) FROM (t CROSS JOIN u) j",
+        2
+    )]
+    #[case::deep_correlation("SELECT EXISTS(SELECT EXISTS(SELECT j.*)) FROM (t CROSS JOIN u) j", 1)]
+    #[case::empty_outer_projection("SELECT FROM (t CROSS JOIN u) j WHERE EXISTS(SELECT j.*)", 1)]
+    #[case::shadowed_alias(
+        "SELECT EXISTS(SELECT j.* FROM (u CROSS JOIN t) j) FROM (t CROSS JOIN u) j",
+        1
+    )]
+    #[case::correlated_lateral(
+        "SELECT child.* FROM (t CROSS JOIN u) j CROSS JOIN LATERAL (SELECT j.*) child",
+        1
+    )]
+    #[case::nested_source_and_target_edits(
+        "SELECT k.* FROM ((SELECT j.* FROM (t CROSS JOIN u) j) child(a,b,id,d) CROSS JOIN t other) k",
+        2
+    )]
+    #[case::duplicate_join_alias("SELECT j.* FROM (t JOIN u ON true) AS j", 1)]
+    #[case::mixed_duplicate_alias("SELECT * FROM (t JOIN u ON true) AS j CROSS JOIN t AS other", 1)]
+    #[case::duplicate_alias_using(
+        "SELECT * FROM (t JOIN u ON true) AS j JOIN (SELECT 1 AS name) v USING (name)",
+        1
+    )]
+    #[case::nested_duplicate_alias(
+        "SELECT k.* FROM ((t JOIN u ON true) AS j CROSS JOIN t AS other) AS k",
+        1
+    )]
+    #[case::duplicate_alias_record("SELECT j.*, record_arg(j.*) FROM (t JOIN u ON true) AS j", 1)]
+    #[case::unique_outer_alias(
+        "SELECT k.* FROM ((t JOIN u ON true) j CROSS JOIN empty) k(a,b,c,d)",
+        1
+    )]
+    #[case::zero_width_returning("DELETE FROM empty RETURNING *, 1", 1)]
+
+    fn rewrite_roundtrip_preserves_result_shape(#[case] sql: &str, #[case] expected: usize) {
+        let mut cache_context = create_cache_context();
+        let original = SemAst::from_ast(&statement(sql), catalog(), &mut cache_context).unwrap();
+        let (rewritten, count) = rewritten(sql);
+        assert_eq!(count, expected);
+        let emitted = rewritten.deparse_sql(Dialect::postgres()).unwrap();
+        let reparsed =
+            SemAst::from_ast(&statement(&emitted), catalog(), &mut cache_context).unwrap();
+        assert!(
+            reparsed.context().reported_problems().is_empty(),
+            "{emitted}: {:?}",
+            reparsed.context().reported_problems()
+        );
+        let before = original.ast().result_columns().unwrap();
+        let after = reparsed.ast().result_columns().unwrap();
+        before.assert_same_result_shape(after, &emitted);
+    }
+
+    #[rstest::rstest]
+    #[case::using("SELECT * FROM t FULL JOIN u USING (id)", "COALESCE")]
+    #[case::natural("SELECT * FROM t NATURAL FULL JOIN u", "COALESCE")]
+    #[case::alias("SELECT joined.* FROM (t FULL JOIN u USING (id)) joined", "joined")]
+    #[case::duplicate("SELECT t.*, t.* FROM t", "AS")]
+    fn resolved_join_expressions_remain_executable(#[case] sql: &str, #[case] expected: &str) {
+        let mut cache_context = create_cache_context();
+        let (rewritten, _) = rewritten(sql);
+        let emitted = rewritten.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            emitted.to_uppercase().contains(&expected.to_uppercase()),
+            "{emitted}"
+        );
+        let pair = SemAst::from_ast(&statement(&emitted), catalog(), &mut cache_context).unwrap();
+        assert!(
+            pair.context().reported_problems().is_empty(),
+            "{emitted}: {:?}",
+            pair.context().reported_problems()
+        );
+    }
+
+    #[test]
+    fn missing_location_preserves_owner_and_allows_retry() {
+        let source = statement("SELECT * FROM t");
+        let groups = expansions(&source);
+        let mut owner = statement("(SELECT * FROM t)");
+        let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            WildcardExpansion::rewrite(&groups, &mut owner)
+                .unwrap_err()
+                .is_not_found()
+        );
+        assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+        let own_groups = expansions(&owner);
+        assert_eq!(
+            WildcardExpansion::rewrite(&own_groups, &mut owner).unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn duplicate_group_rejection_preserves_owner() {
+        let mut owner = statement("SELECT * FROM t");
+        let mut groups = expansions(&owner);
+        groups.push(groups[0].clone());
+        let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            WildcardExpansion::rewrite(&groups, &mut owner)
+                .unwrap_err()
+                .is_duplicate_location()
+        );
+        assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+    }
+
+    #[test]
+    fn wrong_node_kind_is_rejected_without_edit() {
+        let groups = expansions(&statement("SELECT * FROM t"));
+        let mut owner = statement("SELECT 1 FROM t");
+        let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            WildcardExpansion::rewrite(&groups, &mut owner)
+                .unwrap_err()
+                .is_wrong_node_kind()
+        );
+        assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+    }
+
+    #[test]
+    fn fixed_projection_star_is_preserved() {
+        let sql = "SELECT * FROM (SELECT 1 AS id) q";
+        let (owner, count) = rewritten(sql);
+        assert_eq!(count, 0);
+        assert!(
+            owner
+                .deparse_sql(Dialect::postgres())
+                .unwrap()
+                .contains('*')
+        );
+    }
+
+    #[test]
+    fn ambiguous_target_locations_preserve_owner() {
+        use crate::ast::{CteDefinition, HaveWithClause};
+        let mut owner = statement("SELECT * FROM t");
+        let groups = expansions(&owner);
+        let definition = CteDefinition::new("imported", &statement("SELECT * FROM u")).unwrap();
+        owner
+            .ensure_with_clause()
+            .unwrap()
+            .insert(0, &definition)
+            .unwrap();
+        let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            WildcardExpansion::rewrite(&groups, &mut owner)
+                .unwrap_err()
+                .is_ambiguous()
+        );
+        assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+    }
+
+    #[test]
+    fn missing_parser_location_is_rejected_without_edit() {
+        use crate::sem::{ResultColumnCollection, WildcardExpansion};
+        let mut owner = statement("SELECT * FROM t");
+        let group = WildcardExpansion::new(None, &ResultColumnCollection::default(), 0, true, &[]);
+        let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            WildcardExpansion::rewrite(&[group], &mut owner)
+                .unwrap_err()
+                .is_missing_location()
+        );
+        assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+    }
+
+    #[test]
+    fn empty_returning_is_rejected_without_edit() {
+        let mut owner = statement("DELETE FROM empty RETURNING *");
+        let groups = expansions(&owner);
+        let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            WildcardExpansion::rewrite(&groups, &mut owner)
+                .unwrap_err()
+                .is_empty_returning()
+        );
+        assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+    }
+
+    #[rstest::rstest]
+    #[case::new("DELETE FROM t RETURNING new.*", "new")]
+    #[case::old("DELETE FROM t RETURNING old.*", "old")]
+    fn returning_row_image_qualification_is_preserved(#[case] sql: &str, #[case] qualifier: &str) {
+        let mut cache_context = create_cache_context();
+        let metadata = serde_json::from_value(serde_json::json!({
+            "engine": "postgres", "dialect": "postgres", "version": "18", "search_path": ["public"]
+        }))
+        .unwrap();
+        let context = || catalog().with_metadata(&metadata);
+        let mut owner = statement(sql);
+        let analyzed = SemAst::from_ast(&owner, context(), &mut cache_context).unwrap();
+        assert!(analyzed.context().reported_problems().is_empty());
+        WildcardExpansion::rewrite(
+            analyzed.context().analysis_state().wildcard_expansions(),
+            &mut owner,
+        )
+        .unwrap();
+        let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            emitted.contains(&format!(r#""{qualifier}"."id""#)),
+            "{emitted}"
+        );
+        let pair = SemAst::from_ast(&statement(&emitted), context(), &mut cache_context).unwrap();
+        assert!(
+            pair.context().reported_problems().is_empty(),
+            "{emitted}: {:?}",
+            pair.context().reported_problems()
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::explicit("SELECT r.* FROM ROWS FROM (rows_fun(), rows_fun()) r")]
+    #[case::delete("DELETE FROM t USING ROWS FROM (rows_fun(), rows_fun()) r RETURNING r.*")]
+    #[case::update("UPDATE t SET name=1 FROM ROWS FROM (rows_fun(), rows_fun()) r RETURNING r.*")]
+    #[case::implicit("SELECT * FROM ROWS FROM (rows_fun(), rows_fun())")]
+    #[case::nested_alias(
+        "SELECT k.* FROM (ROWS FROM (rows_fun(),rows_fun()) r CROSS JOIN empty) k(a,b,c,d)"
+    )]
+    #[case::ordinality(
+        "SELECT r.* FROM ROWS FROM (rows_fun(), rows_fun()) WITH ORDINALITY r(x,x,y,y,n)"
+    )]
+    fn rows_from_expansion_keeps_duplicate_outputs_stable(#[case] sql: &str) {
+        let mut cache_context = create_cache_context();
+        let mut owner = statement(sql);
+        let original =
+            SemAst::from_ast(&owner, test_helpers::rows_catalog(), &mut cache_context).unwrap();
+        assert!(
+            original.context().reported_problems().is_empty(),
+            "{:?}",
+            original.context().reported_problems()
+        );
+        WildcardExpansion::rewrite(
+            original.context().analysis_state().wildcard_expansions(),
+            &mut owner,
+        )
+        .unwrap();
+        let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
+        let rewritten = SemAst::from_ast(
+            &statement(&emitted),
+            test_helpers::rows_catalog(),
+            &mut cache_context,
+        )
+        .unwrap();
+        assert!(
+            rewritten.context().reported_problems().is_empty(),
+            "{emitted}: {:?}",
+            rewritten.context().reported_problems()
+        );
+        let before = original.ast().result_columns().unwrap();
+        let after = rewritten.ast().result_columns().unwrap();
+        before.assert_same_result_shape(after, &emitted);
+    }
+
+    #[rstest::rstest]
+    #[case::duplicate_join(
+        "MERGE INTO t target USING (t a CROSS JOIN u b) j ON true WHEN MATCHED THEN DELETE RETURNING j.*"
+    )]
+    #[case::rows(
+        "MERGE INTO t target USING ROWS FROM (rows_fun(),rows_fun()) r ON true WHEN MATCHED THEN DELETE RETURNING r.*"
+    )]
+    fn merge_returning_fixes_its_source_projection(
+        #[case] sql: &str,
+        #[values("17", "18")] version: &str,
+    ) {
+        let mut cache_context = create_cache_context();
+        let metadata = serde_json::from_value(serde_json::json!({
+        "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
+    }))
+    .unwrap();
+        let context = || test_helpers::rows_catalog().with_metadata(&metadata);
+        let mut owner = statement(sql);
+        let original = SemAst::from_ast(&owner, context(), &mut cache_context).unwrap();
+        assert!(
+            original.context().reported_problems().is_empty(),
+            "{:?}",
+            original.context().reported_problems()
+        );
+        assert_eq!(
+            WildcardExpansion::rewrite(
+                original.context().analysis_state().wildcard_expansions(),
+                &mut owner
+            )
+            .unwrap(),
+            1
+        );
+        let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
+        let rewritten =
+            SemAst::from_ast(&statement(&emitted), context(), &mut cache_context).unwrap();
+        assert!(
+            rewritten.context().reported_problems().is_empty(),
+            "{emitted}: {:?}",
+            rewritten.context().reported_problems()
+        );
+        let before = original.ast().result_columns().unwrap();
+        let after = rewritten.ast().result_columns().unwrap();
+        before.assert_same_result_shape(after, &emitted);
+    }
+
+    #[test]
+    fn a_late_invalid_target_preserves_sources_and_allows_retry() {
+        let mut cache_context = create_cache_context();
+        let groups = expansions(&statement("SELECT j.*, j.* FROM (t CROSS JOIN u) j"));
+        let mut owner = statement("SELECT j.*, 1   FROM (t CROSS JOIN u) j");
+        let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            WildcardExpansion::rewrite(&groups, &mut owner)
+                .unwrap_err()
+                .is_wrong_node_kind()
+        );
+        assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+        let own_groups = expansions(&owner);
+        assert_eq!(
+            WildcardExpansion::rewrite(&own_groups, &mut owner).unwrap(),
+            1
+        );
+        let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
+        assert!(
+            SemAst::from_ast(&statement(&emitted), catalog(), &mut cache_context)
+                .unwrap()
+                .context()
+                .reported_problems()
+                .is_empty()
+        );
     }
 }
 
@@ -90,104 +432,6 @@ impl<'a> WildcardRewritePlan<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests;
-
-impl SemScalarExpr {
-    fn projection_expression(
-        &self,
-        bindings: &WildcardQualifiers,
-    ) -> Result<Expr, WildcardRewriteError> {
-        with_stack(|| match self {
-            Self::ColumnRef(value) => value.projection_expression(bindings),
-            Self::Coalesce(value) => value.projection_expression(bindings),
-            Self::ImplicitCast(value) => value.projection_expression(bindings),
-            Self::TypeCast(value) => value.projection_expression(bindings),
-            _ => Err(WildcardRewriteError::invalid(
-                "resolved wildcard expression has no executable projection representation",
-            )),
-        })
-    }
-    fn projection_cast(
-        &self,
-        target: &TypeReference,
-        bindings: &WildcardQualifiers,
-    ) -> Result<Expr, WildcardRewriteError> {
-        if target.type_definition().is_some() {
-            return Err(WildcardRewriteError::invalid(
-                "wildcard cast target has no SQL type name",
-            ));
-        }
-        let expression = self.projection_expression(bindings)?;
-        let target = TypeName::projection(
-            &projection_name(
-                target
-                    .full_name()
-                    .expect("owned cast targets rejected above"),
-            ),
-            target.is_array() == Some(true),
-        );
-        Ok(Expr::projection_cast(&expression, &target))
-    }
-}
-impl ColumnReferenceExpr {
-    fn projection_expression(
-        &self,
-        bindings: &WildcardQualifiers,
-    ) -> Result<Expr, WildcardRewriteError> {
-        if let Some(table) = self.table_column_reference()
-            && let Some(qualifier) = bindings.reference_for(table.relation(), table.alias())
-        {
-            let mut parts = qualifier.to_vec();
-            parts.push(self.get_column_name().to_string());
-            return Ok(Expr::projection_column(&Name::from_parts(&parts)));
-        }
-        let Some((alias, column)) = self.projection_reference() else {
-            return Err(WildcardRewriteError::invalid(
-                "wildcard column binding is unresolved",
-            ));
-        };
-        let parts = if alias.is_empty() {
-            vec![column.to_string()]
-        } else {
-            vec![alias.to_owned(), column.to_string()]
-        };
-        Ok(Expr::projection_column(&Name::from_parts(&parts)))
-    }
-}
-impl CoalesceExpr {
-    fn projection_expression(
-        &self,
-        bindings: &WildcardQualifiers,
-    ) -> Result<Expr, WildcardRewriteError> {
-        let mut arguments = Vec::new();
-        for argument in self.arguments() {
-            arguments.push(argument.projection_expression(bindings)?);
-        }
-        Ok(Expr::projection_call(&Call::coalesce_projection(
-            &arguments,
-        )))
-    }
-}
-impl ImplicitCastExpr {
-    fn projection_expression(
-        &self,
-        bindings: &WildcardQualifiers,
-    ) -> Result<Expr, WildcardRewriteError> {
-        let (argument, target) = self.projection_operand();
-        argument.projection_cast(target, bindings)
-    }
-}
-impl TypeCastExpr {
-    fn projection_expression(
-        &self,
-        bindings: &WildcardQualifiers,
-    ) -> Result<Expr, WildcardRewriteError> {
-        let (argument, target) = self.projection_operand();
-        argument.projection_cast(target, bindings)
-    }
-}
-
 impl WildcardExpansion {
     fn rewrite_targets(&self) -> Result<Vec<Target>, WildcardRewriteError> {
         let bindings = self.qualifiers();
@@ -216,16 +460,4 @@ impl WildcardExpansion {
         }
         Ok(targets)
     }
-}
-
-fn projection_name(name: &FullName) -> Name {
-    let mut parts = Vec::new();
-    if let Some(catalog) = name.catalog() {
-        parts.push(catalog.to_string());
-    }
-    if let Some(schema) = name.schema() {
-        parts.push(schema.to_string());
-    }
-    parts.push(name.local_name());
-    Name::from_parts(&parts)
 }

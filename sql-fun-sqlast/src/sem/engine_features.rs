@@ -1,22 +1,100 @@
-//! Validate engine feature gates before semantic interpretation and catalog changes.
+//! Analysis owned by the semantic definitions in this module.
 
-use crate::ast::{
-    AlterRelation, Column, CteBody, DefaultPrivileges, Delete, ForeignTable, Insert, Merge,
-    PrivilegeObject, StatementNode, Table, TableConstraint, Update, With,
-};
 use crate::{
-    ast::{ColumnConstraint, ConstraintExtras, Dialect, Query, ReturningOption},
+    ast::{
+        AlterCommand as AstAlterCommand, AlterRelation as AstAlterRelation, Column as AstColumn,
+        ColumnConstraint as AstColumnConstraint, ConstraintExtras as AstConstraintExtras,
+        CteBody as AstCteBody, DefaultPrivileges as AstDefaultPrivileges, Delete as AstDelete,
+        Dialect as AstDialect, ForeignTable as AstForeignTable, GeneratedColumnMode,
+        Insert as AstInsert, Merge as AstMerge, PrivilegeObject as AstPrivilegeObject,
+        Query as AstQuery, ReturningOption as AstReturningOption,
+        StatementNode as AstStatementNode, Table as AstTable,
+        TableConstraint as AstTableConstraint, Update as AstUpdate, With as AstWith,
+        ddl::{
+            AlterConstraintFlags as AstAlterConstraintFlags, AlterDefinition as AstAlterDefinition,
+            Domain as AstDomain,
+        },
+    },
     context::ParseContext,
     engine_specific::{Postgres18Feature, Postgres18Syntax},
-    sem::{AnalysisError, GeneratedColumnMode},
+    sem::AnalysisError,
 };
+
+impl EngineFeatureValidation {
+    pub(crate) fn alter_command(
+        ast: &AstAlterCommand,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        match ast {
+            AstAlterCommand::Postgres(command) => {
+                Self::alter_definition(&command.definition, context)
+            }
+            AstAlterCommand::Constraint(constraint) => {
+                Self::table_constraint(constraint, context, false)
+            }
+            _ => Ok(true),
+        }
+    }
+
+    pub(crate) fn alter_definition(
+        ast: &AstAlterDefinition,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        match ast {
+            AstAlterDefinition::Constraint(constraint) => {
+                Self::table_constraint(constraint, context, false)
+            }
+            AstAlterDefinition::Column(column) => Self::column(column, context),
+            AstAlterDefinition::ConstraintFlags(flags) => {
+                Self::alter_constraint_flags(flags, context)
+            }
+            _ => Ok(true),
+        }
+    }
+
+    pub(crate) fn alter_constraint_flags(
+        ast: &AstAlterConstraintFlags,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
+        let mut valid = true;
+        if ast.enforced.is_some() {
+            valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
+        }
+        if ast.no_inherit.is_some() {
+            valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintInheritance)?;
+        }
+        if valid && (ast.enforced.is_some() || ast.no_inherit.is_some()) {
+            todo!("ALTER CONSTRAINT enforcement/inheritance (#887)");
+        }
+        Ok(valid)
+    }
+
+    pub(crate) fn domain(
+        ast: &AstDomain,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        let mut valid = true;
+        for constraint in &ast.constraints {
+            valid &= Self::table_constraint(constraint, context, true)?;
+        }
+        if valid
+            && ast.constraints.iter().any(|constraint| {
+                matches!(constraint.constraint, AstColumnConstraint::Enforcement(_))
+            })
+        {
+            todo!("domain constraint analysis (#548)");
+        }
+        Ok(valid)
+    }
+}
 
 /// Validates engine feature availability before semantic interpretation.
 pub(crate) struct EngineFeatureValidation;
 
 impl EngineFeatureValidation {
     pub(crate) fn returning_options(
-        options: &[ReturningOption],
+        options: &[AstReturningOption],
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         if options.is_empty() {
@@ -31,23 +109,23 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn statement(
-        ast: &StatementNode,
+        ast: &AstStatementNode,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if context.dialect() != Dialect::postgres() {
+        if context.dialect() != AstDialect::postgres() {
             return Ok(true);
         }
         match ast {
-            StatementNode::DefaultPrivileges(value) => Self::default_privileges(value, context),
-            StatementNode::ForeignTable(value) => Self::foreign_table(value, context),
-            StatementNode::Query(query) => Self::query(query, context),
-            StatementNode::Insert(insert) => Self::insert(insert, context),
-            StatementNode::Update(update) => Self::update(update, context),
-            StatementNode::Delete(delete) => Self::delete(delete, context),
-            StatementNode::Merge(merge) => Self::merge(merge, context),
-            StatementNode::Table(table) => Self::table(table, context),
-            StatementNode::Domain(domain) => Self::domain(domain, context),
-            StatementNode::AlterRelation(alter) => Self::alter_relation(alter, context),
+            AstStatementNode::DefaultPrivileges(value) => Self::default_privileges(value, context),
+            AstStatementNode::ForeignTable(value) => Self::foreign_table(value, context),
+            AstStatementNode::Query(query) => Self::query(query, context),
+            AstStatementNode::Insert(insert) => Self::insert(insert, context),
+            AstStatementNode::Update(update) => Self::update(update, context),
+            AstStatementNode::Delete(delete) => Self::delete(delete, context),
+            AstStatementNode::Merge(merge) => Self::merge(merge, context),
+            AstStatementNode::Table(table) => Self::table(table, context),
+            AstStatementNode::Domain(domain) => Self::domain(domain, context),
+            AstStatementNode::AlterRelation(alter) => Self::alter_relation(alter, context),
             _ => Ok(true),
         }
     }
@@ -55,13 +133,10 @@ impl EngineFeatureValidation {
 
 #[cfg(test)]
 mod utility_version_tests {
-    use crate::sem::EngineFeatureValidation;
-
-    use crate::sem::SemAst;
-
     use crate::{
         ast::Dialect,
         parse_statements,
+        sem::{EngineFeatureValidation, SemAst},
         test_helpers::{TestParseContext, create_cache_context},
     };
 
@@ -130,9 +205,10 @@ mod utility_version_tests {
 
 #[cfg(test)]
 mod unimplemented_analysis_tests {
-    use crate::sem::EngineFeatureValidation;
-
-    use crate::{ast::Dialect, parse_statements, test_helpers::TestParseContext};
+    use crate::{
+        ast::Dialect, parse_statements, sem::EngineFeatureValidation,
+        test_helpers::TestParseContext,
+    };
 
     #[rstest::rstest]
     #[case::insert_alias("INSERT INTO t VALUES (1) RETURNING WITH (NEW AS n) n.id")]
@@ -161,7 +237,7 @@ mod unimplemented_analysis_tests {
 
 impl EngineFeatureValidation {
     pub(crate) fn with_clause(
-        ast: &With,
+        ast: &AstWith,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
@@ -172,31 +248,31 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn cte_body(
-        ast: &CteBody,
+        ast: &AstCteBody,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         match ast {
-            CteBody::Query(query) => Self::query(query, context),
-            CteBody::Insert(insert) => Self::insert(insert, context),
-            CteBody::Update(update) => Self::update(update, context),
-            CteBody::Delete(delete) => Self::delete(delete, context),
-            CteBody::Merge(merge) => Self::merge(merge, context),
+            AstCteBody::Query(query) => Self::query(query, context),
+            AstCteBody::Insert(insert) => Self::insert(insert, context),
+            AstCteBody::Update(update) => Self::update(update, context),
+            AstCteBody::Delete(delete) => Self::delete(delete, context),
+            AstCteBody::Merge(merge) => Self::merge(merge, context),
         }
     }
 
     pub(crate) fn query(
-        ast: &Query,
+        ast: &AstQuery,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         Self::with_clause(&ast.with, context)
     }
 
     pub(crate) fn table_constraint(
-        ast: &TableConstraint,
+        ast: &AstTableConstraint,
         context: &mut impl ParseContext,
         column: bool,
     ) -> Result<bool, AnalysisError> {
-        if context.dialect() != Dialect::postgres() {
+        if context.dialect() != AstDialect::postgres() {
             return Ok(true);
         }
         let mut valid = Self::temporal_constraint(ast, context)?;
@@ -208,7 +284,7 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn temporal_constraint(
-        ast: &TableConstraint,
+        ast: &AstTableConstraint,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         if !ast.extras.without_overlaps && !ast.extras.fk_with_period && !ast.extras.pk_with_period
@@ -222,17 +298,19 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn column_constraint(
-        ast: &ColumnConstraint,
+        ast: &AstColumnConstraint,
         context: &mut impl ParseContext,
-        extras: &ConstraintExtras,
+        extras: &AstConstraintExtras,
         column: bool,
     ) -> Result<bool, AnalysisError> {
         match ast {
-            ColumnConstraint::Enforcement(enforced) => Self::enforcement(context, *enforced),
-            ColumnConstraint::Generated(_, Some(mode)) if *mode == GeneratedColumnMode::Virtual => {
+            AstColumnConstraint::Enforcement(enforced) => Self::enforcement(context, *enforced),
+            AstColumnConstraint::Generated(_, Some(mode))
+                if *mode == GeneratedColumnMode::Virtual =>
+            {
                 context.postgres18_syntax_used(Postgres18Syntax::VirtualGeneratedColumn)
             }
-            ColumnConstraint::Nullability(true, _, _)
+            AstColumnConstraint::Nullability(true, _, _)
                 if !column || extras.no_inherit || extras.skip_validation =>
             {
                 Self::not_null(context)
@@ -262,7 +340,7 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn column(
-        ast: &Column,
+        ast: &AstColumn,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
@@ -273,7 +351,7 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn table(
-        ast: &Table,
+        ast: &AstTable,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
@@ -289,13 +367,12 @@ impl EngineFeatureValidation {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod sqlite_feature_tests {
-    use crate::sem::EngineFeatureValidation;
     use crate::{
-        ast::{Dialect, Table},
+        ast::{Dialect, Table, TryFromWithTokens},
+        sem::EngineFeatureValidation,
+        syn::Opt,
         test_helpers::{SynBuilder, TestParseContext},
     };
-
-    use crate::{ast::TryFromWithTokens, syn::Opt};
 
     #[test]
     fn virtual_column_has_no_postgres_version_requirement() {
@@ -314,10 +391,10 @@ mod sqlite_feature_tests {
 
 impl EngineFeatureValidation {
     pub(crate) fn alter_relation(
-        ast: &AlterRelation,
+        ast: &AstAlterRelation,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if context.dialect() != Dialect::postgres() {
+        if context.dialect() != AstDialect::postgres() {
             return Ok(true);
         }
         let mut valid = true;
@@ -328,10 +405,10 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn default_privileges(
-        ast: &DefaultPrivileges,
+        ast: &AstDefaultPrivileges,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if ast.object() == PrivilegeObject::large_objects() {
+        if ast.object() == AstPrivilegeObject::large_objects() {
             context.postgres18_syntax_used(Postgres18Syntax::LargeObjectDefaultPrivileges)
         } else {
             Ok(true)
@@ -339,7 +416,7 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn foreign_table(
-        ast: &ForeignTable,
+        ast: &AstForeignTable,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         if ast
@@ -354,28 +431,28 @@ impl EngineFeatureValidation {
     }
 
     pub(crate) fn insert(
-        ast: &Insert,
+        ast: &AstInsert,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         check_dml_features(context, &ast.with, &ast.returning_options)
     }
 
     pub(crate) fn update(
-        ast: &Update,
+        ast: &AstUpdate,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         check_dml_features(context, &ast.with, &ast.returning_options)
     }
 
     pub(crate) fn delete(
-        ast: &Delete,
+        ast: &AstDelete,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         check_dml_features(context, &ast.with, &ast.returning_options)
     }
 
     pub(crate) fn merge(
-        ast: &Merge,
+        ast: &AstMerge,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         check_dml_features(context, &ast.with_clause, &ast.returning_options)
@@ -384,8 +461,8 @@ impl EngineFeatureValidation {
 
 fn check_dml_features(
     context: &mut impl ParseContext,
-    with: &With,
-    returning: &[ReturningOption],
+    with: &AstWith,
+    returning: &[AstReturningOption],
 ) -> Result<bool, AnalysisError> {
     Ok(EngineFeatureValidation::with_clause(with, context)?
         & EngineFeatureValidation::returning_options(returning, context)?)

@@ -1,11 +1,9 @@
-use crate::parse_statements;
-use crate::sem::SemAst;
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::insert::catalog;
-
-use crate::ast::Dialect;
-
-use crate::test_helpers::TestParseContext;
+use crate::{
+    ast::Dialect,
+    parse_statements,
+    sem::SemAst,
+    test_helpers::{TestParseContext, create_cache_context, insert::catalog},
+};
 
 pub(crate) fn analyze_keyed(definition: &str, returning: &str) -> (SemAst, TestParseContext) {
     let mut cache_context = create_cache_context();

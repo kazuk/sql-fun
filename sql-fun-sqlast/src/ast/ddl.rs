@@ -1,5 +1,7 @@
 //! Owned DDL syntax. Catalog bindings are obtained only during resolution.
 
+mod postgres_helpers;
+
 mod check;
 mod column_attributes;
 mod serial;
@@ -9,13 +11,13 @@ mod sql_emission;
 
 use crate::{
     StringSpan,
+    ast::CreateTableMode,
     ast::{
         AlterCommand, AlterRelationKind, Column as AstColumn, Expr, IndexExpression,
         Into as AstInto, Name, PartitionBound, Query, Relation as AstRelation, Role as AstRole,
         StatementNode, SyntaxOption, TableConstraint, TypeName, VariableSet,
     },
     names::FullName,
-    syntax_options::CreateTableMode,
 };
 
 impl From<&FullName> for Name {

@@ -1,15 +1,12 @@
-use crate::AstAndContextPair;
-use crate::ast::Dialect;
-use crate::sem::SemAst;
-use crate::test_helpers::scalar_catalog::schema_from_base;
-
-use crate::context::SchemaFileContext;
-use crate::names::{FullName, SchemaName};
-use crate::parse_statements;
-use crate::sem::{CastContext, CastDefinition};
-
-use crate::sem::TypeReference;
-use crate::test_helpers::{TestParseContext, create_cache_context};
+use crate::{
+    AstAndContextPair,
+    ast::Dialect,
+    context::SchemaFileContext,
+    names::{FullName, SchemaName},
+    parse_statements,
+    sem::{CastContext, CastDefinition, SemAst, TypeReference},
+    test_helpers::{TestParseContext, create_cache_context, scalar_catalog::schema_from_base},
+};
 
 // Small explicit type/cast universe. No builtin metadata is loaded.
 fn context() -> SchemaFileContext {

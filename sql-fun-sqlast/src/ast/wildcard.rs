@@ -1,8 +1,5 @@
 //! Location synchronization for syntax-only projection edits.
-use crate::ast::{
-    Dialect, FromGroup, FromItem, Join, Statement,
-    projection::{ProjectionError, ProjectionLocations},
-};
+use crate::ast::{FromGroup, FromItem, Join, projection::ProjectionError};
 
 /// A rejected synchronization of syntax projection locations.
 /// The destination statement remains unchanged on failure.
@@ -21,7 +18,7 @@ enum TargetLocationProblem {
 }
 
 impl TargetLocationError {
-    fn invalid(message: &str) -> Self {
+    pub(crate) fn invalid(message: &str) -> Self {
         Self(TargetLocationProblem::invalid(message))
     }
     /// Whether the parser output has a target without a lexical location.
@@ -68,49 +65,6 @@ impl From<ProjectionError> for TargetLocationError {
         } else {
             Self::invalid("target collections differ after the parser round trip")
         }
-    }
-}
-
-impl Statement {
-    /// Copy target locations from a parser round trip of this statement.
-    ///
-    /// The source must render identically in the same PostgreSQL dialect and
-    /// retain parser locations for every target. Only target locations change;
-    /// expressions and diagnostic anchors remain attached to their original input.
-    /// The consumed source is temporary parser output. All checks precede edits.
-    ///
-    /// # Errors
-    /// Returns an error without changing this statement if rendering, statement
-    /// correspondence, or parser target locations cannot be validated.
-    pub fn synchronize_target_locations(
-        &mut self,
-        mut reparsed: Self,
-    ) -> Result<(), TargetLocationError> {
-        if self.dialect != Dialect::postgres() || self.dialect != reparsed.dialect {
-            return Err(TargetLocationError::invalid(
-                "target location synchronization requires the same PostgreSQL dialect",
-            ));
-        }
-        let original = self
-            .deparse_sql(self.dialect)
-            .map_err(|error| TargetLocationError::invalid(&error.to_string()))?;
-        let rendered = reparsed
-            .deparse_sql(reparsed.dialect)
-            .map_err(|error| TargetLocationError::invalid(&error.to_string()))?;
-        if original != rendered {
-            return Err(TargetLocationError::invalid(
-                "target location source does not render as the destination statement",
-            ));
-        }
-        let locations = ProjectionLocations::capture(&mut reparsed.node);
-        locations
-            .validate_source()
-            .map_err(TargetLocationError::from)?;
-        locations
-            .validate_destination(&mut self.node)
-            .map_err(TargetLocationError::from)?;
-        locations.apply(&mut self.node);
-        Ok(())
     }
 }
 

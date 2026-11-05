@@ -1,11 +1,9 @@
-pub use crate::syntax_options::ObjectKind;
+mod ddl;
 use crate::{
-    ast::{Comment as AstComment, TryFromWithTokens},
-    sem::AstAndContextPair,
+    ast::{Comment as AstComment, ObjectKind, TryFromWithTokens},
+    sem::{AnalysisError, AstAndContextPair, ParseContext},
     syn::CommentStmt,
 };
-
-use crate::sem::{AnalysisError, ParseContext};
 
 /// analyzed [`crate::syn::CommentStmt`]
 #[derive(Debug, Clone)]

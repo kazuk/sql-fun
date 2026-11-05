@@ -1,6 +1,5 @@
-pub use crate::syntax_options::ConflictClause;
-pub use crate::syntax_options::Deferrable;
-pub use crate::syntax_options::Validity;
+mod ddl;
+
 mod attr_constraint;
 mod check_constraint;
 mod collate_constraint;
@@ -22,37 +21,28 @@ pub use self::{
     collate_constraint::CollateColumnConstraint,
     default_constraint::DefaultColumnConstraint,
     exclusion_constraint::ExclusionColumnConstraint,
-    foreign_key_constraint::{
-        Deferrability, ForeignKeyAction, ForeignKeyColumnConstraint, ForeignKeyMatchType,
-    },
-    generated_constraint::{GeneratedColumnConstraint, GeneratedColumnMode},
-    identity_constraint::{IdentityColumnConstraint, IdentityColumnMode},
+    foreign_key_constraint::ForeignKeyColumnConstraint,
+    generated_constraint::GeneratedColumnConstraint,
+    identity_constraint::IdentityColumnConstraint,
     nullability_constraint::ColumnNullabilityConstraint,
     primary_key_constraint::PrimaryKeyColumnConstraint,
     unique_constraint::UniqueColumnConstraint,
 };
-
-#[cfg(any(test, feature = "sqlite"))]
-use crate::ast::ColumnConstraint as AstColumnConstraint;
-use crate::sem::{ColumnRename, traversal::SemanticVisitorMut};
 #[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ColumnConstraint as SqliteColumnConstraint;
-
+use crate::{SqliteToken, syn::sqlite::ColumnConstraint as SqliteColumnConstraint};
 #[cfg(any(test, feature = "sqlite"))]
-use ::sql_fun_core::IVec;
-
+use crate::{ast::ColumnConstraint as AstColumnConstraint, sem::ParseContext};
 #[cfg(test)]
 use crate::{
     ast::TryFromWithTokens,
     syn::{Constraint as SynConstraint, ScanToken},
 };
-
-#[cfg(any(test, feature = "sqlite"))]
-use crate::sem::ParseContext;
 use crate::{
     names::{ColumnName, TableName},
-    sem::AnalysisError,
+    sem::{AnalysisError, ColumnRename, traversal::SemanticVisitorMut},
 };
+#[cfg(any(test, feature = "sqlite"))]
+use ::sql_fun_core::IVec;
 
 /// common behavior for column constraints
 pub trait ColumnConstraintTrait {
@@ -65,9 +55,6 @@ pub trait ColumnConstraintTrait {
     /// applied column name
     fn column_name(&self) -> &ColumnName;
 }
-
-#[cfg(feature = "sqlite")]
-use crate::SqliteToken;
 
 /// column constraints
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
@@ -240,13 +227,13 @@ impl ColumnConstraintTrait for ColumnConstraint {
 #[cfg(test)]
 mod test_column_constraint_trait_for_column_constraint {
     use crate::{
+        ast::{GeneratedColumnMode, IdentityColumnMode},
         sem::{
             AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
             AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
             ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, DefaultColumnConstraint,
             ExclusionColumnConstraint, ForeignKeyColumnConstraint, GeneratedColumnConstraint,
-            GeneratedColumnMode, IdentityColumnConstraint, IdentityColumnMode,
-            PrimaryKeyColumnConstraint, UniqueColumnConstraint,
+            IdentityColumnConstraint, PrimaryKeyColumnConstraint, UniqueColumnConstraint,
             column_constraints::ColumnNullabilityConstraint,
         },
         test_helpers::{SemValueBuilder, sem_builder},
@@ -599,7 +586,6 @@ mod column_constraint_analyze_constraint_tests {
         syn::Constraint,
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
-
     use testresult::TestResult;
 
     fn constr_not_null() -> Constraint {

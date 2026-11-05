@@ -1,13 +1,10 @@
-use crate::syn::VariableSetStmt;
-use sql_fun_core::IVec;
-
+mod ddl;
 use crate::{
     context::ParseContext,
-    sem::{AstAndContextPair, ScalarAnalysisContext, SemScalarExpr},
-    syn::{ListOpt, ScanToken},
+    sem::{AnalysisError, AstAndContextPair, ScalarAnalysisContext, SemAst, SemScalarExpr},
+    syn::{ListOpt, ScanToken, VariableSetStmt},
 };
-
-use crate::sem::{AnalysisError, SemAst};
+use sql_fun_core::IVec;
 
 /// set a variable
 #[derive(Debug, Clone)]

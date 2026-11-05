@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Context-free SQL syntax shared by the parser frontends.
 //!
 //! Names in this module are spelling, not catalog bindings. In particular, type
@@ -7,12 +6,7 @@
 //! Converters consume newly built child nodes to avoid cloning recursive trees;
 //! ordinary semantic factories borrow their inputs.
 
-use crate::syntax_options::{
-    ConflictClause, CreateTableMode, Deferrability, Deferrable, ForeignKeyAction,
-    ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, ObjectKind, Validity,
-};
-// Syntax retention intentionally precedes semantic support for some SQL clauses.
-// Construction tests cover these fields even when resolution does not consume them.
+#![allow(dead_code)]
 
 pub(crate) mod ddl;
 mod default_privileges;
@@ -22,6 +16,7 @@ mod drop_behavior;
 mod engine_features;
 mod foreign_table;
 mod mutation;
+mod options;
 mod ownership;
 pub(crate) mod postgres;
 pub(crate) mod projection;
@@ -30,16 +25,21 @@ mod query_construction;
 mod returning_options;
 mod rows_from;
 mod rule;
-
 #[cfg(feature = "sqlite")]
 mod sqlite;
-#[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
-mod sqlite_retention;
 mod traversal;
 mod trigger;
 mod utility;
 pub(crate) mod validation;
 mod wildcard;
+
+pub use self::options::{
+    ConflictClause, CreateTableMode, Deferrability, Deferrable, ForeignKeyAction,
+    ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, ObjectKind, Validity,
+};
+
+// Syntax retention intentionally precedes semantic support for some SQL clauses.
+// Construction tests cover these fields even when resolution does not consume them.
 
 pub(crate) use self::ddl::{
     CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs,
@@ -60,7 +60,7 @@ pub use self::{
     wildcard::TargetLocationError,
 };
 
-use crate::syn::ScanToken;
+use crate::{StringSpan, syn::ScanToken};
 
 use sql_fun_core::IVec;
 
@@ -72,8 +72,6 @@ pub(crate) use self::document::{
     JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, MergeMatchKind, MergeWhen,
     MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize,
 };
-
-use crate::StringSpan;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct TableExtras {

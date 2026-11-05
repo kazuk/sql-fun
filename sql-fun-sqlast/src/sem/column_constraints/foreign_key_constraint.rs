@@ -1,19 +1,16 @@
-#[cfg(feature = "sqlite")]
-use crate::sem::AnalysisProblem;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ForeignKeyColumnConstraint as SqliteForeignKeyColumnConstraint;
-pub use crate::syntax_options::Deferrability;
-pub use crate::syntax_options::ForeignKeyAction;
-pub use crate::syntax_options::ForeignKeyMatchType;
-use crate::{sem::ColumnRename, syn::Constraint};
-
 use crate::{
+    ast::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait,
-        ForeignKeyTarget, ParseContext, TypeReference, Validity,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
+        ForeignKeyTarget, ParseContext, TypeReference,
     },
-    syn::{ConstrType, ListOpt, Opt},
+    syn::{ConstrType, Constraint, ListOpt, Opt},
+};
+#[cfg(feature = "sqlite")]
+use crate::{
+    sem::AnalysisProblem,
+    syn::sqlite::ForeignKeyColumnConstraint as SqliteForeignKeyColumnConstraint,
 };
 
 /// foreign key constraint
@@ -83,11 +80,9 @@ impl ForeignKeyColumnConstraint {
 
 #[cfg(test)]
 mod test_foreign_key_serialization {
-    use crate::sem::ForeignKeyColumnConstraint;
-
     use crate::{
         names::{ColumnName, FullName},
-        sem::PgBuiltInType,
+        sem::{ForeignKeyColumnConstraint, PgBuiltInType},
         test_helpers::foreign_keys as fk,
     };
 
@@ -344,7 +339,6 @@ impl ForeignKeyColumnConstraint {
 mod test_analyze_constraint_sqlite {
     #[cfg(feature = "sqlite")]
     use crate::syn::sqlite::ColumnConstraint;
-
     use crate::{
         names::{ColumnName, FullName},
         sem::ForeignKeyColumnConstraint,

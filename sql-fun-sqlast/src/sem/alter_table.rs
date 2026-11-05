@@ -1,33 +1,23 @@
-use crate::sem::RelationAlteration;
+mod ddl;
+mod view;
 #[cfg(feature = "sqlite")]
-use crate::syn::sqlite::AlterTable as SqliteAlterTable;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::AlterTableBody;
 use crate::{
-    ast::{AlterCommand, AlterRelation},
-    sem::{AlterColumnAttributes, ColumnRename, CreateTable, OwnerSpecification},
-    syn::{AlterTableCmd, AlterTableStmt},
+    SqliteToken,
+    syn::sqlite::{AlterTable as SqliteAlterTable, AlterTableBody},
 };
-use sql_fun_core::IVec;
-
-#[cfg(feature = "sqlite")]
-use crate::SqliteToken;
-
 use crate::{
-    ast::TryFromWithTokens,
+    ast::{AlterCommand, AlterRelation, TryFromWithTokens},
     context::GetSourcePathWithSpan,
-    names::{ColumnName, ViewName},
+    names::{ColumnName, TableName, ViewName},
     sem::{
-        AstAndContextPair, ColumnDefinition, Constraint, ConstraintNames, SemScalarExpr,
-        SourcePathWithSpan,
+        AlterColumnAttributes, AnalysisError, AstAndContextPair, ColumnDefinition, ColumnRename,
+        Constraint, ConstraintNames, CreateTable, OwnerSpecification, ParseContext,
+        RelationAlteration, SemScalarExpr, SourcePathWithSpan,
     },
-    syn::{AlterTableType, ScanToken},
+    syn::{AlterTableCmd, AlterTableStmt, AlterTableType, ScanToken},
 };
 
-use crate::{
-    names::TableName,
-    sem::{AnalysisError, ParseContext},
-};
+use sql_fun_core::IVec;
 
 /// analyzed alter table statement
 #[derive(Debug, Clone, derive_getters::Getters)]
@@ -233,10 +223,10 @@ impl AlterTable {
 #[cfg(test)]
 mod test_analyze_alter_table_statement {
     #[cfg(feature = "sqlite")]
-    use crate::test_helpers::alter_table::{make_column, parse_sqlite_alter_table, sqlite_context};
-
-    #[cfg(feature = "sqlite")]
-    use crate::ast::Dialect;
+    use crate::{
+        ast::Dialect,
+        test_helpers::alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
+    };
 
     use crate::{
         AstAndContextPair,
@@ -581,16 +571,16 @@ impl AlterObjSubCommand {
 
 #[cfg(test)]
 mod test_analyze_alter_obj_column_default {
-    use crate::{names::ColumnName, sem::ColumnDefinition};
-
     use crate::{
-        names::{FullName, TableName},
+        names::{ColumnName, FullName, TableName},
         sem::{
-            ScalarConstExpr, SemScalarExpr, SourcePathWithSpan, alter_table::AlterObjSubCommand,
+            ColumnDefinition, ScalarConstExpr, SemScalarExpr, SourcePathWithSpan,
+            alter_table::AlterObjSubCommand,
         },
         syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
+
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -680,10 +670,8 @@ mod test_column_attribute_command {
     use crate::{
         sem::AlterObjSubCommand,
         syn::{ListOpt, Opt},
-        test_helpers::SynBuilder,
+        test_helpers::{SynBuilder, column_attributes as test_helpers},
     };
-
-    use crate::test_helpers::column_attributes as test_helpers;
 
     #[test]
     fn standalone_semantic_command_api_resolves_column_attributes() -> testresult::TestResult {

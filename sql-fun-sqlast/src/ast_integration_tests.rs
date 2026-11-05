@@ -1,35 +1,25 @@
 //! End-to-end fixtures for the expression/query recursive component.
 
 #[cfg(feature = "sqlite")]
-use crate::names::FullName;
-use crate::sem::CreateTable;
-use crate::sem::SelectStatement;
-use crate::sem::SemAst;
-#[cfg(feature = "sqlite")]
-mod sqlite_from_groups;
-mod stack_regressions;
-use crate::test_helpers::ast_query as test_helpers;
-
-#[cfg(feature = "sqlite")]
-use crate::AstAndContextPair;
-#[cfg(feature = "sqlite")]
-use crate::ast::Dialect;
-#[cfg(feature = "sqlite")]
-use crate::names::SchemaName;
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::SqliteSynBuilder as TestHelpersSqliteSynBuilder;
-use crate::{sem::SourcePathWithSpan, test_helpers::create_cache_context};
-
-use crate::test_helpers::ast_query::postgres;
-
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::TestParseContext;
+use crate::{
+    AstAndContextPair,
+    ast::Dialect,
+    names::{FullName, SchemaName},
+    test_helpers::{SqliteSynBuilder as TestHelpersSqliteSynBuilder, TestParseContext},
+};
 use crate::{
     ast::{StatementNode, TryFromWithTokens},
     names::ColumnName,
-    sem::PgBuiltInType,
-    test_helpers::{SynBuilder, source_span},
+    sem::{CreateTable, PgBuiltInType, SelectStatement, SemAst, SourcePathWithSpan},
+    test_helpers::{
+        SynBuilder, ast_query as test_helpers, ast_query::postgres, create_cache_context,
+        source_span,
+    },
 };
+
+#[cfg(feature = "sqlite")]
+mod sqlite_from_groups;
+mod stack_regressions;
 
 use ::sql_fun_core::IVec;
 
@@ -405,25 +395,21 @@ fn context_free_dml_expression_syntax(#[case] sql: &str) -> testresult::TestResu
 
 #[cfg(feature = "sqlite")]
 mod sqlite {
-    use crate::sem::SelectStatement;
-    use crate::sem::SemScalarExpr;
-
     use crate::{
-        AstAndContextPair, ast::Dialect, sem::ScalarAnalysisContext,
-        test_helpers::create_cache_context,
+        AstAndContextPair,
+        ast::{Dialect, Expr},
+        context::MutSourcePathWithSpan,
+        names::ColumnName,
+        sem::{PgBuiltInType, ScalarAnalysisContext, SelectStatement, SemAst, SemScalarExpr},
+        test_helpers::{
+            ast_query::{postgres, sqlite},
+            create_cache_context,
+        },
     };
 
     #[cfg(feature = "sqlite")]
-    use crate::test_helpers::ast_query::AnalysisFixture;
-    use crate::test_helpers::ast_query::postgres;
-    use crate::test_helpers::ast_query::sqlite;
-    #[cfg(feature = "sqlite")]
-    use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
-    use crate::{
-        ast::Expr,
-        context::MutSourcePathWithSpan,
-        names::ColumnName,
-        sem::{PgBuiltInType, SemAst},
+    use crate::test_helpers::{
+        SqliteSynBuilder, TestParseContext, ast_query::AnalysisFixture, source_span,
     };
 
     use ::sql_fun_core::IVec;

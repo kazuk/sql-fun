@@ -1,34 +1,29 @@
-use crate::error::AnalysisError;
-use crate::stack::with_stack;
-use crate::syntax_options::ObjectKind;
-mod ddl;
-mod query;
-
-use crate::{
-    ast::{
-        AlterRelation, CompositeType, CreateRule, CreateTrigger, CurrentOf, DefaultPrivileges,
-        DropRule, DropTrigger, ForeignTable, Table, TableConstraint,
-        VariableSetKind as AstVariableSetKind,
-        ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
-        document::DocumentExpr,
-    },
-    syn::{FunctionParameterMode as SynFunctionParameterMode, ScanToken, String as SynString},
-};
-
 use crate::{
     StringSpan,
     ast::{
-        Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case,
-        CaseArm, Cast, CastTarget, Collate, Comment, Delete, DomainConstraintTarget, DropTable,
-        EnumType, Expr, Extension, FromOpt, Indirection, Insert, Literal, Merge, Name,
-        NamedArgument, NullTest, ObjectArgument, ObjectTarget, OperatorExpr, OperatorKind, Order,
-        Parameter, Query, Role, Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind,
-        SyntaxOption, TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
-        TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+        Access, AlterOwner, AlterRelation, AlterSequence, BooleanExpr, BooleanOperator, Call,
+        CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment, CompositeType, CreateRule,
+        CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropRule,
+        DropTable, DropTrigger, EnumType, Expr, Extension, ForeignTable, FromOpt, Indirection,
+        Insert, Literal, Merge, Name, NamedArgument, NullTest, ObjectArgument, ObjectKind,
+        ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice,
+        SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
+        TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
+        TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
+        View, ViewCheckOption, Window,
+        ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
+        document::DocumentExpr,
     },
-    syn,
-    syn::{ListOpt, Opt},
+    error::AnalysisError,
+    stack::with_stack,
+    syn::{
+        self, FunctionParameterMode as SynFunctionParameterMode, ListOpt, Opt, ScanToken,
+        String as SynString,
+    },
 };
+
+mod ddl;
+mod query;
 
 use ::sql_fun_core::IVec;
 
@@ -71,9 +66,11 @@ impl TryFrom<syn::NodeListOpt> for Name {
 
 #[cfg(test)]
 mod test_name_from_nodes {
-    use crate::syn::Node;
-
-    use crate::{ast::Name, syn::NodeListOpt, test_helpers::SynBuilder};
+    use crate::{
+        ast::Name,
+        syn::{Node, NodeListOpt},
+        test_helpers::SynBuilder,
+    };
 
     #[test]
     fn rejects_non_string_name_components() {
@@ -1839,9 +1836,9 @@ fn call_argument_span(node: &syn::Node, tokens: &IVec<syn::ScanToken>) -> Option
 
 #[cfg(test)]
 mod test_call_argument_span {
-    use crate::ast::postgres::call_argument_span;
-
-    use crate::{PostgresDialect, test_helpers::postgres_expression};
+    use crate::{
+        PostgresDialect, ast::postgres::call_argument_span, test_helpers::postgres_expression,
+    };
 
     #[rstest::rstest]
     #[case::column("column_name", Some("column_name"))]

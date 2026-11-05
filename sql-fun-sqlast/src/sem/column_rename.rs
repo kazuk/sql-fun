@@ -1,5 +1,6 @@
 //! Completed column-rename analysis and exact dependency matching.
 
+mod ddl;
 mod sqlite;
 
 use crate::{

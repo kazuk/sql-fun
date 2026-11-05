@@ -6,10 +6,11 @@ pub use self::rewrite::WildcardRewriteError;
 
 use crate::{
     names::{AliasName, ColumnName, FullName, TableName, ViewName},
-    sem::{OverloadVariant, ParseContext, ProjectionColumn, SemScalarExpr},
+    sem::{
+        OverloadVariant, ParseContext, ProjectionColumn, ResultColumn, ResultColumnCollection,
+        SemScalarExpr,
+    },
 };
-
-use crate::sem::{ResultColumn, ResultColumnCollection};
 
 /// The ordered semantic output of one source wildcard projection.
 ///

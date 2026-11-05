@@ -1,15 +1,15 @@
 //! Small owned catalog and public analysis comparisons for cache contracts.
 
-use crate::sem::SemAst;
 use crate::{
     AstAndContextPair, CacheContext,
     ast::Dialect,
     context::{FrozenBaseContext, ParseContext, SchemaFileContext},
     names::SchemaName,
     parse_statements,
-    sem::PgBuiltInType,
+    sem::{PgBuiltInType, SemAst},
     test_helpers::{TestParseContext, domain_casts, schema_layer},
 };
+
 use std::collections::BTreeMap;
 
 pub(crate) fn base() -> FrozenBaseContext {

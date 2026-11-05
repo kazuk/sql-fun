@@ -1,20 +1,15 @@
+mod ddl;
 use crate::{
-    ast::Function,
-    names::TableName,
-    sem::{ObjectKind, OwnerSpecification, OwnershipIdentity},
-    syn::CreateFunctionStmt,
-};
-use sql_fun_core::IVec;
-
-use crate::{
-    ast::TryFromWithTokens,
-    names::FullName,
+    ast::{Function, ObjectKind, TryFromWithTokens},
+    names::{FullName, TableName},
     sem::{
         AnalysisError, AstAndContextPair, ColumnCollection, FunctionOverloadCollection,
-        OverloadVariant, ParseContext, type_system::ArgumentBindingCollection,
+        OverloadVariant, OwnerSpecification, OwnershipIdentity, ParseContext,
+        type_system::ArgumentBindingCollection,
     },
-    syn::ScanToken,
+    syn::{CreateFunctionStmt, ScanToken},
 };
+use sql_fun_core::IVec;
 
 /// analyzed [`crate::syn::CreateFunctionStmt`]
 #[derive(Debug, Clone)]

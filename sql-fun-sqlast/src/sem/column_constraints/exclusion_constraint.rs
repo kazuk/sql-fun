@@ -1,3 +1,4 @@
+mod ddl;
 use crate::{
     names::{ColumnName, TableName},
     sem::{

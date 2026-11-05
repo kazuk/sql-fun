@@ -1,10 +1,9 @@
-use crate::sem::SemAst;
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
     names::SchemaName,
     parse_statements,
-    sem::{AnalysisError, AstAndContextPair},
+    sem::{AnalysisError, AstAndContextPair, SemAst},
     test_helpers::{
         common_types, create_cache_context, ownership::apply_ownership_sql, source_span,
     },

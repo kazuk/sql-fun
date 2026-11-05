@@ -420,21 +420,16 @@ impl SetOperationQuery {
 
 #[cfg(test)]
 mod test_set_operation {
-    use crate::sem::SemAst;
-
     use crate::{
         ast::Dialect,
         parse_statements,
-        test_helpers::{create_cache_context, ownership::apply_ownership_sql},
-    };
-
-    use crate::{
         sem::{
-            ParseContext, PgBuiltInType, SelectStatement,
+            ParseContext, PgBuiltInType, SelectStatement, SemAst,
             select_statement::set_operation::{SetOperationKind, SetOperationQuery},
         },
-        test_helpers::set_operations,
+        test_helpers::{create_cache_context, ownership::apply_ownership_sql, set_operations},
     };
+
     use std::collections::BTreeMap;
 
     #[test]

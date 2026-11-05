@@ -1,9 +1,9 @@
 use crate::{
+    ast::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, AnalyzeConstraint, ColumnRename, Constraint, Deferrability,
-        ForeignKeyAction, ForeignKeyMatchType, ForeignKeyTarget, ImplicitChange, ParseContext,
-        Validity,
+        AnalysisError, AnalysisProblem, AnalyzeConstraint, ColumnRename, Constraint,
+        ForeignKeyTarget, ImplicitChange, ParseContext,
     },
     syn::{Constraint as SynConstraint, ListOpt, Opt},
 };
@@ -166,7 +166,7 @@ mod test_foreign_key_attributes_and_dependencies {
     #[case::create(fk::Declaration::create())]
     #[case::alter(fk::Declaration::alter())]
     fn table_foreign_key_attributes_survive_catalog_reads(#[case] declaration: fk::Declaration) {
-        use crate::sem::{Deferrability, Validity};
+        use crate::ast::{Deferrability, Validity};
         let context = declaration.bind(
             fk::parents(),
             "child",

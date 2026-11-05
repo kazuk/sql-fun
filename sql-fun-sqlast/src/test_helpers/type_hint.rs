@@ -1,13 +1,12 @@
-use crate::AstAndContextPair;
-use crate::ast::Dialect;
-use crate::context::{
-    BaseParseContext as _, FrozenBaseContext, ParseContext as _, SchemaFileContext,
+use crate::{
+    AstAndContextPair,
+    ast::Dialect,
+    context::{BaseParseContext as _, FrozenBaseContext, ParseContext as _, SchemaFileContext},
+    names::SchemaName,
+    parse_statements,
+    sem::{SemAst, TypeReference},
+    test_helpers::{TestParseContext, create_cache_context},
 };
-use crate::names::SchemaName;
-use crate::parse_statements;
-use crate::sem::SemAst;
-use crate::sem::TypeReference;
-use crate::test_helpers::{TestParseContext, create_cache_context};
 
 /// A small explicit catalog for parameter typing; no builtin catalog loading.
 pub(crate) fn context() -> SchemaFileContext {

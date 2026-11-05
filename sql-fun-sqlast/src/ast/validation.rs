@@ -1,14 +1,15 @@
 //! Walk every query-bearing edge when a statement becomes a nested CTE body.
 
-use crate::stack::with_stack as sem_with_stack;
-
-use crate::ast::{
-    Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Conflict, Cte, CteBody,
-    Cycle, Delete, DerivedTable, Expr, Frame, FrameBound, FromGroup, FromItem, Grouping, InTable,
-    IndexExpression, Indirection, Insert, Into, Join, NamedArgument, NullTest, OperatorExpr, Order,
-    Query, QueryBody, Raise, Select, SetQuery, Slice, Subquery, SyntaxOption, SyntaxValue,
-    TableFunction, TableFunctions, TableSample, Target, TruthTest, TypeName, TypedColumn, Update,
-    Window, With,
+use crate::{
+    ast::{
+        Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Conflict, Cte,
+        CteBody, Cycle, Delete, DerivedTable, Expr, Frame, FrameBound, FromGroup, FromItem,
+        Grouping, InTable, IndexExpression, Indirection, Insert, Into, Join, NamedArgument,
+        NullTest, OperatorExpr, Order, Query, QueryBody, Raise, Select, SetQuery, Slice, Subquery,
+        SyntaxOption, SyntaxValue, TableFunction, TableFunctions, TableSample, Target, TruthTest,
+        TypeName, TypedColumn, Update, Window, With,
+    },
+    stack::with_stack as sem_with_stack,
 };
 
 /// Whether a subtree contains a clause forbidden inside a CTE body.

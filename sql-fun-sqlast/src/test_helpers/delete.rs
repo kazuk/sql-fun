@@ -1,11 +1,9 @@
-use crate::parse_statements;
-use crate::sem::{CastContext, CastDefinition};
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::scalar_catalog::items_catalog;
-
-use crate::ast::Dialect;
-use crate::sem::{AnalysisError, PgBuiltInType, SemAst};
-use crate::test_helpers::TestParseContext;
+use crate::{
+    ast::Dialect,
+    parse_statements,
+    sem::{AnalysisError, CastContext, CastDefinition, PgBuiltInType, SemAst},
+    test_helpers::{TestParseContext, create_cache_context, scalar_catalog::items_catalog},
+};
 
 pub(crate) fn catalog_with_text_integer_cast() -> TestParseContext {
     let mut context = catalog(Dialect::postgres());

@@ -1,4 +1,5 @@
 //! Errors shared by syntax conversion and semantic analysis.
+use crate::ast::Dialect;
 use std::{
     convert::Infallible,
     io::ErrorKind,
@@ -106,5 +107,19 @@ impl AnalysisError {
             ErrorKind::UnexpectedEof,
             "unexpected eof",
         ))
+    }
+}
+
+impl AnalysisError {
+    fn dialect_mismatch(parsed: Dialect, configured: Dialect) -> Self {
+        Self::UnexpectedInput(format!(
+            "statement dialect {parsed} does not match analysis metadata dialect {configured}"
+        ))
+    }
+    pub(crate) fn check_dialect(parsed: Dialect, configured: Dialect) -> Result<(), Self> {
+        if parsed != configured {
+            return Err(Self::dialect_mismatch(parsed, configured));
+        }
+        Ok(())
     }
 }

@@ -1,10 +1,9 @@
-use crate::sem::PgBuiltInType;
-use crate::sem::SelectStatement;
-use crate::test_helpers::ast_query::AnalysisFixture;
-use crate::test_helpers::create_cache_context;
-
-use crate::ast::{Dialect, Query};
-use crate::names::ColumnName;
+use crate::{
+    ast::{Dialect, Query},
+    names::ColumnName,
+    sem::{PgBuiltInType, SelectStatement},
+    test_helpers::{ast_query::AnalysisFixture, create_cache_context},
+};
 
 pub(crate) fn assert_result(syntax: &Query, dialect: Dialect, scenario: &str) {
     let mut catalog = AnalysisFixture::context().with_dialect(dialect);

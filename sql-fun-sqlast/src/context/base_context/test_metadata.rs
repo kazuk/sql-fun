@@ -1,23 +1,18 @@
 //! The caller's selected metadata survives context initialization and analysis.
-use crate::test_helpers::heavy::selected_metadata as heavy;
-
-#[cfg(feature = "sqlite")]
-use crate::SqliteDialect;
-#[cfg(feature = "sqlite")]
-use crate::ast::Dialect as AstDialect;
-#[cfg(feature = "sqlite")]
-use crate::parse_statements;
-#[cfg(feature = "sqlite")]
-use crate::sem::SemAst;
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::TestParseContext;
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::create_cache_context;
-
 use crate::{
     AstAndContextPair, PostgresDialect,
     sem::SelectStatement,
     syn::{ListOpt, Opt},
+    test_helpers::{heavy::selected_metadata as heavy, selected_metadata as test_helpers},
+};
+
+#[cfg(feature = "sqlite")]
+use crate::{
+    SqliteDialect,
+    ast::Dialect as AstDialect,
+    parse_statements,
+    sem::SemAst,
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 #[test]
@@ -138,5 +133,3 @@ fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
     assert!(error.to_string().contains("PostgreSQL"));
     Ok(())
 }
-
-use crate::test_helpers::selected_metadata as test_helpers;

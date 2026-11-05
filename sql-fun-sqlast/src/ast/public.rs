@@ -1,5 +1,9 @@
 //! Supported inspection of the owned common AST.
 
+#[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
+mod sqlite_retention;
+mod wildcard;
+
 use crate::{
     StringSpan,
     ast::{Cte, CteBody, Dialect, StatementNode, With},

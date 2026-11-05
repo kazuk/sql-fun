@@ -1,4 +1,7 @@
-use crate::{context::BaseParseContext, names::ColumnName, sem::PgBuiltInType};
+use crate::{
+    context::BaseParseContext, names::ColumnName, sem::PgBuiltInType,
+    test_helpers::sqlite_from_groups as test_helpers,
+};
 
 #[rstest::rstest]
 #[case("select q.ax as n from (a) as q", false, true)]
@@ -92,5 +95,3 @@ fn parenthesized_sources_report_duplicate_group_aliases() -> testresult::TestRes
     assert_eq!(context.reported_problem_count(), 1);
     Ok(())
 }
-
-use crate::test_helpers::sqlite_from_groups as test_helpers;

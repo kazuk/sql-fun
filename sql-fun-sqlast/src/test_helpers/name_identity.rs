@@ -1,16 +1,10 @@
-use crate::ast::TryFromWithTokens;
-use crate::sem::SemAst;
-use crate::test_helpers::{create_cache_context, source_span};
 use crate::{
-    context::{MutSourcePathWithSpan, ParseContext},
-    test_helpers::schema_layer,
+    ast::{Dialect, StatementNode, TryFromWithTokens},
+    context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
+    names::{ColumnName, FullName, SchemaName},
+    sem::{AnalysisError, PgBuiltInType, SemAst},
+    test_helpers::{SynBuilder, TestParseContext, create_cache_context, schema_layer, source_span},
 };
-
-use crate::ast::{Dialect, StatementNode};
-use crate::context::{BaseParseContext, SchemaFileContext};
-use crate::names::{ColumnName, FullName, SchemaName};
-use crate::sem::{AnalysisError, PgBuiltInType};
-use crate::test_helpers::{SynBuilder, TestParseContext};
 
 pub(crate) fn context() -> SchemaFileContext {
     let mut base = TestParseContext::default();

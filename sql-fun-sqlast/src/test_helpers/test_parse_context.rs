@@ -2,43 +2,32 @@ mod cast_info;
 mod conflict_info;
 
 use crate::{
-    AstAndContextPair,
-    ast::Dialect,
+    AstAndContextPair, StringSpan,
+    ast::{CreateTableMode, Dialect, ObjectKind},
     context::{
-        ConflictMasters, CursorBindings, FrozenBaseContext, ParameterTypeHints, RuleInfoRead,
-        SourceAccessService, ownership::OwnershipCatalog,
-    },
-    sem::{
-        AlterIndex, AlterOwner, AnalysisState, CatalogNameLookup, CreateRule, CreateTrigger,
-        CursorInfo, InsertArbiter, InsertInferenceModifiers, Kind, ObjectKind,
-        OwnedObjectDefinition, ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup,
-        TriggerIdentity, ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport, ViewUpdateSupport,
-        ownership::model_definitions, problem::TriggerProblem,
-        search_path::expand_search_path_inst,
-    },
-};
-
-use crate::{
-    StringSpan,
-    context::{
-        BaseParseContext, DiagnosticContext, FunctionInfoRead, FunctionInfoWrite,
-        GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead,
-        ParseContext, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead,
+        BaseParseContext, ConflictMasters, CursorBindings, DiagnosticContext, FrozenBaseContext,
+        FunctionInfoRead, FunctionInfoWrite, GetSourcePathWithSpanOpt, IndexInfoRead,
+        MutSourcePathWithSpan, OperatorInfoRead, ParameterTypeHints, ParseContext, RuleInfoRead,
+        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead,
         TableInfoWrite, TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+        ownership::OwnershipCatalog,
     },
     names::{FullName, OperatorName, SchemaName, TableName, ValidOperatorName},
     sem::{
-        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem,
-        BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
-        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
-        CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,
-        CreateView, DropTable, FromClause, FunctionOverloadCollection, OperatorDefinition,
-        OverloadVariant, SourcePathWithSpan, TypeDefinition, TypeReference, VariableSet, ViewLike,
-        WithClause,
+        AlterIndex, AlterOwner, AlterSequence, AlterTable, AlterView, AnalysisError,
+        AnalysisProblem, AnalysisState, BinaryOperatorDefinition, CastContext, CastDefinition,
+        CatalogNameLookup, ColumnDefinition, Comment, CreateCompositeType, CreateDomain,
+        CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateRule, CreateSchema,
+        CreateSequence, CreateTable, CreateTableAs, CreateTrigger, CreateView, CursorInfo,
+        DropTable, FromClause, FunctionOverloadCollection, InsertArbiter, InsertInferenceModifiers,
+        Kind, OperatorDefinition, OverloadVariant, OwnedObjectDefinition, ParameterConstraints,
+        Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan, TriggerIdentity,
+        TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport, ViewInsertSupport, ViewLike,
+        ViewMergeSupport, ViewUpdateSupport, WithClause, ownership::model_definitions,
+        problem::TriggerProblem, search_path::expand_search_path_inst,
     },
     test_helpers::{SynBuilder, source_span},
 };
-
 use std::collections::{HashMap, HashSet};
 
 /// ParseContext implementation for tests

@@ -22,18 +22,29 @@ mod table_rename_tests;
 mod type_info;
 mod view_info;
 
+use self::{
+    func_info::FunctionDefinitionCollection, sequence_info::SequenceInfoCollection,
+    table_info::TableDefinitionCollection, type_info::TypeDefinitionCollection,
+    view_info::ViewInformationCollection,
+};
 use crate::{
-    AstAndContextPair, ParsedSchemaDump,
+    AstAndContextPair, ParsedSchemaDump, StringSpan, TrieMap,
+    ast::ObjectKind,
     context::{
-        CursorBindings, ExtensionInfoRead, OwnershipInfoRead, ParameterTypeHints, RuleInfoRead,
+        BaseParseContext, CursorBindings, DiagnosticContext, ExtensionInfoRead, FrozenBaseContext,
+        GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead,
+        OwnershipInfoRead, ParameterTypeHints, ParseContext, RuleInfoRead, SearchPathRead,
+        SourceAccessService, TableInfoRead, ViewInfoRead,
         ownership::{ConfiguredRoles, OwnershipCatalog},
     },
-    names::TableName as NamesTableName,
+    names::{FullName, OperatorName, SchemaName, TableName as NamesTableName},
     sem::{
-        AlterIndex, AlterOwner, AnalysisState, CatalogNameLookup, CollationDefinition,
-        ConflictArbiterInference, CreateRule, CreateTrigger, CursorInfo, DatabaseCollation,
-        InsertConflict, Kind, OperatorClassDefinition, OverloadVariant as SemOverloadVariant,
-        OwnedObjectDefinition, ParameterConstraints, Role, RuleIdentity, SemAst, TriggerIdentity,
+        AlterIndex, AlterOwner, AnalysisError, AnalysisProblem, AnalysisState, CastDefinition,
+        CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
+        CreateIndex, CreateRule, CreateSchema, CreateTrigger, CursorInfo, DatabaseCollation,
+        ImplicitChange, InsertConflict, Kind, OperatorClassDefinition, OperatorDefinition,
+        OverloadVariant as SemOverloadVariant, OwnedObjectDefinition, ParameterConstraints, Role,
+        RuleIdentity, SemAst, SemScalarExpr, SourcePathWithSpan, TriggerIdentity, TypeReference,
         VariableSet, ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport,
         ViewUpdateSupport,
         conflict_info::infer_from_catalog,
@@ -42,26 +53,6 @@ use crate::{
             lookup_operator_class as conflict_masters_lookup_operator_class,
         },
         problem::{CreationProblem, TriggerProblem},
-    },
-};
-
-use self::{
-    func_info::FunctionDefinitionCollection, sequence_info::SequenceInfoCollection,
-    table_info::TableDefinitionCollection, type_info::TypeDefinitionCollection,
-    view_info::ViewInformationCollection,
-};
-use crate::{
-    StringSpan, TrieMap,
-    context::{
-        BaseParseContext, DiagnosticContext, FrozenBaseContext, GetSourcePathWithSpanOpt,
-        IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead, ParseContext, SearchPathRead,
-        SourceAccessService, TableInfoRead, ViewInfoRead,
-    },
-    names::{FullName, OperatorName, SchemaName},
-    sem::{
-        AnalysisError, AnalysisProblem, CastDefinition, Comment, CreateExtension, CreateIndex,
-        CreateSchema, ImplicitChange, ObjectKind, OperatorDefinition, SemScalarExpr,
-        SourcePathWithSpan, TypeReference,
     },
 };
 use ::sql_fun_core::SqlFunArgs;
@@ -197,11 +188,9 @@ impl SchemaFileContext {
 
 #[cfg(test)]
 mod test_schema_file_context {
-    use crate::test_helpers::schema_layer;
-
     use crate::{
         context::ParseContext,
-        test_helpers::{TestParseContext, test_context},
+        test_helpers::{TestParseContext, schema_layer, test_context},
     };
     use std::path::Path;
 
@@ -287,13 +276,13 @@ impl IndexInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_index_lookup {
-    use crate::{names::SchemaName as NamesSchemaName, test_helpers::schema_layer};
-
-    use crate::test_helpers::index_layers::index;
-    use crate::test_helpers::index_layers::layer;
     use crate::{
         context::{BaseParseContext, IndexInfoRead, ParseContext},
-        names::FullName,
+        names::{FullName, SchemaName as NamesSchemaName},
+        test_helpers::{
+            index_layers::{index, layer},
+            schema_layer,
+        },
     };
 
     #[rstest::rstest]
@@ -490,8 +479,10 @@ impl OperatorInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_operator_layers {
-    use crate::test_helpers::operator_layers as test_helpers;
-    use crate::{context::BaseParseContext, names::OperatorName, sem::PgBuiltInType};
+    use crate::{
+        context::BaseParseContext, names::OperatorName, sem::PgBuiltInType,
+        test_helpers::operator_layers as test_helpers,
+    };
 
     #[rstest::rstest]
     #[case::binary(true, true)]
@@ -541,14 +532,12 @@ impl DiagnosticContext for SchemaFileContext {
 
 #[cfg(test)]
 mod test_diagnostic_context {
-    use crate::{sem::AnalysisError, test_helpers::schema_layer};
-
     use crate::{
         StringSpan,
         context::{DiagnosticContext, ParseContext},
         names::FullName,
-        sem::AnalysisProblem,
-        test_helpers::TestParseContext,
+        sem::{AnalysisError, AnalysisProblem},
+        test_helpers::{TestParseContext, schema_layer},
     };
     use std::path::Path;
 
@@ -722,11 +711,10 @@ impl crate::context::ParameterTypeHintRead for SchemaFileContext {
 #[cfg(test)]
 mod test_parameter_type_hint_read {
 
-    use crate::test_helpers::type_hint::context;
-
     use crate::{
         context::{ParameterTypeHintRead, ParameterTypeHintWrite},
         sem::TypeReference,
+        test_helpers::type_hint::context,
     };
 
     #[rstest::rstest]
@@ -757,17 +745,13 @@ impl crate::context::ParameterTypeHintWrite for SchemaFileContext {
 
 #[cfg(test)]
 mod test_parameter_type_hint_write {
-    use crate::{names::FullName as NamesFullName, test_helpers::TestParseContext};
-
     #[cfg(feature = "sqlite")]
     use crate::ast::Dialect;
-
-    use crate::test_helpers::type_hint::context;
-
     use crate::{
         context::{ParameterTypeHintRead, ParameterTypeHintWrite},
-        names::SchemaName,
+        names::{FullName as NamesFullName, SchemaName},
         sem::{PgBuiltInType, TypeReference},
+        test_helpers::{TestParseContext, type_hint::context},
     };
 
     #[rstest::rstest]
@@ -1039,9 +1023,11 @@ impl ParseContext for SchemaFileContext {
 
 #[cfg(test)]
 mod test_extension_record {
-    use crate::test_helpers::schema_layer;
-
-    use crate::{context::ParseContext, sem::CreateExtension, test_helpers::TestParseContext};
+    use crate::{
+        context::ParseContext,
+        sem::CreateExtension,
+        test_helpers::{TestParseContext, schema_layer},
+    };
     use std::path::Path;
 
     #[test]
@@ -1068,8 +1054,6 @@ mod test_extension_record {
 
 #[cfg(test)]
 mod test_freeze {
-    use crate::test_helpers::freeze as test_helpers;
-    use crate::test_helpers::schema_layer;
     use crate::{
         StringSpan,
         context::{
@@ -1077,6 +1061,7 @@ mod test_freeze {
             TableInfoWrite,
         },
         names::{ColumnName, SchemaName},
+        test_helpers::{freeze as test_helpers, schema_layer},
     };
     use std::path::Path;
 
@@ -1143,11 +1128,10 @@ mod test_freeze {
 
 #[cfg(test)]
 mod test_search_path {
-    use crate::test_helpers::schema_layer;
-    use crate::test_helpers::search_path as test_helpers;
     use crate::{
         context::{BaseParseContext, ParseContext, SearchPathRead},
         names::{FullName, SchemaName},
+        test_helpers::{schema_layer, search_path as test_helpers},
     };
     use std::path::Path;
 

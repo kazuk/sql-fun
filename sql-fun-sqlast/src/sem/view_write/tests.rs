@@ -1,8 +1,7 @@
-use crate::sem::SemAst;
 use crate::{
     ast::Dialect,
     parse_statements,
-    sem::AnalysisError,
+    sem::{AnalysisError, SemAst},
     test_helpers::{TestParseContext, create_cache_context},
 };
 

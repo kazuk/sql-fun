@@ -1,5 +1,6 @@
 mod analyze;
 mod bind_result;
+mod ddl;
 mod in_out_param;
 mod in_param;
 mod out_param;
@@ -9,24 +10,22 @@ mod variadic_param;
 pub use self::bind_result::ParameterBindResult;
 
 use crate::{
-    context::BaseParseContext, names::TableName, sem::type_system::SimpleInferResult,
-    syn::FunctionParameter,
+    context::BaseParseContext,
+    names::TableName,
+    sem::{
+        AnalysisError, ColumnCollection, ParseContext, SemScalarExpr, TypeReference,
+        create_comp_type::CompositeFieldDefinition,
+        type_system::{
+            ArgumentBindingCollection, CommonInferContext, SimpleInferContext, SimpleInferResult,
+            TypeError,
+        },
+    },
+    syn::{FunctionParameter, ScanToken},
 };
 
 use self::{
     in_out_param::FunctionParamInOut, in_param::FunctionParamIn, out_param::FunctionParamOut,
     table_param::FunctionParamTable, variadic_param::FunctionParamVariadic,
-};
-
-use crate::{
-    sem::{
-        AnalysisError, ColumnCollection, ParseContext, SemScalarExpr, TypeReference,
-        create_comp_type::CompositeFieldDefinition,
-        type_system::{
-            ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
-        },
-    },
-    syn::ScanToken,
 };
 
 use ::sql_fun_core::IVec;

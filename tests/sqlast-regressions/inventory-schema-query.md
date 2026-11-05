@@ -2,9 +2,9 @@
 
 This inventory maps schema-dependent query assertions from
 [`qualified_columns.rs`](../../sql-fun-sqlast/tests/qualified_columns.rs) and
-[`array_subquery.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/query/tests/array_subquery.rs)
+[`select_statement/ast.rs::test_from_ast::array_subquery`](../../sql-fun-sqlast/src/sem/select_statement/ast.rs)
 and table-function assertions from
-[`table_functions.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/query/tests/table_functions.rs)
+[`select_statement/ast.rs::test_from_ast::table_functions`](../../sql-fun-sqlast/src/sem/select_statement/ast.rs)
 to the custom-schema CLI fixtures introduced for issue #764. The fixtures use
 the real CLI analysis path with project schema DDL; they do not execute SQL.
 

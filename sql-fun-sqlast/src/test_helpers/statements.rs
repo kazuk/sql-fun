@@ -1,18 +1,10 @@
 use crate::{
-    AstAndContextPair,
-    context::{FrozenBaseContext, MutSourcePathWithSpan},
-    test_helpers::source_span,
-};
-use crate::{StringSpan, sem::SourcePathWithSpan};
-use crate::{
+    AstAndContextPair, StringSpan,
     ast::Dialect,
+    context::{FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
     parse_statements,
-    sem::{AnalysisError, SemAst},
-    test_helpers::{TestParseContext, create_cache_context},
-};
-use crate::{
-    context::{ParseContext, SchemaFileContext},
-    sem::SelectStatement,
+    sem::{AnalysisError, SelectStatement, SemAst, SourcePathWithSpan},
+    test_helpers::{TestParseContext, create_cache_context, source_span},
 };
 
 pub(crate) fn resolve_postgres(

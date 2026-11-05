@@ -1,11 +1,10 @@
-use crate::{
-    sem::{AstAndContextPair, OwnerSpecification},
-    syn::{CreateEnumStmt, ListOpt},
-};
-
+mod ddl;
 use crate::{
     names::FullName,
-    sem::{AnalysisError, ParseContext, SemAst, TypeReference},
+    sem::{
+        AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst, TypeReference,
+    },
+    syn::{CreateEnumStmt, ListOpt},
 };
 
 /// analyzed [`crate::syn::CreateEnumStmt`]

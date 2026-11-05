@@ -1,5 +1,9 @@
 //! Clause structure retained after name resolution.
 
+mod ast;
+
+pub(crate) use self::ast::ClauseBinding;
+
 use crate::{
     ast::Dialect,
     names::{AliasName, ColumnName, FullName, OperatorName, TableName},

@@ -1,8 +1,9 @@
 //! Configuration and storage for catalog ownership.
 
 use crate::{
+    ast::ObjectKind,
     names::FullName,
-    sem::{ObjectKind, OwnedObjectDefinition, Role},
+    sem::{OwnedObjectDefinition, OwnershipIdentity, Role},
 };
 
 /// Roles derived from the current analysis metadata, independent of frozen configuration.
@@ -51,7 +52,7 @@ impl OwnershipCatalog {
         self.definitions
             .iter()
             .filter(|definition| {
-                kind.accepts_owner_kind(definition.identity().kind())
+                OwnershipIdentity::accepts_owner_kind(kind, definition.identity().kind())
                     && definition.identity().name() == name
             })
             .cloned()

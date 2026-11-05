@@ -1,13 +1,14 @@
 use crate::test_helpers::create_cache_context;
-use ::sql_fun_sqlast::sem::SemAst;
-
-use ::sql_fun_core::SqlFunArgs;
 use ::sql_fun_sqlast::{
     AstAndContextPair,
     ast::Dialect,
     context::{BaseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
     parse_statements,
+    sem::SemAst,
 };
+
+use ::sql_fun_core::SqlFunArgs;
+
 use std::path::{Path, PathBuf};
 
 /// Load real builtin cast metadata and small domain DDL per test process.

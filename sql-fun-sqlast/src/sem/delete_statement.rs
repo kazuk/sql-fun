@@ -1,3 +1,6 @@
+mod ast;
+mod cte;
+
 mod cursor;
 mod destination;
 mod row;
@@ -12,18 +15,14 @@ pub(crate) use self::{cursor::DeletePredicate, destination::DeleteDestination};
 
 use crate::{
     CacheContext,
-    ast::{Delete, Dialect, StatementNode},
-    sem::{AccessKind, traversal::SemanticVisitor},
-    syn::DeleteStmt,
-};
-
-use crate::{
-    ast::TryFromWithTokens,
+    ast::{Delete, Dialect, StatementNode, TryFromWithTokens},
     names::TableName,
     sem::{
-        AnalysisError, FromClause, ParseContext, QueryCte, ResultColumnCollection, SemAst,
-        SemScalarExpr, traversal::SemanticVisitorMut,
+        AccessKind, AnalysisError, FromClause, ParseContext, QueryCte, ResultColumnCollection,
+        SemAst, SemScalarExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
+    syn::DeleteStmt,
 };
 
 /// An analyzed DELETE, including its destination, sources and RETURNING outputs.

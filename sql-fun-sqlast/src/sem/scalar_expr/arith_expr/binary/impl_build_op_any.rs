@@ -1,10 +1,10 @@
-use crate::sem::scalar_expr::arith_expr::binary::BinaryCastCandidate;
-
 use crate::{
     names::OperatorName,
     sem::{
         AnalysisError, MinMaxExpr, ParseContext, PgBuiltInType, SemScalarExpr,
-        scalar_expr::arith_expr::{AnyBinaryCallSite, UndefinedOperatorAnyCallSite},
+        scalar_expr::arith_expr::{
+            AnyBinaryCallSite, UndefinedOperatorAnyCallSite, binary::BinaryCastCandidate,
+        },
     },
 };
 
@@ -26,19 +26,18 @@ impl super::ArithExpr {
 
 #[cfg(test)]
 mod test_build_op_any {
-    use crate::sem::SemAst;
-
-    use crate::test_helpers::quantified;
-    use crate::test_helpers::quantified_any as test_helpers;
-    use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
     use crate::{
+        ast::Dialect,
         names::OperatorName,
+        parse_statements,
         sem::{
             ArithExpr, BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
-            PgBuiltInType, SemScalarExpr, TypeDefinition, TypeReference,
+            PgBuiltInType, SemAst, SemScalarExpr, TypeDefinition, TypeReference,
             scalar_expr::{ArrayExpr, ScalarConstExpr},
         },
-        test_helpers::TestParseContext,
+        test_helpers::{
+            TestParseContext, create_cache_context, quantified, quantified_any as test_helpers,
+        },
     };
 
     #[rstest::rstest]

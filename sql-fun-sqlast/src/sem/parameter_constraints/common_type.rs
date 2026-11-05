@@ -1,17 +1,18 @@
 //! Owned common-type facts and relationships for initially unrestricted inputs.
 //! These are inference data, not a second catalog or analysis environment.
 
-use crate::sem::parameter_constraints::environment::InferenceEnvironment;
 use crate::{
     context::CastInfoRead,
     sem::{
         MinMaxExpr, ParseContext, PgBuiltInType, TypeReference,
         parameter_constraints::{
             ConstraintGraph, InputTypeConstraint, SignatureAlternative, default_types,
+            environment::InferenceEnvironment,
         },
         problem::MinMaxProblem,
     },
 };
+
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -246,10 +247,8 @@ impl CommonTypeFacts {
 
 #[cfg(test)]
 mod test_common_type_facts {
-    use crate::sem::parameter_constraints::common_type::CommonTypeFacts;
-
     use crate::{
-        sem::{MinMaxExpr, TypeReference},
+        sem::{MinMaxExpr, TypeReference, parameter_constraints::common_type::CommonTypeFacts},
         test_helpers::common_types as test_helpers,
     };
 
@@ -459,18 +458,18 @@ impl CommonTypeConstraint {
 
 #[cfg(test)]
 mod tests {
-    use crate::sem::SemAst;
-
-    use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
-
-    use crate::test_helpers::common_types as test_helpers;
-
-    use crate::sem::{
-        MinMaxExpr, PgBuiltInType, TypeReference,
-        parameter_constraints::{
-            ConstraintGraph, InputTypeConstraint, ParameterConstraints, TypeProjection,
+    use crate::{
+        ast::Dialect,
+        parse_statements,
+        sem::{
+            MinMaxExpr, PgBuiltInType, SemAst, TypeReference,
+            parameter_constraints::{
+                ConstraintGraph, InputTypeConstraint, ParameterConstraints, TypeProjection,
+            },
         },
+        test_helpers::{common_types as test_helpers, create_cache_context},
     };
+
     use std::collections::BTreeMap;
 
     #[rstest::rstest]

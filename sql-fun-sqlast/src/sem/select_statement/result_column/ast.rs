@@ -1,0 +1,887 @@
+use crate::{
+    ast::{Dialect, Name, Target},
+    context::ParseContext,
+    names::{AliasName, ColumnName, FullName},
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, FromClause, InsertDestination,
+        ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr, WildcardExpansion,
+        WildcardProjection, WithClause,
+        problem::{DeleteProblemKind, InsertProblemKind, QueryProblem, UpdateProblemKind},
+    },
+};
+
+impl ResultColumnCollection {
+    pub(crate) fn resolve_for_merge(
+        targets: &[Target],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Self, AnalysisError> {
+        let mut results = Self::default();
+        for target in targets {
+            if let Some(name) = target.source_star_name() {
+                let qualifier = AliasName::from_ast_star_qualifier(name)?;
+                if scope.check_returning_star(context, qualifier.as_ref())? {
+                    continue;
+                }
+                let projection_qualifier = qualifier.as_ref().map(|alias| {
+                    scope
+                        .merge_row_target(alias)
+                        .map_or(alias, |(target, _, _)| target)
+                });
+                if !results.expand_projection(
+                    context,
+                    scope.sources(),
+                    scope,
+                    target.projection_location(),
+                    projection_qualifier,
+                    qualifier
+                        .as_ref()
+                        .filter(|alias| scope.merge_row_target(alias).is_some()),
+                )? {
+                    return Err(AnalysisError::unexpected_input_error(
+                        "MERGE RETURNING star source is not visible",
+                    ));
+                }
+            } else {
+                results.append_resolved_target(target, context, scope)?;
+            }
+        }
+        Ok(results)
+    }
+}
+
+impl ResultColumnCollection {
+    pub(crate) fn ast_append_to_results(
+        ast: &Target,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+        results: &mut Self,
+    ) -> Result<(), AnalysisError> {
+        if let Some(name) = ast.source_star_name() {
+            return Self::ast_append_source_star(ast, name, context, with, from, scope, results);
+        }
+        if let Some(base) = SemScalarExpr::ast_projection_base(&ast.expression, context, scope)? {
+            return results.append_composite_star(context, base);
+        }
+        let expression = SemScalarExpr::from_ast_in(&ast.expression, context, scope)?;
+        expression.validate_scalar_value(context)?;
+        let name = ast
+            .alias
+            .clone()
+            .unwrap_or_else(|| expression.get_column_name());
+        results.push_projection(
+            &ColumnName::from(name.as_str()),
+            expression,
+            ast.alias.is_some() && !ast.implicit_alias,
+        );
+        Ok(())
+    }
+}
+
+impl ResultColumnCollection {
+    pub(crate) fn ast_append_source_star(
+        ast: &Target,
+        name: &Name,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+        results: &mut Self,
+    ) -> Result<(), AnalysisError> {
+        let relation = FullName::from_ast_star_relation(name)?;
+        let qualifier = if relation.is_none() {
+            AliasName::from_ast_star_qualifier(name)?
+        } else {
+            None
+        };
+        let projection = if let Some(relation) = &relation {
+            scope.relation_projection_names(context, relation)?
+        } else if let Some(qualifier) = &qualifier {
+            scope.projection_names(context, qualifier)?
+        } else {
+            from.wildcard_projection(context, with, None)?
+        };
+        let source_found = projection.source_found();
+        if !source_found && qualifier.is_some() {
+            let base = SemScalarExpr::from_ast_column(name, context, scope)?;
+            return results.append_composite_star(context, base);
+        }
+        if !source_found {
+            context.report_analysis_problem(AnalysisProblem::query(
+                QueryProblem::reference_not_found("star source"),
+            ))?;
+        }
+        let start = results.len();
+        projection.append_results(context, scope, results, ast.location, None)?;
+        if relation.is_none() && qualifier.is_none() {
+            results.mark_join_sensitive_star_since(start);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_append_ast_wildcard {
+    // Semantic wildcard groups use the same small relation fixtures as name resolution.
+
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        parse_statements,
+        sem::{MergeRecordRole, ResultColumn, SemAst, WildcardExpansion},
+        test_helpers::{
+            create_cache_context,
+            query::{source_namespace_statement, table_function_query},
+        },
+    };
+
+    #[cfg(feature = "sqlite")]
+    use crate::test_helpers::query::resolve;
+
+    #[rstest::rstest]
+    #[case::zero_width("SELECT * FROM a.zero_columns", &[7], &[true], &[""])]
+    #[case::qualified_zero_width("SELECT z.* FROM a.zero_columns z", &[7], &[true], &[""])]
+    #[case::relation_zero_width("SELECT a.zero_columns.* FROM a.zero_columns", &[7], &[true], &[""])]
+    #[case::unqualified("SELECT * FROM a.t", &[7], &[true], &["id,only_a"])]
+    #[case::qualified("SELECT t.* FROM a.t", &[7], &[true], &["id,only_a"])]
+    #[case::repeated("SELECT t.*, t.* FROM a.t", &[7, 12], &[true, true], &["id,only_a", "id,only_a"])]
+    #[case::view("SELECT * FROM a.v", &[7], &[false], &["id"])]
+    #[case::fixed_derived("SELECT * FROM (SELECT id FROM a.t) s", &[7], &[false], &["id"])]
+    #[case::nested("SELECT * FROM (SELECT * FROM a.t) s", &[22, 7], &[true, false], &["id,only_a", "id,only_a"])]
+    #[case::cte("WITH q AS (SELECT * FROM a.t) SELECT * FROM q", &[18, 37], &[true, false], &["id,only_a", "id,only_a"])]
+    #[case::using("SELECT * FROM a.t JOIN b.t USING (id)", &[7], &[true], &["id,only_a,only_b"])]
+    #[case::natural("SELECT * FROM a.t NATURAL JOIN b.t", &[7], &[true], &["id,only_a,only_b"])]
+    #[case::full("SELECT * FROM a.t FULL JOIN b.t USING (id)", &[7], &[true], &["id,only_a,only_b"])]
+    fn retains_groups_names_order_and_origins(
+        #[case] sql: &str,
+        #[case] locations: &[usize],
+        #[case] dependencies: &[bool],
+        #[case] names: &[&str],
+    ) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), locations.len());
+        groups.assert_groups(locations, dependencies, names);
+    }
+
+    #[rstest::rstest]
+    #[case::insert("INSERT INTO a.t(id, only_a) VALUES (1, 2) RETURNING *")]
+    #[case::update("UPDATE a.t SET only_a = 2 RETURNING *")]
+    #[case::delete("DELETE FROM a.t RETURNING *")]
+    fn returning_records_the_destination_expansion(#[case] sql: &str) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].location(), sql.find('*'));
+        assert!(groups[0].is_table_dependent());
+        assert_eq!(groups[0].columns().len(), 2);
+    }
+
+    #[test]
+    fn aliased_merged_projection_retains_visible_reference() {
+        let analyzed =
+            source_namespace_statement("SELECT j.* FROM (a.t FULL JOIN b.t USING (id)) j");
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(
+            groups[0].reference_at(0),
+            Some(["j".to_owned(), "id".to_owned()].as_slice())
+        );
+    }
+
+    #[test]
+    fn next_analysis_resets_previous_groups() {
+        let mut cache_context = create_cache_context();
+        let analyzed = source_namespace_statement("SELECT * FROM a.t");
+        assert_eq!(
+            analyzed
+                .context()
+                .analysis_state()
+                .wildcard_expansions()
+                .len(),
+            1
+        );
+        let statement = parse_statements("SELECT 1", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let next =
+            SemAst::from_ast(&statement, analyzed.into_context(), &mut cache_context).unwrap();
+        assert!(
+            next.context()
+                .analysis_state()
+                .wildcard_expansions()
+                .is_empty()
+        );
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_groups_do_not_require_lexical_locations() {
+        let (_, context) = resolve(
+            "SELECT s.* FROM (SELECT 1 AS id) s",
+            Dialect::sqlite(),
+            true,
+        )
+        .unwrap();
+        let groups = context.analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].location(), None);
+        assert!(!groups[0].is_table_dependent());
+        assert_eq!(
+            groups[0].columns()[0]
+                .column_name()
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "id"
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::fixed_record("SELECT r.* FROM out_fun() r", false)]
+    #[case::named_composite("SELECT r.* FROM pair_fun() r", false)]
+    #[case::table_row("SELECT r.* FROM row_fun() r", true)]
+    #[case::rows_from("SELECT r.* FROM ROWS FROM (row_fun(), pair_fun()) r", true)]
+    fn classifies_function_output_by_its_resolved_shape(
+        #[case] sql: &str,
+        #[case] table_dependent: bool,
+    ) {
+        let (_, context) = table_function_query(sql, false);
+        assert!(
+            context.reported_problems().is_empty(),
+            "{:?}",
+            context.reported_problems()
+        );
+        let groups = context.analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].is_table_dependent(), table_dependent);
+    }
+
+    #[rstest::rstest]
+    #[case::explicit("SELECT r.* FROM ROWS FROM (row_fun(), pair_fun()) WITH ORDINALITY r(x,x,y,n)", "r", &["x", "x", "y", "n"], Some("n"), "0:a=x;1:a=x;1:b=y;")]
+    #[case::implicit("SELECT row_fun.* FROM ROWS FROM (row_fun(), pair_fun())", "row_fun", &["a", "a", "b"], None, "0:a=a;1:a=a;1:b=b;")]
+    fn rows_sources_retain_each_function_layout_before_aliasing(
+        #[case] sql: &str,
+        #[case] alias: &str,
+        #[case] output_names: &[&str],
+        #[case] ordinality: Option<&str>,
+        #[case] expected_layout: &str,
+    ) {
+        let (_, context) = table_function_query(sql, false);
+        assert!(
+            context.reported_problems().is_empty(),
+            "{:?}",
+            context.reported_problems()
+        );
+        let group = &context.analysis_state().wildcard_expansions()[0];
+        let [source] = group.rows_sources() else {
+            panic!("one resolved ROWS FROM source")
+        };
+        assert_eq!(source.alias(), alias);
+        assert_eq!(source.function_count(), 2);
+        assert!(source.has_valid_output_layout());
+        let mut retained = String::new();
+        source
+            .try_project_functions(|index, projection| {
+                projection.project_columns(|physical, visible| {
+                    retained.push_str(&format!("{index}:{physical}={visible};"))
+                });
+                Ok::<(), std::convert::Infallible>(())
+            })
+            .unwrap();
+        assert_eq!(retained, expected_layout);
+        assert_eq!(source.ordinality_name(), ordinality);
+        for index in 0..output_names.len() {
+            assert_eq!(group.source_ordinal_at(index), Some((alias, index)));
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::direct("SELECT (pair_fun()).*")]
+    #[case::table_row("SELECT (row_fun()).*")]
+    fn composite_value_expansion_is_not_a_source_wildcard(#[case] sql: &str) {
+        let (_, context) = table_function_query(sql, true);
+        assert!(context.analysis_state().wildcard_expansions().is_empty());
+    }
+
+    #[rstest::rstest]
+    #[case::insert("INSERT INTO a.zero_columns DEFAULT VALUES RETURNING *, 1 AS marker")]
+    #[case::delete("DELETE FROM a.zero_columns RETURNING *, 1 AS marker")]
+    fn returning_empty_star_preserves_group_before_fixed_output(#[case] sql: &str) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), 1);
+        assert!(groups[0].is_table_dependent());
+        assert!(groups[0].columns().is_empty());
+    }
+
+    #[test]
+    fn repeated_names_keep_their_resolved_relation_occurrence() {
+        let analyzed = source_namespace_statement("SELECT a.t.*, b.t.* FROM a.t CROSS JOIN b.t");
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), 2);
+        groups.assert_relation_schemas(&["a", "b"]);
+    }
+
+    #[test]
+    fn set_operands_keep_separate_expansion_groups() {
+        let analyzed = source_namespace_statement("SELECT * FROM a.u UNION ALL SELECT * FROM b.u");
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(
+            groups[0].columns()[0]
+                .column_name()
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "aid"
+        );
+        assert_eq!(
+            groups[1].columns()[0]
+                .column_name()
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "bid"
+        );
+    }
+
+    #[test]
+    fn duplicate_source_metadata_retains_columns_reordered_by_outer_using() {
+        let analyzed = source_namespace_statement(
+            "SELECT * FROM (a.t CROSS JOIN b.t CROSS JOIN a.u) j JOIN (SELECT 1 AS aid) v USING(aid)",
+        );
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        let source = &groups[0].source_projections()[0];
+        assert_eq!(source.alias(), "j");
+        source
+            .columns()
+            .assert_retained_names("id,only_a,id,only_b,aid");
+        assert_eq!(groups[0].source_ordinal_at(0), Some(("j", 4)));
+        assert_eq!(groups[0].source_ordinal_at(1), Some(("j", 0)));
+        assert_eq!(groups[0].source_ordinal_at(3), Some(("j", 2)));
+    }
+
+    #[test]
+    fn unaliased_same_local_relations_retain_component_qualifiers() {
+        let analyzed = source_namespace_statement("SELECT * FROM a.t FULL JOIN b.t USING(id)");
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        let qualifiers = groups[0].qualifiers();
+        assert_eq!(
+            qualifiers
+                .reference_for(
+                    &crate::names::FullName::with_schema("a", "t"),
+                    &crate::names::AliasName::from("t")
+                )
+                .unwrap(),
+            ["a", "t"]
+        );
+        assert_eq!(
+            qualifiers
+                .reference_for(
+                    &crate::names::FullName::with_schema("b", "t"),
+                    &crate::names::AliasName::from("t")
+                )
+                .unwrap(),
+            ["b", "t"]
+        );
+        assert_eq!(groups[0].reference_at(1).unwrap(), ["a", "t", "only_a"]);
+    }
+
+    #[test]
+    fn row_source_star_expands_fields_before_positional_member_access() {
+        let analyzed = source_namespace_statement(
+            "SELECT (ROW(j.*)).f1, (ROW(j.*)).f3 FROM (a.t CROSS JOIN b.t) j",
+        );
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let columns = analyzed.ast().result_columns().unwrap();
+        assert_eq!(
+            columns.get_column_at(0).unwrap().col_type(),
+            &Some(crate::sem::PgBuiltInType::int4())
+        );
+        assert_eq!(
+            columns.get_column_at(1).unwrap().col_type(),
+            &Some(crate::sem::PgBuiltInType::int8())
+        );
+        assert!(
+            analyzed
+                .context()
+                .analysis_state()
+                .wildcard_expansions()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn nested_duplicate_sources_keep_alias_scopes_separate() {
+        let analyzed =
+            source_namespace_statement("SELECT j.* FROM ((a.t CROSS JOIN b.t) j CROSS JOIN a.u) j");
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        let outer = &groups[0].source_projections()[0];
+        let inner = &outer.source_projections()[0];
+        assert_eq!(outer.alias(), "j");
+        assert_eq!(inner.alias(), "j");
+        assert_eq!(outer.columns().len(), 5);
+        assert_eq!(inner.columns().len(), 4);
+        assert_eq!(outer.source_ordinal_at(0), Some(("j", 0)));
+    }
+
+    #[rstest::rstest]
+    #[case::table("SELECT j.* FROM a.mixed j(x,x)")]
+    #[case::function("SELECT j.* FROM mixed_fun() j(x,x)")]
+    #[case::view("SELECT j.* FROM a.mixed_v j(x,x)")]
+    fn duplicate_base_aliases_keep_physical_column_ordinals(#[case] sql: &str) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let groups = analyzed.context().analysis_state().wildcard_expansions();
+        assert_eq!(
+            groups[0].columns()[0].col_type(),
+            &Some(crate::sem::PgBuiltInType::int4())
+        );
+        assert_eq!(
+            groups[0].columns()[1].col_type(),
+            &Some(crate::sem::PgBuiltInType::int8())
+        );
+        assert_eq!(groups[0].typed_record_at(0).unwrap().column(), "id");
+        assert_eq!(groups[0].typed_record_at(1).unwrap().column(), "other");
+        assert_eq!(groups[0].typed_record_at(0).unwrap().alias(), "j");
+    }
+
+    #[rstest::rstest]
+    #[case::table("SELECT j.*, $1::int4 AS parameter FROM a.mixed j(x,x)")]
+    #[case::function("SELECT j.*, $1::int4 AS parameter FROM mixed_fun() j(x,x)")]
+    fn duplicate_named_row_alias_rewrites_using_physical_fields(#[case] sql: &str) {
+        let mut cache_context = create_cache_context();
+        let original = source_namespace_statement(sql);
+        let mut statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let analyzed =
+            SemAst::from_ast(&statement, original.into_context(), &mut cache_context).unwrap();
+        WildcardExpansion::rewrite(
+            analyzed.context().analysis_state().wildcard_expansions(),
+            &mut statement,
+        )
+        .unwrap();
+        let output = statement.deparse_sql(Dialect::postgres()).unwrap();
+        let reparsed = parse_statements(&output, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let rewritten =
+            SemAst::from_ast(&reparsed, analyzed.into_context(), &mut cache_context).unwrap();
+        assert!(
+            rewritten.context().reported_problems().is_empty(),
+            "{:?}: {output}",
+            rewritten.context().reported_problems()
+        );
+        let columns = rewritten.ast().result_columns().unwrap();
+        assert_eq!(columns.len(), 3);
+        assert_eq!(
+            columns.get_column_at(0).unwrap().col_type(),
+            &Some(crate::sem::PgBuiltInType::int4())
+        );
+        assert_eq!(
+            columns.get_column_at(1).unwrap().col_type(),
+            &Some(crate::sem::PgBuiltInType::int8())
+        );
+        assert_eq!(
+            columns
+                .get_column_at(0)
+                .unwrap()
+                .column_name()
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "x"
+        );
+        assert_eq!(
+            columns
+                .get_column_at(1)
+                .unwrap()
+                .column_name()
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "x"
+        );
+        assert!(
+            rewritten
+                .context()
+                .parameter_constraints()
+                .parameter(1)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn hidden_duplicate_join_origin_does_not_escape_its_outer_alias() {
+        let analyzed = source_namespace_statement(
+            "SELECT k.* FROM ((a.t JOIN b.t ON true) j(id,id) JOIN a.u ON true) k(first,second,third)",
+        );
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let group = &analyzed.context().analysis_state().wildcard_expansions()[0];
+        assert_eq!(group.source_ordinal_at(0), Some(("k", 0)));
+        assert_eq!(
+            group.reference_at(0),
+            Some(["k".to_owned(), "first".to_owned()].as_slice())
+        );
+    }
+
+    #[test]
+    fn named_row_cast_does_not_accept_mismatched_field_count() {
+        let analyzed = source_namespace_statement("SELECT (ROW(1)::a.mixed).id");
+        assert!(!analyzed.context().reported_problems().is_empty());
+    }
+
+    #[rstest::rstest]
+    #[case::duplicate_join(
+        "MERGE INTO a.u d USING (a.t CROSS JOIN b.t) j ON true WHEN MATCHED THEN DELETE RETURNING j.*"
+    )]
+    #[case::rows(
+        "MERGE INTO a.u d USING ROWS FROM (mixed_fun(), mixed_fun()) r ON true WHEN MATCHED THEN DELETE RETURNING r.*"
+    )]
+    fn merge_wildcard_columns_preserve_record_roles_after_positional_binding(#[case] sql: &str) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let group = &analyzed.context().analysis_state().wildcard_expansions()[0];
+        group.columns().assert_merge_role(MergeRecordRole::source());
+    }
+
+    #[rstest::rstest]
+    #[case::unknown_function("SELECT * FROM missing_wildcard_function()")]
+    #[case::invalid_arguments("SELECT * FROM row_fun(1)")]
+    #[case::rows_from("SELECT * FROM ROWS FROM (row_fun(1))")]
+    fn unresolved_function_output_is_not_a_known_empty_projection(#[case] sql: &str) {
+        let (_, context) = table_function_query(sql, false);
+        assert!(
+            context.has_reported_problem("query_reference_not_found"),
+            "{:?}",
+            context.reported_problems()
+        );
+    }
+
+    trait RetainedColumnsAssertions {
+        fn assert_retained_names(&self, expected: &str);
+        fn assert_merge_role(&self, expected: MergeRecordRole);
+    }
+    impl RetainedColumnsAssertions for [ResultColumn] {
+        fn assert_retained_names(&self, expected: &str) {
+            let names: Vec<_> = self
+                .iter()
+                .map(|column| column.column_name().as_ref().unwrap().as_str())
+                .collect();
+            assert_eq!(names.join(","), expected);
+            assert!(self.iter().all(|column| column.expression().is_some()));
+        }
+        fn assert_merge_role(&self, expected: MergeRecordRole) {
+            for column in self {
+                assert_eq!(
+                    column
+                        .expression()
+                        .unwrap()
+                        .merge_record_reference()
+                        .unwrap()
+                        .role(),
+                    expected
+                );
+            }
+        }
+    }
+    trait WildcardGroupsAssertions {
+        fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]);
+        fn assert_relation_schemas(&self, schemas: &[&str]);
+    }
+    impl WildcardGroupsAssertions for [WildcardExpansion] {
+        fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]) {
+            for (index, group) in self.iter().enumerate() {
+                assert_eq!(group.location(), Some(locations[index]));
+                assert_eq!(group.is_table_dependent(), dependencies[index]);
+                group.columns().assert_retained_names(names[index]);
+            }
+        }
+        fn assert_relation_schemas(&self, schemas: &[&str]) {
+            for (index, group) in self.iter().enumerate() {
+                let reference = group.columns()[0]
+                    .expression()
+                    .unwrap()
+                    .table_column_reference()
+                    .unwrap();
+                assert_eq!(
+                    reference.relation(),
+                    &crate::names::FullName::with_schema(schemas[index], "t")
+                );
+            }
+        }
+    }
+}
+
+impl ResultColumnCollection {
+    pub(crate) fn resolve_for_insert(
+        targets: &[Target],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        table: &InsertDestination,
+        alias: &AliasSpec,
+    ) -> Result<Self, AnalysisError> {
+        let mut results = Self::default();
+        for target in targets {
+            if let Some(name) = target.source_star_name() {
+                if scope.check_returning_star(
+                    context,
+                    AliasName::from_ast_star_qualifier(name)?.as_ref(),
+                )? {
+                    continue;
+                }
+                Self::require_ast_returning_star(name, context, alias)?;
+                let first = results.len();
+                let mut index = 0;
+                while let Some(column) = table.get_column_at(index) {
+                    index += 1;
+                    let column_name = column.name().as_ref().expect("catalog column name");
+                    results.append_resolved_column(
+                        column_name,
+                        Some(alias.name()),
+                        context,
+                        scope,
+                    )?;
+                }
+                context
+                    .analysis_state_mut()
+                    .record_wildcard(WildcardExpansion::new(
+                        target.projection_location(),
+                        &results,
+                        first,
+                        table.is_base_table(),
+                        &[],
+                    ));
+            } else {
+                results.append_resolved_target(target, context, scope)?;
+            }
+        }
+        Ok(results)
+    }
+
+    pub(crate) fn resolve_for_update(
+        targets: &[Target],
+        context: &mut impl ParseContext,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Self, AnalysisError> {
+        let mut results = Self::default();
+        for target_expr in targets {
+            if let Some(name) = target_expr.source_star_name() {
+                if context.dialect() == Dialect::sqlite() && !name.is_empty() {
+                    context.report_analysis_problem(AnalysisProblem::update(
+                        UpdateProblemKind::returning_qualifier(),
+                        "SQLite RETURNING does not permit qualified stars",
+                    ))?;
+                }
+                // Unqualified RETURNING * expands only the modified relation.
+                let qualifier = AliasName::from_ast_star_qualifier(name)?;
+                if scope.check_returning_star(context, qualifier.as_ref())? {
+                    continue;
+                }
+                if !results.expand_returning_projection(
+                    context,
+                    from,
+                    scope,
+                    target_expr.projection_location(),
+                    qualifier.as_ref(),
+                    None,
+                )? {
+                    context.report_analysis_problem(AnalysisProblem::update(
+                        UpdateProblemKind::returning_qualifier(),
+                        "RETURNING star source is not visible",
+                    ))?;
+                }
+            } else {
+                results.append_resolved_target(target_expr, context, scope)?;
+            }
+        }
+        Ok(results)
+    }
+
+    pub(crate) fn resolve_for_delete(
+        targets: &[Target],
+        context: &mut impl ParseContext,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Self, AnalysisError> {
+        let mut results = Self::default();
+        for target_expr in targets {
+            if let Some(name) = target_expr.source_star_name() {
+                if context.dialect() == Dialect::sqlite() && !name.is_empty() {
+                    context.report_analysis_problem(AnalysisProblem::delete(
+                        DeleteProblemKind::returning_qualifier(),
+                    ))?;
+                }
+                // Unqualified RETURNING * expands only the modified relation.
+                let qualifier = AliasName::from_ast_star_qualifier(name)?;
+                if scope.check_returning_star(context, qualifier.as_ref())? {
+                    continue;
+                }
+                // PostgreSQL 18 can bind OLD and NEW to the modified row while
+                // projection_names still needs the underlying target alias.
+                let projection_qualifier = qualifier.as_ref().map(|alias| {
+                    scope
+                        .delete_row_target(alias)
+                        .map_or(alias, |(target, _)| target)
+                });
+                if !results.expand_returning_projection(
+                    context,
+                    from,
+                    scope,
+                    target_expr.projection_location(),
+                    projection_qualifier,
+                    qualifier
+                        .as_ref()
+                        .filter(|alias| scope.delete_row_target(alias).is_some()),
+                )? {
+                    context.report_analysis_problem(AnalysisProblem::delete(
+                        DeleteProblemKind::returning_qualifier(),
+                    ))?;
+                }
+            } else {
+                results.append_resolved_target(target_expr, context, scope)?;
+            }
+        }
+        Ok(results)
+    }
+
+    pub(crate) fn append_resolved_target(
+        &mut self,
+        target: &Target,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<(), AnalysisError> {
+        let value = SemScalarExpr::from_ast_in(&target.expression, context, scope)?;
+        let name = target
+            .alias
+            .clone()
+            .unwrap_or_else(|| value.get_column_name());
+        self.push_expression(&ColumnName::from(name.as_str()), value);
+        Ok(())
+    }
+
+    pub(crate) fn append_resolved_column(
+        &mut self,
+        column: &ColumnName,
+        qualifier: Option<&AliasName>,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<(), AnalysisError> {
+        let value = scope.resolve_column(context, qualifier, column)?.0;
+        self.push_expression(column, value);
+        Ok(())
+    }
+
+    pub(crate) fn expand_projection(
+        &mut self,
+        context: &mut impl ParseContext,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+        location: Option<usize>,
+        projection_qualifier: Option<&AliasName>,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Result<bool, AnalysisError> {
+        let columns =
+            from.wildcard_projection(context, scope.with_clause(), projection_qualifier)?;
+        self.append_projection_columns(columns, context, scope, location, binding_qualifier)
+    }
+
+    fn expand_returning_projection(
+        &mut self,
+        context: &mut impl ParseContext,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+        location: Option<usize>,
+        projection_qualifier: Option<&AliasName>,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Result<bool, AnalysisError> {
+        let columns = if projection_qualifier.is_none() || binding_qualifier.is_some() {
+            from.destination_wildcard_projection(context, scope.with_clause())?
+        } else {
+            from.wildcard_projection(context, scope.with_clause(), projection_qualifier)?
+        };
+        self.append_projection_columns(columns, context, scope, location, binding_qualifier)
+    }
+
+    fn append_projection_columns(
+        &mut self,
+        projection: WildcardProjection<'_>,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        location: Option<usize>,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Result<bool, AnalysisError> {
+        projection.append_results(context, scope, self, location, binding_qualifier)
+    }
+}
+
+impl ResultColumnCollection {
+    pub(crate) fn require_ast_returning_star(
+        ast: &Name,
+        context: &mut impl ParseContext,
+        alias: &AliasSpec,
+    ) -> Result<(), AnalysisError> {
+        if !ast.0.is_empty() && ast.0.as_slice() != [alias.name().as_str()] {
+            context.report_analysis_problem(AnalysisProblem::insert(
+                InsertProblemKind::returning_qualifier(),
+                "RETURNING star qualifier does not identify the destination",
+            ))?;
+        }
+        if !ast.0.is_empty() && context.dialect() == Dialect::sqlite() {
+            context.report_analysis_problem(AnalysisProblem::insert(
+                InsertProblemKind::returning_qualifier(),
+                "SQLite RETURNING does not permit qualified stars",
+            ))?;
+        }
+        Ok(())
+    }
+}

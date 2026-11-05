@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::sem::{
     AnalysisError, CursorInfo, SemScalarExpr,
     traversal::{SemanticVisitor, SemanticVisitorMut},

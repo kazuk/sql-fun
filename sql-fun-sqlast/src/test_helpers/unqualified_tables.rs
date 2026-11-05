@@ -1,9 +1,10 @@
-use crate::context::ParseContext as _;
-use crate::test_helpers::{TestParseContext, schema_layer, source_span};
-
-use crate::context::SchemaFileContext;
-use crate::names::{FullName, SchemaName, TableName};
-use crate::sem::{AnalysisError, CreateTable, CreateTableMode};
+use crate::{
+    ast::CreateTableMode,
+    context::{ParseContext as _, SchemaFileContext},
+    names::{FullName, SchemaName, TableName},
+    sem::{AnalysisError, CreateTable},
+    test_helpers::{TestParseContext, schema_layer, source_span},
+};
 
 pub(crate) fn unqualified_tables() -> Result<SchemaFileContext, AnalysisError> {
     let root = TestParseContext::default().freeze();

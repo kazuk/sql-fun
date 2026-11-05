@@ -1,26 +1,18 @@
+mod ddl;
 #[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ColumnDefinition as SqliteColumnDefinition;
+use crate::{SqliteToken, syn::sqlite::ColumnDefinition as SqliteColumnDefinition};
 use crate::{
-    ast::Column,
-    names::FullName as NamesFullName,
+    ast::{Column, TryFromWithTokens},
+    names::{ColumnName, FullName as NamesFullName, TableName},
     sem::{
-        CatalogNameLookup, ColumnNullabilityConstraint, ColumnRename, DeclarationCollation,
-        DefaultColumnConstraint, GeneratedColumnConstraint, WithTypmod,
+        AnalysisError, CatalogNameLookup, ColumnConstraint, ColumnNullabilityConstraint,
+        ColumnRename, DeclarationCollation, DefaultColumnConstraint, GeneratedColumnConstraint,
+        ParseContext, SemScalarExpr, TypeReference, WithTypmod,
         traversal::{ColumnRenamer, SemanticVisitorMut},
     },
-    syn::ColumnDef,
+    syn::{ColumnDef, ScanToken},
 };
 use sql_fun_core::IVec;
-
-use crate::{
-    ast::TryFromWithTokens,
-    names::{ColumnName, TableName},
-    sem::{AnalysisError, ColumnConstraint, ParseContext, SemScalarExpr, TypeReference},
-    syn::ScanToken,
-};
-
-#[cfg(feature = "sqlite")]
-use crate::SqliteToken;
 
 /// column definitions
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -293,9 +285,10 @@ impl ColumnDefinition {
 mod test_column_serialization {
     //! SQL-to-semantics and catalog-chain regressions; no external server is required.
 
-    use crate::sem::ColumnDefinition as SemColumnDefinition;
-
-    use crate::test_helpers::column_attributes as test_helpers;
+    use crate::{
+        sem::ColumnDefinition as SemColumnDefinition,
+        test_helpers::column_attributes as test_helpers,
+    };
 
     #[test]
     fn legacy_column_json_shape_remains_readable() -> testresult::TestResult {
@@ -412,14 +405,6 @@ impl ColumnDefinition {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_sqlite_column_definition {
-    use crate::test_helpers::column_definition::setup_context;
-
-    #[cfg(feature = "sqlite")]
-    use crate::syn::sqlite::CreateTableStatement;
-
-    use assert_matches::assert_matches;
-    use sql_fun_core::IVec;
-
     use crate::{
         SqliteToken,
         names::TableName,
@@ -429,7 +414,14 @@ mod test_sqlite_column_definition {
         },
         sqlite::SqliteDialect,
         syn::sqlite::CreateTableBody,
+        test_helpers::column_definition::setup_context,
     };
+
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::CreateTableStatement;
+
+    use assert_matches::assert_matches;
+    use sql_fun_core::IVec;
 
     fn parse_create_table<'a>(sql: &'a str) -> (CreateTableStatement, IVec<SqliteToken<'a>>) {
         let cmd = SqliteDialect::parse(sql)

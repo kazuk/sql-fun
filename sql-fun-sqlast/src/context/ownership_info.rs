@@ -1,6 +1,7 @@
 use crate::{
+    ast::ObjectKind,
     names::FullName,
-    sem::{CreateFunction, CreateSchema, ObjectKind, OwnedObjectDefinition, Role},
+    sem::{CreateFunction, CreateSchema, OwnedObjectDefinition, Role},
 };
 
 /// Exact-name role lookup supplied by the explicitly selected analysis environment.

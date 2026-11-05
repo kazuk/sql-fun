@@ -3,14 +3,13 @@ use crate::{
     context::ParseContext,
     parse_statements,
     sem::{
-        FunctionParam, OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
-        TypeReference,
+        FuncCallExpr, FunctionParam, OverloadVariant, PgBuiltInType, ScalarConstExpr,
+        SelectStatement, SemScalarExpr, TypeReference,
     },
-    test_helpers::{create_cache_context, query::catalog},
-};
-use crate::{
-    sem::{FuncCallExpr, SelectStatement},
-    test_helpers::{TestParseContext, query::expression},
+    test_helpers::{
+        TestParseContext, create_cache_context,
+        query::{catalog, expression},
+    },
 };
 
 pub(crate) fn call(query: &SelectStatement) -> FuncCallExpr {

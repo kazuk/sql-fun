@@ -1,12 +1,12 @@
 use crate::test_helpers::create_cache_context;
-use ::sql_fun_sqlast::sem::SemAst;
-
 use ::sql_fun_sqlast::{
     AstAndContextPair, PostgresDialect, SqlFunArgs,
     ast::Dialect,
     context::{BaseContext, FrozenBaseContext, SchemaFileContext},
     parse_statements,
+    sem::SemAst,
 };
+
 use std::path::Path;
 
 /// Uses the shipped builtin initialization path and an in-memory-size schema

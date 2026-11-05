@@ -2,6 +2,7 @@ mod analyze;
 mod arith_expr;
 mod array;
 mod array_subquery;
+mod ast;
 mod boolean;
 mod case_expr;
 mod cast_expr;
@@ -11,6 +12,7 @@ mod column_ref;
 mod const_expr;
 mod constrained;
 mod context;
+mod ddl;
 mod distinct;
 mod exists;
 mod func_call;
@@ -26,6 +28,7 @@ mod sql_value;
 mod sub_link;
 mod truth_test;
 mod whole_row;
+mod wildcard_projection;
 
 pub use self::{
     arith_expr::{ArithExpr, SqliteLikeExpr},
@@ -64,23 +67,20 @@ use crate::{
     StringSpan,
     ast::Dialect,
     context::{BaseParseContext, ParseContext as ContextParseContext},
-    names::{AliasName as NamesAliasName, FullName as NamesFullName, TableName as NamesTableName},
+    names::{
+        AliasName as NamesAliasName, ColumnName, FullName as NamesFullName,
+        TableName as NamesTableName,
+    },
     sem::{
-        BinaryOperatorDefinition, ColumnCollection as SemColumnCollection, ColumnRename,
-        DeleteRowColumn, DeleteRowVersion, FunctionModifiers, InputTypeConstraint, MergeRecordRole,
-        MinMaxExpr as SemMinMaxExpr, OverloadVariant, ParameterConstraints, QueryNameResolution,
-        QueryProblem, ResolvedOperator, TypeDefinition as SemTypeDefinition,
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition,
+        ColumnCollection as SemColumnCollection, ColumnRename, DeleteRowColumn, DeleteRowVersion,
+        FunctionModifiers, InputTypeConstraint, MergeRecordRole, MinMaxExpr as SemMinMaxExpr,
+        OverloadVariant, ParameterConstraints, ParseContext, PgBuiltInType, QueryNameResolution,
+        QueryProblem, ResolvedOperator, TypeDefinition as SemTypeDefinition, TypeReference,
+        create_table::ColumnDefinition,
         parameter_resolution::ParameterResolution,
         traversal::{SemanticVisitor, SemanticVisitorMut},
         with_stack,
-    },
-};
-
-use crate::{
-    names::ColumnName,
-    sem::{
-        AnalysisError, AnalysisProblem, ParseContext, PgBuiltInType, TypeReference,
-        create_table::ColumnDefinition,
     },
 };
 

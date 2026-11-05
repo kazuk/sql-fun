@@ -1,18 +1,15 @@
 //! Public analyzer regressions over a small in-memory catalog.
 
-use crate::sem::SemAst;
-use crate::test_helpers::indirection as test_helpers;
-
-use crate::{
-    sem::{IndirectionExpr, SemScalarExpr, TypeReference as SemTypeReference},
-    test_helpers::create_cache_context,
-};
-
 use crate::{
     ast::Dialect,
     parse_statements,
-    sem::{ParseContext, PgBuiltInType},
+    sem::{
+        IndirectionExpr, ParseContext, PgBuiltInType, SemAst, SemScalarExpr,
+        TypeReference as SemTypeReference,
+    },
+    test_helpers::{create_cache_context, indirection as test_helpers},
 };
+
 use std::collections::BTreeMap;
 
 #[rstest::rstest]

@@ -1,3 +1,4 @@
+mod ddl;
 use crate::{
     ast::{AlterOwner as AstAlterOwner, TryFromWithTokens},
     names::FullName as NamesFullName,
@@ -87,8 +88,9 @@ impl OwnershipLookup {
 #[cfg(test)]
 mod lookup_message_tests {
     use crate::{
+        ast::ObjectKind,
         names::FullName,
-        sem::{ObjectKind, OwnershipIdentity, OwnershipLookup, PgBuiltInType},
+        sem::{OwnershipIdentity, OwnershipLookup, PgBuiltInType},
     };
 
     #[test]

@@ -51,18 +51,20 @@ $ cat > "$SQL_FUN_API_FIXTURE/bindings.json" <<'JSON'
 ```
 
 ```scrut
-$ grep -E 'Complete:|\$1 id:|\[0\] known:' "$SQL_FUN_API_FIXTURE/bindings.stdout"
-  Complete: false
-    $1 id: unresolved; unknown
-    [0] known: pg_catalog.int4; not_null
-  Complete: true
-    $1 id: pg_catalog.int4; unknown
-    [0] known: pg_catalog.int4; not_null
+$ grep -E '^ERROR |^OK |^    \$1 .* id |^    0 .*known ' \
+>   "$SQL_FUN_API_FIXTURE/bindings.stdout" | \
+>   sed "s|$SQL_FUN_API_FIXTURE|FIXTURE|g" | awk '{$1=$1; print}'
+ERROR FIXTURE/bindings.json#$.queries[0]
+$1 id unresolved unknown
+0 known pg_catalog.int4 not_null
+OK FIXTURE/bindings.json#$.queries[1]
+$1 id pg_catalog.int4 unknown
+0 known pg_catalog.int4 not_null
 ```
 
 ```scrut
 $ grep -Eo 'parameter_type_unresolved|application input binding[^;]+' \
-> "$SQL_FUN_API_FIXTURE/bindings.stderr"
+> "$SQL_FUN_API_FIXTURE/bindings.stdout"
 parameter_type_unresolved
 application input binding for parameter $1 is unresolved
 ```

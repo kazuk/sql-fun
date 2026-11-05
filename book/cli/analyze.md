@@ -32,20 +32,28 @@ multiple selected nodes, empty arrays, mixed arrays, and other selected types
 are input errors. Multiple selected nodes are never flattened. Relative filenames
 are resolved from the command's working directory.
 
-Each selected SQL string can contain multiple statements. For every returned
-statement, output identifies the input and zero-based statement index and shows
-the query kind, completion status, executable SQL, parameters, result columns,
-and relation/column accesses. Parameters include their SQL placeholder index,
-name, type, and nullability; result columns appear in ordinal order with their
-name, type, and nullability. Array types have a `[]` suffix. Unavailable SQL or
-query kinds and unresolved types are marked explicitly; collection counts show
-when no parameters, columns, or accesses were returned.
+Each selected SQL string can contain multiple statements. Each input starts
+with one source identity and an overall status: `OK` means no warnings or
+errors, `WARN` means warnings without errors, and `ERROR` means at least one
+error. Advice alone is `OK`. With multiple statements the highest severity is
+used, and zero-based statement headings identify each statement. An operational
+error is identified separately from SQL diagnostics. Status colors are green,
+yellow, and red respectively. `--term-color auto` enables color when the output
+stream is a terminal; `never` disables it and `ansi` forces it.
 
-Diagnostics are shown for every statement with SQL source context.
-See the [diagnostic reference](../diagnostics/README.md) for code meanings and
-suggested corrections. Error diagnostics do not stop later inputs. Each input
-uses the same selected schema base, without inheriting changes from preceding
-inputs.
+The report shows executable SQL, diagnostics, and nonempty tables of parameters,
+result columns, and relation/column accesses. Parameters include their SQL
+placeholder index, name, type, and nullability; result columns appear in ordinal
+order with their name, type, and nullability. Array types have a `[]` suffix.
+Unavailable SQL and unresolved types are marked explicitly. Tables use the width
+of their contents, so a wide table may wrap at the terminal edge.
+
+SQL diagnostics and their source highlighting are included in the stdout report.
+Use `--diagnostics-to-stderr` to additionally copy SQL diagnostics to stderr;
+status headers, SQL, and tables are not copied. See the
+[diagnostic reference](../diagnostics/README.md) for code meanings and suggested
+corrections. Error diagnostics do not stop later inputs. Each input uses the same
+selected schema base, without inheriting changes from preceding inputs.
 
 ## Relation and column access
 
@@ -54,10 +62,11 @@ facts in a `Column access` section for each statement. Each record shows a
 resolved relation, its kind, an optional column, and the purpose of the access:
 
 ```text
-  Column access (3):
-    public.events (Table): ReadRows
-    public.events.id (Table): SelectFilter
-    public.events.id (Table): SelectOutput
+  Column access
+    Relation/column    Kind   Role
+    public.events      Table  ReadRows
+    public.events.id   Table  SelectFilter
+    public.events.id   Table  SelectOutput
 ```
 
 A record without a column describes a relation-level action. Names preserve
@@ -77,9 +86,9 @@ sql-fun --metadata-file Cargo.toml --datasource app analyze \
 ```
 
 This option preserves ordinary diagnostics, parameters, and result columns.
-`Column access (0)` means the requested analysis returned no accesses for that
-statement. Access facts can also be returned for incomplete statements; they do
-not guarantee that every access was resolved.
+When no accesses are returned, the section is omitted. Access facts can also be
+returned for incomplete statements; they do not guarantee that every access was
+resolved.
 
 ## Parameter bindings
 

@@ -127,13 +127,16 @@ async fn capture_requests(listener: TcpListener) -> (Vec<Value>, Option<Value>) 
                 })
             }
             "analyze_query" => {
-                let item = ::serde_json::json!({
-                    "query_span":null, "query_kind":"Select", "execute_sql":null,
-                    "complete":true, "probrems":page(&[]), "parameters":page(&[]),
-                    "result_columns":page(&[]), "column_access":page(&[])
-                });
+                let query = request["params"]["query"]["Text"].as_str().unwrap();
+                let severities = match query {
+                    "warning case" => vec![Some("warning")],
+                    "mixed case" => vec![Some("warning"), Some("error")],
+                    "advice case" => vec![Some("advice")],
+                    _ => vec![None],
+                };
+                let items = severities.into_iter().map(statement).collect::<Vec<_>>();
                 requests.push(request["params"].clone());
-                ::serde_json::json!({"queries":page(&[item])})
+                ::serde_json::json!({"queries":page(&items)})
             }
             method => panic!("unexpected method {method}"),
         };
@@ -149,4 +152,32 @@ async fn capture_requests(listener: TcpListener) -> (Vec<Value>, Option<Value>) 
 
 fn page(items: &[Value]) -> Value {
     ::serde_json::json!({"handle":"test", "total_length":items.len(), "offset":0, "require_release":false, "items":items})
+}
+
+fn statement(severity: Option<&str>) -> Value {
+    let diagnostics = if let Some(severity) = severity {
+        let problem = ::sql_fun_core::analysis_problem::AnalysisProblem::parameter_constraint(
+            "unresolved parameter",
+        );
+        let severity = match severity {
+            "warning" => ::sql_fun_client::payloads::DiagnosticSeverity::warning(),
+            "error" => ::sql_fun_client::payloads::DiagnosticSeverity::error(),
+            _ => ::sql_fun_client::payloads::DiagnosticSeverity::advice(),
+        };
+        let diagnostic = ::sql_fun_client::payloads::AnalysisProbrem::new(
+            problem.code(),
+            severity,
+            std::path::Path::new("query"),
+            None,
+        )
+        .with_semantic_problem(&problem);
+        vec![::serde_json::to_value(diagnostic).unwrap()]
+    } else {
+        Vec::new()
+    };
+    ::serde_json::json!({
+        "query_span":null, "query_kind":"Select", "execute_sql":"SELECT 1",
+        "complete":false, "probrems":page(&diagnostics), "parameters":page(&[]),
+        "result_columns":page(&[]), "column_access":page(&[])
+    })
 }

@@ -2,7 +2,7 @@ use ::sql_fun_client::{
     Collection,
     payloads::{
         AccessKind, AnalyzeQueryItem, AnalyzeQueryResponse, ColumnAccess, Nullability, ObjectKind,
-        RelationName, ResultSetColumn, TypeReference,
+        ParameterDescribe, RelationName, ResultSetColumn, TypeReference,
     },
 };
 
@@ -51,7 +51,10 @@ pub(crate) fn column_access_response() -> AnalyzeQueryResponse {
             None,
             false,
             Collection::completed(Vec::new()),
-            Collection::completed(Vec::new()),
+            Collection::completed(vec![
+                ParameterDescribe::new("third", 3, None, Vec::new()),
+                ParameterDescribe::new("first", 1, None, Vec::new()),
+            ]),
             Collection::completed(columns),
             Collection::completed(accesses),
         ),
@@ -66,4 +69,42 @@ pub(crate) fn column_access_response() -> AnalyzeQueryResponse {
             Collection::completed(Vec::new()),
         ),
     ]))
+}
+
+/// Construct ordered statements with independently specified diagnostic severities.
+pub(crate) fn diagnostic_response(
+    severities: &[&[::sql_fun_client::payloads::DiagnosticSeverity]],
+) -> AnalyzeQueryResponse {
+    use ::sql_fun_client::payloads::AnalysisProbrem;
+    let problem = ::sql_fun_core::analysis_problem::AnalysisProblem::parameter_constraint(
+        "unresolved parameter",
+    );
+    let statements = severities
+        .iter()
+        .map(|severities| {
+            let diagnostics = severities
+                .iter()
+                .map(|severity| {
+                    AnalysisProbrem::new(
+                        problem.code(),
+                        *severity,
+                        std::path::Path::new("query"),
+                        None,
+                    )
+                    .with_semantic_problem(&problem)
+                })
+                .collect();
+            AnalyzeQueryItem::new(
+                None,
+                None,
+                Some("SELECT 1".to_owned()),
+                false,
+                Collection::completed(diagnostics),
+                Collection::completed(Vec::new()),
+                Collection::completed(Vec::new()),
+                Collection::completed(Vec::new()),
+            )
+        })
+        .collect();
+    AnalyzeQueryResponse::new(Collection::completed(statements))
 }

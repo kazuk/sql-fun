@@ -20,18 +20,20 @@ Analysis remains incomplete, but delivers an ordinary error diagnostic instead
 of failing the request with a JSON-RPC decoding error.
 
 ```scrut
-$ grep -F '  Complete: false' "$SQL_FUN_API_FIXTURE/derived-alias.stdout"
-  Complete: false
+$ grep -E '^ERROR ' "$SQL_FUN_API_FIXTURE/derived-alias.stdout" | sed "s|$SQL_FUN_API_FIXTURE|FIXTURE|g"
+ERROR FIXTURE/derived-alias.sql
 ```
 
 ```scrut
-$ grep -F 'sub_query_not_have_column_for_derived_column_name' "$SQL_FUN_API_FIXTURE/derived-alias.stderr"
+$ grep -F 'sub_query_not_have_column_for_derived_column_name' \
+>   "$SQL_FUN_API_FIXTURE/derived-alias.stdout" | awk '{$1=$1; print}'
 sub_query_not_have_column_for_derived_column_name
 ```
 
 ```scrut
-$ grep -F '  × subquery has no column for the derived column name' "$SQL_FUN_API_FIXTURE/derived-alias.stderr"
-  × subquery has no column for the derived column name
+$ grep -F '× subquery has no column for the derived column name' \
+>   "$SQL_FUN_API_FIXTURE/derived-alias.stdout" | awk '{$1=$1; print}'
+× subquery has no column for the derived column name
 ```
 
 ```scrut

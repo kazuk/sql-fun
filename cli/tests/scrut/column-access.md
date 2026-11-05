@@ -29,45 +29,43 @@ All statements retain their identities. Every purpose for the same column is
 shown, including relation-level actions without a column.
 
 ```scrut
-$ grep -E '^  Column access|^    public.events' "$SQL_FUN_API_FIXTURE/access.stdout"
-  Column access (3):
-    public.events (Table): ReadRows
-    public.events.id (Table): SelectFilter
-    public.events.id (Table): SelectOutput
-  Column access (5):
-    public.events (Table): ReadRows
-    public.events (Table): UpdateRows
-    public.events.id (Table): UpdateInput
-    public.events.id (Table): UpdateReturning
-    public.events.id (Table): UpdateTarget
-  Column access (3):
-    public.events (Table): DeleteRows
-    public.events (Table): ReadRows
-    public.events.id (Table): DeleteReturning
-  Column access (2):
-    public.events (Table): ReadRows
-    public.events.id (Table): SelectOutput
-  Column access (0):
-  Column access (2):
-    public.events (Table): ReadRows
-    public.events.id (Table): SelectOutput
+$ grep -E '^  Column access|^    public.events' \
+>   "$SQL_FUN_API_FIXTURE/access.stdout" | awk '{$1=$1; print}'
+Column access
+public.events Table ReadRows
+public.events.id Table SelectFilter
+public.events.id Table SelectOutput
+Column access
+public.events Table ReadRows
+public.events Table UpdateRows
+public.events.id Table UpdateInput
+public.events.id Table UpdateReturning
+public.events.id Table UpdateTarget
+Column access
+public.events Table DeleteRows
+public.events Table ReadRows
+public.events.id Table DeleteReturning
+Column access
+public.events Table ReadRows
+public.events.id Table SelectOutput
+Column access
+public.events Table ReadRows
+public.events.id Table SelectOutput
 ```
 
 The nested WHERE reference retains its outer output purpose. The final input is
 incomplete but still reports its resolved accesses and ordinary result columns.
 
 ```scrut
-$ grep -E 'statement [12]|Complete: false|\$1 input:|\[0\] id:' \
-> "$SQL_FUN_API_FIXTURE/access.stdout" | \
-> sed "s|$SQL_FUN_API_FIXTURE|FIXTURE|g"
-    [0] id: pg_catalog.int4; nullable
-FIXTURE/access.yaml#$.queries[0] (statement 1)
-    [0] id: pg_catalog.int4; nullable
-FIXTURE/access.yaml#$.queries[0] (statement 2)
-    [0] id: pg_catalog.int4; nullable
-  Complete: false
-    $1 input: unresolved; unknown
-    [0] id: pg_catalog.int4; nullable
+$ grep -E 'Statement [12]|^    \$1.*input|^    0 .*id .*pg_catalog.int4' \
+> "$SQL_FUN_API_FIXTURE/access.stdout" | awk '{$1=$1; print}'
+0 id pg_catalog.int4 nullable
+Statement 1
+0 id pg_catalog.int4 nullable
+Statement 2
+0 id pg_catalog.int4 nullable
+$1 input unresolved unknown
+0 id pg_catalog.int4 nullable
 ```
 
 Opt-out preserves exit status, diagnostics, and all ordinary output, while
@@ -86,14 +84,15 @@ $ SQL_FUN_HOME="$SQL_FUN_API_FIXTURE/home" \
 ```
 
 ```scrut
-$ grep -E 'Column access|\(Table\):' "$SQL_FUN_API_FIXTURE/access-disabled.stdout"
+$ grep -E 'Column access|public.events.*Table' "$SQL_FUN_API_FIXTURE/access-disabled.stdout"
 [1]
 ```
 
 ```scrut
-$ grep -v -E '^  Column access|^    .* \(Table\):' \
-> "$SQL_FUN_API_FIXTURE/access.stdout" \
-> > "$SQL_FUN_API_FIXTURE/access-ordinary.stdout"
+$ awk '/^  Column access$/ {skip=1; next} \
+>   skip && /^$/ {skip=0; next} !skip {print}' \
+>   "$SQL_FUN_API_FIXTURE/access.stdout" \
+>   > "$SQL_FUN_API_FIXTURE/access-ordinary.stdout"
 > diff -u "$SQL_FUN_API_FIXTURE/access-ordinary.stdout" \
 > "$SQL_FUN_API_FIXTURE/access-disabled.stdout"
 > diff -u "$SQL_FUN_API_FIXTURE/access.stderr" \

@@ -1,111 +1,404 @@
+use crate::{analysis::PreparedDiagnostics, diagnostic::DiagnosticRenderer};
 use std::io::Write;
 
 use ::sql_fun_client::payloads::{
-    AnalyzeQueryResponse, ColumnAccess, ObjectKind, QueryKind, TypeReference,
+    AnalyzeQueryItem, AnalyzeQueryResponse, ColumnAccess, DiagnosticSeverity, ObjectKind,
+    TypeReference,
 };
+use ::tabled::{builder::Builder, settings::Style};
 
-/// Display completed collections, preserving input and statement identity.
-pub(super) fn write_response(
-    output: &mut impl Write,
-    source: &str,
-    response: &AnalyzeQueryResponse,
-    show_access: bool,
-) -> Result<(), std::io::Error> {
-    for (index, statement) in response.queries().items().iter().enumerate() {
-        writeln!(output, "{source} (statement {index})")?;
-        let kind = statement
-            .query_kind()
-            .as_ref()
-            .map_or("unavailable", AnalysisLabel::label);
-        writeln!(output, "  Query kind: {kind}")?;
-        writeln!(output, "  Complete: {}", statement.complete())?;
-        writeln!(output, "  Executable SQL:")?;
+/// Buffered statement output and severity for one independently selected input.
+#[derive(Default)]
+pub(super) struct AnalysisReport {
+    body: Vec<u8>,
+    diagnostics_stderr: Vec<u8>,
+    severity: Status,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+enum Status {
+    #[default]
+    Ok,
+    Warn,
+    Error,
+}
+
+impl AnalysisReport {
+    pub(super) fn collect(
+        &mut self,
+        response: &AnalyzeQueryResponse,
+        prepared: &PreparedDiagnostics,
+        stdout_renderer: &DiagnosticRenderer,
+        stderr_renderer: Option<&DiagnosticRenderer>,
+        show_access: bool,
+    ) -> Result<(), ::anyhow::Error> {
+        let statements = response.queries().items();
+        let mut errors = Vec::new();
+        for (index, statement) in statements.iter().enumerate() {
+            if statements.len() > 1 {
+                writeln!(self.body, "\n  Statement {index}")?;
+            }
+            self.collect_statement(
+                statement,
+                prepared,
+                stdout_renderer,
+                stderr_renderer,
+                show_access,
+                &mut errors,
+            )?;
+        }
+        if let Some(error) = prepared.error() {
+            errors.push(format!("cannot tokenize SQL diagnostics: {error}"));
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            ::anyhow::bail!("{}", errors.join("\n"))
+        }
+    }
+
+    fn collect_statement(
+        &mut self,
+        statement: &AnalyzeQueryItem,
+        prepared: &PreparedDiagnostics,
+        stdout_renderer: &DiagnosticRenderer,
+        stderr_renderer: Option<&DiagnosticRenderer>,
+        show_access: bool,
+        errors: &mut Vec<String>,
+    ) -> std::io::Result<()> {
+        writeln!(self.body, "\n  SQL")?;
         if let Some(sql) = statement.execute_sql() {
             for line in sql.lines() {
-                writeln!(output, "    {line}")?;
+                writeln!(self.body, "    {line}")?;
             }
         } else {
-            writeln!(output, "    unavailable")?;
+            writeln!(self.body, "    unavailable")?;
         }
-        let mut parameters: Vec<_> = statement.parameters().items().iter().collect();
-        parameters.sort_by_key(|parameter| *parameter.parameter_index());
-        writeln!(output, "  Parameters ({}):", parameters.len())?;
-        for parameter in parameters {
-            writeln!(
-                output,
-                "    ${} {}: {}; {}",
-                parameter.parameter_index(),
-                parameter.name(),
-                type_name(parameter.parameter_type().as_ref()),
-                parameter.nullability().contract_name(),
-            )?;
-        }
-        let mut columns: Vec<_> = statement.result_columns().items().iter().collect();
-        columns.sort_by_key(|column| *column.ordinal());
-        writeln!(output, "  Result columns ({}):", columns.len())?;
-        for column in columns {
-            writeln!(
-                output,
-                "    [{}] {}: {}; {}",
-                column.ordinal(),
-                column.name(),
-                type_name(column.column_type().as_ref()),
-                column.nullability().contract_name(),
-            )?;
-        }
+        self.collect_diagnostics(
+            statement,
+            prepared,
+            stdout_renderer,
+            stderr_renderer,
+            errors,
+        )?;
+        write_parameters(&mut self.body, statement)?;
+        write_columns(&mut self.body, statement)?;
         if show_access {
-            write_accesses(output, statement.column_access().items())?;
+            write_accesses(&mut self.body, statement.column_access().items())?;
         }
+        Ok(())
+    }
+
+    fn collect_diagnostics(
+        &mut self,
+        statement: &AnalyzeQueryItem,
+        prepared: &PreparedDiagnostics,
+        stdout_renderer: &DiagnosticRenderer,
+        stderr_renderer: Option<&DiagnosticRenderer>,
+        errors: &mut Vec<String>,
+    ) -> std::io::Result<()> {
+        if !statement.probrems().items().is_empty() {
+            writeln!(self.body, "\n  Diagnostics")?;
+        }
+        for diagnostic in statement.probrems().items() {
+            self.severity = self.severity.max(match diagnostic.severity() {
+                DiagnosticSeverity::Error => Status::Error,
+                DiagnosticSeverity::Warning => Status::Warn,
+                DiagnosticSeverity::Advice => Status::Ok,
+            });
+            match prepared.render(diagnostic, stdout_renderer) {
+                Ok(rendered) => {
+                    for line in rendered.lines() {
+                        writeln!(self.body, "    {line}")?;
+                    }
+                }
+                Err(error) => errors.push(format!("cannot render SQL diagnostic: {error:#}")),
+            }
+            if let Some(renderer) = stderr_renderer {
+                match prepared.render(diagnostic, renderer) {
+                    Ok(rendered) => writeln!(self.diagnostics_stderr, "{rendered}")?,
+                    Err(error) => errors.push(format!(
+                        "cannot render SQL diagnostic for stderr: {error:#}"
+                    )),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn passed(&self) -> bool {
+        self.severity != Status::Error
+    }
+
+    pub(super) fn write(
+        &self,
+        output: &mut impl Write,
+        stderr: &mut impl Write,
+        name: &str,
+        error: Option<&str>,
+        color: bool,
+    ) -> std::io::Result<()> {
+        let status = if error.is_some() {
+            Status::Error
+        } else {
+            self.severity
+        };
+        let (label, ansi) = match status {
+            Status::Ok => ("OK", 32),
+            Status::Warn => ("WARN", 33),
+            Status::Error => ("ERROR", 31),
+        };
+        if color {
+            writeln!(output, "\x1b[{ansi}m{label}\x1b[0m {name}")?;
+        } else {
+            writeln!(output, "{label} {name}")?;
+        }
+        output.write_all(&self.body)?;
+        if let Some(error) = error {
+            writeln!(output, "\n  Operational error:")?;
+            for line in error.lines() {
+                writeln!(output, "    {line}")?;
+            }
+        }
+        writeln!(output)?;
+        stderr.write_all(&self.diagnostics_stderr)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_analysis_report {
+    use crate::{
+        analysis::PreparedDiagnostics,
+        direct_sql::results::AnalysisReport,
+        test_helpers::direct_sql::{
+            results::{column_access_response, diagnostic_response},
+            session,
+        },
+    };
+    use ::sql_fun_client::payloads::DiagnosticSeverity as Severity;
+
+    #[rstest::rstest]
+    #[case::none(vec![vec![]], "OK", true)]
+    #[case::advice(vec![vec![Severity::advice()]], "OK", true)]
+    #[case::warning(vec![vec![Severity::warning()]], "WARN", true)]
+    #[case::error_after_warning(vec![vec![Severity::warning()], vec![Severity::error()]], "ERROR", false)]
+    fn aggregates_and_duplicates_diagnostics(
+        #[case] severities: Vec<Vec<Severity>>,
+        #[case] status: &str,
+        #[case] passed: bool,
+    ) -> ::testresult::TestResult {
+        let severities = severities.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let response = diagnostic_response(&severities);
+        let renderer = session::renderer()?;
+        let mut report = AnalysisReport::default();
+        report.collect(
+            &response,
+            &PreparedDiagnostics::default(),
+            &renderer,
+            Some(&renderer),
+            true,
+        )?;
+        assert_eq!(report.passed(), passed);
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        report.write(&mut stdout, &mut stderr, "input", None, false)?;
+        let stdout = String::from_utf8(stdout)?;
+        let stderr = String::from_utf8(stderr)?;
+        assert!(stdout.starts_with(&format!("{status} input\n")), "{stdout}");
+        assert_eq!(stdout.matches("input").count(), 1);
+        assert_eq!(stdout.contains("Statement 0"), severities.len() > 1);
+        assert_eq!(
+            stdout.matches("parameter_constraint").count(),
+            stderr.matches("parameter_constraint").count()
+        );
+        assert!(!stdout.contains("Complete"));
+        assert!(!stdout.contains("Query kind"));
+        assert!(!stdout.contains("Parameters"));
+        assert!(!stdout.contains("Column access"));
+        assert!(!stderr.contains("Statement"));
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::ok(Severity::advice(), "\x1b[32mOK\x1b[0m")]
+    #[case::warn(Severity::warning(), "\x1b[33mWARN\x1b[0m")]
+    #[case::error(Severity::error(), "\x1b[31mERROR\x1b[0m")]
+    fn applies_status_colors(
+        #[case] severity: Severity,
+        #[case] expected: &str,
+    ) -> ::testresult::TestResult {
+        let renderer = session::renderer()?;
+        let mut report = AnalysisReport::default();
+        report.collect(
+            &diagnostic_response(&[&[severity]]),
+            &PreparedDiagnostics::default(),
+            &renderer,
+            None,
+            true,
+        )?;
+        let mut stdout = Vec::new();
+        report.write(&mut stdout, &mut Vec::new(), "input", None, true)?;
+        assert!(String::from_utf8(stdout)?.starts_with(expected));
+        Ok(())
+    }
+
+    #[test]
+    fn reports_operational_error_without_losing_results() -> ::testresult::TestResult {
+        let renderer = session::renderer()?;
+        let mut report = AnalysisReport::default();
+        report.collect(
+            &column_access_response(),
+            &PreparedDiagnostics::default(),
+            &renderer,
+            None,
+            true,
+        )?;
+        let mut stdout = Vec::new();
+        report.write(
+            &mut stdout,
+            &mut Vec::new(),
+            "input",
+            Some("transport failure"),
+            false,
+        )?;
+        let stdout = String::from_utf8(stdout)?;
+        assert!(stdout.starts_with("ERROR input"));
+        assert!(stdout.contains("Operational error:\n    transport failure"));
+        assert!(stdout.contains("unresolved"));
+        assert!(stdout.contains("pg_catalog.int4[]"));
+        assert!(stdout.contains("Statement 1"));
+        assert_eq!(stdout.matches("Column access").count(), 1);
+        Ok(())
+    }
+}
+
+fn write_table(
+    output: &mut impl Write,
+    title: &str,
+    headings: &[&str],
+    rows: Vec<Vec<String>>,
+) -> std::io::Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let mut builder = Builder::new();
+    builder.push_record(headings.iter().copied());
+    for row in rows {
+        builder.push_record(row);
+    }
+    let mut table = builder.build();
+    table.with(Style::blank());
+    writeln!(output, "\n  {title}")?;
+    for line in table.to_string().lines() {
+        writeln!(output, "   {line}")?;
     }
     Ok(())
 }
 
 #[cfg(test)]
-mod test_response_display {
-    use crate::{
-        direct_sql::results::write_response,
-        test_helpers::direct_sql::results::column_access_response,
-    };
+mod test_write_table {
+    use crate::direct_sql::results::write_table;
 
     #[test]
-    fn displays_returned_column_access_and_unresolved_columns() -> ::testresult::TestResult {
-        let response = column_access_response();
+    fn keeps_long_unicode_and_multiline_values_without_width_limits() -> ::testresult::TestResult {
+        let long = "x".repeat(160);
         let mut output = Vec::new();
-        write_response(&mut output, "queries.yaml#$.queries[2]", &response, true)?;
+        write_table(
+            &mut output,
+            "Values",
+            &["Name", "Type"],
+            vec![vec!["名前\nsecond".to_owned(), long.clone()]],
+        )?;
         let output = String::from_utf8(output)?;
-        assert!(output.contains("queries.yaml#$.queries[2] (statement 0)"));
-        assert!(output.contains("Column access (4):"));
-        assert!(output.contains("public.events.id (Table): SelectOutput"));
-        assert!(output.contains("Complete: false"));
-        assert!(output.contains("queries.yaml#$.queries[2] (statement 1)"));
-        assert!(output.contains("Column access (0):"));
-        let expected_accesses = concat!(
-            "  Column access (4):\n",
-            "    public.events (Table): ReadRows\n",
-            "    public.events.id (Table): SelectFilter\n",
-            "    public.events.id (Table): SelectOutput\n",
-            "    app.public.events.id (Table): SelectOutput\n",
-        );
-        assert!(output.contains(expected_accesses), "{output}");
-        let mut disabled = Vec::new();
-        write_response(&mut disabled, "queries.yaml#$.queries[2]", &response, false)?;
-        let disabled = String::from_utf8(disabled)?;
-        assert!(!disabled.contains("Column access"));
-        assert!(!disabled.contains("SelectOutput"));
-        assert_eq!(
-            output
-                .replace(expected_accesses, "")
-                .replace("  Column access (0):\n", ""),
-            disabled
-        );
-        assert!(output.contains("[0] id: unresolved; unknown"));
-        assert!(output.contains("[1] ids: pg_catalog.int4[]; nullable"));
-        assert!(output.find("[0]").unwrap() < output.find("[1]").unwrap());
+        assert!(output.contains("名前"));
+        assert!(output.contains("second"));
+        assert!(output.contains(&long));
         Ok(())
     }
 }
 
-fn write_accesses(output: &mut impl Write, records: &[ColumnAccess]) -> Result<(), std::io::Error> {
+fn write_parameters(output: &mut impl Write, statement: &AnalyzeQueryItem) -> std::io::Result<()> {
+    let mut parameters: Vec<_> = statement.parameters().items().iter().collect();
+    parameters.sort_by_key(|parameter| *parameter.parameter_index());
+    let rows = parameters
+        .into_iter()
+        .map(|parameter| {
+            vec![
+                format!("${}", parameter.parameter_index()),
+                parameter.name().to_owned(),
+                type_name(parameter.parameter_type().as_ref()),
+                parameter.nullability().contract_name().to_owned(),
+            ]
+        })
+        .collect();
+    write_table(
+        output,
+        "Parameters",
+        &["#", "Name", "Type", "Nullability"],
+        rows,
+    )
+}
+
+#[cfg(test)]
+mod test_write_parameters {
+    use crate::{
+        direct_sql::results::write_parameters,
+        test_helpers::direct_sql::results::column_access_response,
+    };
+    #[test]
+    fn sorts_parameters_by_placeholder_index() -> ::testresult::TestResult {
+        let response = column_access_response();
+        let mut output = Vec::new();
+        write_parameters(&mut output, &response.queries().items()[0])?;
+        let output = String::from_utf8(output)?;
+        assert!(output.find("first").unwrap() < output.find("third").unwrap());
+        assert!(output.contains("$1") && output.contains("$3"));
+        Ok(())
+    }
+}
+
+fn write_columns(output: &mut impl Write, statement: &AnalyzeQueryItem) -> std::io::Result<()> {
+    let mut columns: Vec<_> = statement.result_columns().items().iter().collect();
+    columns.sort_by_key(|column| *column.ordinal());
+    let rows = columns
+        .into_iter()
+        .map(|column| {
+            vec![
+                column.ordinal().to_string(),
+                column.name().to_owned(),
+                type_name(column.column_type().as_ref()),
+                column.nullability().contract_name().to_owned(),
+            ]
+        })
+        .collect();
+    write_table(
+        output,
+        "Result columns",
+        &["#", "Name", "Type", "Nullability"],
+        rows,
+    )
+}
+
+#[cfg(test)]
+mod test_write_columns {
+    use crate::{
+        direct_sql::results::write_columns,
+        test_helpers::direct_sql::results::column_access_response,
+    };
+    #[test]
+    fn sorts_columns_by_ordinal_and_displays_types() -> ::testresult::TestResult {
+        let response = column_access_response();
+        let mut output = Vec::new();
+        write_columns(&mut output, &response.queries().items()[0])?;
+        let output = String::from_utf8(output)?;
+        assert!(output.find(" id ").unwrap() < output.find(" ids ").unwrap());
+        assert!(output.contains("unresolved") && output.contains("pg_catalog.int4[]"));
+        Ok(())
+    }
+}
+
+fn write_accesses(output: &mut impl Write, records: &[ColumnAccess]) -> std::io::Result<()> {
     let mut accesses: Vec<_> = records.iter().collect();
     accesses.sort_by_key(|access| {
         let relation = access.relation();
@@ -118,29 +411,58 @@ fn write_accesses(output: &mut impl Write, records: &[ColumnAccess]) -> Result<(
             access.access_kind().name(),
         )
     });
-    writeln!(output, "  Column access ({}):", accesses.len())?;
-    for access in accesses {
-        let relation = access.relation();
-        let relation_name = relation
-            .catalog()
-            .iter()
-            .chain(relation.schema())
-            .map(String::as_str)
-            .chain(std::iter::once(relation.name().as_str()))
-            .collect::<Vec<_>>()
-            .join(".");
-        let column = access
-            .column_name()
-            .as_ref()
-            .map_or(String::new(), |name| format!(".{name}"));
-        writeln!(
-            output,
-            "    {relation_name}{column} ({}): {}",
-            access.relation_kind().label(),
-            access.access_kind().name()
+    let rows = accesses
+        .into_iter()
+        .map(|access| {
+            let relation = access.relation();
+            let mut name = relation
+                .catalog()
+                .iter()
+                .chain(relation.schema())
+                .map(String::as_str)
+                .chain(std::iter::once(relation.name().as_str()))
+                .collect::<Vec<_>>()
+                .join(".");
+            if let Some(column) = access.column_name() {
+                name.push('.');
+                name.push_str(column);
+            }
+            vec![
+                name,
+                access.relation_kind().label().to_owned(),
+                access.access_kind().name().to_owned(),
+            ]
+        })
+        .collect();
+    write_table(
+        output,
+        "Column access",
+        &["Relation/column", "Kind", "Role"],
+        rows,
+    )
+}
+
+#[cfg(test)]
+mod test_write_accesses {
+    use crate::{
+        direct_sql::results::write_accesses,
+        test_helpers::direct_sql::results::column_access_response,
+    };
+    #[test]
+    fn sorts_accesses_and_preserves_repeated_roles() -> ::testresult::TestResult {
+        let response = column_access_response();
+        let mut output = Vec::new();
+        write_accesses(
+            &mut output,
+            response.queries().items()[0].column_access().items(),
         )?;
+        let output = String::from_utf8(output)?;
+        assert!(output.find("ReadRows").unwrap() < output.find("SelectFilter").unwrap());
+        assert!(output.find("SelectFilter").unwrap() < output.find("SelectOutput").unwrap());
+        assert_eq!(output.matches("SelectOutput").count(), 2);
+        assert!(output.contains("app.public.events.id"));
+        Ok(())
     }
-    Ok(())
 }
 
 fn type_name(reference: Option<&TypeReference>) -> String {
@@ -149,7 +471,7 @@ fn type_name(reference: Option<&TypeReference>) -> String {
             "{}.{}{}",
             reference.schema_name(),
             reference.local_name(),
-            if *reference.is_array() { "[]" } else { "" },
+            if *reference.is_array() { "[]" } else { "" }
         ),
         None => "unresolved".to_owned(),
     }
@@ -158,7 +480,6 @@ fn type_name(reference: Option<&TypeReference>) -> String {
 #[cfg(test)]
 mod test_type_display {
     use crate::direct_sql::results::{TypeReference, type_name};
-
     #[rstest::rstest]
     #[case::scalar(Some(false), "pg_catalog.int4")]
     #[case::array(Some(true), "pg_catalog.int4[]")]
@@ -172,25 +493,9 @@ mod test_type_display {
     }
 }
 
-// CLI presentation stays local without extending the protocol's public API.
 trait AnalysisLabel {
     fn label(&self) -> &'static str;
 }
-
-impl AnalysisLabel for QueryKind {
-    fn label(&self) -> &'static str {
-        match self {
-            Self::Select => "Select",
-            Self::Insert => "Insert",
-            Self::Update => "Update",
-            Self::Delete => "Delete",
-            Self::Truncate => "Truncate",
-            Self::Merge => "Merge",
-            Self::Other => "Other",
-        }
-    }
-}
-
 impl AnalysisLabel for ObjectKind {
     fn label(&self) -> &'static str {
         match self {

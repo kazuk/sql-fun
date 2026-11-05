@@ -108,6 +108,30 @@ use ::url::Url;
 - Use `#[path]` only when a deliberately non-standard module location is
   required; do not use it merely to restate the default path.
 
+### Module responsibilities
+
+- Before creating a module, identify what it does: the responsibility it
+  owns and the operations or decisions that belong there. Its name and
+  module-level documentation SHOULD communicate that purpose. A description
+  that only lists the contained types or methods is insufficient to establish
+  a responsibility boundary. Use that stated purpose when deciding whether a
+  new item belongs in the module or whether the module should be consolidated.
+- Place inherent implementations in the module defining the type or its
+  descendant modules. Re-exporting a type does not transfer implementation
+  ownership to the re-exporting module. When relocating code, verify the actual
+  defining module, including inline modules, rather than relying only on file
+  names or import paths.
+- Avoid creating modules that contain only a small number of closely related
+  items. A separate module should establish a meaningful responsibility
+  boundary, not merely distribute methods or reduce file size.
+- When consolidating a small module into its parent, move its items directly
+  into the parent module and eliminate the original module boundary. Replacing
+  a file module with an inline module does not constitute consolidation.
+- Modules containing 100 lines or fewer SHOULD generally be consolidated into
+  their parent unless they represent a distinct responsibility that justifies
+  their existence. Focused inline test modules required by the test-placement
+  rule are exempt.
+
 ### Test placement
 
 - **Test placement is mandatory (MUST), not a stylistic preference.**
@@ -117,6 +141,19 @@ use ::url::Url;
   distant `tests` modules merely for organization. Parameterized tests follow
   the same rule. Broader integration tests that exercise multiple components
   may live in dedicated integration-test modules/files.
+- Determine the implementation under test from the behavior asserted, rather
+  than the function called directly by the test. Parsing helpers, dispatchers,
+  and public analysis entry points may provide the test harness without owning
+  the asserted behavior. Place the test immediately after the implementation
+  responsible for that behavior. Split test groups that cover distinct
+  responsibilities.
+- Calling multiple functions or passing through multiple layers does not by
+  itself make a test an integration test. Use integration-test placement when
+  the asserted contract concerns the interaction between independent
+  components. Explain that contract when its scope is not apparent.
+- Mechanical adjacency and successful compilation do not establish
+  test-placement compliance. Review the assertions and identify the
+  implementation responsible for the behavior they verify.
 - **Split inherent impl blocks where needed (MUST).** An inherent `impl Type`
   block MUST be split into multiple inherent impl blocks when necessary to place
   a focused unit-test module immediately after the method or implementation it
@@ -441,6 +478,12 @@ Generated and vendored source files are excluded from the maintained-source scan
 - Public fields in `struct` are prohibited.  
   All access must go through constructors, getters, or methods to maintain
   encapsulation and allow future changes without breaking the public API.
+  This prohibition includes restricted field visibility such as `pub(crate)`,
+  `pub(super)`, and `pub(in ...)`. Do not widen field visibility to make code
+  relocation or cross-module access compile. Use the owner's existing
+  operations, or add the smallest necessary constructor, read accessor, or
+  domain operation. Do not replace direct field access with unrestricted
+  mutable access that exposes the same representation.
 - Constructors
   - For single-parameter cases, it is recommended to implement `From` or
     `TryFrom` instead of providing a constructor.
@@ -611,6 +654,10 @@ without tracing parsing details through the dispatch site.
 - Use `From` for infallible one-to-one conversions and `TryFrom` for fallible
   one-to-one conversions. Put the conversion implementation on the semantic
   type being constructed.
+- Moving an implementation across module boundaries is not sufficient if the
+  operation remains owned by an adapter or wrapper instead of the type
+  responsible for its result. Review both dependency direction and
+  implementation ownership.
 - Preserve the diagnostic guarantees supported by each parser. PostgreSQL
   conversions use `TryFromWithTokens` when `pg_query` supplies an AST location
   anchor: combine that anchor with the scanned token stream to retain reliable

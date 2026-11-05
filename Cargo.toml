@@ -139,6 +139,7 @@ sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
 stacker = "0.1.23"
 syn = { version = "3.0", features = ["extra-traits", "full", "visit"] }
 sysinfo = "0.38.4"
+tabled = { version = "0.22.0", default-features = false, features = ["std"] }
 tar = "0.4"
 tempfile = "3.27.0"
 testresult = "0.4"

@@ -69,6 +69,7 @@ sql-fun-codegen.workspace = true
 sql-fun-core.workspace = true
 sql-fun-server-api.workspace = true
 syn.workspace = true
+tabled.workspace = true
 tar.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true

@@ -24,11 +24,12 @@ impl DiagnosticRenderer {
     /// # Errors
     /// Returns an error when the selected theme cannot be loaded.
     pub fn from_args(args: &SqlFunArgs) -> Result<Self, anyhow::Error> {
-        let color = match args.term_color() {
-            TerminalColor::Auto => std::io::stderr().is_terminal(),
-            TerminalColor::Never => false,
-            TerminalColor::Ansi => true,
-        };
+        Self::for_terminal(args, std::io::stderr().is_terminal())
+    }
+
+    /// Resolve diagnostics for an output stream independently of stderr.
+    pub(crate) fn for_terminal(args: &SqlFunArgs, terminal: bool) -> Result<Self, anyhow::Error> {
+        let color = terminal_color(args.term_color(), terminal);
         let theme = if color {
             let path = match args.highlighter_theme_path() {
                 Some(path) if path.is_absolute() => path.to_path_buf(),
@@ -134,6 +135,28 @@ impl DiagnosticRenderer {
         let mut output = String::new();
         handler.render_report(&mut output, &*report)?;
         Ok(output)
+    }
+}
+
+pub(crate) const fn terminal_color(setting: TerminalColor, terminal: bool) -> bool {
+    match setting {
+        TerminalColor::Auto => terminal,
+        TerminalColor::Never => false,
+        TerminalColor::Ansi => true,
+    }
+}
+
+#[cfg(test)]
+mod test_terminal_color {
+    use crate::diagnostic::terminal_color;
+    use ::sql_fun_core::TerminalColor;
+
+    #[test]
+    fn honors_explicit_mode_and_each_stream_terminal() {
+        assert!(!terminal_color(TerminalColor::Auto, false));
+        assert!(terminal_color(TerminalColor::Auto, true));
+        assert!(!terminal_color(TerminalColor::Never, true));
+        assert!(terminal_color(TerminalColor::Ansi, false));
     }
 }
 

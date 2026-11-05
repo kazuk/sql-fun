@@ -91,10 +91,39 @@ async fn command_requests_access_only_for_default_analyze(
         );
     }
     let stdout = String::from_utf8(output.stdout)?;
-    assert_eq!(
-        stdout.matches("Column access (0):").count(),
-        if access { 2 } else { 0 }
+    assert!(!stdout.contains("Column access"));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::advice("advice case", "OK", 0)]
+#[case::warning("warning case", "WARN", 0)]
+#[case::mixed("mixed case", "ERROR", 1)]
+#[tokio::test]
+async fn analyze_status_and_diagnostic_duplication(
+    #[case] query: &str,
+    #[case] status: &str,
+    #[case] exit: i32,
+) -> ::testresult::TestResult {
+    let (output, _) =
+        test_helpers::request_peer::run(&["analyze", query, "--diagnostics-to-stderr"]).await?;
+    assert_eq!(output.status.code(), Some(exit));
+    let stdout = String::from_utf8(output.stdout)?;
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(
+        stdout.starts_with(&format!("{status} <inline SQL>")),
+        "{stdout}"
     );
+    assert_eq!(stdout.matches("<inline SQL>").count(), 1);
+    assert!(stdout.contains("parameter_constraint"), "{stdout}");
+    assert_eq!(
+        stdout.matches("parameter_constraint").count(),
+        stderr.matches("parameter_constraint").count()
+    );
+    assert!(!stderr.contains("<inline SQL>"));
+    assert!(!stderr.contains("  SQL"));
+    assert!(!stdout.contains("Complete"));
+    assert_eq!(stdout.contains("Statement 1"), query == "mixed case");
     Ok(())
 }
 
@@ -234,14 +263,13 @@ async fn analyze_reports_all_statements_and_continues_after_diagnostics() -> ::t
         .await?;
     assert_eq!(output.status.code(), Some(1));
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("PASS"), "{stdout}");
-    assert_eq!(stdout.matches("Query kind: Select").count(), 3, "{stdout}");
-    assert!(stdout.contains("statement 1"), "{stdout}");
-    assert!(stdout.contains("Complete: false"), "{stdout}");
-    assert!(stdout.contains("Complete: true"), "{stdout}");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("missing"), "{stderr}");
-    assert!(stderr.contains("statement 0"), "{stderr}");
+    assert!(stdout.contains("OK "), "{stdout}");
+    assert!(stdout.contains("ERROR "), "{stdout}");
+    assert!(stdout.contains("Statement 0"), "{stdout}");
+    assert!(stdout.contains("Statement 1"), "{stdout}");
+    assert!(stdout.contains("missing"), "{stdout}");
+    assert!(!stdout.contains("Complete:"), "{stdout}");
+    assert!(!stdout.contains("Query kind:"), "{stdout}");
     Ok(())
 }
 
@@ -360,27 +388,19 @@ async fn analyze_displays_statement_results_and_accesses() -> ::testresult::Test
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        stdout.contains(&format!("{}[0] (statement 0)", suite.selection())),
+        stdout.contains(&format!("OK {}[0]", suite.selection())),
         "{stdout}"
     );
-    assert!(stdout.contains("statement 1"), "{stdout}");
-    assert!(stdout.contains("Query kind: Select"), "{stdout}");
-    assert!(stdout.contains("Query kind: Insert"), "{stdout}");
-    assert!(stdout.contains("Complete: true"), "{stdout}");
-    assert!(stdout.contains("Executable SQL:"), "{stdout}");
+    assert!(stdout.contains("Statement 0"), "{stdout}");
+    assert!(stdout.contains("Statement 1"), "{stdout}");
+    assert!(stdout.contains("  SQL"), "{stdout}");
+    assert!(stdout.contains("Parameters"), "{stdout}");
     assert!(stdout.contains("$1"), "{stdout}");
-    assert!(stdout.contains("Parameters (1):"), "{stdout}");
-    assert!(stdout.contains("$1 id: pg_catalog.int4;"), "{stdout}");
-    assert!(
-        stdout.contains("[0] id: pg_catalog.int4; not_null"),
-        "{stdout}"
-    );
-    assert!(stdout.contains("Result columns (0):"), "{stdout}");
-    assert!(stdout.contains("public.events (Table)"), "{stdout}");
-    assert!(
-        stdout.contains("public.events.id (Table): SelectOutput"),
-        "{stdout}"
-    );
+    assert!(stdout.contains("pg_catalog.int4"), "{stdout}");
+    assert!(stdout.contains("Result columns"), "{stdout}");
+    assert!(stdout.contains("Column access"), "{stdout}");
+    assert!(stdout.contains("public.events.id"), "{stdout}");
+    assert!(stdout.contains("SelectOutput"), "{stdout}");
     Ok(())
 }
 
@@ -398,15 +418,11 @@ async fn analyze_displays_unavailable_results_for_parser_diagnostics() -> ::test
         .await?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(output.status.code(), Some(1));
-    assert!(stdout.contains("Query kind: unavailable"), "{stdout}");
-    assert!(stdout.contains("Complete: false"), "{stdout}");
-    assert!(
-        stdout.contains("Executable SQL:\n    unavailable"),
-        "{stdout}"
-    );
-    assert!(stdout.contains("Parameters (0):"), "{stdout}");
-    assert!(stdout.contains("Column access (0):"), "{stdout}");
-    assert!(String::from_utf8_lossy(&output.stderr).contains("query_parse"));
+    assert!(stdout.contains("  SQL\n    unavailable"), "{stdout}");
+    assert!(!stdout.contains("Parameters"), "{stdout}");
+    assert!(!stdout.contains("Column access"), "{stdout}");
+    assert!(stdout.contains("query_parse"), "{stdout}");
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("query_parse"));
     Ok(())
 }
 

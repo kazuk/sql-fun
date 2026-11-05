@@ -23,6 +23,17 @@ $ sql-fun test --help | grep -- '--no-column-access'
 [1]
 ```
 
+```scrut
+$ sql-fun analyze --help | grep -A1 -- '--diagnostics-to-stderr'
+      --diagnostics-to-stderr
+          Additionally write SQL diagnostics to stderr
+```
+
+```scrut
+$ sql-fun test --help | grep -- '--diagnostics-to-stderr'
+[1]
+```
+
 ## Required input and explicit schema levels
 
 ```scrut

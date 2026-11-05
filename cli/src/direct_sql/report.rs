@@ -1,3 +1,4 @@
+use crate::direct_sql::results::AnalysisReport;
 use std::{io::Write, path::Path, time::Duration};
 
 use ::quick_xml::{
@@ -10,6 +11,7 @@ pub(super) struct Case {
     duration: Duration,
     failures: Vec<String>,
     error: Option<String>,
+    analysis: Option<AnalysisReport>,
 }
 impl Case {
     pub(super) fn new(name: &str) -> Self {
@@ -18,7 +20,26 @@ impl Case {
             duration: Duration::ZERO,
             failures: Vec::new(),
             error: None,
+            analysis: None,
         }
+    }
+    pub(super) fn enable_analysis(&mut self) {
+        self.analysis = Some(AnalysisReport::default());
+    }
+    pub(super) const fn analysis_mut(&mut self) -> Option<&mut AnalysisReport> {
+        self.analysis.as_mut()
+    }
+    pub(super) fn print_analysis(&self, color: bool) -> std::io::Result<()> {
+        if let Some(report) = &self.analysis {
+            report.write(
+                &mut std::io::stdout().lock(),
+                &mut std::io::stderr().lock(),
+                &self.name,
+                self.error.as_deref(),
+                color,
+            )?;
+        }
+        Ok(())
     }
     pub(super) const fn set_duration(&mut self, duration: Duration) {
         self.duration = duration;
@@ -29,11 +50,21 @@ impl Case {
     pub(super) fn set_error(&mut self, error: &str) {
         self.error = Some(error.to_owned());
     }
+    pub(super) fn append_error(&mut self, error: &str) {
+        if let Some(existing) = &mut self.error {
+            existing.push('\n');
+            existing.push_str(error);
+        } else {
+            self.set_error(error);
+        }
+    }
     pub(super) const fn has_error(&self) -> bool {
         self.error.is_some()
     }
-    pub(super) const fn passed(&self) -> bool {
-        self.error.is_none() && self.failures.is_empty()
+    pub(super) fn passed(&self) -> bool {
+        self.error.is_none()
+            && self.failures.is_empty()
+            && self.analysis.as_ref().is_none_or(AnalysisReport::passed)
     }
     pub(super) fn print(&self) -> std::io::Result<()> {
         self.write_console(&mut std::io::stdout().lock())

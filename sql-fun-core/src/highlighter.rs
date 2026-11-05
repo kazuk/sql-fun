@@ -1,7 +1,7 @@
 /// terminal color settings
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, clap::ValueEnum)]
 pub enum TerminalColor {
-    /// enable ANSI Color if stderr is terminal
+    /// Enable ANSI color when the output stream is a terminal.
     Auto,
     /// disable ANSI Color (plain text)
     Never,

@@ -29,7 +29,7 @@ $ fixture="$SQL_FUN_API_FIXTURE"
 >     --metadata-file "$fixture/Cargo.toml" --datasource products "$@"
 > }
 > diagnostic_cli --term-color ansi --highlighter-theme "$fixture/yellow.toml" \
->   analyze --schema-level builtin \
+>   analyze --schema-level builtin --diagnostics-to-stderr \
 >   'SELECT missing AS result FROM (SELECT 1 AS id) AS src' \
 >   > "$fixture/identifier-analyze.out" 2> "$fixture/identifier-analyze.err"
 [1]
@@ -39,6 +39,8 @@ The diagnostic prose is uncolored around the name.
 
 ```scrut
 $ grep -F $'column \e[33mmissing\e[0m not found in query source' \
+>   "$fixture/identifier-analyze.out" > /dev/null
+> grep -F $'column \e[33mmissing\e[0m not found in query source' \
 >   "$fixture/identifier-analyze.err" > /dev/null
 ```
 
@@ -70,10 +72,10 @@ $ diagnostic_cli --term-color auto test "$fixture/identifier-cases.json" \
 >   --schema-level builtin > "$fixture/identifier-auto.out" \
 >   2> "$fixture/identifier-auto.err"
 > grep -F 'column missing not found in query source' \
->   "$fixture/identifier-never.err" > /dev/null
+>   "$fixture/identifier-never.out" > /dev/null
 > grep -F 'column missing not found in query source' \
 >   "$fixture/identifier-auto.err" > /dev/null
-> ! grep -F $'\e[' "$fixture/identifier-never.err"
+> ! grep -F $'\e[' "$fixture/identifier-never.out"
 > ! grep -F $'\e[' "$fixture/identifier-auto.err"
 ```
 
@@ -86,8 +88,8 @@ $ diagnostic_cli --term-color ansi --highlighter-theme "$fixture/yellow.toml" \
 
 ```scrut
 $ grep -F $'function not found: \e[33mpublic.no_such_function\e[0m' \
->   "$fixture/qualified.err" > /dev/null
-> grep -F $'\e[34mSELECT' "$fixture/qualified.err" > /dev/null
+>   "$fixture/qualified.out" > /dev/null
+> grep -F $'\e[34mSELECT' "$fixture/qualified.out" > /dev/null
 ```
 
 An explicit underline applies to the name in the message and to identifiers in
@@ -107,10 +109,10 @@ $ cat > "$fixture/underlined.toml" <<'TOML'
 
 ```scrut
 $ grep -F $'function not found: \e[33;4mpublic.no_such_function\e[0m' \
->   "$fixture/underlined.err" > /dev/null
+>   "$fixture/underlined.out" > /dev/null
 > grep -F $'\e[33;4mpublic\e[0m.\e[33;4mno_such_function\e[0m' \
->   "$fixture/underlined.err" > /dev/null
-> grep -F $'\e[34mSELECT' "$fixture/underlined.err" > /dev/null
+>   "$fixture/underlined.out" > /dev/null
+> grep -F $'\e[34mSELECT' "$fixture/underlined.out" > /dev/null
 ```
 
 Equal column and alias text is styled at both typed positions.
@@ -126,5 +128,5 @@ $ diagnostic_cli --term-color ansi --highlighter-theme "$fixture/yellow.toml" \
 ```scrut
 $ expected=$'column \e[33mmissing\e[0m not found in subquery '
 > expected+=$'\e[33mmissing\e[0m'
-> grep -F "$expected" "$fixture/repeated.err" > /dev/null
+> grep -F "$expected" "$fixture/repeated.out" > /dev/null
 ```

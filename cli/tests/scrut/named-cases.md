@@ -42,10 +42,7 @@ PASS FIXTURE/named.json::expected-binding-error
 ```
 
 ```scrut
-$ grep -F 'named.json[1]::expected-binding-error (statement 0)' \
-> "$SQL_FUN_API_FIXTURE/named.stderr" | \
-> sed "s|$SQL_FUN_API_FIXTURE|FIXTURE|g"
-FIXTURE/named.json[1]::expected-binding-error (statement 0)
+$ test ! -s "$SQL_FUN_API_FIXTURE/named.stderr"
 ```
 
 ```scrut

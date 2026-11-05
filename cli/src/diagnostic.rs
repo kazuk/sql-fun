@@ -4,9 +4,12 @@ use self::sql_highlighter::SqlHighlighter;
 use crate::highlighter_theme::HighlighterTheme;
 use std::io::IsTerminal;
 
+use ::owo_colors::OwoColorize;
 use ::sql_fun_core::{
     SqlFunArgs, TerminalColor, TokenStream,
-    analysis_problem::{AnalysisProblem, DiagnosticMessage, DiagnosticSeverity},
+    analysis_problem::{
+        AnalysisProblem, DiagnosticMessage, DiagnosticMessageFragment, DiagnosticSeverity,
+    },
 };
 
 /// CLI-owned diagnostic rendering, including terminal and theme configuration.
@@ -56,6 +59,28 @@ impl DiagnosticRenderer {
         )
     }
 
+    fn message(&self, problem: &AnalysisProblem) -> Result<(String, bool), anyhow::Error> {
+        if !self.color {
+            return Ok((problem.diagnostic_message(), false));
+        }
+        let style = self.theme.identifier().style()?;
+        let mut message = String::new();
+        let mut has_names = false;
+        for fragment in problem.diagnostic_fragments() {
+            use std::fmt::Write;
+            match fragment {
+                DiagnosticMessageFragment::Text(text) => message.push_str(&text),
+                name => {
+                    has_names = true;
+                    for part in name.as_str().split_inclusive(char::is_whitespace) {
+                        write!(message, "{}", part.style(style))?;
+                    }
+                }
+            }
+        }
+        Ok((message, has_names))
+    }
+
     /// Render a structured problem even when source positions or tokens are absent.
     /// Labels are attached only to the exact retained statement source.
     pub(crate) fn render_problem(
@@ -71,7 +96,8 @@ impl DiagnosticRenderer {
             DiagnosticSeverity::Warning => ::miette::Severity::Warning,
             DiagnosticSeverity::Advice => ::miette::Severity::Advice,
         };
-        let mut diagnostic = ::miette::MietteDiagnostic::new(problem.diagnostic_message())
+        let (message, has_names) = self.message(problem)?;
+        let mut diagnostic = ::miette::MietteDiagnostic::new(message)
             .with_code(problem.code())
             .with_severity(severity);
         if source.is_some()
@@ -96,6 +122,11 @@ impl DiagnosticRenderer {
             ::miette::GraphicalTheme::unicode_nocolor()
         };
         let mut handler = ::miette::GraphicalReportHandler::new().with_theme(theme);
+        if has_names {
+            // Miette's continuation indent resets ANSI styles. Keep each styled
+            // word intact so the following word can restore its identifier style.
+            handler = handler.with_break_words(false);
+        }
         if let Some(tokens) = tokens {
             handler =
                 handler.with_syntax_highlighting(SqlHighlighter::from_theme(&self.theme, tokens)?);

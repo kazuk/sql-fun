@@ -172,6 +172,72 @@ diagnostic_text!(Kind);
 diagnostic_text!(TypeName);
 diagnostic_text!(DebugName);
 
+/// A terminal-independent piece of a diagnostic message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiagnosticMessageFragment<'a> {
+    /// Ordinary prose or an untyped value.
+    Text(String),
+    /// A qualified name.
+    FullName(&'a FullName),
+    /// A column name.
+    ColumnName(&'a ColumnName),
+    /// A table name.
+    TableName(&'a TableName),
+    /// An alias.
+    AliasName(&'a AliasName),
+    /// A common table expression name.
+    CteName(&'a CteName),
+    /// A view name.
+    ViewName(&'a ViewName),
+    /// A type name.
+    TypeName(&'a TypeName),
+    /// A retained diagnostic name.
+    DebugName(&'a DebugName),
+}
+
+impl DiagnosticMessageFragment<'_> {
+    /// Text displayed for this fragment without terminal styling.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Text(value) => value,
+            Self::FullName(value) => value.as_str(),
+            Self::ColumnName(value) => value.as_str(),
+            Self::TableName(value) => value.as_str(),
+            Self::AliasName(value) => value.as_str(),
+            Self::CteName(value) => value.as_str(),
+            Self::ViewName(value) => value.as_str(),
+            Self::TypeName(value) => value.as_str(),
+            Self::DebugName(value) => value.as_str(),
+        }
+    }
+}
+
+impl From<String> for DiagnosticMessageFragment<'_> {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for DiagnosticMessageFragment<'_> {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_owned())
+    }
+}
+
+macro_rules! name_fragment {
+    ($($name:ident),* $(,)?) => {$ (
+        impl<'a> From<&'a $name> for DiagnosticMessageFragment<'a> {
+            fn from(value: &'a $name) -> Self {
+                Self::$name(value)
+            }
+        }
+    )*};
+}
+name_fragment!(
+    FullName, ColumnName, TableName, AliasName, CteName, ViewName, TypeName, DebugName
+);
+
 /// Diagnostic text for an ownership lookup outcome.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]

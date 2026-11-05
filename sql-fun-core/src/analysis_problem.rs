@@ -60,9 +60,9 @@ pub use self::{
     update::{UpdateProblem, UpdateProblemKind},
     values::{
         AExprKind, AliasName, ColumnName, CteName, DebugName, DefElemKey, DiagnosticLabel,
-        DiagnosticMetadata, DiagnosticSeverity, FullName, Kind, OperatorName, OwnershipIdentity,
-        OwnershipLookup, RuleIdentity, StringSpan, TableName, TriggerIdentity, TypeDefinition,
-        TypeName, TypeReference, ViewName,
+        DiagnosticMessageFragment, DiagnosticMetadata, DiagnosticSeverity, FullName, Kind,
+        OperatorName, OwnershipIdentity, OwnershipLookup, RuleIdentity, StringSpan, TableName,
+        TriggerIdentity, TypeDefinition, TypeName, TypeReference, ViewName,
     },
     view::ViewProblem,
 };
@@ -70,6 +70,18 @@ pub use self::{
 pub trait DiagnosticMessage {
     /// Describe the problem using the facts retained by its semantic payload.
     fn diagnostic_message(&self) -> String;
+
+    /// Message fragments in display order, retaining identifier domain types.
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        vec![DiagnosticMessageFragment::Text(self.diagnostic_message())]
+    }
+}
+
+fn fragments_text(fragments: &[DiagnosticMessageFragment<'_>]) -> String {
+    fragments
+        .iter()
+        .map(DiagnosticMessageFragment::as_str)
+        .collect()
 }
 /// Semantic analysis problems
 #[allow(clippy::large_enum_variant)]
@@ -639,15 +651,16 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::ParameterConstraint(problem) => problem.diagnostic_message(),
             Self::NameResolution(problem) => problem.diagnostic_message(),
             Self::OverloadResolution(problem) => problem.diagnostic_message(),
-            Self::ForeignKeyReferencedPrimaryKeyMissing(table) => {
-                format!("referenced table {table} has no primary key")
+            Self::ForeignKeyReferencedPrimaryKeyMissing(_)
+            | Self::ArgumentTypeMismatch(..)
+            | Self::MemberAccessRequiresCompositeType(..)
+            | Self::FunctionArgImplicitCastNotFound(..)
+            | Self::ParameterTypeMismatchForTableFunction(..) => {
+                fragments_text(&self.diagnostic_fragments())
             }
             Self::ExtensionNotFound(name) => format!("extension not found: {name}"),
             Self::NullabilityUnknown(name) => {
                 format!("nullability could not be determined for {name}")
-            }
-            Self::ArgumentTypeMismatch(name, index) => {
-                format!("argument {index} has an incompatible type for {name}")
             }
             Self::DuplicateDefElemKey(key) => format!("duplicate definition option: {key}"),
             Self::ExplicitCastNotDefined(source, target) => {
@@ -674,19 +687,8 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::ArrayIndexTypeMismatch(_, ty) => {
                 format!("array subscript has an incompatible type: {ty}")
             }
-            Self::MemberAccessRequiresCompositeType(name, member) => {
-                format!("member {member} of {name} requires a composite type")
-            }
-            Self::FunctionArgImplicitCastNotFound(name, index, ty, expression) => {
-                format!(
-                    "argument {index} of {name} ({expression}) cannot be implicitly cast to {ty}"
-                )
-            }
             Self::ImplicitCastNotFound(source, target) => {
                 format!("implicit cast from {source} to {target} is not defined")
-            }
-            Self::ParameterTypeMismatchForTableFunction(name, arguments) => {
-                format!("no matching table-function signature for {name} with {arguments}")
             }
             Self::UnreachableCoalesceArgument(..) => {
                 "COALESCE argument is unreachable after a non-null operand".to_owned()
@@ -696,6 +698,45 @@ impl DiagnosticMessage for AnalysisProblem {
                     "COALESCE operands do not have a common implicit result type: {expressions}"
                 )
             }
+        }
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        match self {
+            Self::NameResolution(problem) => problem.diagnostic_fragments(),
+            Self::OverloadResolution(problem) => problem.diagnostic_fragments(),
+            Self::Index(problem) => problem.diagnostic_fragments(),
+            Self::AlterColumn(problem) => problem.diagnostic_fragments(),
+            Self::Creation(problem) => problem.diagnostic_fragments(),
+            Self::View(problem) => problem.diagnostic_fragments(),
+            Self::Rule(problem) => problem.diagnostic_fragments(),
+            Self::Trigger(problem) => problem.diagnostic_fragments(),
+            Self::Delete(problem) => problem.diagnostic_fragments(),
+            Self::ForeignKeyReferencedPrimaryKeyMissing(table) => vec![
+                "referenced table ".into(),
+                table.into(),
+                " has no primary key".into(),
+            ],
+            Self::ArgumentTypeMismatch(name, index) => vec![
+                format!("argument {index} has an incompatible type for ").into(),
+                name.into(),
+            ],
+            Self::MemberAccessRequiresCompositeType(name, member) => vec![
+                format!("member {member} of ").into(),
+                name.into(),
+                " requires a composite type".into(),
+            ],
+            Self::FunctionArgImplicitCastNotFound(name, index, ty, expression) => vec![
+                format!("argument {index} of ").into(),
+                name.into(),
+                format!(" ({expression}) cannot be implicitly cast to {ty}").into(),
+            ],
+            Self::ParameterTypeMismatchForTableFunction(name, arguments) => vec![
+                "no matching table-function signature for ".into(),
+                name.into(),
+                format!(" with {arguments}").into(),
+            ],
+            _ => vec![self.diagnostic_message().into()],
         }
     }
 }

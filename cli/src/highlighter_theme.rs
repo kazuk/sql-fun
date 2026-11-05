@@ -199,6 +199,11 @@ impl HighlighterStyle {
         let style = if self.bold { style.bold() } else { style };
         let style = if self.dimmed { style.dimmed() } else { style };
         let style = if self.italic { style.italic() } else { style };
+        let style = if self.underline {
+            style.underline()
+        } else {
+            style
+        };
         let style = if self.strikethrough {
             style.strikethrough()
         } else {

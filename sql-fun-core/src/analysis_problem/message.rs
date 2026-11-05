@@ -3,9 +3,10 @@ use std::fmt::Write;
 
 use crate::analysis_problem::{
     AlterColumnProblem, ArrayProblem, CallArgumentProblem, ColumnAttributeProblem, CreationProblem,
-    DeleteProblem, DiagnosticMessage, IndexProblem, InsertProblem, MinMaxProblem, OwnershipProblem,
-    ParameterConstraintProblem, QueryProblem, RuleDefinitionProblem, RuleProblem,
-    TableFunctionProblem, TriggerProblem, UpdateProblem, ViewProblem,
+    DeleteProblem, DiagnosticMessage, DiagnosticMessageFragment, IndexProblem, InsertProblem,
+    MinMaxProblem, OwnershipProblem, ParameterConstraintProblem, QueryProblem,
+    RuleDefinitionProblem, RuleProblem, TableFunctionProblem, TriggerProblem, UpdateProblem,
+    ViewProblem, fragments_text,
 };
 
 impl DiagnosticMessage for ArrayProblem {
@@ -70,17 +71,21 @@ impl DiagnosticMessage for CallArgumentProblem {
 
 impl DiagnosticMessage for IndexProblem {
     fn diagnostic_message(&self) -> String {
-        let mut message = format!("{}: {}", self.name(), self.kind().message());
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        let mut suffix = format!(": {}", self.kind().message());
         if let Some(parameter) = self.parameter_name() {
-            let _ = write!(message, " ({parameter})");
+            let _ = write!(suffix, " ({parameter})");
         }
         if let Some(column) = self.column() {
-            let _ = write!(message, " (column {column})");
+            let _ = write!(suffix, " (column {column})");
         }
         if let Some(value) = self.value() {
-            let _ = write!(message, ": {value}");
+            let _ = write!(suffix, ": {value}");
         }
-        message
+        vec![self.name().into(), suffix.into()]
     }
 }
 
@@ -119,30 +124,43 @@ impl DiagnosticMessage for AlterColumnProblem {
 
 impl DiagnosticMessage for ColumnAttributeProblem {
     fn diagnostic_message(&self) -> String {
-        format!(
-            "{}.{}: {}",
-            self.table(),
-            self.column(),
-            self.reason().diagnostic_message()
-        )
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        vec![
+            self.table().into(),
+            ".".into(),
+            self.column().into(),
+            format!(": {}", self.reason().diagnostic_message()).into(),
+        ]
     }
 }
 
 impl DiagnosticMessage for CreationProblem {
     fn diagnostic_message(&self) -> String {
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
         if let (Some(requested), Some(existing)) = (self.requested_kind(), self.existing_kind()) {
-            format!(
-                "cannot create {requested} {}: name is occupied by {existing}",
-                self.name()
-            )
+            vec![
+                format!("cannot create {requested} ").into(),
+                self.name().into(),
+                format!(": name is occupied by {existing}").into(),
+            ]
         } else if let Some(container) = self.container() {
-            format!("constraint {} already exists on {container}", self.name())
+            vec![
+                "constraint ".into(),
+                self.name().into(),
+                " already exists on ".into(),
+                container.into(),
+            ]
         } else {
-            format!(
-                "conflicting {} definition: {}",
-                self.namespace(),
-                self.name()
-            )
+            vec![
+                format!("conflicting {} definition: ", self.namespace()).into(),
+                self.name().into(),
+            ]
         }
     }
 }
@@ -155,13 +173,19 @@ impl DiagnosticMessage for RuleDefinitionProblem {
 
 impl DiagnosticMessage for RuleProblem {
     fn diagnostic_message(&self) -> String {
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
         match self {
-            Self::Target(target) => {
-                format!("rule target {target} does not resolve to a supported relation")
-            }
-            Self::Duplicate(identity) => format!("rule {identity} already exists"),
-            Self::Missing(identity) => format!("rule {identity} does not exist"),
-            Self::Definition(problem) => problem.diagnostic_message(),
+            Self::Target(target) => vec![
+                "rule target ".into(),
+                target.into(),
+                " does not resolve to a supported relation".into(),
+            ],
+            Self::Duplicate(identity) => vec![format!("rule {identity} already exists").into()],
+            Self::Missing(identity) => vec![format!("rule {identity} does not exist").into()],
+            Self::Definition(problem) => problem.diagnostic_fragments(),
         }
     }
 }
@@ -180,40 +204,62 @@ impl DiagnosticMessage for OwnershipProblem {
 
 impl DiagnosticMessage for TriggerProblem {
     fn diagnostic_message(&self) -> String {
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
         match self {
-            Self::Target(target) => {
-                format!("trigger target {target} does not resolve to a supported relation")
+            Self::Target(target) => vec![
+                "trigger target ".into(),
+                target.into(),
+                " does not resolve to a supported relation".into(),
+            ],
+            Self::Duplicate(identity) => vec![format!("trigger {identity} already exists").into()],
+            Self::Missing(identity) => vec![format!("trigger {identity} does not exist").into()],
+            Self::MissingName(name) => {
+                vec!["trigger ".into(), name.into(), " does not exist".into()]
             }
-            Self::Duplicate(identity) => format!("trigger {identity} already exists"),
-            Self::Missing(identity) => format!("trigger {identity} does not exist"),
-            Self::MissingName(name) => format!("trigger {name} does not exist"),
-            Self::Column(target, column) => {
-                format!("event column {column} does not exist on trigger target {target}")
-            }
-            Self::Function(name) => {
-                format!("trigger function {name} is missing or is not usable as a trigger function")
-            }
-            Self::Options(target, rule) => {
-                format!("trigger {target} has incompatible options: {rule}")
-            }
+            Self::Column(target, column) => vec![
+                format!("event column {column} does not exist on trigger target ").into(),
+                target.into(),
+            ],
+            Self::Function(name) => vec![
+                "trigger function ".into(),
+                name.into(),
+                " is missing or is not usable as a trigger function".into(),
+            ],
+            Self::Options(target, rule) => vec![
+                "trigger ".into(),
+                target.into(),
+                format!(" has incompatible options: {rule}").into(),
+            ],
         }
     }
 }
 
 impl DiagnosticMessage for ViewProblem {
     fn diagnostic_message(&self) -> String {
+        fragments_text(&self.diagnostic_fragments())
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
         match self {
-            Self::InvalidTarget(view) => {
-                format!("declaration target {view} is not an ordinary view")
-            }
-            Self::UnknownDefaultColumn(view, column) => {
-                format!("default column {column} does not exist on {view}")
-            }
-            Self::MissingMetadata(view) => format!(
-                "the semantic definition required for {view} is missing; reload the complete schema declarations"
-            ),
+            Self::InvalidTarget(view) => vec![
+                "declaration target ".into(),
+                view.into(),
+                " is not an ordinary view".into(),
+            ],
+            Self::UnknownDefaultColumn(view, column) => vec![
+                format!("default column {column} does not exist on ").into(),
+                view.into(),
+            ],
+            Self::MissingMetadata(view) => vec![
+                "the semantic definition required for ".into(),
+                view.into(),
+                " is missing; reload the complete schema declarations".into(),
+            ],
             Self::InvalidAlter => {
-                "PostgreSQL does not permit ALTER trigger/rule state on views".to_owned()
+                vec!["PostgreSQL does not permit ALTER trigger/rule state on views".into()]
             }
         }
     }
@@ -228,6 +274,10 @@ impl DiagnosticMessage for InsertProblem {
 impl DiagnosticMessage for DeleteProblem {
     fn diagnostic_message(&self) -> String {
         self.message()
+    }
+
+    fn diagnostic_fragments(&self) -> Vec<DiagnosticMessageFragment<'_>> {
+        self.fragments()
     }
 }
 

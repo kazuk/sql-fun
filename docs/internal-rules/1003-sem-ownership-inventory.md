@@ -938,8 +938,12 @@ collisions, or metadata changes. Their normalized identity SHA-256 values are
 respectively
 `41e0aa28523a7699b4aa097afb99981ec3a6b67ef666aca3517579a030d199e0` and
 `34b0d935101c074620dd59db9957888f0d270ec0926ebf81768b17a7298f8808`.
-Packaging, SemVer, and installed-distribution checks are pending for the
-implementation commit.
+Packaging and SemVer/release-intent checks passed for implementation commit
+`50167cc7039aeab39acf2689445038a5e6b7f94f`. Package layout, metadata, checksums,
+and identical executables were verified. Executables extracted from that
+commit's generated archive passed all 3,064 SQL regression cases in 166 groups.
+The subsequent documentation-only commit records these results; the tested
+Rust sources are unchanged.
 At planning, available capacity was 78 GiB against an estimated additional
 20 GiB, meeting the repository baseline. Contributor commands, maintained
 execution paths, package versions, and release intents remain unchanged.

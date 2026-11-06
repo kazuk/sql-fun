@@ -3233,6 +3233,7 @@ dependencies = [
  "notify",
  "rand",
  "rstest",
+ "same-file",
  "scopeguard",
  "serde",
  "serde_json",

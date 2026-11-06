@@ -17,6 +17,9 @@ doc = false
 [features]
 sqlite = ["sql-fun-core/sqlite", "sql-fun-sqlast/sqlite", "sql-fun-server-api/sqlite"]
 
+[target.'cfg(windows)'.dependencies]
+same-file = "1.0.6"
+
 [dependencies]
 clap = { workspace = true }
 derive-getters = { workspace = true }

@@ -143,7 +143,7 @@ Datasource configuration and the installed builtin catalog are still required.
 The existing initialization API currently supports PostgreSQL schema contexts.
 
 Server connection uses the same `USER`, `SQL_FUN_SERVER`, and
-`SQL_FUN_SERVER_COMMAND` settings as [`sql-fun api`](api.md).
+`SQL_FUN_SERVER_COMMAND` settings as [`sql-fun api`](../api/cli-api.md).
 
 The command exits with status 0 if all analysis completes without error-level
 diagnostics. Warnings and advice alone succeed. Error diagnostics and execution

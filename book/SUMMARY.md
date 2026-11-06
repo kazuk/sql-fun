@@ -78,7 +78,6 @@
 - [Test SQL contracts](cli/test.md)
 <!-- Empty links mark draft chapters in mdBook. -->
 <!-- rumdl-disable MD042 -->
-- [api](./cli/api.md)
 - [api-help]()
 <!-- rumdl-enable MD042 -->
 
@@ -87,6 +86,7 @@
 - [Server API Reference](api/server-api.md)
   - [Connection and authentication](api/initialize.md)
   - [Schema context and query analysis](api/check-analysis-design.md)
+  - [Using the Server API via sql-fun api](api/cli-api.md)
   - [Method reference](api/methods.md)
 
 ## SQL diagnostic reference

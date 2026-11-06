@@ -82,14 +82,12 @@
 - [api-help]()
 <!-- rumdl-enable MD042 -->
 
-## `sql-fun` server api reference
+## Server API
 
-- [Connection and authentication](api/initialize.md)
-- [Schema context and query analysis](api/check-analysis-design.md)
-
-### Method reference
-<!-- BEGIN GENERATED SERVER API METHODS -->
-<!-- END GENERATED SERVER API METHODS -->
+- [Server API Reference](api/server-api.md)
+  - [Connection and authentication](api/initialize.md)
+  - [Schema context and query analysis](api/check-analysis-design.md)
+  - [Method reference](api/methods.md)
 
 ## SQL diagnostic reference
 

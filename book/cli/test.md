@@ -20,7 +20,7 @@ sql-fun [COMMON OPTIONS] test [OPTIONS] <INPUT>
 ```
 
 `INPUT` is a filename, optionally followed by `#JSONPath`.
-[Common options](README.md#common-options) precede `test`.
+[Common options](index.md#common-options) precede `test`.
 
 | Option | Behavior |
 | --- | --- |

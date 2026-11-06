@@ -8,7 +8,7 @@ catalog; it does not execute the SQL or require a live database or `cargo-expand
 sql-fun [COMMON OPTIONS] analyze [OPTIONS] [SQL]
 ```
 
-Use [common options](README.md#common-options) before `analyze`. Exactly one of
+Use [common options](index.md#common-options) before `analyze`. Exactly one of
 `SQL` or `--sql-file <FILE[#JSONPath]>` is required. `--schema-level` accepts
 `builtin`, `default`, `extensions`, or `project` (the default).
 `--no-column-access` omits access analysis, and `--diagnostics-to-stderr` copies

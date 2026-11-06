@@ -165,7 +165,7 @@ selection and must be visible to the server.
 sql-fun [COMMON OPTIONS] check [OPTIONS]
 ```
 
-There are no positional arguments. Place [common options](README.md#common-options)
+There are no positional arguments. Place [common options](index.md#common-options)
 before `check`. The command returns 0 on success, 1 on validation or operational
 failure, and 2 for invalid CLI usage. A successful check does not guarantee that
 the application compiles, as described above. `-h` / `--help` prints help.

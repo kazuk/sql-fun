@@ -8,7 +8,7 @@ sql-fun [COMMON OPTIONS] api [OPTIONS]
 
 Install `sql-fun-server` and make it available on `PATH`, or set
 `SQL_FUN_SERVER` to its executable path. A valid user namespace is required.
-The [common options](README.md#common-options) precede `api`; project and schema
+The [common options](index.md#common-options) precede `api`; project and schema
 settings are not used by the bridge.
 
 | Option | Environment | Behavior |

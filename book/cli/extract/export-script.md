@@ -16,4 +16,4 @@ sql-fun extract export-script > export-extensions.sh
 The command exits with status 0 on success, nonzero on output failure, and 2
 for invalid CLI usage. Running the resulting script has separate prerequisites;
 see [the extraction guide](../extract.md#obtain-extension-files-from-an-administrator).
-[Common options](../README.md#common-options) are specified before `extract`.
+[Common options](../index.md#common-options) are specified before `extract`.

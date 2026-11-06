@@ -69,7 +69,7 @@
 
 ## CLI Reference
 
-- [CLI Reference and common options](cli/README.md)
+- [CLI Reference and common options](cli/index.md)
   - [init](cli/init.md)
   - [analyze](cli/analyze.md)
   - [test](cli/test.md)

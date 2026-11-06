@@ -162,11 +162,11 @@ impl CheckArgs {
         progress.phase("Extracting SQL queries from selected Cargo targets")?;
         let mut requirements = Vec::new();
         let members = if self.workspace {
-            Self::dependent_members()?
+            self.dependent_members()?
         } else if let Some(member) = &self.package {
             vec![member.clone()]
         } else {
-            Self::default_packages()?
+            self.default_packages()?
         };
         for member in members {
             requirements.extend(self.expand_member(&member, common_args).await?);
@@ -312,7 +312,26 @@ impl CheckArgs {
         member: &str,
         common_args: &SqlFunArgs,
     ) -> Result<::sql_fun_codegen::QueryRequirements, anyhow::Error> {
+        let file = self.cargo_expand(member, common_args)?.exec().await?;
+        let requirements = sql_fun_codegen::QueryRequirements::extract(&file).map_err(|error| {
+            anyhow::anyhow!("failed to read query requirements for {member}: {error}")
+        })?;
+        log::debug!(
+            "extracted {} query requirements from {member}",
+            requirements.len()
+        );
+        Ok(requirements)
+    }
+
+    fn cargo_expand(
+        &self,
+        member: &str,
+        common_args: &SqlFunArgs,
+    ) -> Result<CargoExpand, anyhow::Error> {
         let mut cargo_expand_command = CargoExpand::new(member, common_args)?;
+        for option in self.cargo_options() {
+            cargo_expand_command.set(&option, true);
+        }
         cargo_expand_command.set("--lib", self.lib);
         cargo_expand_command.set("--tests", self.tests);
         cargo_expand_command.set_value("--bin", self.bin.as_deref());
@@ -348,19 +367,94 @@ impl CheckArgs {
                 })
                 .transpose()?,
         );
-        let file = cargo_expand_command.exec().await?;
-        let requirements = sql_fun_codegen::QueryRequirements::extract(&file).map_err(|error| {
-            anyhow::anyhow!("failed to read query requirements for {member}: {error}")
-        })?;
-        log::debug!(
-            "extracted {} query requirements from {member}",
-            requirements.len()
-        );
-        Ok(requirements)
+        Ok(cargo_expand_command)
     }
 
-    fn dependent_members() -> Result<Vec<String>, anyhow::Error> {
-        let metadata = MetadataCommand::new().no_deps().exec()?;
+    fn cargo_metadata(&self) -> MetadataCommand {
+        let mut command = MetadataCommand::new();
+        command.no_deps().other_options(self.cargo_options());
+        command
+    }
+
+    fn cargo_options(&self) -> Vec<String> {
+        let mut options = Vec::new();
+        if self.frozen {
+            options.push("--frozen".to_owned());
+        }
+        if self.locked {
+            options.push("--locked".to_owned());
+        }
+        if self.offline {
+            options.push("--offline".to_owned());
+        }
+        options
+    }
+}
+
+#[cfg(test)]
+mod test_cargo_commands {
+    use crate::check::CheckArgs;
+    use ::clap::Parser;
+    use ::sql_fun_core::SqlFunArgs;
+
+    #[rstest::rstest]
+    #[case::none(&[])]
+    #[case::frozen(&["--frozen"])]
+    #[case::locked(&["--locked"])]
+    #[case::offline(&["--offline"])]
+    #[case::frozen_locked(&["--frozen", "--locked"])]
+    #[case::frozen_offline(&["--frozen", "--offline"])]
+    #[case::locked_offline(&["--locked", "--offline"])]
+    #[case::combined(&["--frozen", "--locked", "--offline"])]
+    fn forwards_cargo_options(#[case] options: &[&str]) {
+        let args = CheckArgs::try_parse_from(["check"].into_iter().chain(options.iter().copied()))
+            .unwrap();
+        let metadata = args.cargo_metadata().cargo_command();
+        let mut metadata_args: Vec<_> = metadata
+            .get_args()
+            .filter(|arg| matches!(arg.to_str(), Some("--frozen" | "--locked" | "--offline")))
+            .collect();
+        let expected: Vec<_> = options.iter().map(std::ffi::OsStr::new).collect();
+        metadata_args.sort_unstable();
+        assert_eq!(metadata_args, expected);
+
+        let project = ::tempfile::tempdir().unwrap();
+        let metadata_file = project.path().join("Cargo.toml");
+        std::fs::write(
+            &metadata_file,
+            r#"[package]
+name = "test"
+version = "0.1.0"
+"#,
+        )
+        .unwrap();
+        let common_args = SqlFunArgs::builder(&std::collections::HashMap::new())
+            .unwrap()
+            .sql_fun_home(project.path())
+            .metadata_file(metadata_file.to_str().unwrap())
+            .build()
+            .unwrap();
+        for member in ["first", "second"] {
+            let expansion = args.cargo_expand(member, &common_args).unwrap();
+            let command_args: Vec<_> = expansion.0.as_std().get_args().collect();
+            assert!(
+                command_args
+                    .windows(2)
+                    .any(|pair| pair == ["--package", member])
+            );
+            let mut expansion_args: Vec<_> = command_args
+                .into_iter()
+                .filter(|arg| matches!(arg.to_str(), Some("--frozen" | "--locked" | "--offline")))
+                .collect();
+            expansion_args.sort_unstable();
+            assert_eq!(expansion_args, expected);
+        }
+    }
+}
+
+impl CheckArgs {
+    fn dependent_members(&self) -> Result<Vec<String>, anyhow::Error> {
+        let metadata = self.cargo_metadata().exec()?;
         let mut deps_members = Vec::new();
         for member in metadata.workspace_members {
             if let Some(member_package) = metadata.packages.iter().find(|p| p.id == member)
@@ -372,8 +466,8 @@ impl CheckArgs {
         Ok(deps_members)
     }
 
-    fn default_packages() -> Result<Vec<String>, anyhow::Error> {
-        let metadata = MetadataCommand::new().no_deps().exec()?;
+    fn default_packages(&self) -> Result<Vec<String>, anyhow::Error> {
+        let metadata = self.cargo_metadata().exec()?;
         let mut deps_members = Vec::new();
         for package in metadata.workspace_default_packages() {
             if Self::depends_sql_fun(package) {

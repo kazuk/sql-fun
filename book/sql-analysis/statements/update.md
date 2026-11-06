@@ -49,7 +49,7 @@ database was built with SQLITE_ENABLE_UPDATE_DELETE_LIMIT. PostgreSQL 18
 renamed/destination RETURNING row-image binding remains unimplemented
 ([#621](https://github.com/kazuk/sql-fun/issues/621)). Supported UPDATE analysis
 does not establish support for ON CONFLICT DO UPDATE, which has its own
-unimplemented INSERT path ([#474](https://github.com/kazuk/sql-fun/issues/474)).
+unimplemented INSERT path ([#1024](https://github.com/kazuk/sql-fun/issues/1024)).
 
 ## Diagnostics
 

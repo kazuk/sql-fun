@@ -130,6 +130,12 @@ distinct from analysis support.
 
 ### Remaining comparison and operator limitations
 
+Parameter constraint analysis for some `ANY`/`ALL` array comparisons and `NULLIF`
+expressions is unimplemented and can terminate analysis
+([#513](https://github.com/kazuk/sql-fun/issues/513)). Parameter-free support
+for these operators does not establish support for those parameter-dependent
+paths.
+
 SQLite's table-name shorthand `value IN table_name` and `NOT IN table_name`
 remain unimplemented and can terminate analysis
 ([#496](https://github.com/kazuk/sql-fun/issues/496)). The supported value-list

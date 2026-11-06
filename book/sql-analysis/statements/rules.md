@@ -22,7 +22,8 @@ remain a separately tracked semantic boundary (#621), rather than binding the
 enclosing rule row.
 
 Actions use the common query/INSERT/UPDATE/DELETE analyzers. Their ordinary
-limitations apply, including ON CONFLICT DO UPDATE (#474). Within rules, EXISTS
+limitations apply, including ON CONFLICT DO UPDATE
+([#1024](https://github.com/kazuk/sql-fun/issues/1024)). Within rules, EXISTS
 (#570), quantified/row (#571) and multi-expression (#573) subquery semantics are
 explicitly rejected pending their implementations. Scalar, correlated and ARRAY
 subqueries use the shared query-expression support rules. Exact result

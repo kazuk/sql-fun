@@ -63,6 +63,7 @@ def check_navigation(root, paths):
         parent: (),
         "api/initialize.html": (parent,),
         "api/check-analysis-design.html": (parent,),
+        "api/cli-api.html": (parent,),
         methods: (parent,),
     }
     expected.update({f"api/methods/{path.name}": (parent, methods) for path in paths})

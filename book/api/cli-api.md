@@ -1,8 +1,11 @@
-# `sql-fun api`
+# Using the Server API via `sql-fun api`
 
 Stream JSON Lines requests to the authenticated, shared per-user
 `sql-fun-server`. Install both `sql-fun-cli` and `sql-fun-server` and make the
 server executable available on `PATH`, or set `SQL_FUN_SERVER` to its path.
+The [method reference](methods.md) describes the server's declared request and
+result schemas. For a direct connection without the CLI bridge, see
+[connection and authentication](initialize.md).
 
 ```sh
 printf '%s\n' '{"method":"echo","params":{"hello":[1,null,true]}}' |
@@ -87,10 +90,12 @@ values, including null. Scalar or null parameters are rejected. Other accepted
 method names are `initialize_schema_context`, `read_collection`,
 `release_collection`, `tokenize_sql`, `analyze_query`, `list_object`, and
 `describe_table`, with parameters matching their public API argument types.
-Currently `echo`, `tokenize_sql`, and `initialize_schema_context` are dispatched
-by the server, and schema-context
-initialization remains incomplete. Other declared methods can return a server
-method error; `echo` verifies the transport, not SQL analysis functionality.
+The server dispatches `echo`, `tokenize_sql`, `initialize_schema_context`,
+`read_collection`, `release_collection`, and `analyze_query`. The CLI accepts
+`list_object` and `describe_table`, but the server does not dispatch them and
+returns an unknown-method error. See the
+[schema context and query analysis workflow](check-analysis-design.md) for
+initialization and analysis examples.
 
 Requests can remain outstanding while subsequent lines are submitted. Slow
 output applies backpressure. Stdout contains only complete JSON-RPC response

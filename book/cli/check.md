@@ -155,7 +155,7 @@ This is an SQL input rule, independent of the connector's execution capabilities
 See the [installation guide](../installation.md) for setup instructions.
 The server must be installed on `PATH` or selected through `SQL_FUN_SERVER`;
 `USER` selects its namespace, and `SQL_FUN_SERVER_COMMAND` can supply the launch
-command as described for [`api`](api.md). Requirements select their datasources
+command as described for [`api`](../api/cli-api.md). Requirements select their datasources
 from project metadata. Schema input follows the common `--schema-file` / `--schema`
 selection and must be visible to the server.
 

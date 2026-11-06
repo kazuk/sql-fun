@@ -46,7 +46,7 @@ impl Statement {
 mod tests {
     use crate::{
         ast::Dialect,
-        sem::{SemAst, WildcardExpansion},
+        sem::SemAst,
         test_helpers::{
             create_cache_context,
             wildcard::{catalog, expansions, statement},
@@ -70,8 +70,8 @@ mod tests {
             .unwrap();
         let groups = expansions(&owner);
         assert_eq!(groups.len(), 2);
-        assert_ne!(groups[0].location(), groups[1].location());
-        assert_eq!(WildcardExpansion::rewrite(&groups, &mut owner).unwrap(), 2);
+        assert_ne!(groups.groups()[0].location(), groups.groups()[1].location());
+        assert_eq!(groups.rewrite(&mut owner).unwrap(), 2);
         let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
         assert!(!emitted.contains('*'), "{emitted}");
         assert!(
@@ -88,6 +88,7 @@ mod tests {
         let mut owner = statement("SELECT * FROM t");
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
         let locations: Vec<_> = expansions(&owner)
+            .groups()
             .iter()
             .map(|group| group.location())
             .collect();
@@ -100,6 +101,7 @@ mod tests {
         assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
         assert_eq!(
             expansions(&owner)
+                .groups()
                 .iter()
                 .map(|group| group.location())
                 .collect::<Vec<_>>(),
@@ -109,7 +111,7 @@ mod tests {
             .synchronize_target_locations(statement(&before))
             .unwrap();
         let groups = expansions(&owner);
-        assert_eq!(WildcardExpansion::rewrite(&groups, &mut owner).unwrap(), 1);
+        assert_eq!(groups.rewrite(&mut owner).unwrap(), 1);
     }
 
     #[test]
@@ -125,6 +127,7 @@ mod tests {
         let rendered = source.deparse_sql(Dialect::postgres()).unwrap();
         let mut owner = statement(&rendered);
         let before: Vec<_> = expansions(&owner)
+            .groups()
             .iter()
             .map(|group| group.location())
             .collect();
@@ -137,6 +140,7 @@ mod tests {
         assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), rendered);
         assert_eq!(
             expansions(&owner)
+                .groups()
                 .iter()
                 .map(|group| group.location())
                 .collect::<Vec<_>>(),
@@ -146,6 +150,6 @@ mod tests {
             .synchronize_target_locations(statement(&rendered))
             .unwrap();
         let groups = expansions(&owner);
-        assert_eq!(WildcardExpansion::rewrite(&groups, &mut owner).unwrap(), 2);
+        assert_eq!(groups.rewrite(&mut owner).unwrap(), 2);
     }
 }

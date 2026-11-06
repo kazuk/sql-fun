@@ -22,7 +22,10 @@ use ::sql_fun_sqlast::{
     ast::{Dialect, Statement},
     context::{BaseParseContext, ParameterTypeHintWrite, ParseContext, SchemaFileContext},
     parse_statements,
-    sem::{AnalysisProblem, QueryMetadata, SemAst, TypeReference as SqlType, WildcardExpansion},
+    sem::{
+        AnalysisProblem, QueryMetadata, SemAst, TypeReference as SqlType,
+        WildcardExpansionCollection,
+    },
 };
 
 use std::path::{Path, PathBuf};
@@ -516,9 +519,11 @@ fn prepare_output_statement(
 /// Render executable SQL only after the checked mutation has completed.
 fn rewrite_executable_sql(
     statement: &mut Statement,
-    expansions: &[WildcardExpansion],
+    expansions: &WildcardExpansionCollection,
 ) -> Result<String, String> {
-    WildcardExpansion::rewrite(expansions, statement).map_err(|error| error.to_string())?;
+    expansions
+        .rewrite(statement)
+        .map_err(|error| error.to_string())?;
     statement
         .deparse_sql(statement.dialect())
         .map_err(|error| error.to_string())

@@ -6,7 +6,7 @@ use crate::{
     sem::{
         BinaryOperatorDefinition, ColumnDefinition, FunctionOverloadCollection, FunctionParam,
         OperatorDefinition, OverloadVariant, PgBuiltInType, ResultColumnCollection, SemAst,
-        TypeDefinition, TypeReference, WildcardExpansion,
+        TypeDefinition, TypeReference, WildcardExpansionCollection,
     },
     test_helpers::{TestParseContext, create_cache_context, source_span},
 };
@@ -58,7 +58,7 @@ fn wildcard_int4_column(name: &str) -> ColumnDefinition {
     )
 }
 
-pub(crate) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {
+pub(crate) fn expansions(statement: &Statement) -> WildcardExpansionCollection {
     let mut cache_context = create_cache_context();
     let pair = SemAst::from_ast(statement, catalog(), &mut cache_context).unwrap();
     assert!(
@@ -69,13 +69,13 @@ pub(crate) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {
     pair.context()
         .analysis_state()
         .wildcard_expansions()
-        .to_vec()
+        .clone()
 }
 
 pub(crate) fn rewritten(sql: &str) -> (Statement, usize) {
     let mut statement = statement(sql);
     let groups = expansions(&statement);
-    let count = WildcardExpansion::rewrite(&groups, &mut statement).unwrap();
+    let count = groups.rewrite(&mut statement).unwrap();
     (statement, count)
 }
 
@@ -180,16 +180,16 @@ pub(crate) trait WildcardGroupsAssertions {
     fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]);
     fn assert_relation_schemas(&self, schemas: &[&str]);
 }
-impl WildcardGroupsAssertions for [WildcardExpansion] {
+impl WildcardGroupsAssertions for WildcardExpansionCollection {
     fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]) {
-        for (index, group) in self.iter().enumerate() {
+        for (index, group) in self.groups().iter().enumerate() {
             assert_eq!(group.location(), Some(locations[index]));
             assert_eq!(group.is_table_dependent(), dependencies[index]);
             group.columns().assert_retained_names(names[index]);
         }
     }
     fn assert_relation_schemas(&self, schemas: &[&str]) {
-        for (index, group) in self.iter().enumerate() {
+        for (index, group) in self.groups().iter().enumerate() {
             let reference = group.columns()[0]
                 .expression()
                 .unwrap()

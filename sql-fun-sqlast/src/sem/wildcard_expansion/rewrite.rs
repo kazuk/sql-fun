@@ -11,10 +11,10 @@ use crate::{
         Expr, Name, Statement, Target,
         projection::{ProjectionReplacements, ProjectionScopes},
     },
-    sem::WildcardExpansion,
+    sem::{WildcardExpansion, WildcardExpansionCollection},
 };
 
-impl WildcardExpansion {
+impl WildcardExpansionCollection {
     /// Replace table-dependent wildcard projections using one semantic analysis.
     /// Returns the number of replaced projection items.
     ///
@@ -28,12 +28,9 @@ impl WildcardExpansion {
     /// # Errors
     /// Rejects missing/ambiguous locations, non-wildcard destinations, and
     /// unresolved expressions that cannot represent an executable projection.
-    pub fn rewrite(
-        expansions: &[Self],
-        statement: &mut Statement,
-    ) -> Result<usize, WildcardRewriteError> {
+    pub fn rewrite(&self, statement: &mut Statement) -> Result<usize, WildcardRewriteError> {
         let mut staged = statement.clone();
-        let mut plan = WildcardRewritePlan::new(expansions);
+        let mut plan = WildcardRewritePlan::new(&self.0);
         plan.prepare(&mut staged)?;
         let count = plan.apply(&mut staged)?;
         *statement = staged;
@@ -46,7 +43,7 @@ mod tests {
     use crate::{
         ast::Dialect,
         context::ParseContext,
-        sem::{SemAst, WildcardExpansion},
+        sem::{SemAst, WildcardExpansionCollection},
         test_helpers::{
             create_cache_context, wildcard as test_helpers,
             wildcard::{ResultShapeAssertions, catalog, expansions, rewritten, statement},
@@ -145,27 +142,21 @@ mod tests {
         let groups = expansions(&source);
         let mut owner = statement("(SELECT * FROM t)");
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
-        assert!(
-            WildcardExpansion::rewrite(&groups, &mut owner)
-                .unwrap_err()
-                .is_not_found()
-        );
+        assert!(groups.rewrite(&mut owner).unwrap_err().is_not_found());
         assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
         let own_groups = expansions(&owner);
-        assert_eq!(
-            WildcardExpansion::rewrite(&own_groups, &mut owner).unwrap(),
-            1
-        );
+        assert_eq!(own_groups.rewrite(&mut owner).unwrap(), 1);
     }
 
     #[test]
     fn duplicate_group_rejection_preserves_owner() {
         let mut owner = statement("SELECT * FROM t");
         let mut groups = expansions(&owner);
-        groups.push(groups[0].clone());
+        groups.push(groups.groups()[0].clone());
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
         assert!(
-            WildcardExpansion::rewrite(&groups, &mut owner)
+            groups
+                .rewrite(&mut owner)
                 .unwrap_err()
                 .is_duplicate_location()
         );
@@ -177,11 +168,7 @@ mod tests {
         let groups = expansions(&statement("SELECT * FROM t"));
         let mut owner = statement("SELECT 1 FROM t");
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
-        assert!(
-            WildcardExpansion::rewrite(&groups, &mut owner)
-                .unwrap_err()
-                .is_wrong_node_kind()
-        );
+        assert!(groups.rewrite(&mut owner).unwrap_err().is_wrong_node_kind());
         assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
     }
 
@@ -210,11 +197,7 @@ mod tests {
             .insert(0, &definition)
             .unwrap();
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
-        assert!(
-            WildcardExpansion::rewrite(&groups, &mut owner)
-                .unwrap_err()
-                .is_ambiguous()
-        );
+        assert!(groups.rewrite(&mut owner).unwrap_err().is_ambiguous());
         assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
     }
 
@@ -223,9 +206,12 @@ mod tests {
         use crate::sem::{ResultColumnCollection, WildcardExpansion};
         let mut owner = statement("SELECT * FROM t");
         let group = WildcardExpansion::new(None, &ResultColumnCollection::default(), 0, true, &[]);
+        let mut groups = WildcardExpansionCollection::default();
+        groups.push(group);
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
         assert!(
-            WildcardExpansion::rewrite(&[group], &mut owner)
+            groups
+                .rewrite(&mut owner)
                 .unwrap_err()
                 .is_missing_location()
         );
@@ -237,11 +223,7 @@ mod tests {
         let mut owner = statement("DELETE FROM empty RETURNING *");
         let groups = expansions(&owner);
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
-        assert!(
-            WildcardExpansion::rewrite(&groups, &mut owner)
-                .unwrap_err()
-                .is_empty_returning()
-        );
+        assert!(groups.rewrite(&mut owner).unwrap_err().is_empty_returning());
         assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
     }
 
@@ -258,11 +240,12 @@ mod tests {
         let mut owner = statement(sql);
         let analyzed = SemAst::from_ast(&owner, context(), &mut cache_context).unwrap();
         assert!(analyzed.context().reported_problems().is_empty());
-        WildcardExpansion::rewrite(
-            analyzed.context().analysis_state().wildcard_expansions(),
-            &mut owner,
-        )
-        .unwrap();
+        analyzed
+            .context()
+            .analysis_state()
+            .wildcard_expansions()
+            .rewrite(&mut owner)
+            .unwrap();
         let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
         assert!(
             emitted.contains(&format!(r#""{qualifier}"."id""#)),
@@ -297,11 +280,12 @@ mod tests {
             "{:?}",
             original.context().reported_problems()
         );
-        WildcardExpansion::rewrite(
-            original.context().analysis_state().wildcard_expansions(),
-            &mut owner,
-        )
-        .unwrap();
+        original
+            .context()
+            .analysis_state()
+            .wildcard_expansions()
+            .rewrite(&mut owner)
+            .unwrap();
         let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
         let rewritten = SemAst::from_ast(
             &statement(&emitted),
@@ -344,11 +328,12 @@ mod tests {
             original.context().reported_problems()
         );
         assert_eq!(
-            WildcardExpansion::rewrite(
-                original.context().analysis_state().wildcard_expansions(),
-                &mut owner
-            )
-            .unwrap(),
+            original
+                .context()
+                .analysis_state()
+                .wildcard_expansions()
+                .rewrite(&mut owner)
+                .unwrap(),
             1
         );
         let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
@@ -370,17 +355,10 @@ mod tests {
         let groups = expansions(&statement("SELECT j.*, j.* FROM (t CROSS JOIN u) j"));
         let mut owner = statement("SELECT j.*, 1   FROM (t CROSS JOIN u) j");
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
-        assert!(
-            WildcardExpansion::rewrite(&groups, &mut owner)
-                .unwrap_err()
-                .is_wrong_node_kind()
-        );
+        assert!(groups.rewrite(&mut owner).unwrap_err().is_wrong_node_kind());
         assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
         let own_groups = expansions(&owner);
-        assert_eq!(
-            WildcardExpansion::rewrite(&own_groups, &mut owner).unwrap(),
-            1
-        );
+        assert_eq!(own_groups.rewrite(&mut owner).unwrap(), 1);
         let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
         assert!(
             SemAst::from_ast(&statement(&emitted), catalog(), &mut cache_context)

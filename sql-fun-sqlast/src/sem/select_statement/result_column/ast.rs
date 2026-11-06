@@ -94,7 +94,11 @@ mod test_merge_wildcard_columns_preserve_record_roles_after_positional_binding {
             "{:?}",
             analyzed.context().reported_problems()
         );
-        let group = &analyzed.context().analysis_state().wildcard_expansions()[0];
+        let group = &analyzed
+            .context()
+            .analysis_state()
+            .wildcard_expansions()
+            .groups()[0];
         group.columns().assert_merge_role(MergeRecordRole::source());
     }
 }

@@ -1,9 +1,18 @@
 //! Small explicit catalog and SQL fixtures for foreign-key binding contracts.
 
 #[cfg(feature = "sqlite")]
-use crate::{ast::Dialect, parse_statements, sem::SemAst, test_helpers::create_cache_context};
+use crate::{
+    ast::Dialect,
+    parse_statements,
+    sem::SemAst,
+    test_helpers::{column_definition::parse_create_table, create_cache_context},
+};
 
 use crate::{
+    ast::{
+        ColumnConstraint as AstColumnConstraint, TableConstraint as AstTableConstraint,
+        TryFromWithTokens,
+    },
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
     },
@@ -181,6 +190,39 @@ pub(crate) fn postgres_constraint(sql: &str) -> Constraint {
         .as_constraint()
         .as_inner()
         .expect("constraint")
+}
+
+/// Preserve parser-produced table-constraint fixtures outside semantic tests.
+pub(crate) fn postgres_table_constraint(sql: &str) -> AstTableConstraint {
+    AstTableConstraint::try_from_with_tokens(
+        &postgres_constraint(sql),
+        &::sql_fun_core::IVec::default(),
+    )
+    .expect("common table-constraint syntax")
+}
+
+/// The empty-key synthetic fixture used to exercise standalone table analysis.
+pub(crate) fn synthetic_primary_constraint() -> AstTableConstraint {
+    AstTableConstraint::try_from_with_tokens(
+        &SynBuilder::new().constraint_primary_key(),
+        &::sql_fun_core::IVec::default(),
+    )
+    .expect("common primary-key syntax")
+}
+
+pub(crate) fn postgres_column_constraint(sql: &str) -> AstColumnConstraint {
+    AstColumnConstraint::try_from_with_tokens(
+        &postgres_constraint(sql),
+        &::sql_fun_core::IVec::default(),
+    )
+    .expect("common foreign-key syntax")
+}
+
+#[cfg(feature = "sqlite")]
+pub(crate) fn sqlite_column_constraint(sql: &str) -> AstColumnConstraint {
+    parse_create_table(sql).columns()[0].constraints()[0]
+        .constraint()
+        .clone()
 }
 
 #[cfg(feature = "sqlite")]

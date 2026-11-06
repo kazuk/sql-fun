@@ -1,9 +1,7 @@
 mod ddl;
 use crate::{
-    ast::{AlterOwner as AstAlterOwner, TryFromWithTokens},
     names::FullName as NamesFullName,
-    sem::{AnalysisError, AstAndContextPair, OwnerSpecification, OwnershipIdentity, ParseContext},
-    syn::AlterOwnerStmt,
+    sem::{OwnerSpecification, OwnershipIdentity},
 };
 
 /// Completed target lookup for an ALTER OWNER statement.
@@ -209,19 +207,6 @@ mod test_missing_owner_does_not_replace_previously_committed_ownership {
             Some("bob")
         );
         Ok(())
-    }
-}
-
-impl AlterOwner {
-    /// Analyze and apply a PostgreSQL ALTER OWNER through the common AST.
-    pub fn analyze_alter_owner<C: ParseContext>(
-        context: C,
-        syntax: AlterOwnerStmt,
-    ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        Self::from_ast_and_apply(
-            &AstAlterOwner::try_from_with_tokens(&syntax, &::sql_fun_core::IVec::default())?,
-            context,
-        )
     }
 }
 

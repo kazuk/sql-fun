@@ -1,8 +1,6 @@
 use crate::{
     ast::Alias as AstAlias,
-    names::{AliasName, ColumnName, FullName},
-    sem::{AnalysisError, ParseContext},
-    syn::{Alias, ListOpt},
+    names::{AliasName, ColumnName},
 };
 use ::itertools::Itertools;
 
@@ -87,69 +85,6 @@ impl AliasSpec {
             derived_column_names: Vec::new(),
             explicit: false,
         }
-    }
-
-    /// analyze Alias syn node
-    pub fn analyze<TParseContext>(
-        context: TParseContext,
-        rel_fullname: &FullName,
-        alias: &Alias,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let alias_name = alias.get_aliasname();
-        let alias_name = if alias_name.is_empty() {
-            rel_fullname.local_name()
-        } else {
-            alias_name
-        };
-        let col_names = if let Some(col_names) = alias.get_colnames().map(|v| v.as_string()) {
-            col_names
-                .iter()
-                .map(|v| ColumnName::from(v.get_sval()))
-                .collect()
-        } else {
-            Vec::default()
-        };
-        Ok((
-            Self {
-                alias_name: AliasName::from(alias_name.as_str()),
-                derived_column_names: col_names,
-                explicit: !alias.get_aliasname().is_empty(),
-            },
-            context,
-        ))
-    }
-
-    /// analyze Alias syn node without default alias name
-    pub fn analyze_without_relname<TParseContext>(
-        context: TParseContext,
-        alias: &Alias,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let alias_name = alias.get_aliasname();
-        if alias_name.is_empty() {
-            AnalysisError::raise_unexpected_none("alias.aliasname is empty")?;
-        }
-        let col_names = if let Some(col_names) = alias.get_colnames().map(|v| v.as_string()) {
-            col_names
-                .iter()
-                .map(|v| ColumnName::from(v.get_sval()))
-                .collect()
-        } else {
-            Vec::default()
-        };
-        Ok((
-            Self {
-                alias_name: AliasName::from(alias_name.as_str()),
-                derived_column_names: col_names,
-                explicit: !alias.get_aliasname().is_empty(),
-            },
-            context,
-        ))
     }
 
     /// find column name from delived column list

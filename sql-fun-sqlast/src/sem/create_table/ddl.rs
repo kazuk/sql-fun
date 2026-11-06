@@ -98,9 +98,9 @@ mod test_analyze_create_table {
         context::BaseParseContext,
         names::{FullName, SchemaName, TableName},
         sem::{SemAst, SourcePathWithSpan, create_table::CreateTable as CreateTableCreateTable},
-        syn::sqlite::Stmt,
         test_helpers::{
-            SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
+            TestParseContext, column_definition::parse_create_table, sem_builder, source_span,
+            test_context,
         },
     };
 
@@ -129,7 +129,6 @@ mod test_analyze_create_table {
     )]
     fn test_analyze_create_table(
         test_context: TestParseContext,
-        sqlite_syn: SqliteSynBuilder,
         source_span: SourcePathWithSpan,
         #[case] sql: &str,
         #[case] table_name: &str,
@@ -140,20 +139,9 @@ mod test_analyze_create_table {
         let mut test_context = test_context.with_dialect(Dialect::sqlite());
         test_context.set_get_search_path_result(&[SchemaName::from("main")]);
 
-        let stmt = sqlite_syn.parse_as_stmt(sql);
-
-        let Stmt::CreateTable(ct) = stmt else {
-            panic!("expect CreateTable: {stmt:?}");
-        };
-        let tokens = Vec::default().into();
+        let syntax = parse_create_table(sql);
         let AstAndContextPair(sem_ast, result_context) =
-            CreateTableCreateTable::analyze_create_table(
-                test_context,
-                &None,
-                ct,
-                &tokens,
-                &source_span,
-            )?;
+            CreateTableCreateTable::from_ast_and_apply_at(&syntax, test_context, &source_span)?;
         assert_matches!(sem_ast, SemAst::CreateTable(_));
         let Some(create_table) = sem_ast.as_create_table() else {
             panic!("expect CreateTable")
@@ -212,7 +200,7 @@ mod test_skipped_creation_and_name_collisions_preserve_sequences {
 }
 
 impl CreateTable {
-    #[cfg(any(test, feature = "sqlite"))]
+    #[cfg(test)]
     pub(crate) fn from_ast(
         ast: &AstTable,
         context: &mut impl ParseContext,
@@ -295,9 +283,9 @@ mod test_preserves_explicit_creation_mode {
         ast::CreateTableMode,
         names::SchemaName,
         sem::{SourcePathWithSpan, create_table::CreateTable},
-        syn::sqlite::{CreateTableBody, Stmt},
         test_helpers::{
-            SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
+            TestParseContext, column_definition::parse_create_table, sem_builder, source_span,
+            test_context,
         },
     };
 
@@ -307,7 +295,6 @@ mod test_preserves_explicit_creation_mode {
     #[case(CreateTableMode::OrReplace)]
     fn preserves_explicit_creation_mode(
         mut test_context: TestParseContext,
-        sqlite_syn: SqliteSynBuilder,
         source_span: SourcePathWithSpan,
         #[case] mode: CreateTableMode,
     ) -> testresult::TestResult {
@@ -315,24 +302,12 @@ mod test_preserves_explicit_creation_mode {
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
-        let Stmt::CreateTable(table) = sqlite_syn.parse_as_stmt("create table users(id integer)")
-        else {
-            panic!("expected CREATE TABLE");
-        };
-        let (_, _, _, body) = table.dissolve();
-        let CreateTableBody::ColumnsAndConstraint(body) = body else {
-            panic!("expected column definitions");
-        };
-        let (table, _) = CreateTable::analyze_columns_and_constraint(
-            test_context,
-            &None,
-            &sem_builder().table_name("users"),
-            &mode,
+        let syntax = parse_create_table("create table users(id integer)").named(
+            sem_builder().table_name("users").full_name(),
+            mode,
             true,
-            body,
-            &Vec::new().into(),
-            &source_span,
-        )?;
+        );
+        let table = CreateTable::from_ast(&syntax, &mut test_context, &source_span)?;
         assert_eq!(table.mode(), &mode);
         assert!(table.temporary());
         Ok(())
@@ -454,9 +429,10 @@ impl DropTable {
 mod test_analyze_drop_stmt {
     use crate::{
         AstAndContextPair,
+        ast::{Dialect, StatementNode},
+        parse_statements,
         sem::DropTable,
-        syn::Opt,
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{TestParseContext, test_context},
     };
 
     use testresult::TestResult;
@@ -472,13 +448,15 @@ mod test_analyze_drop_stmt {
         #[case] if_exists: bool,
         #[case] cascade: bool,
     ) -> TestResult {
-        let builder = SynBuilder::new();
-        let Some(node) = builder.parse(sql).as_drop_stmt().as_inner() else {
-            panic!("expect DropStmt");
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .expect("statement")?
+            .into_test_node();
+        let StatementNode::DropTable(node) = statement else {
+            panic!("expect DropTable")
         };
-        let tokens = Vec::default().into();
         let AstAndContextPair(ast, _result_context) =
-            DropTable::analyze_drop_stmt(test_context, node, &tokens)?;
+            DropTable::from_ast_and_apply(&node, test_context)?;
         let Some(drop_table) = ast.as_drop_table() else {
             panic!("{ast:?} is not DropTable");
         };
@@ -496,23 +474,25 @@ mod test_analyze_drop_stmt {
 mod test_analyze_drop_table {
     use crate::{
         AstAndContextPair,
+        ast::{Dialect, StatementNode},
+        parse_statements,
         sem::create_table::DropTable,
-        syn::sqlite::DropTableStatement,
-        test_helpers::{SqliteSynBuilder, TestParseContext, sqlite_syn, test_context},
+        test_helpers::{TestParseContext, test_context},
     };
 
     use testresult::TestResult;
 
     #[rstest::rstest]
-    fn test_analyze_drop_table(
-        test_context: TestParseContext,
-        sqlite_syn: SqliteSynBuilder,
-    ) -> TestResult {
-        let table_name = sqlite_syn.qualified_name("table_one");
-        let statement = DropTableStatement::new(true, table_name);
-        let tokens = Vec::default().into();
+    fn test_analyze_drop_table(test_context: TestParseContext) -> TestResult {
+        let statement = parse_statements("drop table if exists table_one", Dialect::sqlite())
+            .next()
+            .expect("statement")?
+            .into_test_node();
+        let StatementNode::DropTable(node) = statement else {
+            panic!("expect DropTable")
+        };
         let AstAndContextPair(ast, result_context) =
-            DropTable::analyze_drop_table(test_context, statement, &tokens)?;
+            DropTable::from_ast_and_apply(&node, test_context)?;
         let Some(drop_table) = ast.as_drop_table() else {
             panic!("{ast:?} is not DropTable")
         };

@@ -1,82 +1,62 @@
 use crate::{
-    names::FullName,
-    sem::{
-        AnalysisError, TypeReference,
-        client_type::{
-            invalid,
-            token::{TypeToken, TypeTokens},
-            typmod,
-        },
+    ast::client_type::{
+        ClientBuiltin, ClientTypeHint, ClientTypeName, ClientTypePath, invalid,
+        token::{TypeToken, TypeTokens},
     },
+    error::AnalysisError,
 };
 use ::combine::{Parser, attempt, choice, many, optional};
 
-pub(super) fn parse(tokens: &TypeTokens) -> Result<TypeReference, AnalysisError> {
+pub(super) fn parse(tokens: &TypeTokens) -> Result<ClientTypeHint, AnalysisError> {
     if tokens.interval_modifier() {
-        return Err(typmod());
+        return Ok(ClientTypeHint::unsupported_modifier());
     }
     let ((name, array), remaining) = (simple_name(), array_suffix())
         .parse(tokens.as_slice())
         .map_err(|_| invalid("invalid PostgreSQL client type hint syntax"))?;
     if let Some(token) = remaining.first() {
-        return Err(if token.is_symbol("(") {
-            typmod()
+        return if token.is_symbol("(") {
+            Ok(ClientTypeHint::unsupported_modifier())
         } else {
-            invalid("unexpected tokens after PostgreSQL type name")
-        });
+            Err(invalid("unexpected tokens after PostgreSQL type name"))
+        };
     }
-    Ok(TypeReference::concrete_type_ref(&name.full_name()?, array))
+    Ok(ClientTypeHint::new(name.into_name()?, array))
 }
 
-struct ParsedName {
-    parts: Vec<String>,
-    system: bool,
-    float_precision: Option<String>,
+enum ParsedName {
+    Builtin(ClientBuiltin),
+    Named(Vec<String>),
+    Float(Option<String>),
 }
 
 impl ParsedName {
-    fn builtin(name: &str) -> Self {
-        Self {
-            parts: vec![name.to_owned()],
-            system: true,
-            float_precision: None,
-        }
+    const fn builtin(name: ClientBuiltin) -> Self {
+        Self::Builtin(name)
     }
-
     fn generic(head: &str, tail: &[String]) -> Self {
         let mut parts = vec![head.to_owned()];
         parts.extend_from_slice(tail);
-        Self {
-            parts,
-            system: false,
-            float_precision: None,
-        }
+        Self::Named(parts)
     }
-
     fn float(precision: &Option<String>) -> Self {
-        Self {
-            float_precision: precision.clone(),
-            ..Self::builtin("float8")
-        }
+        Self::Float(precision.clone())
     }
-
-    fn full_name(&self) -> Result<FullName, AnalysisError> {
-        if let Some(precision) = &self.float_precision {
-            let precision = integer_value(precision)?;
-            let name = match precision {
-                1..=24 => "float4",
-                25..=53 => "float8",
-                _ => return Err(invalid("float precision must be between 1 and 53")),
-            };
-            return Ok(FullName::with_schema("pg_catalog", name));
-        }
-        match self.parts.as_slice() {
-            [name] if self.system => Ok(FullName::with_schema("pg_catalog", name)),
-            [name] => Ok(FullName::from_local_name(name)),
-            [schema, name] => Ok(FullName::with_schema(schema, name)),
-            [catalog, schema, name] => Ok(FullName::with_catalog(catalog, schema, name)),
-            _ => Err(invalid("a type name has at most three components")),
-        }
+    fn into_name(self) -> Result<ClientTypeName, AnalysisError> {
+        Ok(match self {
+            Self::Builtin(name) => ClientTypeName::Builtin(name),
+            Self::Named(parts) => ClientTypeName::Named(match parts.as_slice() {
+                [name] => ClientTypePath::Local(name.clone()),
+                [schema, name] => ClientTypePath::Schema(schema.clone(), name.clone()),
+                [catalog, schema, name] => {
+                    ClientTypePath::Catalog(catalog.clone(), schema.clone(), name.clone())
+                }
+                _ => return Err(invalid("a type name has at most three components")),
+            }),
+            Self::Float(precision) => {
+                ClientTypeName::Float(precision.as_deref().map(integer_value).transpose()?)
+            }
+        })
     }
 }
 
@@ -89,11 +69,17 @@ fn simple_name<'a>() -> impl Parser<&'a [TypeToken], Output = ParsedName> {
             TypeToken::keyword("bit")
                 .with(optional(TypeToken::keyword("varying")))
                 .map(|varying| {
-                    ParsedName::builtin(if varying.is_some() { "varbit" } else { "bit" })
+                    ParsedName::builtin(if varying.is_some() {
+                        ClientBuiltin::BitVarying
+                    } else {
+                        ClientBuiltin::Bit
+                    })
                 }),
         ),
-        attempt(TypeToken::keyword("interval").map(|()| ParsedName::builtin("interval"))),
-        attempt(TypeToken::keyword("json").map(|()| ParsedName::builtin("json"))),
+        attempt(
+            TypeToken::keyword("interval").map(|()| ParsedName::builtin(ClientBuiltin::Interval)),
+        ),
+        attempt(TypeToken::keyword("json").map(|()| ParsedName::builtin(ClientBuiltin::Json))),
         (
             TypeToken::name(true),
             many::<Vec<_>, _, _>(TypeToken::punctuation(".").with(TypeToken::name(false))),
@@ -106,20 +92,20 @@ fn numeric_name<'a>() -> impl Parser<&'a [TypeToken], Output = ParsedName> {
     choice((
         TypeToken::keyword("int")
             .or(TypeToken::keyword("integer"))
-            .map(|()| ParsedName::builtin("int4")),
-        TypeToken::keyword("smallint").map(|()| ParsedName::builtin("int2")),
-        TypeToken::keyword("bigint").map(|()| ParsedName::builtin("int8")),
-        TypeToken::keyword("real").map(|()| ParsedName::builtin("float4")),
-        TypeToken::keyword("boolean").map(|()| ParsedName::builtin("bool")),
+            .map(|()| ParsedName::builtin(ClientBuiltin::Integer)),
+        TypeToken::keyword("smallint").map(|()| ParsedName::builtin(ClientBuiltin::Smallint)),
+        TypeToken::keyword("bigint").map(|()| ParsedName::builtin(ClientBuiltin::Bigint)),
+        TypeToken::keyword("real").map(|()| ParsedName::builtin(ClientBuiltin::Real)),
+        TypeToken::keyword("boolean").map(|()| ParsedName::builtin(ClientBuiltin::Boolean)),
         TypeToken::keyword("decimal")
             .or(TypeToken::keyword("dec"))
             .or(TypeToken::keyword("numeric"))
-            .map(|()| ParsedName::builtin("numeric")),
+            .map(|()| ParsedName::builtin(ClientBuiltin::Numeric)),
         (
             TypeToken::keyword("double"),
             TypeToken::keyword("precision"),
         )
-            .map(|_| ParsedName::builtin("float8")),
+            .map(|_| ParsedName::builtin(ClientBuiltin::DoublePrecision)),
         TypeToken::keyword("float")
             .with(optional(
                 TypeToken::punctuation("(")
@@ -139,14 +125,14 @@ fn character_name<'a>() -> impl Parser<&'a [TypeToken], Output = ParsedName> {
             .with(TypeToken::keyword("character").or(TypeToken::keyword("char"))),
     ));
     choice((
-        TypeToken::keyword("varchar").map(|()| ParsedName::builtin("varchar")),
+        TypeToken::keyword("varchar").map(|()| ParsedName::builtin(ClientBuiltin::Varchar)),
         character
             .with(optional(TypeToken::keyword("varying")))
             .map(|varying| {
                 ParsedName::builtin(if varying.is_some() {
-                    "varchar"
+                    ClientBuiltin::Varchar
                 } else {
-                    "bpchar"
+                    ClientBuiltin::Character
                 })
             }),
     ))
@@ -168,10 +154,10 @@ fn datetime_name<'a>() -> impl Parser<&'a [TypeToken], Output = ParsedName> {
         .map(|(time, timezone)| {
             let with_zone = timezone.is_some_and(|(with_zone, (), ())| with_zone);
             ParsedName::builtin(match (time, with_zone) {
-                (true, true) => "timetz",
-                (true, false) => "time",
-                (false, true) => "timestamptz",
-                (false, false) => "timestamp",
+                (true, true) => ClientBuiltin::TimeWithZone,
+                (true, false) => ClientBuiltin::Time,
+                (false, true) => ClientBuiltin::TimestampWithZone,
+                (false, false) => ClientBuiltin::Timestamp,
             })
         })
 }

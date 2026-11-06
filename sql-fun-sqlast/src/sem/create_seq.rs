@@ -1,14 +1,10 @@
 mod ddl;
 use crate::{
     names::{FullName, TableName},
-    sem::{
-        AlterSequence, AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst,
-        alter_table::AlterObjSubCommand,
-    },
-    syn::{CreateSeqStmt, Opt},
+    sem::{AlterSequence, AnalysisError, OwnerSpecification, alter_table::AlterObjSubCommand},
 };
 
-/// analyzed [`crate::syn::CreateSeqStmt`]
+/// Analyzed CREATE SEQUENCE statement.
 #[derive(Debug, Clone)]
 pub struct CreateSequence {
     temporary: bool,
@@ -116,26 +112,5 @@ impl CreateSequence {
             }
         }
         Ok(())
-    }
-
-    /// analyze [`crate::syn::CreateSeqStmt`]
-    pub fn analyze_create_seq<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: CreateSeqStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(name) = syn.get_sequence().as_inner() else {
-            AnalysisError::raise_unexpected_none("create_seq.sequence")?
-        };
-
-        let create_sequence = Self::new(&FullName::try_from(name)?);
-        let context = context.apply_create_sequence(&create_sequence)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateSequence(create_sequence),
-            context,
-        ))
     }
 }

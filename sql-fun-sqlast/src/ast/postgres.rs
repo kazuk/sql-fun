@@ -4,10 +4,10 @@ use crate::{
         Access, AlterOwner, AlterRelation, AlterSequence, BooleanExpr, BooleanOperator, Call,
         CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment, CompositeType, CreateRule,
         CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropRule,
-        DropTable, DropTrigger, EnumType, Expr, Extension, ForeignTable, FromOpt, Indirection,
-        Insert, Literal, Merge, Name, NamedArgument, NullTest, ObjectArgument, ObjectKind,
-        ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice,
-        SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
+        DropTable, DropTrigger, EnumType, Expr, Extension, ForeignTable, Indirection, Insert,
+        Literal, Merge, Name, NamedArgument, NullTest, ObjectArgument, ObjectKind, ObjectTarget,
+        OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice, SqlValue,
+        StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
         TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
@@ -65,6 +65,31 @@ impl TryFrom<syn::NodeListOpt> for Name {
 }
 
 #[cfg(test)]
+mod tests {
+    use crate::{
+        ast::Name, names::FullName, test_helpers::type_syntax::build_string_node_list_opt,
+    };
+
+    #[test]
+    fn test_try_from_nodelistopt_two_elements() {
+        let nlo = build_string_node_list_opt(&["schema", "name"]);
+        let qt = FullName::from_ast_name(&Name::try_from(nlo).unwrap()).unwrap();
+        assert!(qt.catalog().is_none());
+        assert_eq!(qt.schema().unwrap().as_str(), "schema");
+        assert_eq!(qt.name().as_str(), "name");
+    }
+
+    #[test]
+    fn test_try_from_nodelistopt_three_elements() {
+        let nlo = build_string_node_list_opt(&["cat", "sch", "nm"]);
+        let qt = FullName::from_ast_name(&Name::try_from(nlo).unwrap()).unwrap();
+        assert_eq!(qt.catalog().unwrap().as_str(), "cat");
+        assert_eq!(qt.schema().unwrap().as_str(), "sch");
+        assert_eq!(qt.name().as_str(), "nm");
+    }
+}
+
+#[cfg(test)]
 mod test_name_from_nodes {
     use crate::{
         ast::Name,
@@ -84,17 +109,123 @@ mod test_name_from_nodes {
     }
 }
 
-impl From<&syn::RangeVar> for Name {
-    fn from(value: &syn::RangeVar) -> Self {
+impl TryFrom<&syn::RangeVar> for Name {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::RangeVar) -> Result<Self, Self::Error> {
+        let catalog = nonempty(value.get_catalogname());
+        let schema = nonempty(value.get_schemaname());
+        if catalog.is_some() && schema.is_none() {
+            return Err(AnalysisError::unexpected_input_error(
+                "a catalog requires a schema",
+            ));
+        }
         let mut parts = Vec::new();
-        if let Some(catalog) = nonempty(value.get_catalogname()) {
+        if let Some(catalog) = catalog {
             parts.push(catalog);
         }
-        if let Some(schema) = nonempty(value.get_schemaname()) {
+        if let Some(schema) = schema {
             parts.push(schema);
         }
         parts.push(value.get_relname());
-        Self::from_parts(&parts)
+        Ok(Self::from_parts(&parts))
+    }
+}
+
+#[cfg(test)]
+mod range_var_tests {
+    use crate::{ast::Name, syn::RangeVar};
+
+    #[test]
+    fn rejects_catalog_without_schema() {
+        let relation = ::pg_query::protobuf::RangeVar {
+            catalogname: "db".to_owned(),
+            relname: "items".to_owned(),
+            ..Default::default()
+        };
+        let relation = RangeVar::from(relation);
+        assert!(Name::try_from(&relation).is_err());
+    }
+}
+
+#[cfg(test)]
+mod sql_name_conversion_tests {
+    use crate::{
+        ast::{Dialect, Name},
+        names::FullName,
+        test_helpers::SynBuilder,
+    };
+    #[cfg(feature = "sqlite")]
+    use crate::{syn::sqlite::Stmt, test_helpers::SqliteSynBuilder};
+
+    #[rstest::rstest]
+    #[case::dot(FullName::with_schema("a.b", "c"))]
+    #[case::quote(FullName::with_schema("a", "b\"c"))]
+    #[case::catalog(FullName::with_catalog("my.db", "a.b", "c.d"))]
+    #[case::case(FullName::from_local_name("Mixed"))]
+    #[case::keyword(FullName::from_local_name("select"))]
+    #[case::unicode(FullName::from_local_name("éclair"))]
+    fn postgres_sql_parser_recovers_logical_names(
+        #[case] name: FullName,
+    ) -> testresult::TestResult {
+        use crate::syn::ListOpt;
+        for spelling in [name.to_string(), name.to_sql(Dialect::postgres())?] {
+            let node = SynBuilder::new().parse(&format!("SELECT * FROM {spelling}"));
+            let relation = node
+                .as_select_stmt()
+                .get_from_clause()
+                .map(|node| node.as_range_var())
+                .expect("FROM");
+            assert_eq!(
+                FullName::from_ast_name(&Name::try_from(&relation[0])?)?,
+                name
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn postgres_case_folding_belongs_to_sql_parsing() -> testresult::TestResult {
+        use crate::syn::ListOpt;
+        let node = SynBuilder::new().parse("SELECT * FROM Mixed");
+        let relations = node
+            .as_select_stmt()
+            .get_from_clause()
+            .map(|node| node.as_range_var())
+            .expect("FROM");
+        assert_eq!(
+            FullName::from_ast_name(&Name::try_from(&relations[0])?)?,
+            FullName::from_local_name("mixed")
+        );
+        assert_eq!(
+            "Mixed".parse::<FullName>()?,
+            FullName::from_local_name("Mixed")
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::empty("")]
+    #[case::dot("a.b")]
+    #[case::quote("a\"b")]
+    #[case::case("Mixed")]
+    #[case::keyword("select")]
+    fn sqlite_parser_preserves_quoted_names(#[case] component: &str) -> testresult::TestResult {
+        let name = FullName::with_schema("main", component);
+        let sql = format!(
+            "CREATE TABLE {} (id INTEGER)",
+            name.to_sql(Dialect::sqlite())?
+        );
+        let statement = SqliteSynBuilder.parse_as_stmt(&sql);
+        let Stmt::CreateTable(table) = statement else {
+            panic!("CREATE TABLE")
+        };
+        assert_eq!(
+            FullName::from_ast_name(&Name::from(table.table_name()))?,
+            name
+        );
+        Ok(())
     }
 }
 
@@ -786,7 +917,12 @@ impl TryFromWithTokens<&syn::AlterOwnerStmt> for AlterOwner {
         value: &syn::AlterOwnerStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let relation = Name::from_opt(value.get_relation().as_inner().as_ref());
+        let relation = value
+            .get_relation()
+            .as_inner()
+            .as_ref()
+            .map(Name::try_from)
+            .transpose()?;
         let object = value
             .get_object()
             .as_inner()
@@ -893,7 +1029,7 @@ impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
     ) -> Result<Self, Self::Error> {
         let sequence = required(value.get_sequence().as_inner(), "alter_seq.sequence")?;
         Ok(Self::new(
-            Name::from(&sequence),
+            Name::try_from(&sequence)?,
             SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
             value.get_for_identity(),
             value.get_missing_ok(),
@@ -937,7 +1073,7 @@ impl TryFromWithTokens<&syn::CreateSeqStmt> for Sequence {
     ) -> Result<Self, Self::Error> {
         let sequence = required(value.get_sequence().as_inner(), "create_seq.sequence")?;
         Ok(Self::new(
-            Name::from(&sequence),
+            Name::try_from(&sequence)?,
             SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
             value.get_owner_id(),
             value.get_for_identity(),
@@ -1037,7 +1173,7 @@ impl TryFromWithTokens<&syn::ViewStmt> for View {
             aliases.push(required(alias.as_string().get_sval(), "view alias")?);
         }
         Ok(Self::new(
-            Name::from(&view),
+            Name::try_from(&view)?,
             aliases,
             Query::try_from_with_tokens(&query, tokens)?,
             value.get_replace(),
@@ -2168,5 +2304,40 @@ impl TryFromWithTokens<&syn::CoalesceExpr> for Expr {
             "coalesce",
             Self::try_collect_from_with_tokens(value.get_args(), tokens)?,
         ))))
+    }
+}
+
+impl From<&syn::AExprKind> for ::sql_fun_core::analysis_problem::AExprKind {
+    fn from(value: &syn::AExprKind) -> Self {
+        use crate::syn::AExprKind as Kind;
+        let description = match value {
+            Kind::AexprOp => "operator",
+            Kind::AexprOpAny => "ANY comparison",
+            Kind::AexprOpAll => "ALL comparison",
+            Kind::AexprDistinct => "IS DISTINCT FROM",
+            Kind::AexprNotDistinct => "IS NOT DISTINCT FROM",
+            Kind::AexprNullif => "NULLIF",
+            Kind::AexprIn => "IN",
+            Kind::AexprLike => "LIKE",
+            Kind::AexprIlike => "ILIKE",
+            Kind::AexprSimilar => "SIMILAR TO",
+            Kind::AexprBetween => "BETWEEN",
+            Kind::AexprNotBetween => "NOT BETWEEN",
+            Kind::AexprBetweenSym => "BETWEEN SYMMETRIC",
+            Kind::AexprNotBetweenSym => "NOT BETWEEN SYMMETRIC",
+            Kind::Undefined => "unrecognized operator expression",
+            Kind::OptionNone => "unspecified operator expression",
+        };
+        Self::new(description)
+    }
+}
+impl From<syn::AExprKind> for ::sql_fun_core::analysis_problem::AExprKind {
+    fn from(value: syn::AExprKind) -> Self {
+        Self::from(&value)
+    }
+}
+impl From<&syn::TypeName> for ::sql_fun_core::analysis_problem::TypeName {
+    fn from(value: &syn::TypeName) -> Self {
+        Self::new(&value.full_name().to_string())
     }
 }

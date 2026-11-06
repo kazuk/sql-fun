@@ -1,11 +1,11 @@
 //! CHECK binding, catalog transitions and dependency propagation through public analysis.
 use crate::{
-    ast::Dialect,
-    context::{ParseContext, SequenceInfoRead, TableInfoRead},
+    ast::{Column as AstColumn, Dialect, TableConstraint, TryFromWithTokens},
+    context::{BaseParseContext, ParseContext, SequenceInfoRead, TableInfoRead},
     names::{ColumnName, FullName, TableName},
     sem::{
-        AlterObjSubCommand, AnalyzeConstraint, CheckColumnConstraint, ColumnConstraintTrait,
-        ColumnDefinition, Constraint, PgBuiltInType,
+        AlterObjSubCommand, CheckColumnConstraint, ColumnConstraintTrait, ColumnDefinition,
+        Constraint, PgBuiltInType,
     },
     test_helpers::{checks, foreign_keys, serial, statements},
 };
@@ -255,14 +255,12 @@ fn legacy_constraint_entry_point_retains_completed_bindings() -> testresult::Tes
         "CREATE TABLE bounds(a integer, b integer)",
     )?;
     let mut context = pair.into_context();
-    let syntax = foreign_keys::postgres_constraint(
+    let syntax = foreign_keys::postgres_table_constraint(
         "ALTER TABLE bounds ADD CONSTRAINT ordered CHECK(a < b) NO INHERIT NOT VALID",
     );
-    let analyzed = Constraint::analyze(
-        &mut context,
-        Some(&TableName::from(FullName::from_local_name("bounds"))),
-        syntax,
-    )?;
+    let requested = TableName::from(FullName::from_local_name("bounds"));
+    let table = context.resolve_table_name(&requested).unwrap_or(requested);
+    let analyzed = Constraint::from_ast_table(&syntax, &mut context, &table)?;
     let check = analyzed.as_check().unwrap();
     assert!(check.can_apply());
     assert!(check.no_inherit());
@@ -594,12 +592,12 @@ fn legacy_inline_entry_point_binds_existing_row_and_retains_options() -> testres
     let syntax = foreign_keys::postgres_constraint(
         "ALTER TABLE bounds ADD CONSTRAINT ordered CHECK(a < b) NO INHERIT",
     );
-    let (check, context) = CheckColumnConstraint::analyze_constraint(
+    let syntax = TableConstraint::try_from_with_tokens(&syntax, &::sql_fun_core::IVec::default())?;
+    let (check, context) = CheckColumnConstraint::from_ast_legacy_inline(
+        &syntax,
         pair.into_context(),
         &TableName::from(FullName::from_local_name("bounds")),
         &ColumnName::from("a"),
-        &syntax,
-        &::sql_fun_core::IVec::default(),
     )?;
     assert!(check.can_apply());
     assert!(check.no_inherit());
@@ -620,11 +618,11 @@ fn standalone_column_analysis_includes_its_own_declared_row(
     let syntax = checks::postgres_column(&format!(
         "CREATE TABLE bounds(a integer CHECK({expression}))"
     ));
-    let (column, _) = ColumnDefinition::analyze_column_def(
+    let syntax = AstColumn::try_from_with_tokens(&syntax, &::sql_fun_core::IVec::default())?;
+    let (column, _) = ColumnDefinition::from_ast_and_report(
+        &syntax,
         checks::context(Dialect::postgres()),
         &TableName::from(FullName::with_schema("public", "bounds")),
-        &syntax,
-        &::sql_fun_core::IVec::default(),
     )?;
     assert_eq!(column.declaration_can_apply(), applicable);
     assert_eq!(

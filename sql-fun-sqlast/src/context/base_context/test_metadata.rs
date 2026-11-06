@@ -1,18 +1,14 @@
 //! The caller's selected metadata survives context initialization and analysis.
-use crate::{
-    AstAndContextPair, PostgresDialect,
-    sem::SelectStatement,
-    syn::{ListOpt, Opt},
-    test_helpers::{heavy::selected_metadata as heavy, selected_metadata as test_helpers},
-};
-
 #[cfg(feature = "sqlite")]
+use crate::test_helpers::TestParseContext;
 use crate::{
-    SqliteDialect,
+    AstAndContextPair,
     ast::Dialect as AstDialect,
     parse_statements,
     sem::SemAst,
-    test_helpers::{TestParseContext, create_cache_context},
+    test_helpers::{
+        create_cache_context, heavy::selected_metadata as heavy, selected_metadata as test_helpers,
+    },
 };
 
 #[test]
@@ -20,19 +16,11 @@ fn retains_selected_postgres_metadata_without_reloading_default()
 -> Result<(), Box<dyn std::error::Error>> {
     let metadata = test_helpers::selected_metadata("selected-postgres.toml")?;
     let context = heavy::context(&metadata)?;
-    let syntax = PostgresDialect::parse("select 42 as n")?;
-    let select = syntax
-        .get_stmts()
-        .get(0)
-        .get_stmt()
-        .as_select_stmt()
-        .as_inner()
-        .expect("SELECT");
-    let AstAndContextPair(_, context) = SelectStatement::analyze_select(
-        context,
-        select,
-        &PostgresDialect::scan("select 42 as n")?,
-    )?;
+    let syntax = parse_statements("select 42 as n", AstDialect::postgres())
+        .next()
+        .expect("SELECT")?;
+    let AstAndContextPair(_, context) =
+        SemAst::from_ast(&syntax, context, &mut create_cache_context())?;
     test_helpers::assert_selected_metadata(&context, &metadata);
     Ok(())
 }
@@ -43,16 +31,15 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
 -> Result<(), Box<dyn std::error::Error>> {
     let metadata = test_helpers::selected_metadata("selected-sqlite.toml")?;
     let context = heavy::context(&metadata)?;
-    let statement = SqliteDialect::parse("select q.n as n from ((select 42 as n)) as q")?
-        .expect("statement")
-        .into_plain_statement()
-        .expect("plain SELECT");
+    let statement = parse_statements(
+        "select q.n as n from ((select 42 as n)) as q",
+        AstDialect::sqlite(),
+    )
+    .next()
+    .expect("statement")?;
     test_helpers::assert_selected_metadata(&context, &metadata);
-    let AstAndContextPair(ast, context) = SemAst::semantic_analysis_sqlite_stmt(
-        context,
-        statement,
-        &::sql_fun_core::IVec::default(),
-    )?;
+    let AstAndContextPair(ast, context) =
+        SemAst::from_ast(&statement, context, &mut create_cache_context())?;
     let query = ast.into_select_statemtnt().expect("SELECT");
     assert_eq!(
         query

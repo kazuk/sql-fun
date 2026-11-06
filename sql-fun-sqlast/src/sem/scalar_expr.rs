@@ -1,4 +1,3 @@
-mod analyze;
 mod arith_expr;
 mod array;
 mod array_subquery;

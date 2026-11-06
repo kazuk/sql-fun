@@ -1,19 +1,15 @@
 use crate::{
     names::TableName,
     sem::type_system::{SimpleInferResult, func_params::output_field_definition},
-    syn::FunctionParameter,
 };
-use sql_fun_core::IVec;
 
 use crate::{
-    names::{ColumnName, FullName},
+    names::ColumnName,
     sem::{
-        AnalysisError, ColumnCollection, ColumnDefinition, FunctionParam, ParseContext,
-        SemScalarExpr, TypeReference,
+        ColumnCollection, ColumnDefinition, FunctionParam, SemScalarExpr, TypeReference,
         create_comp_type::CompositeFieldDefinition,
         type_system::{ArgumentBindingCollection, TypeError, func_params::ParameterBindResult},
     },
-    syn::{Opt, ScanToken},
 };
 
 use crate::sem::type_system::func_params::FunctionParameterTrait;
@@ -129,33 +125,6 @@ impl FunctionParameterTrait for FunctionParamTable {
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
         None
-    }
-
-    fn from_syn<TParseContext>(
-        context: TParseContext,
-        param: FunctionParameter,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<(FunctionParam, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let param_name = param.get_name();
-        let Some(param_type) = param.get_arg_type().as_inner() else {
-            AnalysisError::raise_unexpected_none("function_parameter.arg_type")?
-        };
-        let param_type = FullName::try_from(param_type)?;
-        let param_type = if let Some(definition) = context.get_type(&param_type) {
-            definition.type_reference().cloned()
-        } else {
-            None
-        };
-        Ok((
-            FunctionParam::Table(Self {
-                name: Some(param_name),
-                param_type,
-            }),
-            context,
-        ))
     }
 
     fn bind_arg(

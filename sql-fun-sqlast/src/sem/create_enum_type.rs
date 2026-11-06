@@ -4,10 +4,9 @@ use crate::{
     sem::{
         AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst, TypeReference,
     },
-    syn::{CreateEnumStmt, ListOpt},
 };
 
-/// analyzed [`crate::syn::CreateEnumStmt`]
+/// Analyzed CREATE TYPE AS ENUM statement.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateEnum {
     #[serde(skip)]
@@ -65,31 +64,6 @@ impl CreateEnum {
     #[must_use]
     pub const fn values(&self) -> &Vec<EnumValueDefinition> {
         &self.values
-    }
-
-    /// analyze [`crate::syn::CreateEnumStmt`]
-    pub fn analyze_create_enum_type<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        create: CreateEnumStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let name = FullName::try_from(create.get_type_name())?;
-        let Some(enum_values) = create.get_vals().map(|v| v.as_string()) else {
-            AnalysisError::raise_unexpected_none("create_enum_stmt.vals")?
-        };
-        let values = enum_values
-            .iter()
-            .map(|value| value.get_sval())
-            .collect::<Vec<_>>();
-        let enum_def = Self::new(&name, &values);
-        let result_context = context.apply_create_enum(&enum_def)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateEnum(enum_def),
-            result_context,
-        ))
     }
 }
 

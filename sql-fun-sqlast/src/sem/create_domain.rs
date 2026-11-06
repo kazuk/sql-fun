@@ -1,17 +1,14 @@
 mod ddl;
 use crate::{
-    ast::{Domain, TryFromWithTokens},
     context::ParseContext,
     names::{FullName, TableName},
     sem::{
-        AnalysisError, AstAndContextPair, CatalogNameLookup, DeclarationCollation,
-        OwnerSpecification, TypeCategory, TypeReference, WithTypmod,
+        AnalysisError, CatalogNameLookup, DeclarationCollation, OwnerSpecification, TypeCategory,
+        TypeReference, WithTypmod,
     },
-    syn::{CreateDomainStmt, ScanToken},
 };
-use sql_fun_core::IVec;
 
-/// analyzed [`crate::syn::CreateDomainStmt`]
+/// Analyzed CREATE DOMAIN statement.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateDomain {
     #[serde(skip)]
@@ -140,18 +137,6 @@ impl CreateDomain {
     #[must_use]
     pub const fn type_ref(&self) -> &TypeReference {
         &self.type_ref
-    }
-
-    /// analyze [`crate::syn::CreateDomainStmt`]
-    pub fn analyze_create_domain<TParseContext>(
-        context: TParseContext,
-        syn: CreateDomainStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply(&Domain::try_from_with_tokens(&syn, tokens)?, context)
     }
 }
 

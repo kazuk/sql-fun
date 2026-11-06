@@ -1,13 +1,9 @@
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::UniqueColumnConstraint as SqliteUniqueColumnConstraint;
 use crate::{
     ast::ConflictClause,
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ParseContext,
+        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename, ParseContext,
     },
-    syn::{ConstrType, Constraint, Opt},
 };
 
 /// unique value constraint
@@ -54,53 +50,6 @@ impl ColumnConstraintTrait for UniqueColumnConstraint {
 
     fn column_name(&self) -> &ColumnName {
         &self.column_name
-    }
-}
-
-impl UniqueColumnConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        if !matches!(contype, ConstrType::ConstrUnique) {
-            AnalysisError::raise_unexpected_input("constraint.contype")?;
-            AnalysisError::never()
-        }
-
-        Ok((Self::new(table_name, column_name, None), context))
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl UniqueColumnConstraint {
-    /// analyze [`crate::syn::sqlite::UniqueColumnConstraint`]
-    pub fn analyze_constraint_sqlite<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &SqliteUniqueColumnConstraint,
-    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Ok((
-            ColumnConstraint::unique(Self::new(
-                table_name,
-                column_name,
-                syn.conflict_clause().map(ConflictClause::from),
-            )),
-            context,
-        ))
     }
 }
 

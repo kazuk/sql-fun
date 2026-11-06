@@ -8,19 +8,15 @@ pub use self::{
     set_operation::{SetOperationKind, SetOperationQuery},
 };
 use crate::{
-    CacheContext,
-    ast::{Query as AstQuery, TryFromWithTokens},
     names::ColumnName,
     sem::{
-        AccessKind, AnalysisError, AstAndContextPair, CreateCompositeType, FromClause,
-        InsertTarget, ParseContext, SelectClauses, SemAst, SemScalarExpr, SemanticQuery,
-        SemanticValues, TypeDefinition, TypeReference, WithClause,
+        AccessKind, AnalysisError, CreateCompositeType, FromClause, InsertTarget, ParseContext,
+        SelectClauses, SemScalarExpr, SemanticQuery, SemanticValues, TypeDefinition, TypeReference,
+        WithClause,
         create_table::ColumnDefinition,
         traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
     },
-    syn::{ScanToken, SelectStmt},
 };
-use ::sql_fun_core::IVec;
 
 /// select statement
 #[allow(clippy::large_enum_variant)]
@@ -167,21 +163,6 @@ impl SelectStatement {
             }
         }
     }
-
-    /// analyze [`crate::syn::SelectStmt`]
-    pub fn analyze_select<TParseContext>(
-        mut context: TParseContext,
-        syn: SelectStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = AstQuery::try_from_with_tokens(&syn, tokens)?;
-        let outcome = Self::from_ast(&syntax, &mut context, &mut CacheContext::new());
-        let query = outcome?;
-        Ok(AstAndContextPair::new(SemAst::select(&query), context))
-    }
 }
 
 struct SetOperationValidity(bool);
@@ -247,21 +228,6 @@ impl SelectStatementNode {
         let cct = CreateCompositeType::from_fields(&fields);
         let type_def = TypeDefinition::CompositeType(cct);
         Ok(TypeReference::dynamic(&type_def))
-    }
-
-    /// analyze [`crate::syn::SelectStmt`]
-    pub fn analyze_select_node<TParseContext>(
-        mut context: TParseContext,
-        syn: SelectStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SelectStatement, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = AstQuery::try_from_with_tokens(&syn, tokens)?;
-        let outcome = SelectStatement::from_ast(&syntax, &mut context, &mut CacheContext::new());
-        let query = outcome?;
-        Ok((query, context))
     }
 }
 

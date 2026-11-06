@@ -21,7 +21,7 @@ use crate::{
 };
 
 impl ColumnConstraint {
-    #[cfg(any(test, feature = "sqlite"))]
+    #[cfg(test)]
     pub(crate) fn from_ast_and_report<TContext: ParseContext>(
         ast: &AstColumnConstraint,
         mut context: TContext,
@@ -33,7 +33,88 @@ impl ColumnConstraint {
         let constraint = context.finish_analysis(result)?;
         Ok((constraint, context))
     }
+}
 
+#[cfg(test)]
+mod test_analyze_constraint {
+    use crate::{
+        names::ColumnName,
+        sem::{ColumnConstraint, PgBuiltInType},
+        test_helpers::foreign_keys as fk,
+    };
+
+    #[rstest::rstest]
+    #[case::resolved("parent", true)]
+    #[case::missing("absent", false)]
+    fn direct_analysis_retains_completed_lookup(
+        #[case] target: &str,
+        #[case] resolved: bool,
+    ) -> testresult::TestResult {
+        let context = fk::parents();
+        let syntax = fk::postgres_column_constraint(&format!(
+            "ALTER TABLE a.child ADD FOREIGN KEY(id) REFERENCES {target}(id) ON UPDATE CASCADE"
+        ));
+        let (constraint, mut context) = ColumnConstraint::from_ast_and_report(
+            &syntax,
+            context,
+            &fk::name("a", "child"),
+            &ColumnName::from("id"),
+        )?;
+        let constraint = constraint.as_foreign_key().expect("foreign-key constraint");
+        let expected = if resolved {
+            Some(fk::name("a", "parent"))
+        } else {
+            None
+        };
+        assert_eq!(constraint.primary_key_table(), expected.as_ref());
+        if resolved {
+            assert_eq!(
+                constraint.primary_key_column_type(),
+                Some(&PgBuiltInType::int4())
+            );
+            assert!(context.problems().is_empty(), "{:?}", context.problems());
+        } else {
+            assert_eq!(context.problems()[0].code(), "table_not_found");
+        }
+        fk::reversed_path(&mut context);
+        assert_eq!(constraint.primary_key_table(), expected.as_ref());
+        Ok(())
+    }
+}
+
+#[cfg(all(test, feature = "sqlite"))]
+mod test_analyze_constraint_sqlite {
+    use crate::{
+        names::{ColumnName, FullName},
+        sem::ColumnConstraint,
+        test_helpers::foreign_keys as fk,
+    };
+
+    #[test]
+    fn direct_sqlite_analysis_retains_the_canonical_target() -> testresult::TestResult {
+        let context = fk::apply_sqlite(fk::sqlite_context(), "CREATE TABLE Parent(id PRIMARY KEY)");
+        let syntax = fk::sqlite_column_constraint("CREATE TABLE child(id REFERENCES PARENT(id))");
+        let (result, context) = ColumnConstraint::from_ast_and_report(
+            &syntax,
+            context,
+            &fk::name("main", "child"),
+            &ColumnName::from("id"),
+        )?;
+        assert_eq!(
+            result
+                .as_foreign_key()
+                .unwrap()
+                .primary_key_table()
+                .unwrap()
+                .full_name(),
+            &FullName::with_schema("main", "parent")
+        );
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        Ok(())
+    }
+}
+
+impl ColumnConstraint {
     pub(crate) fn from_ast(
         ast: &AstColumnConstraint,
         context: &mut impl ParseContext,

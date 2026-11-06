@@ -1,5 +1,3 @@
-#[cfg(feature = "sqlite")]
-use crate::{SqliteToken, sem::ScalarAnalysisContext, syn::sqlite::ExprCast};
 use crate::{
     ast::{Dialect, Expr},
     context::BaseParseContext,
@@ -12,8 +10,6 @@ use crate::{
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
-#[cfg(feature = "sqlite")]
-use ::sql_fun_core::IVec;
 
 /// implicit cast expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -132,24 +128,6 @@ impl SemScalarExprNode for TypeCastExpr {
 
     fn is_not_null(&self) -> Option<bool> {
         self.arg.is_not_null()
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl TypeCastExpr {
-    /// analyze [`crate::syn::sqlite::ExprCast`]
-    pub fn analyze_sqlite_cast<TParseContext>(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: &ExprCast,
-        _tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = Expr::try_from(syn)?;
-        let result = SemScalarExpr::from_ast(&syntax, &mut context, scalar_context);
-        Ok((result?, context))
     }
 }
 

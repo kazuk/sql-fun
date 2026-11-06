@@ -1,16 +1,6 @@
-mod postgres;
-
-#[cfg(feature = "sqlite")]
-mod sqlite;
-mod token;
-
-use crate::sem::client_type::postgres::parse as postgres_parse;
-#[cfg(feature = "sqlite")]
-use crate::sem::client_type::sqlite::parse as sqlite_parse;
-
-use self::token::TypeTokens;
 use crate::{
-    ast::Dialect,
+    ast::client_type::{ClientBuiltin, ClientTypeHint, ClientTypeName, ClientTypePath},
+    names::FullName,
     sem::{AnalysisError, ParseContext, TypeReference},
 };
 
@@ -36,22 +26,51 @@ pub fn parse_client_type(
     input: &str,
     context: &impl ParseContext,
 ) -> Result<TypeReference, AnalysisError> {
-    if input.contains('\0') {
-        return Err(invalid("NUL in type name"));
-    }
-    let dialect = context.dialect();
-    if dialect == Dialect::postgres() {
-        let tokens = TypeTokens::postgres(input)?;
-        postgres_parse(&tokens)
-    } else {
-        #[cfg(feature = "sqlite")]
-        {
-            let tokens = TypeTokens::sqlite(input)?;
-            sqlite_parse(&tokens)
+    let (name, array) = ClientTypeHint::parse(input, context.dialect())?.into_parts();
+    let name = match name {
+        ClientTypeName::Named(path) => match path {
+            ClientTypePath::Local(name) => FullName::from_local_name(&name),
+            ClientTypePath::Schema(schema, name) => FullName::with_schema(&schema, &name),
+            ClientTypePath::Catalog(catalog, schema, name) => {
+                FullName::with_catalog(&catalog, &schema, &name)
+            }
+        },
+        ClientTypeName::Builtin(name) => {
+            let identity = match name {
+                ClientBuiltin::Integer => "int4",
+                ClientBuiltin::Smallint => "int2",
+                ClientBuiltin::Bigint => "int8",
+                ClientBuiltin::Real => "float4",
+                ClientBuiltin::Boolean => "bool",
+                ClientBuiltin::Numeric => "numeric",
+                ClientBuiltin::DoublePrecision => "float8",
+                ClientBuiltin::Character => "bpchar",
+                ClientBuiltin::Varchar => "varchar",
+                ClientBuiltin::Bit => "bit",
+                ClientBuiltin::BitVarying => "varbit",
+                ClientBuiltin::Time => "time",
+                ClientBuiltin::TimeWithZone => "timetz",
+                ClientBuiltin::Timestamp => "timestamp",
+                ClientBuiltin::TimestampWithZone => "timestamptz",
+                ClientBuiltin::Interval => "interval",
+                ClientBuiltin::Json => "json",
+            };
+            FullName::with_schema("pg_catalog", identity)
         }
-        #[cfg(not(feature = "sqlite"))]
-        Err(invalid("SQLite requires the sqlite feature"))
-    }
+        ClientTypeName::Float(precision) => {
+            let identity = match precision {
+                None => "float8",
+                Some(1..=24) => "float4",
+                Some(25..=53) => "float8",
+                Some(_) => return Err(invalid("float precision must be between 1 and 53")),
+            };
+            FullName::with_schema("pg_catalog", identity)
+        }
+        #[cfg(feature = "sqlite")]
+        ClientTypeName::Sqlite(parts) => FullName::from_local_name(&parts.join(" ")),
+        ClientTypeName::UnsupportedModifier => return Err(typmod()),
+    };
+    Ok(TypeReference::concrete_type_ref(&name, array))
 }
 
 #[cfg(test)]

@@ -1,19 +1,15 @@
 use crate::{
     ast::{
         ColumnConstraint as AstColumnConstraint, Dialect, TableConstraint as AstTableConstraint,
-        TryFromWithTokens,
     },
     names::TableName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnRename, Constraint, CreateTable,
-        EngineFeatureValidation, MinMaxExpr, ParseContext, PgBuiltInType, ScalarAnalysisContext,
-        SemScalarExpr, TruthTestExpr,
+        AnalysisError, AnalysisProblem, ColumnRename, CreateTable, MinMaxExpr, ParseContext,
+        PgBuiltInType, ScalarAnalysisContext, SemScalarExpr, TruthTestExpr,
         problem::CheckProblem,
         traversal::{ColumnRenamer, SemanticVisitorMut},
     },
-    syn::{Constraint as SynConstraint, ScanToken},
 };
-use ::sql_fun_core::IVec;
 
 /// Analyzed table CHECK, including failed definitions and their applicability.
 #[derive(Debug, Clone)]
@@ -91,6 +87,7 @@ impl CheckConstraint {
         }
         self.reject(context, CheckProblem::DuplicateName(self.name.clone()))
     }
+    #[cfg(test)]
     pub(crate) const fn disallow(&mut self) {
         self.applicable = false;
     }
@@ -261,28 +258,5 @@ impl CheckConstraint {
         }
         check.set_validated(!alter || !ast.extras().skip_validation());
         Ok(check)
-    }
-
-    pub(crate) fn from_legacy_syntax(
-        context: &mut impl ParseContext,
-        target: Option<&TableName>,
-        syntax: &SynConstraint,
-    ) -> Result<Constraint, AnalysisError> {
-        let Some(target) = target else {
-            return AnalysisError::raise_unexpected_none("CHECK target table");
-        };
-        let canonical = context
-            .resolve_table_name(target)
-            .unwrap_or_else(|| target.clone());
-        let table = context.get_table(&canonical).cloned();
-        let common =
-            AstTableConstraint::try_from_with_tokens(syntax, &IVec::<ScanToken>::default())?;
-        let valid = EngineFeatureValidation::table_constraint(&common, context, false)?;
-        let mut check =
-            Self::from_ast_table_constraint(&common, context, &canonical, table.as_ref(), true)?;
-        if !valid {
-            check.disallow();
-        }
-        Ok(Constraint::Check(check))
     }
 }

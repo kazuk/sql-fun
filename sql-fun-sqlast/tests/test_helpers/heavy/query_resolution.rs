@@ -1,8 +1,9 @@
 use ::sql_fun_sqlast::{
-    PostgresDialect, SqlFunArgs,
+    CacheContext, SqlFunArgs,
+    ast::Dialect,
     context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-    sem::{AnalysisError, SelectStatement},
-    syn::{ListOpt, Opt},
+    parse_statements,
+    sem::{AnalysisError, SemAst},
 };
 use std::path::PathBuf;
 
@@ -27,14 +28,9 @@ pub(crate) fn analyze(sql: &str) -> Result<(), AnalysisError> {
         let analysis_base = &FrozenBaseContext::from(base);
         SchemaFileContext::new(&metadata, analysis_base, &args, selected)
     };
-    let syntax = PostgresDialect::parse(sql).expect("legal SELECT syntax");
-    let tokens = PostgresDialect::scan(sql).expect("SELECT tokens");
-    let select = syntax
-        .get_stmts()
-        .get(0)
-        .get_stmt()
-        .as_select_stmt()
-        .as_inner()
-        .expect("SELECT fixture");
-    SelectStatement::analyze_select(context, select, &tokens).map(|_| ())
+    let syntax = parse_statements(sql, Dialect::postgres())
+        .next()
+        .expect("SELECT fixture")
+        .expect("legal SELECT syntax");
+    SemAst::from_ast(&syntax, context, &mut CacheContext::new()).map(|_| ())
 }

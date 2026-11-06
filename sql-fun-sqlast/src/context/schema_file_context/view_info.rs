@@ -9,7 +9,6 @@ use crate::{
         AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, Kind, ViewLike,
         problem::CreationProblem, search_path::expand_relation_search_path,
     },
-    syn::ObjectType,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -88,7 +87,7 @@ impl ViewInfoWrite for SchemaFileContext {
         }
         let name = self.apply_default_schema(create_table_as.name())?;
         match create_table_as.obj_type() {
-            ObjectType::ObjectMatview => {
+            Kind::MaterializedView => {
                 if !self.permits_relation_creation(
                     &name,
                     Kind::materialized_view(),

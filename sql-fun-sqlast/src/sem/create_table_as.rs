@@ -1,28 +1,26 @@
 use crate::{
     CacheContext,
-    ast::{CreateTableMode, TableAs, TryFromWithTokens},
+    ast::{CreateTableMode, TableAs},
     names::{ColumnName, FullName, TableName},
     sem::{
         AlterView, AnalysisError, AnalysisProblem, AstAndContextPair, ColumnRename, CreateTable,
-        OwnerSpecification, ParseContext, ResultColumnCollection, SelectStatement, SemAst,
+        Kind, OwnerSpecification, ParseContext, ResultColumnCollection, SelectStatement, SemAst,
         SourcePathWithSpan,
         alter_table::AlterObjSubCommand,
         create_table::ColumnDefinition,
         problem::CreationProblem,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
     },
-    syn::{CreateTableAsStmt, ObjectType, ScanToken},
 };
-use sql_fun_core::IVec;
 
-/// analyzed [`crate::syn::CreateTableAsStmt`]
+/// Analyzed CREATE TABLE AS statement.
 #[derive(Debug, Clone)]
 pub struct CreateTableAs {
     if_not_exists: bool,
 
     name: FullName,
     query: Box<SemAst>,
-    obj_type: ObjectType,
+    obj_type: Kind,
     owner: Option<OwnerSpecification>,
     alter_statements: Vec<AlterView>,
 }
@@ -86,9 +84,9 @@ impl CreateTableAs {
             name: name.clone(),
             query: Box::new(query.clone()),
             obj_type: if materialized {
-                ObjectType::ObjectMatview
+                Kind::MaterializedView
             } else {
-                ObjectType::ObjectTable
+                Kind::Table
             },
             owner: None,
             alter_statements: Vec::new(),
@@ -102,7 +100,7 @@ impl CreateTableAs {
 
     /// object type
     #[must_use]
-    pub const fn obj_type(&self) -> ObjectType {
+    pub const fn obj_type(&self) -> Kind {
         self.obj_type
     }
 
@@ -128,26 +126,6 @@ impl CreateTableAs {
     }
     pub(crate) fn has_column(&self, column: &ColumnName) -> bool {
         self.result_columns().has_column(column)
-    }
-
-    /// analyze [`crate::syn::CreateTableAsStmt`]
-    #[tracing::instrument(skip_all)]
-    pub fn analyze_create_table_as<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: CreateTableAsStmt,
-        tokens: &IVec<ScanToken>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply_at(
-            &TableAs::try_from_with_tokens(&syn, tokens)?,
-            context,
-            &mut CacheContext::new(),
-            source_span,
-        )
     }
 }
 

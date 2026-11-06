@@ -1,13 +1,9 @@
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::NotNullColumnConstraint;
 use crate::{
     ast::{ConflictClause, Validity},
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ParseContext,
+        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename, ParseContext,
     },
-    syn::{ConstrType, Constraint, Opt},
 };
 
 /// `NULL` / `NOT NULL` constraint
@@ -65,75 +61,6 @@ impl ColumnConstraintTrait for ColumnNullabilityConstraint {
 
     fn column_name(&self) -> &ColumnName {
         &self.column_name
-    }
-}
-
-impl ColumnNullabilityConstraint {
-    fn is_not_null_constraint(contype: ConstrType) -> Result<bool, AnalysisError> {
-        let not_null = if matches!(contype, ConstrType::ConstrNotnull) {
-            true
-        } else if matches!(contype, ConstrType::ConstrNull) {
-            false
-        } else {
-            AnalysisError::raise_unexpected_input("constraint.contype")?;
-            AnalysisError::never()
-        };
-        Ok(not_null)
-    }
-}
-
-impl ColumnNullabilityConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-
-        let not_null = Self::is_not_null_constraint(contype)?;
-        Ok((
-            Self::new(
-                table_name,
-                column_name,
-                not_null,
-                None,
-                Some(Validity::from_constraint(syn)),
-            ),
-            context,
-        ))
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl ColumnNullabilityConstraint {
-    /// analyze [`crate::syn::sqlite::NotNullColumnConstraint`]
-    pub fn analyze_constraint_sqlite<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &NotNullColumnConstraint,
-    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Ok((
-            ColumnConstraint::nullability(Self::new(
-                table_name,
-                column_name,
-                !syn.nullable(),
-                syn.conflict_clause().map(ConflictClause::from),
-                None,
-            )),
-            context,
-        ))
     }
 }
 

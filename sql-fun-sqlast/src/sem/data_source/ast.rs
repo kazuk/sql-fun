@@ -14,108 +14,6 @@ use crate::{
     },
 };
 
-#[cfg(test)]
-use crate::{
-    ast::TryFromWithTokens,
-    syn::{JoinExpr, RangeFunction, RangeSubselect, RangeTableFunc, ScanToken},
-};
-#[cfg(test)]
-use ::sql_fun_core::IVec;
-
-impl DataSource {
-    // Standalone boundary fixture; nested queries resolve through their common scope.
-    #[cfg(test)]
-    fn analyze_range_subselect<TParseContext>(
-        mut context: TParseContext,
-        range_subsel: RangeSubselect,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = FromItem::query(DerivedTable::try_from_with_tokens(&range_subsel, tokens)?);
-        let outcome = Self::from_ast_source(
-            &syntax,
-            &mut context,
-            &WithClause::default(),
-            &FromClause::default(),
-        );
-        Ok((outcome?, context))
-    }
-}
-
-impl DataSource {
-    #[cfg(test)]
-    fn analyze_join_expr<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        join_expr: JoinExpr,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = FromItem::join(Join::try_from_with_tokens(&join_expr, tokens)?);
-        let outcome = Self::from_ast_source(&syntax, &mut context, with_clause, from_clause);
-        Ok((outcome?, context))
-    }
-}
-
-impl DataSource {
-    #[cfg(test)]
-    fn analyze_range_table_func<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        node: RangeTableFunc,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = FromItem::xml(XmlTable::try_from_with_tokens(&node, tokens)?);
-        let outcome = Self::from_ast_source(&syntax, &mut context, with_clause, from_clause);
-        Ok((outcome?, context))
-    }
-}
-
-impl DataSource {
-    #[cfg(test)]
-    fn analyze_range_func_rows_from<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        node: RangeFunction,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = FromItem::functions(TableFunctions::try_from_with_tokens(&node, tokens)?);
-        let outcome = Self::from_ast_source(&syntax, &mut context, with_clause, from_clause);
-        Ok((outcome?, context))
-    }
-}
-
-impl DataSource {
-    #[cfg(test)]
-    fn analyze_range_func<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        node: RangeFunction,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = FromItem::functions(TableFunctions::try_from_with_tokens(&node, tokens)?);
-        let outcome = Self::from_ast_source(&syntax, &mut context, with_clause, from_clause);
-        Ok((outcome?, context))
-    }
-}
-
 impl DataSource {
     pub(crate) fn from_ast_xml_table(
         ast: &XmlTable,
@@ -219,11 +117,9 @@ impl DataSource {
 mod test_analyze_range_func {
     use crate::{
         names::SchemaName,
-        sem::{DataSource, DataSource as AnalyzeDataSource, FromClause, WithClause},
-        test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
+        sem::{DataSource, FromClause, WithClause},
+        test_helpers::{TestParseContext, setup_function_overload, source_syntax, test_context},
     };
-
-    use ::sql_fun_core::IVec;
 
     use ::testresult::TestResult;
 
@@ -234,21 +130,11 @@ mod test_analyze_range_func {
         test_context.setup_type(int4);
         test_context.setup_function("set_func", std::slice::from_ref(&overload));
 
-        let builder = SynBuilder::new();
-        let func_call_node = builder.build_func_call_node("set_func");
-        let functions_node = builder.build_list_node(vec![func_call_node]);
-        let range_function = builder.build_range_function(functions_node, "set_alias", false);
-        let tokens = IVec::default();
+        let syntax = source_syntax::function("set_func", "set_alias", false)?;
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-
-        let (ds, _) = AnalyzeDataSource::analyze_range_func(
-            test_context,
-            &with_clause,
-            &from_clause,
-            range_function,
-            &tokens,
-        )?;
+        let ds =
+            DataSource::from_ast_source(&syntax, &mut test_context, &with_clause, &from_clause)?;
 
         let mut aliases = Vec::new();
         ds.push_alias_names(&mut aliases);
@@ -326,10 +212,10 @@ mod test_analyze_range_func_rows_from {
     use crate::{
         names::{FullName, SchemaName},
         sem::{
-            AliasSpec, DataSource, DataSource as AnalyzeDataSource, DataSourceRowFunctions,
-            DataSourceRowsFromFunc, FromClause, WithClause,
+            AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, FromClause,
+            WithClause,
         },
-        test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
+        test_helpers::{TestParseContext, setup_function_overload, source_syntax, test_context},
     };
 
     use ::sql_fun_core::IVec;
@@ -343,20 +229,11 @@ mod test_analyze_range_func_rows_from {
         test_context.setup_type(int4);
         let func_name = test_context.setup_function("rows_func", std::slice::from_ref(&overload));
 
-        let builder = SynBuilder::new();
-        let func_call_node = builder.build_func_call_node(func_name.local_name().as_str());
-        let range_function = builder.build_range_function(func_call_node, "rows_alias", true);
-        let tokens = IVec::default();
+        let syntax = source_syntax::function(func_name.local_name().as_str(), "rows_alias", true)?;
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-
-        let (ds, _) = AnalyzeDataSource::analyze_range_func_rows_from(
-            test_context,
-            &with_clause,
-            &from_clause,
-            range_function,
-            &tokens,
-        )?;
+        let ds =
+            DataSource::from_ast_source(&syntax, &mut test_context, &with_clause, &from_clause)?;
 
         let mut invocation = DataSource::table_function(
             &overload,
@@ -413,11 +290,9 @@ impl DataSource {
 mod test_analyze_range_table_func {
     use crate::{
         names::SchemaName,
-        sem::{DataSource, DataSource as AnalyzeDataSource, FromClause, WithClause},
-        test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
+        sem::{DataSource, FromClause, WithClause},
+        test_helpers::{TestParseContext, setup_function_overload, source_syntax, test_context},
     };
-
-    use ::sql_fun_core::IVec;
 
     use ::testresult::TestResult;
 
@@ -428,21 +303,11 @@ mod test_analyze_range_table_func {
         test_context.setup_type(int4);
         test_context.setup_function("table_func", std::slice::from_ref(&overload));
 
-        let builder = SynBuilder::new();
-        let func_call_node = builder.build_func_call_node("table_func");
-        let alias = builder.alias("func_alias", &[]);
-        let range_table_func = builder.build_range_table_func(func_call_node, alias);
-        let tokens = IVec::default();
+        let syntax = source_syntax::table_function("table_func", "func_alias")?;
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-
-        let (ds, _) = AnalyzeDataSource::analyze_range_table_func(
-            test_context,
-            &with_clause,
-            &from_clause,
-            range_table_func,
-            &tokens,
-        )?;
+        let ds =
+            DataSource::from_ast_source(&syntax, &mut test_context, &with_clause, &from_clause)?;
 
         let mut aliases = Vec::new();
         ds.push_alias_names(&mut aliases);
@@ -521,6 +386,7 @@ impl DataSource {
 }
 
 impl DataSource {
+    #[cfg(test)]
     pub(crate) fn from_ast_list(
         items: &[FromItem],
         context: &mut impl ParseContext,
@@ -533,6 +399,7 @@ impl DataSource {
 }
 
 impl DataSource {
+    #[cfg(test)]
     pub(crate) fn from_ast_source(
         ast: &FromItem,
         context: &mut impl ParseContext,
@@ -595,12 +462,9 @@ impl DataSource {
 mod test_analyze_range_subselect {
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{DataSource, SourcePathWithSpan},
-        syn::{Node, NodeInner, NodeList, WithClauseOpt},
-        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
+        sem::{DataSource, FromClause, SourcePathWithSpan, WithClause},
+        test_helpers::{TestParseContext, source_span, source_syntax, test_context},
     };
-
-    use ::sql_fun_core::IVec;
 
     use ::testresult::TestResult;
 
@@ -609,21 +473,14 @@ mod test_analyze_range_subselect {
         mut test_context: TestParseContext,
         source_span: SourcePathWithSpan,
     ) -> TestResult {
-        let builder = SynBuilder::new();
         test_context.set_source_path_with_span(&source_span);
-
-        let res_target =
-            builder.res_target("name", NodeInner::AConst(builder.const_int4(10)).into());
-        let query = builder.select_stmt(
-            WithClauseOpt::none(),
-            NodeList::from(Vec::<Node>::new()),
-            vec![res_target],
-        );
-        let alias_spec = builder.alias_name_only("alias1");
-        let range_subselect = builder.range_subselect(alias_spec, query);
-        let tokens = IVec::default();
-
-        DataSource::analyze_range_subselect(test_context, range_subselect, &tokens)?;
+        let syntax = source_syntax::subselect()?;
+        DataSource::from_ast_source(
+            &syntax,
+            &mut test_context,
+            &WithClause::default(),
+            &FromClause::default(),
+        )?;
         Ok(())
     }
 }
@@ -662,15 +519,12 @@ impl DataSource {
 #[cfg(test)]
 mod test_analyze_join_expr {
     use crate::{
-        names::{ColumnName, FullName, SchemaName},
+        names::{ColumnName, SchemaName},
         sem::{
             ColumnDefinition, DataSource, FromClause, SourcePathWithSpan, TypeReference, WithClause,
         },
-        syn::NodeInner,
-        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
+        test_helpers::{TestParseContext, source_span, source_syntax, test_context},
     };
-
-    use ::sql_fun_core::IVec;
 
     use ::testresult::TestResult;
 
@@ -695,34 +549,10 @@ mod test_analyze_join_expr {
         test_context.setup_table("table2", &columns, &source_span);
         test_context.setup_binary("=", "int4", "int4", "bool", true);
 
-        let builder = SynBuilder::new();
-
-        let name = FullName::from_local_name("table1");
-        let alias = builder.alias("t1", &[]);
-        let table1 = NodeInner::RangeVar(builder.range_var(&name, &alias.into()));
-        let name = FullName::from_local_name("table2");
-        let alias = builder.alias("t2", &[]);
-        let table2 = NodeInner::RangeVar(builder.range_var(&name, &alias.into()));
-        let left = builder.column_ref("t1", "id");
-        let right = builder.column_ref("t2", "id");
-        let qual = builder.operator_equals(
-            NodeInner::ColumnRef(left).into(),
-            NodeInner::ColumnRef(right).into(),
-        );
-
-        let join_expr = builder.inner_join(&table1.into(), &table2.into(), &qual);
-
+        let syntax = source_syntax::inner_join()?;
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let tokens = IVec::default();
-
-        let (_ds, _) = DataSource::analyze_join_expr(
-            test_context,
-            &with_clause,
-            &from_clause,
-            join_expr,
-            &tokens,
-        )?;
+        DataSource::from_ast_source(&syntax, &mut test_context, &with_clause, &from_clause)?;
 
         Ok(())
     }

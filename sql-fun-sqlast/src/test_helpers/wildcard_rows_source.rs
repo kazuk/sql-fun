@@ -1,3 +1,4 @@
+use crate::PostgresDialect;
 use crate::ast::{Dialect, FromItem, Query, Statement, StatementNode, TableFunctions};
 use crate::names::{AliasName, ColumnName};
 use crate::parse_statements;
@@ -60,4 +61,9 @@ pub(crate) fn rendered(source: FromItem) -> String {
     Query::test_projection_statement(source)
         .deparse_sql(Dialect::postgres())
         .unwrap()
+}
+
+/// Verify that rewritten SQL remains accepted by the PostgreSQL parser.
+pub(crate) fn assert_parses(sql: &str) {
+    PostgresDialect::parse(sql).unwrap();
 }

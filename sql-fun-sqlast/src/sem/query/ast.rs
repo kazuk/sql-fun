@@ -345,7 +345,7 @@ impl QueryWindow {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        // pg_query stores OVER name in WindowDef.name; WINDOW declarations
+        // An OVER reference stores its name in WindowDef.name; WINDOW declarations
         // use the same parser field for a definition. Classify at this boundary.
         if let Some(name) = &ast.name() {
             let reference =

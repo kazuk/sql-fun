@@ -40,7 +40,6 @@ mod from_clause;
 mod insert_statement;
 mod merge_statement;
 mod name_analysis;
-mod name_conversion;
 mod object_info;
 mod operators;
 mod overload_rank;
@@ -113,7 +112,7 @@ pub use self::{
     drop_trigger::DropTrigger,
     merge_statement::{
         MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
-        ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
+        ViewMergeSupport, ViewMergeTriggers,
     },
     query_access::{AccessObjectKind, AccessRecord, QueryAccess},
     query_metadata::QueryMetadata,
@@ -123,27 +122,18 @@ pub use self::{
 };
 pub use crate::AstAndContextPair;
 pub(crate) use crate::stack::with_stack;
-#[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::Cmd};
 use crate::{
     StringSpan,
-    ast::{
-        Comment as AstComment, DropBehavior, Extension as AstExtension, ObjectKind,
-        TryFromWithTokens,
-    },
+    ast::{Comment as AstComment, DropBehavior, Extension as AstExtension, ObjectKind},
     context::ParseContext,
     names::FullName,
     sem::traversal::{SemanticVisitor, SemanticVisitorMut},
-    syn::{CommentStmt, CreateExtensionStmt},
 };
 pub use ::sql_fun_core::AccessKind;
-#[cfg(feature = "sqlite")]
-use ::sql_fun_core::IVec;
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
 };
-#[expect(deprecated)]
 pub use {
     self::{
         alter_column::{
@@ -173,7 +163,7 @@ pub use {
             CatalogTypeIdentity, CollationDefinition, CollationIdentity, DatabaseCollation,
             OperatorClassDefinition, OperatorFamilyIdentity,
         },
-        constraint::{AnalyzeConstraint, CheckConstraint, Constraint, PrimaryKeyConstraint},
+        constraint::{CheckConstraint, Constraint, PrimaryKeyConstraint},
         create_comp_type::{CompositeFieldCollection, CreateCompositeType},
         create_domain::CreateDomain,
         create_enum_type::CreateEnum,
@@ -192,17 +182,15 @@ pub use {
             DeferredTableFunction, JoinKind, MergeRecordDataSource, MergeRecordRole, Nullable,
             SamplingInput, TableSampleSource,
         },
-        def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
+        def_elem::DefElemKey,
         delete_statement::{
             DeleteCursor, DeleteRowColumn, DeleteRowVersion, DeleteStatement, ViewDeleteSupport,
-            analyze_delete_statement,
         },
         from_clause::FromClause,
         insert_statement::{
             InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
             InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
             InsertTarget, InsertValue, ViewInsertSupport, ViewSourceArbiter,
-            analyze_insert_statement,
         },
         object_info::Kind,
         operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
@@ -240,9 +228,9 @@ pub use {
         },
         update_statement::{
             UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
-            ViewUpdateSupport, analyze_update_statement,
+            ViewUpdateSupport,
         },
-        variable_set::{VariableSet, analyze_variable_set},
+        variable_set::VariableSet,
         view_like::ViewLike,
         wildcard_expansion::{
             WildcardExpansion, WildcardExpansionCollection, WildcardRewriteError,
@@ -645,22 +633,9 @@ impl SemAst {
             None
         }
     }
-
-    /// analyze [`Cmd`]
-    #[cfg(feature = "sqlite")]
-    pub fn semantic_analysis_sqlite<TContext>(
-        context: TContext,
-        syn: Cmd,
-        tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        Self::semantic_analysis_sqlite_stmt(context, syn.into_statement(), tokens)
-    }
 }
 
-/// analyzed [`crate::syn::CommentStmt`]
+/// Analyzed COMMENT statement.
 #[derive(Debug, Clone)]
 pub struct Comment {
     target: String,
@@ -695,20 +670,6 @@ impl Comment {
             object_type,
             comment: comment.to_owned(),
         }
-    }
-
-    /// analyze [`crate::syn::CommentStmt`]
-    pub fn analyze_comment<TParseContext>(
-        context: TParseContext,
-        syn: CommentStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply(
-            &AstComment::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?,
-            context,
-        )
     }
 }
 
@@ -775,7 +736,7 @@ impl ProblemLikeError {
     }
 }
 
-/// analyzed [`crate::syn::CreateExtensionStmt`]
+/// Analyzed CREATE EXTENSION statement.
 #[derive(Debug, Clone)]
 pub struct CreateExtension {
     if_not_exists: bool,
@@ -803,24 +764,6 @@ impl CreateExtension {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    /// analyze [`crate::syn::CreateExtensionStmt`]
-    pub fn analyze_create_extension<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: CreateExtensionStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let extension =
-            Self::from_name(&syn.get_extname()).with_if_not_exists(syn.get_if_not_exists());
-        let result_context = context.apply_create_extension(&extension)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateExtension(extension),
-            result_context,
-        ))
     }
 }
 

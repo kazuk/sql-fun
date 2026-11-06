@@ -7,7 +7,6 @@ use crate::{
         scalar_expr::arith_expr::{ArithExpr, call_sites::binary_is_not_null},
         traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
     },
-    syn::AExprKind,
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -206,7 +205,7 @@ impl UndefinedOperatorCallSite {
         TParseContext: ParseContext,
     {
         context.report_analysis_problem(AnalysisProblem::undefined_operator(
-            AExprKind::AexprOp,
+            ::sql_fun_core::analysis_problem::AExprKind::new("operator"),
             name,
             lexpr.as_ref(),
             rexpr.as_ref(),

@@ -5,6 +5,7 @@ use crate::{
     AstAndContextPair,
     ast::Dialect,
     names::{FullName, SchemaName},
+    parse_statements,
     test_helpers::{SqliteSynBuilder as TestHelpersSqliteSynBuilder, TestParseContext},
 };
 use crate::{
@@ -159,15 +160,19 @@ fn public_sqlite_table_dispatch_preserves_column_semantics(
     source_span: SourcePathWithSpan,
 ) -> testresult::TestResult {
     use crate::{context::MutSourcePathWithSpan, sem::SemAst};
-    let parsed = TestHelpersSqliteSynBuilder
-        .parse_as_stmt("create table items (label text not null default 'one')");
+    let parsed = parse_statements(
+        "create table items (label text not null default 'one')",
+        Dialect::sqlite(),
+    )
+    .next()
+    .unwrap()?;
     let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
     context
         .set_get_search_path_result(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
     context.setup_type(PgBuiltInType::text());
     context.set_source_path_with_span(&source_span);
     let AstAndContextPair(statement, context) =
-        SemAst::semantic_analysis_sqlite_stmt(context, parsed, &IVec::default())?;
+        SemAst::from_ast(&parsed, context, &mut create_cache_context())?;
     let SemAst::CreateTable(table) = statement else {
         panic!("semantic table");
     };
@@ -400,6 +405,7 @@ mod sqlite {
         ast::{Dialect, Expr},
         context::MutSourcePathWithSpan,
         names::ColumnName,
+        parse_statements,
         sem::{PgBuiltInType, ScalarAnalysisContext, SelectStatement, SemAst, SemScalarExpr},
         test_helpers::{
             ast_query::{postgres, sqlite},
@@ -411,8 +417,6 @@ mod sqlite {
     use crate::test_helpers::{
         SqliteSynBuilder, TestParseContext, ast_query::AnalysisFixture, source_span,
     };
-
-    use ::sql_fun_core::IVec;
 
     #[test]
     fn sqlite_case_does_not_use_postgres_implicit_casts() -> testresult::TestResult {
@@ -494,10 +498,14 @@ mod sqlite {
     fn public_sqlite_select_dispatch_resolves_cte_columns() -> testresult::TestResult {
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.set_source_path_with_span(&source_span());
-        let statement =
-            SqliteSynBuilder.parse_as_stmt("with c(x) as (select 42) select x as n from c");
+        let statement = parse_statements(
+            "with c(x) as (select 42) select x as n from c",
+            Dialect::sqlite(),
+        )
+        .next()
+        .unwrap()?;
         let AstAndContextPair(ast, context) =
-            SemAst::semantic_analysis_sqlite_stmt(context, statement, &IVec::default())?;
+            SemAst::from_ast(&statement, context, &mut create_cache_context())?;
         let query = ast.into_select_statemtnt().expect("SELECT result");
         let column = query
             .result_columns()
@@ -659,7 +667,7 @@ fn missing_index_table_reports_resolution_problem() -> testresult::TestResult {
 #[cfg(test)]
 mod test_name_from_range_var {
     use crate::{
-        ast::{FromOpt, Name},
+        ast::Name,
         names::{FullName, LocalName},
         syn::AliasOpt,
         test_helpers::SynBuilder,
@@ -671,15 +679,26 @@ mod test_name_from_range_var {
     #[case(FullName::with_catalog("catalog", "app", "items"))]
     fn preserves_relation_qualification(#[case] expected: FullName) -> testresult::TestResult {
         let source = SynBuilder::new().range_var(&expected, &AliasOpt::none());
-        assert_eq!(FullName::from_ast_name(&Name::from(&source))?, expected);
-        let optional = Name::from_opt(Some(&source)).expect("present relation");
+        assert_eq!(
+            FullName::from_ast_name(&Name::try_from(&source)?)?,
+            expected
+        );
+        let optional = Some(Name::try_from(&source))
+            .transpose()?
+            .expect("present relation");
         assert_eq!(FullName::from_ast_name(&optional)?, expected);
         Ok(())
     }
 
     #[test]
     fn absent_relation_remains_absent() {
-        assert!(Name::from_opt(None::<&crate::syn::RangeVar>).is_none());
+        assert!(
+            None::<&crate::syn::RangeVar>
+                .map(Name::try_from)
+                .transpose()
+                .unwrap()
+                .is_none()
+        );
     }
 }
 
@@ -896,18 +915,16 @@ mod test_public_postgres_entry_points_share_insert_resolution {
 
     #[test]
     fn public_postgres_entry_points_share_insert_resolution() {
-        use crate::{
-            PostgresDialect,
-            sem::{SemAst, analyze_insert_statement},
-            syn::{ListOpt, Opt},
-        };
+        use crate::{parse_statements, sem::SemAst, test_helpers::create_cache_context};
         let sql = "INSERT INTO items(id) VALUES($1) RETURNING id";
-        let parsed = PostgresDialect::parse(sql).unwrap();
-        let tokens = PostgresDialect::scan(sql).unwrap();
-        let result = SemAst::semantic_analysis(
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let result = SemAst::from_ast(
+            &statement,
             test_helpers::catalog(Dialect::postgres()),
-            parsed.clone(),
-            &tokens,
+            &mut create_cache_context(),
         )
         .unwrap();
         assert_eq!(result.ast().as_insert().unwrap().result_columns().len(), 1);
@@ -918,15 +935,9 @@ mod test_public_postgres_entry_points_share_insert_resolution {
                 .parameter(1)
                 .is_some()
         );
-        let insert = parsed
-            .get_stmts()
-            .get(0)
-            .get_stmt()
-            .as_insert_stmt()
-            .as_inner()
-            .unwrap();
-        let (result, context) =
-            analyze_insert_statement(test_helpers::catalog(Dialect::postgres()), &None, insert)
+        let mut context = test_helpers::catalog(Dialect::postgres());
+        let result =
+            SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context())
                 .unwrap();
         assert_eq!(result.as_insert().unwrap().result_columns().len(), 1);
         assert!(context.parameter_constraints().parameter(1).is_some());
@@ -966,17 +977,16 @@ mod test_public_postgres_entry_points_share_insert_resolution {
     #[test]
     fn public_sqlite_entry_point_retains_returning_and_parameters() {
         #[cfg(feature = "sqlite")]
-        use crate::{sem::SemAst, sqlite::SqliteDialect};
+        use crate::{parse_statements, sem::SemAst, test_helpers::create_cache_context};
         let sql = "INSERT INTO items(id) VALUES(?1) RETURNING id";
-        let statement = SqliteDialect::parse(sql)
+        let statement = parse_statements(sql, Dialect::sqlite())
+            .next()
             .unwrap()
-            .unwrap()
-            .into_plain_statement()
             .unwrap();
-        let result = SemAst::semantic_analysis_sqlite_stmt(
+        let result = SemAst::from_ast(
+            &statement,
             test_helpers::catalog(Dialect::sqlite()),
-            statement,
-            &SqliteDialect::scan(sql).unwrap(),
+            &mut create_cache_context(),
         )
         .unwrap();
         assert_eq!(result.ast().as_insert().unwrap().result_columns().len(), 1);
@@ -1003,7 +1013,7 @@ mod test_rejects_invalid_structure {
     };
 
     #[cfg(feature = "sqlite")]
-    use crate::{sem::SemAst as SemSemAst, test_helpers::SqliteSynBuilder};
+    use crate::sem::SemAst as SemSemAst;
 
     #[rstest::rstest]
     #[case::missing_relation("UPDATE absent SET id=1", false)]
@@ -1031,18 +1041,15 @@ mod test_rejects_invalid_structure {
 
     #[test]
     fn public_postgres_entry_points_share_update_resolution() {
-        use crate::{
-            PostgresDialect,
-            sem::{SemAst, analyze_update_statement},
-            syn::{ListOpt, Opt},
-        };
         let sql = "UPDATE items SET id=$1 RETURNING id";
-        let parsed = PostgresDialect::parse(sql).unwrap();
-        let tokens = PostgresDialect::scan(sql).unwrap();
-        let result = SemAst::semantic_analysis(
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let result = SemAst::from_ast(
+            &statement,
             test_helpers::catalog(Dialect::postgres()),
-            parsed.clone(),
-            &tokens,
+            &mut create_cache_context(),
         )
         .unwrap();
         assert_eq!(result.ast().as_update().unwrap().result_columns().len(), 1);
@@ -1053,15 +1060,9 @@ mod test_rejects_invalid_structure {
                 .parameter(1)
                 .is_some()
         );
-        let update = parsed
-            .get_stmts()
-            .get(0)
-            .get_stmt()
-            .as_update_stmt()
-            .as_inner()
-            .unwrap();
-        let (result, context) =
-            analyze_update_statement(test_helpers::catalog(Dialect::postgres()), &None, update)
+        let mut context = test_helpers::catalog(Dialect::postgres());
+        let result =
+            SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context())
                 .unwrap();
         assert_eq!(result.as_update().unwrap().result_columns().len(), 1);
         assert!(context.parameter_constraints().parameter(1).is_some());
@@ -1070,12 +1071,17 @@ mod test_rejects_invalid_structure {
     #[cfg(feature = "sqlite")]
     #[test]
     fn public_sqlite_entry_point_analyzes_update() {
-        let syntax = SqliteSynBuilder
-            .parse_as_stmt("UPDATE OR IGNORE items NOT INDEXED SET id=?1 RETURNING id");
-        let result = SemSemAst::semantic_analysis_sqlite_stmt(
+        let syntax = parse_statements(
+            "UPDATE OR IGNORE items NOT INDEXED SET id=?1 RETURNING id",
+            Dialect::sqlite(),
+        )
+        .next()
+        .unwrap()
+        .unwrap();
+        let result = SemSemAst::from_ast(
+            &syntax,
             catalog(Dialect::sqlite()),
-            syntax,
-            &::sql_fun_core::IVec::default(),
+            &mut create_cache_context(),
         )
         .unwrap();
         let update = result.ast().as_update().unwrap();
@@ -1095,7 +1101,9 @@ mod test_rejects_invalid_structure {
 #[cfg(test)]
 mod test_retains_invalid_structure_as_diagnostics {
     #[cfg(feature = "sqlite")]
-    use crate::{sem::SemAst as SemSemAst, test_helpers::SqliteSynBuilder};
+    use crate::sem::SemAst as SemSemAst;
+    #[cfg(feature = "sqlite")]
+    use crate::{parse_statements, test_helpers::create_cache_context};
 
     use crate::{
         ast::Dialect,
@@ -1115,26 +1123,22 @@ mod test_retains_invalid_structure_as_diagnostics {
 
     #[test]
     fn postgres_public_entry_points_agree() {
-        use crate::{
-            PostgresDialect,
-            sem::{SemAst, analyze_delete_statement},
-            syn::{ListOpt, Opt},
-        };
+        use crate::{parse_statements, sem::SemAst, test_helpers::create_cache_context};
         let sql = "DELETE FROM items WHERE $1 RETURNING id";
-        let parsed = PostgresDialect::parse(sql).unwrap();
-        let tokens = PostgresDialect::scan(sql).unwrap();
-        let result =
-            SemAst::semantic_analysis(catalog(Dialect::postgres()), parsed.clone(), &tokens)
-                .unwrap();
-        let delete = parsed
-            .get_stmts()
-            .get(0)
-            .get_stmt()
-            .as_delete_stmt()
-            .as_inner()
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
             .unwrap();
-        let (adapted, context) =
-            analyze_delete_statement(catalog(Dialect::postgres()), &None, delete).unwrap();
+        let result = SemAst::from_ast(
+            &statement,
+            catalog(Dialect::postgres()),
+            &mut create_cache_context(),
+        )
+        .unwrap();
+        let mut context = catalog(Dialect::postgres());
+        let adapted =
+            SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context())
+                .unwrap();
         assert_eq!(result.ast().as_delete(), adapted.as_delete());
         assert_eq!(
             result
@@ -1154,12 +1158,17 @@ mod test_retains_invalid_structure_as_diagnostics {
     #[cfg(feature = "sqlite")]
     #[test]
     fn sqlite_public_adapter_analyzes_delete() {
-        let syntax =
-            SqliteSynBuilder.parse_as_stmt("DELETE FROM items NOT INDEXED WHERE ?1 RETURNING id");
-        let result = SemSemAst::semantic_analysis_sqlite_stmt(
+        let syntax = parse_statements(
+            "DELETE FROM items NOT INDEXED WHERE ?1 RETURNING id",
+            Dialect::sqlite(),
+        )
+        .next()
+        .unwrap()
+        .unwrap();
+        let result = SemSemAst::from_ast(
+            &syntax,
             catalog(Dialect::sqlite()),
-            syntax,
-            &::sql_fun_core::IVec::default(),
+            &mut create_cache_context(),
         )
         .unwrap();
         let delete = result.ast().as_delete().unwrap();
@@ -1837,11 +1846,11 @@ mod test_ownership_lifecycle {
 #[cfg(test)]
 mod test_ownership_adapter_equivalence {
     use crate::{
+        ast::StatementNode,
         context::OwnershipInfoRead,
         sem::{AlterOwner, SemAst},
-        syn::Opt,
         test_helpers::{
-            SynBuilder, create_cache_context,
+            create_cache_context,
             ownership::{apply_ownership_sql, ownership_context, ownership_statement},
         },
     };
@@ -1863,12 +1872,10 @@ mod test_ownership_adapter_equivalence {
                 .is_some()
         );
         assert!(context.schema_definition("app").unwrap().owner().is_none());
-        let syntax = SynBuilder::new()
-            .parse("ALTER SCHEMA app OWNER TO alice")
-            .as_alter_owner_stmt()
-            .as_inner()
-            .unwrap();
-        let result = AlterOwner::analyze_alter_owner(context, syntax)?;
+        let StatementNode::AlterOwner(syntax) = &statement else {
+            panic!("ALTER OWNER syntax")
+        };
+        let result = AlterOwner::from_ast_and_apply(syntax, context)?;
         assert_eq!(
             result.ast().ownership_change().unwrap().target(),
             semantics.ownership_change().unwrap().target()
@@ -2402,6 +2409,7 @@ mod test_analyze_constraint {
     };
 
     use crate::{
+        ast::{ColumnConstraint as AstColumnConstraint, TryFromWithTokens},
         names::{ColumnName, FullName, TableName},
         sem::{ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait},
         syn::Constraint,
@@ -2436,12 +2444,12 @@ mod test_analyze_constraint {
         let table_name = TableName::from(FullName::from_local_name("table1"));
         let column_name = ColumnName::new("col1");
         let tokens = Vec::default().into();
-        let (constraint, _new_context) = ColumnConstraint::analyze_constraint(
+        let syntax = AstColumnConstraint::try_from_with_tokens(&syn, &tokens)?;
+        let (constraint, _new_context) = ColumnConstraint::from_ast_and_report(
+            &syntax,
             test_context,
             &table_name,
             &column_name,
-            &syn,
-            &tokens,
         )?;
         assert_eq!(constraint.kind(), kind);
         Ok(())
@@ -2453,7 +2461,9 @@ mod test_invalid_drop_leaves_named_definitions_and_links_intact {
     use crate::{
         context::{ParseContext, RuleInfoRead},
         sem::SemAst,
-        test_helpers::{drop_rule as test_helpers, heavy::drop_rule as heavy},
+        test_helpers::{
+            create_cache_context, drop_rule as test_helpers, heavy::drop_rule as heavy,
+        },
     };
 
     #[rstest::rstest]
@@ -2468,7 +2478,7 @@ mod test_invalid_drop_leaves_named_definitions_and_links_intact {
             SemAst::from_ast_node(
                 test_helpers::statement(sql).node(),
                 &mut child,
-                &mut crate::test_helpers::create_cache_context()
+                &mut create_cache_context()
             )
             .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
         );
@@ -2486,8 +2496,7 @@ mod test_postgres_scalar_syntax {
             ScalarConstExpr::*,
             SemScalarExpr::{self, *},
         },
-        syn::ListOpt,
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{TestParseContext, ast_query, test_context},
     };
 
     use ::testresult::TestResult;
@@ -2500,21 +2509,10 @@ mod test_postgres_scalar_syntax {
         #[case] sql_expr: &str,
         #[case] expect_expr: SemScalarExpr,
     ) -> TestResult {
-        let syn_builder = SynBuilder::new();
-        let node = syn_builder.parse(&format!("select {sql_expr}"));
-        let expr = node
-            .as_select_stmt()
-            .get_target_list()
-            .map(|v| v.as_res_target().get_val())
-            .unwrap()
-            .swap_remove(0);
-        let tokens = Vec::default().into();
-        let (expr, _result_context) = SemScalarExpr::analyze_scaler_expr(
-            test_context,
-            &ScalarAnalysisContext::default(),
-            expr,
-            &tokens,
-        )?;
+        let syntax = ast_query::postgres_expression(sql_expr)?;
+        let mut context = test_context;
+        let expr =
+            SemScalarExpr::from_ast(&syntax, &mut context, &ScalarAnalysisContext::default())?;
         assert_eq!(expr, expect_expr);
 
         Ok(())
@@ -2531,8 +2529,7 @@ mod test_sqlite_scalar_syntax {
             ScalarConstExpr::*,
             SemScalarExpr::{self, *},
         },
-        syn::sqlite::{OneSelect, ResultColumn, Stmt},
-        test_helpers::{SqliteSynBuilder, TestParseContext, sqlite_syn, test_context},
+        test_helpers::{TestParseContext, ast_query, test_context},
     };
 
     use ::testresult::TestResult;
@@ -2548,28 +2545,13 @@ mod test_sqlite_scalar_syntax {
         ))]
     fn test_analyze_sqlite_scalar_expr(
         test_context: TestParseContext,
-        sqlite_syn: SqliteSynBuilder,
         #[case] sql_expr: &str,
         #[case] expect_expr: SemScalarExpr,
     ) -> TestResult {
-        let stmt = sqlite_syn.parse_as_stmt(&format!("select {sql_expr}"));
-        let Stmt::Select(select) = stmt else {
-            panic!("{stmt:?}")
-        };
-        let OneSelect::Select(select_item) = select.body().select() else {
-            panic!("{select:?}")
-        };
-        let Some(ResultColumn::Expr(result_column_expr)) = select_item.columns().first() else {
-            panic!("{select_item:?}")
-        };
-        let expr = result_column_expr.expr().as_ref();
-        let tokens = Vec::default().into();
-        let (sem_expr, _new_context) = SemScalarExpr::analyze_sqlite_scalar_expr(
-            test_context.with_dialect(Dialect::sqlite()),
-            &ScalarAnalysisContext::default(),
-            expr,
-            &tokens,
-        )?;
+        let syntax = ast_query::sqlite_expression(sql_expr)?;
+        let mut context = test_context.with_dialect(Dialect::sqlite());
+        let sem_expr =
+            SemScalarExpr::from_ast(&syntax, &mut context, &ScalarAnalysisContext::default())?;
         assert_eq!(sem_expr, expect_expr);
         Ok(())
     }

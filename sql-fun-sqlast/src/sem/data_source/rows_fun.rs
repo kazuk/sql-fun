@@ -1,18 +1,17 @@
 use crate::{
-    ast::{Expr, TryFromWithTokens},
+    ast::Expr,
     context::ParseContext,
     names::{AliasName, ColumnName as NamesColumnName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, DataSource, FromClause, FuncCallExpr, Nullable,
-        QueryName, ScalarAnalysisContext, SemScalarExpr, TableFunctionProblem,
-        WildcardRowsFunction, WildcardRowsSource, WithClause,
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, FuncCallExpr, Nullable, QueryName,
+        ScalarAnalysisContext, SemScalarExpr, TableFunctionProblem, WildcardRowsFunction,
+        WildcardRowsSource, WithClause,
         data_source::{
             ColumnCandidates, ProjectionColumn, TableFunctionOutput,
             function_columns::OutputColumnNames, projection::ProjectionColumns,
         },
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::{FuncCall, Node, ScanToken},
 };
 use ::sql_fun_core::IVec;
 
@@ -288,45 +287,6 @@ impl DataSourceRowsFromFunc {
             RowsFromSource::Expression(source) => Some(&source.value),
             _ => None,
         }
-    }
-    /// analyze `FuncCall` node in RangeFunction.functions
-    pub fn analyze_func_call<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        func_call: FuncCall,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = Expr::try_from_with_tokens(&func_call, tokens)?;
-        let result = Self::from_ast(
-            &syntax,
-            &mut context,
-            &ScalarAnalysisContext::new(with_clause, from_clause),
-        );
-        Ok((result?, context))
-    }
-
-    /// analyze Node in RangeFunction.functions
-    pub fn analyze_node<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        function: Node,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = Expr::try_from_with_tokens(&function, tokens)?;
-        let result = Self::from_ast(
-            &syntax,
-            &mut context,
-            &ScalarAnalysisContext::new(with_clause, from_clause),
-        );
-        Ok((result?, context))
     }
 }
 
@@ -795,6 +755,7 @@ impl RowsFromExpression {
 }
 
 impl DataSourceRowsFromFunc {
+    #[cfg(test)]
     pub(crate) fn from_ast(
         ast: &Expr,
         context: &mut impl ParseContext,

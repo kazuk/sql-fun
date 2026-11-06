@@ -211,6 +211,67 @@ impl SemAst {
     }
 }
 
+#[cfg(test)]
+mod tests {
+
+    use crate::{
+        AstAndContextPair, CacheContext,
+        ast::Dialect,
+        context::{BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext},
+        parse_statements,
+        sem::SourcePathWithSpan,
+        test_helpers::context_args,
+        test_helpers::source_span,
+    };
+    use ::sql_fun_core::SqlFunArgs;
+    use ::testresult::TestResult;
+    use std::path::Path;
+
+    #[rstest::rstest]
+    #[case(r#"create table users ( id bigserial not null primary key, name varchar )"#)]
+    #[case(r#"create type user_kind as enum('member', 'guest')"#)]
+    #[case(r#"CREATE TYPE compfoo AS (f1 int, f2 text)"#)]
+    #[case(r#"CREATE EXTENSION hstore;"#)]
+    #[case(
+        r#"CREATE FUNCTION hstore_subscript_handler(internal)
+RETURNS internal
+AS 'MODULE_PATHNAME', 'hstore_subscript_handler'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
+    )]
+    #[case("SET statement_timeout = 0;")]
+    #[case(r#"CREATE DOMAIN public."AccountNumber" AS character varying(15);"#)]
+    #[case("ALTER TYPE public.user_kind OWNER TO application_owner;")]
+    #[case("CREATE VIEW users_view AS SELECT 1 AS id;")]
+    #[case("CREATE SCHEMA app CREATE TABLE app.users (id integer);")]
+    fn test_schema_file_context_accepts_top_level_statements(
+        #[case] sql: &str,
+        context_args: SqlFunArgs,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
+        use crate::sem::SemAst;
+
+        let parsed = parse_statements(sql, Dialect::postgres())
+            .next()
+            .expect("statement")?;
+
+        eprintln!("{parsed:?}");
+
+        let collection = context_args.load_metadata()?;
+        let selected = collection.get("default").expect("selected test metadata");
+        let base_context = BaseContext::new(&context_args, selected)?;
+        let path = Path::new("test.sql");
+        let mut file_context = {
+            let analysis_base = &FrozenBaseContext::from(base_context);
+            SchemaFileContext::new(path, analysis_base, &context_args, selected)
+        };
+        file_context.set_source_path_with_span(&source_span);
+        let AstAndContextPair(_ast, _context) =
+            SemAst::from_ast(&parsed, file_context, &mut CacheContext::new())?;
+
+        Ok(())
+    }
+}
+
 impl SemAst {
     fn from_insert_resolution(value: Option<&InsertStatement>) -> Self {
         value.map_or_else(Self::unresolved_statement, Self::insert)

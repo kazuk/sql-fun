@@ -1,10 +1,8 @@
 use crate::{
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ParseContext,
+        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename, ParseContext,
     },
-    syn::{ConstrType, Constraint, Opt},
 };
 
 /// deferrable / not deferrable constraint
@@ -47,33 +45,6 @@ impl ColumnConstraintTrait for AttrDeferrabilityColumnConstraint {
 
     fn column_name(&self) -> &ColumnName {
         &self.column_name
-    }
-}
-
-impl AttrDeferrabilityColumnConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        let attr_deferrable = if matches!(contype, ConstrType::ConstrAttrDeferrable) {
-            true
-        } else if matches!(contype, ConstrType::ConstrAttrNotDeferrable) {
-            false
-        } else {
-            AnalysisError::raise_unexpected_input("contype not attr deferrable ")?;
-            AnalysisError::never()
-        };
-        Ok((Self::new(table_name, column_name, attr_deferrable), context))
     }
 }
 
@@ -134,29 +105,6 @@ impl ColumnConstraintTrait for AttrDeferredColumnConstraint {
     }
 }
 
-impl AttrDeferredColumnConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        if !matches!(contype, ConstrType::ConstrAttrDeferred) {
-            AnalysisError::raise_unexpected_input("contype not attr deferred")?;
-            AnalysisError::never()
-        }
-        Ok((Self::new(table_name, column_name), context))
-    }
-}
-
 impl ColumnConstraint {
     /// create AttrDeferred variant
     pub const fn attr_deferred(value: AttrDeferredColumnConstraint) -> Self {
@@ -211,29 +159,6 @@ impl ColumnConstraintTrait for AttrImmediateColumnConstraint {
 
     fn column_name(&self) -> &ColumnName {
         &self.column_name
-    }
-}
-
-impl AttrImmediateColumnConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        if !matches!(contype, ConstrType::ConstrAttrImmediate) {
-            AnalysisError::raise_unexpected_input("contype not attr immediate")?;
-            AnalysisError::never()
-        }
-        Ok((Self::new(table_name, column_name), context))
     }
 }
 

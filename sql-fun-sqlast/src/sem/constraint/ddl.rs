@@ -72,6 +72,78 @@ impl Constraint {
     }
 }
 
+#[cfg(test)]
+mod test_analyze_alter_obj_add_constraint {
+    use crate::{
+        ast::CreateTableMode,
+        names::{FullName, TableName},
+        sem::{Constraint, CreateTable, SourcePathWithSpan},
+        test_helpers::{TestParseContext, foreign_keys, source_span, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_alter_obj_add_constraint(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
+        let constraint = foreign_keys::synthetic_primary_constraint();
+        let table_name = TableName::from(FullName::with_schema("public", "table1"));
+        let create_table = CreateTable::new(
+            &table_name,
+            vec![],
+            CreateTableMode::Default,
+            false,
+            &source_span,
+        );
+        test_context.set_get_table_impl_result(table_name.full_name(), &Some(create_table));
+        let _result = Constraint::from_ast_table(&constraint, &mut test_context, &table_name)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_analyze {
+    use crate::{sem::Constraint, test_helpers::foreign_keys as fk};
+
+    #[rstest::rstest]
+    #[case::explicit("parent(id)")]
+    fn direct_analysis_retains_the_matched_catalog_key(
+        #[case] reference: &str,
+    ) -> testresult::TestResult {
+        let mut context = fk::apply(fk::parents(), "CREATE TABLE a.child(id integer)");
+        let syntax = fk::postgres_table_constraint(&format!(
+            "ALTER TABLE a.child ADD FOREIGN KEY(id) REFERENCES {reference}"
+        ));
+        let result = Constraint::from_ast_table(&syntax, &mut context, &fk::name("a", "child"))?;
+        let result = result.as_foreign_key().unwrap();
+        assert_eq!(result.target_table(), Some(&fk::name("a", "parent")));
+        assert_eq!(
+            result.target_columns(),
+            Some(&[crate::names::ColumnName::from("id")][..])
+        );
+        fk::reversed_path(&mut context);
+        assert_eq!(result.target_table(), Some(&fk::name("a", "parent")));
+        assert!(context.problems().is_empty());
+        Ok(())
+    }
+    #[test]
+    fn common_ast_expands_omitted_columns_from_the_bound_parent() {
+        use crate::context::TableInfoRead;
+        let context = fk::bind(fk::parents(), "child", "parent", true);
+        let table = context
+            .get_table_impl(fk::name("a", "child").full_name())
+            .unwrap();
+        let constraint = table.constraint("fk").unwrap().as_foreign_key().unwrap();
+        assert_eq!(
+            constraint.target_columns(),
+            Some(&[crate::names::ColumnName::from("id")][..])
+        );
+        assert_eq!(constraint.target_table(), Some(&fk::name("a", "parent")));
+        assert!(context.problems().is_empty());
+    }
+}
+
 impl Constraint {
     pub(crate) fn from_ast_column_table(
         ast: &AstColumnConstraint,

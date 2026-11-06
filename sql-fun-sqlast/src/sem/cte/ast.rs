@@ -154,17 +154,6 @@ impl CteStatement {
     }
 }
 
-impl WithClause {
-    pub(crate) fn from_ast_top_level(
-        ast: &With,
-        context: &mut impl ParseContext,
-    ) -> Result<Self, AnalysisError> {
-        context.begin_parameter_type_analysis();
-        let result = Self::from_ast(ast, context, None);
-        context.finish_analysis(result)
-    }
-}
-
 impl CteStatement {
     pub(crate) fn validate_ast_select_rule_ctes(
         ast: &CteBody,

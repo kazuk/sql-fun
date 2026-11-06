@@ -1,17 +1,14 @@
 mod ddl;
 use crate::{
-    ast::{Function, ObjectKind, TryFromWithTokens},
+    ast::ObjectKind,
     names::{FullName, TableName},
     sem::{
-        AnalysisError, AstAndContextPair, ColumnCollection, FunctionOverloadCollection,
-        OverloadVariant, OwnerSpecification, OwnershipIdentity, ParseContext,
-        type_system::ArgumentBindingCollection,
+        ColumnCollection, FunctionOverloadCollection, OverloadVariant, OwnerSpecification,
+        OwnershipIdentity, ParseContext, type_system::ArgumentBindingCollection,
     },
-    syn::{CreateFunctionStmt, ScanToken},
 };
-use sql_fun_core::IVec;
 
-/// analyzed [`crate::syn::CreateFunctionStmt`]
+/// Analyzed CREATE FUNCTION statement.
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
     replace: bool,
@@ -102,19 +99,6 @@ impl CreateFunction {
     #[must_use]
     pub const fn name(&self) -> &FullName {
         &self.name
-    }
-
-    /// analyze [`crate::syn::CreateFunctionStmt`]
-    pub fn analyze_create_function<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: CreateFunctionStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply(&Function::try_from_with_tokens(&syn, tokens)?, context)
     }
 }
 

@@ -64,17 +64,15 @@ use crate::{
     ast::Dialect,
     names::{FullName, SchemaName, TableName},
     sem::{
-        AliasSpec, AlterIndex, AlterOwner, AnalysisError, AnalysisState, Comment,
-        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
-        CreateIndex, CreateSchema, CreateTable, CursorInfo, DataSource, InputTypeConstraint, Kind,
-        OwnedObjectDefinition, ParameterConstraints, Role, SamplingMethodLookup, SelectStatement,
-        SemScalarExpr, VariableSet, parameter_resolution::ParameterResolution,
-        problem::CreationProblem, type_system::ArgumentBindingCollection,
+        AlterIndex, AlterOwner, AnalysisError, AnalysisState, Comment, CreateCompositeType,
+        CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
+        CreateTable, CursorInfo, InputTypeConstraint, Kind, OwnedObjectDefinition,
+        ParameterConstraints, Role, SamplingMethodLookup, SelectStatement, SemScalarExpr,
+        VariableSet, parameter_resolution::ParameterResolution, problem::CreationProblem,
     },
-    syn::FuncCall,
 };
 
-use sql_fun_core::{IVec, analysis_problem::AnalysisProblem};
+use sql_fun_core::analysis_problem::AnalysisProblem;
 
 /// Common environment for SQL analysis and mutable schema loading.
 ///
@@ -514,34 +512,6 @@ where
 
     /// apply `create index` statement to current schema
     fn apply_create_index(self, create_index: &CreateIndex) -> Result<Self, AnalysisError>;
-
-    /// resolve table function call as data source
-    fn resolve_table_function(
-        &mut self,
-        call: &FuncCall,
-        func_name: FullName,
-        alias_name: &AliasSpec,
-        arg_exprs: IVec<SemScalarExpr>,
-        arg_types: ArgumentBindingCollection,
-    ) -> Result<DataSource, AnalysisError> {
-        let Some(overloads) = self.get_function_by_name(&func_name) else {
-            self.report_analysis_problem(AnalysisProblem::table_function_not_found(&func_name))?;
-            return DataSource::undefined_table_function(call, arg_exprs, alias_name);
-        };
-
-        let Some(calling_overload) = overloads.resolve_overload(self, &arg_types) else {
-            self.report_analysis_problem(
-                AnalysisProblem::parameter_type_mismatch_for_table_function(&func_name, &arg_types),
-            )?;
-            return DataSource::undefined_table_function(call, arg_exprs, alias_name);
-        };
-
-        Ok(DataSource::table_function(
-            &calling_overload,
-            arg_exprs,
-            alias_name,
-        ))
-    }
 }
 
 #[cfg(test)]

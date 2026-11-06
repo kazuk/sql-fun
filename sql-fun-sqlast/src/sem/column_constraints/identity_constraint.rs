@@ -2,10 +2,8 @@ use crate::{
     ast::IdentityColumnMode,
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ParseContext,
+        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename, ParseContext,
     },
-    syn::{ConstrType, Constraint, Opt},
 };
 
 /// identity column constraint
@@ -59,29 +57,6 @@ impl IdentityColumnConstraint {
     /// Whether explicit values require an OVERRIDING clause.
     pub const fn is_always(&self) -> bool {
         matches!(self.generated_when, IdentityColumnMode::Always)
-    }
-
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        if !matches!(contype, ConstrType::ConstrIdentity) {
-            AnalysisError::raise_unexpected_input("contype not identity")?;
-            AnalysisError::never()
-        }
-        let generated_when =
-            IdentityColumnMode::from_postgres_generate_when(&syn.get_generated_when())?;
-        Ok((Self::new(table_name, column_name, generated_when), context))
     }
 }
 

@@ -1,30 +1,20 @@
 mod ddl;
 mod serial;
 pub use self::column_def::ColumnDefinition;
-#[cfg(feature = "sqlite")]
 use crate::{
-    SqliteToken,
-    syn::sqlite::{
-        ColumnsAndConstraint, CreateTableBody, CreateTableStatement, DropTableStatement,
-    },
-};
-use crate::{
-    ast::{CreateTableMode, Dialect, Table, TryFromWithTokens},
+    ast::{CreateTableMode, Dialect},
     context::{GetSourcePathWithSpan, ParseContext},
     names::{ColumnName, FullName, TableName},
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, CheckConstraint,
-        ColumnAttributeAction, ColumnRename, Constraint, CreateIndex, CreateSequence,
-        ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
-        OwnerSpecification, RuleIdentity, RuleReferences, SemAst, SemScalarExpr,
-        SourcePathWithSpan, TriggerReferences, TypeReference,
+        AlterTable, AnalysisError, AnalysisProblem, CheckConstraint, ColumnAttributeAction,
+        ColumnRename, Constraint, CreateIndex, CreateSequence, ForeignKeyConstraint,
+        ImplicitChange, IndirectionExpr, InsertArbiter, Kind, OwnerSpecification, RuleIdentity,
+        RuleReferences, SemScalarExpr, SourcePathWithSpan, TriggerReferences, TypeReference,
         alter_table::AlterObjSubCommand,
         problem::CreationProblem,
         traversal::{RelationRenamer, SemanticVisitorMut},
     },
-    syn::{CreateStmt, DropStmt, ListOpt, Opt, ScanToken},
 };
-use sql_fun_core::IVec;
 use std::collections::HashMap;
 
 mod column_def;
@@ -914,93 +904,8 @@ mod test_primary_key_columns {
 }
 
 impl CreateTable {
-    /// analyze [`crate::syn::CreateStmt`]
-    #[tracing::instrument(skip(context))]
-    pub fn analyze_create_stmt<TParseContext>(
-        context: TParseContext,
-        parent_schema: &Option<String>,
-        create: CreateStmt,
-        tokens: &IVec<ScanToken>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply_at(
-            &Table::try_from_with_tokens(&create, tokens)?,
-            context,
-            source_span,
-        )
-    }
-
     pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
         self.drop_statements.push(drop_table.clone());
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl CreateTable {
-    /// analyze [`crate::syn::sqlite::ColumnsAndConstraint`]
-    #[expect(clippy::too_many_arguments)]
-    pub fn analyze_columns_and_constraint<TParseContext>(
-        mut context: TParseContext,
-        _parent_schema: &Option<String>,
-        table_name: &TableName,
-        mode: &CreateTableMode,
-        temporary: bool,
-        syn: ColumnsAndConstraint,
-        _tokens: &IVec<SqliteToken<'_>>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
-        let table = Self::from_ast(&syntax, &mut context, source_span)?;
-        Ok((table, context))
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl CreateTable {
-    /// analyze [`crate::syn::sqlite::CreateTableBody`]
-    #[expect(clippy::too_many_arguments)]
-    pub fn analyze_create_table_body<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        table_name: &TableName,
-        mode: &CreateTableMode,
-        temporary: bool,
-        syn: CreateTableBody,
-        _tokens: &IVec<SqliteToken<'_>>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply_at(
-            &Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary),
-            context,
-            source_span,
-        )
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl CreateTable {
-    /// analyze [`crate::syn::sqlite::CreateTableStatement`]
-    #[tracing::instrument(skip(context))]
-    pub fn analyze_create_table<TParseContext>(
-        context: TParseContext,
-        parent_schema: &Option<String>,
-        syn: CreateTableStatement,
-        tokens: &IVec<SqliteToken<'_>>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply_at(&Table::try_from(&syn)?, context, source_span)
     }
 }
 
@@ -1041,76 +946,6 @@ impl DropTable {
     /// get restrict
     pub const fn restrict(&self) -> bool {
         !self.cascade
-    }
-}
-
-impl DropTable {
-    ///
-    /// analyze DropStmt as Drop Table for Postgres dialect
-    ///
-    /// # Panics
-    ///
-    /// When drop statement is not targeting table.
-    ///
-    pub fn analyze_drop_stmt<TParseContext>(
-        mut context: TParseContext,
-        syn: DropStmt,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        assert!(matches!(
-            syn.get_remove_type().as_inner(),
-            Some(crate::syn::ObjectType::ObjectTable)
-        ));
-
-        let Some(objects) = syn.get_objects().as_inner() else {
-            AnalysisError::raise_unexpected_none("DropStmt.objects")?;
-            AnalysisError::never();
-        };
-        let cascade = matches!(
-            syn.get_behavior().as_inner(),
-            Some(crate::syn::DropBehavior::DropCascade)
-        );
-
-        let mut table_names = Vec::new();
-        for object in objects {
-            let full_name = FullName::try_from(object.as_list().get_items())?;
-            let table_name = TableName::from(full_name);
-            if context.get_table(&table_name).is_none() {
-                context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
-            }
-            table_names.push(table_name);
-        }
-
-        let result = Self::new(&table_names, syn.get_missing_ok(), cascade);
-        context = context.apply_drop_table(&result)?;
-        Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
-    }
-}
-
-impl DropTable {
-    ///
-    /// analyze DropTableStatemtn for SQLite dialect
-    ///
-    #[cfg(feature = "sqlite")]
-    pub fn analyze_drop_table<TParseContext>(
-        mut context: TParseContext,
-        syn: DropTableStatement,
-        _tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let if_exists = syn.if_exists();
-        let table_name = TableName::try_from(syn.name())?;
-        if context.get_table(&table_name).is_none() {
-            context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
-        }
-        let result = Self::new(std::slice::from_ref(&table_name), *if_exists, false);
-        context = context.apply_drop_table(&result)?;
-        Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
     }
 }
 

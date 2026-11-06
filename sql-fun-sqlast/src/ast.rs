@@ -8,6 +8,7 @@
 
 #![allow(dead_code)]
 
+pub(crate) mod client_type;
 pub(crate) mod ddl;
 mod default_privileges;
 pub(crate) mod deparse;
@@ -30,7 +31,7 @@ mod trigger;
 pub(crate) mod validation;
 
 pub(crate) use self::{
-    ddl::{CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs},
+    ddl::{CompositeType, Domain, Function, Index, Schema, TableAs},
     deparse::render_full_name,
     document::{
         CmdType, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,

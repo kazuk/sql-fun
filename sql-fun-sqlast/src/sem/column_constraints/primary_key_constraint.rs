@@ -1,13 +1,9 @@
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::PrimaryKeyColumnConstraint as SqlitePrimaryKeyColumnConstraint;
 use crate::{
     ast::{ConflictClause, Deferrable},
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ParseContext,
+        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename, ParseContext,
     },
-    syn::{ConstrType, Constraint, Opt},
 };
 
 /// primary key constraint
@@ -57,60 +53,6 @@ impl ColumnConstraintTrait for PrimaryKeyColumnConstraint {
 
     fn column_name(&self) -> &ColumnName {
         &self.column_name
-    }
-}
-
-impl PrimaryKeyColumnConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        if !matches!(contype, ConstrType::ConstrPrimary) {
-            AnalysisError::raise_unexpected_input("contype not primary key")?;
-            AnalysisError::never()
-        }
-
-        Ok((
-            Self::new(
-                table_name,
-                column_name,
-                None,
-                Deferrable::try_from_constraint(syn)?,
-            ),
-            context,
-        ))
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl PrimaryKeyColumnConstraint {
-    /// analyze [`crate::syn::sqlite::PrimaryKeyColumnConstraint`]
-    pub fn analyze_constraint_sqlite<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &SqlitePrimaryKeyColumnConstraint,
-    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let constraint = Self::new(
-            table_name,
-            column_name,
-            syn.conflict_clause().map(ConflictClause::from),
-            None,
-        );
-        Ok((ColumnConstraint::primary_key(constraint), context))
     }
 }
 

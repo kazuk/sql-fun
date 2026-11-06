@@ -52,29 +52,22 @@ impl CreateIndex {
 #[cfg(test)]
 mod test_analyze_index_elem_collects_column_order_and_alias {
     use crate::{
+        context::ParseContext,
         names::ColumnName,
         sem::{
             ScalarConstExpr, SemScalarExpr,
             create_index::{CreateIndex, IndexElement, SortOrder},
         },
-        syn::{Node, NodeInner, ScanToken, SortByDir},
-        test_helpers::{SynBuilder, TestParseContext},
+        test_helpers::{TestParseContext, index_layers},
     };
-
-    use sql_fun_core::IVec;
 
     #[test]
     fn analyze_index_elem_collects_column_order_and_alias() {
-        let builder = SynBuilder::new();
-        let keys = vec![
-            builder.index_elem_column("id", SortByDir::SortbyDesc.into(), Some("id_alias")),
-            builder.index_elem_column("name", SortByDir::SortbyDefault.into(), None),
-        ];
-        let tokens: IVec<ScanToken> = IVec::default();
-        let context = TestParseContext::default();
-
-        let (collection, _context) =
-            CreateIndex::analyze_index_elem(context, keys, &tokens).expect("analyze index elem");
+        let keys = index_layers::aliased_index_keys().expect("index syntax");
+        let mut context = TestParseContext::default();
+        context.begin_parameter_type_analysis();
+        let result = CreateIndex::elements_from_ast(&keys, &mut context);
+        let collection = context.finish_analysis(result).expect("analyze index elem");
 
         assert_eq!(collection.0.len(), 2);
 
@@ -97,14 +90,11 @@ mod test_analyze_index_elem_collects_column_order_and_alias {
 
     #[test]
     fn analyze_index_elem_collects_expression() {
-        let builder = SynBuilder::new();
-        let expr_node = Node::from(NodeInner::AConst(builder.const_int4(42)));
-        let keys = vec![builder.index_elem_expr(expr_node, SortByDir::SortbyDefault.into(), None)];
-        let tokens: IVec<ScanToken> = IVec::default();
-        let context = TestParseContext::default();
-
-        let (collection, _context) =
-            CreateIndex::analyze_index_elem(context, keys, &tokens).expect("analyze index elem");
+        let keys = index_layers::expression_index_key().expect("index syntax");
+        let mut context = TestParseContext::default();
+        context.begin_parameter_type_analysis();
+        let result = CreateIndex::elements_from_ast(&keys, &mut context);
+        let collection = context.finish_analysis(result).expect("analyze index elem");
 
         assert_eq!(collection.0.len(), 1);
         let item = &collection.0[0];
@@ -194,37 +184,17 @@ mod test_analyze_index_stmt_collects_keys_including_order_and_includes {
             AstAndContextPair, SemAst,
             create_index::{CreateIndex, IndexElement, SortOrder},
         },
-        syn::{AliasOpt, RangeVarOpt, ScanToken, SortByDir},
-        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
+        test_helpers::{TestParseContext, index_layers, source_span, test_context},
     };
-
-    use sql_fun_core::IVec;
 
     #[rstest::rstest]
     fn analyze_index_stmt_collects_keys_including_order_and_includes(
         mut test_context: TestParseContext,
     ) {
         test_context.setup_table("items", &[], &source_span());
-        let builder = SynBuilder::new();
-        let relation = RangeVarOpt::from(
-            builder.range_var(&FullName::with_schema("public", "items"), &AliasOpt::none()),
-        );
-        let index_params = builder.index_elem_list(vec![
-            builder.index_elem_column("id", SortByDir::SortbyDesc.into(), None),
-            builder.index_elem_column("name", SortByDir::SortbyDefault.into(), None),
-        ]);
-        let include_params = builder.index_elem_list(vec![builder.index_elem_column(
-            "metadata",
-            SortByDir::SortbyDefault.into(),
-            None,
-        )]);
-        let index_stmt =
-            builder.index_stmt("idx_items", relation, index_params, include_params, false);
-        let tokens: IVec<ScanToken> = IVec::default();
-
+        let syntax = index_layers::index_statement().expect("index syntax");
         let AstAndContextPair(ast, context) =
-            CreateIndex::analyze_index_stmt(test_context, &None, index_stmt, &tokens)
-                .expect("analyze index");
+            CreateIndex::from_ast_and_apply(&syntax, test_context).expect("analyze index");
 
         let SemAst::CreateIndex(create_index) = ast else {
             panic!("expected create index ast");

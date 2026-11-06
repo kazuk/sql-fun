@@ -86,7 +86,7 @@ impl TryFrom<&syn::TableLikeClause> for TableLike {
     type Error = AnalysisError;
     fn try_from(value: &syn::TableLikeClause) -> Result<Self, Self::Error> {
         Ok(Self {
-            source: Name::from(&required(value.get_relation().as_inner(), "LIKE source")?),
+            source: Name::try_from(&required(value.get_relation().as_inner(), "LIKE source")?)?,
             options: value.get_options(),
         })
     }
@@ -333,10 +333,10 @@ impl TryFromWithTokens<&syn::CreateForeignTableStmt> for ForeignTable {
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         let base = required(value.get_base_stmt().as_inner(), "foreign table definition")?;
-        let name = Name::from(&required(
+        let name = Name::try_from(&required(
             base.get_relation().as_inner(),
             "foreign table name",
-        )?);
+        )?)?;
         let mut elements = Vec::new();
         for node in base.get_table_elts().as_inner().unwrap_or_default() {
             elements.push(ForeignTableElement::try_from_with_tokens(&node, tokens)?);

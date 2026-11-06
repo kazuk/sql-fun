@@ -7,7 +7,6 @@ use crate::{
         scalar_expr::SemScalarExprNode,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::NullTestType as SynNullTestType,
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -103,20 +102,6 @@ impl NullTestExpr {
         Self {
             null_test_type,
             arg_expr: Box::new(arg_expr),
-        }
-    }
-}
-
-impl TryFrom<SynNullTestType> for NullTestType {
-    type Error = AnalysisError;
-
-    fn try_from(value: SynNullTestType) -> Result<Self, Self::Error> {
-        match value {
-            SynNullTestType::OptionNone | SynNullTestType::Undefined => {
-                AnalysisError::raise_unexpected_input("nulltesttype")?
-            }
-            SynNullTestType::IsNull => Ok(Self::IsNull),
-            SynNullTestType::IsNotNull => Ok(Self::IsNotNull),
         }
     }
 }

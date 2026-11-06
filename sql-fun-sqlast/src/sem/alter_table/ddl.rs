@@ -22,6 +22,7 @@ use crate::{
 };
 
 impl AlterObjSubCommand {
+    #[cfg(test)]
     pub(crate) fn from_ast_and_report<TContext: ParseContext>(
         ast: &AstAlterCommand,
         mut context: TContext,
@@ -50,16 +51,16 @@ impl AlterObjSubCommand {
 #[cfg(test)]
 mod test_analyze_alter_obj_change_owner {
     use crate::{
-        sem::alter_table::analyze_alter_obj_change_owner,
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        sem::AlterObjSubCommand,
+        test_helpers::{TestParseContext, alter_syntax, test_context},
     };
 
     use testresult::TestResult;
 
     #[rstest::rstest]
-    fn test_analyze_alter_obj_change_owner(test_context: TestParseContext) -> TestResult {
-        let alter_table_cmd = SynBuilder::new().alter_table_cmd_change_owner("test");
-        let _result = analyze_alter_obj_change_owner(&test_context, alter_table_cmd)?;
+    fn test_analyze_alter_obj_change_owner(mut test_context: TestParseContext) -> TestResult {
+        let command = alter_syntax::owner()?;
+        let _result = AlterObjSubCommand::from_ast_owner(&command, &mut test_context)?;
         Ok(())
     }
 }
@@ -86,7 +87,7 @@ mod test_analyze_sqlite_alter_table_reports_drop_missing_column {
     #[cfg(feature = "sqlite")]
     use crate::{
         AstAndContextPair,
-        sem::{AlterTable, SourcePathWithSpan},
+        sem::{RelationAlteration, SourcePathWithSpan},
         test_helpers::{
             alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
             source_span,
@@ -98,13 +99,12 @@ mod test_analyze_sqlite_alter_table_reports_drop_missing_column {
     fn test_analyze_sqlite_alter_table_reports_drop_missing_column(
         source_span: SourcePathWithSpan,
     ) {
-        let (alter_table, tokens) =
-            parse_sqlite_alter_table("alter table users drop column missing");
+        let alter_table = parse_sqlite_alter_table("alter table users drop column missing");
         let mut context = sqlite_context();
         context.setup_table("users", &[make_column("name")], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+            RelationAlteration::from_ast_and_apply_at(&alter_table, context, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
@@ -131,7 +131,7 @@ mod test_analyze_sqlite_alter_table_reports_existing_column {
     #[cfg(feature = "sqlite")]
     use crate::{
         AstAndContextPair,
-        sem::{AlterTable, SourcePathWithSpan},
+        sem::{RelationAlteration, SourcePathWithSpan},
         test_helpers::{
             alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
             source_span,
@@ -141,13 +141,12 @@ mod test_analyze_sqlite_alter_table_reports_existing_column {
     #[cfg(feature = "sqlite")]
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_existing_column(source_span: SourcePathWithSpan) {
-        let (alter_table, tokens) =
-            parse_sqlite_alter_table("alter table users add column name text");
+        let alter_table = parse_sqlite_alter_table("alter table users add column name text");
         let mut context = sqlite_context();
         context.setup_table("users", &[make_column("name")], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+            RelationAlteration::from_ast_and_apply_at(&alter_table, context, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
@@ -207,11 +206,8 @@ mod test_analyze_alter_obj_column_default {
             ColumnDefinition, ScalarConstExpr, SemScalarExpr, SourcePathWithSpan,
             alter_table::AlterObjSubCommand,
         },
-        syn::NodeInner,
-        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
+        test_helpers::{TestParseContext, alter_syntax, source_span, test_context},
     };
-
-    use sql_fun_core::IVec;
 
     use testresult::TestResult;
 
@@ -233,19 +229,10 @@ mod test_analyze_alter_obj_column_default {
             &source_span,
         );
 
-        let builder = SynBuilder::new();
-        let value = builder.const_int4(0);
-        let cmd =
-            builder.alter_table_cmd_set_column_default("value", NodeInner::AConst(value).into());
-        let tokens = IVec::default();
+        let command = alter_syntax::default_command()?;
         let table_name = TableName::from(FullName::with_schema("public", "table1"));
-
-        let (res, test_context) = AlterObjSubCommand::analyze_alter_obj_column_default(
-            test_context,
-            &table_name,
-            cmd,
-            &tokens,
-        )?;
+        let (res, test_context) =
+            AlterObjSubCommand::from_ast_and_report(&command, test_context, &table_name)?;
         let AlterObjSubCommand::SetColumnDefault(col_name, expr) = res else {
             panic!("unexpected response {res:#?}");
         };
@@ -619,25 +606,15 @@ impl AlterObjSubCommand {
 mod test_standalone_semantic_command_api_resolves_column_attributes {
     use crate::{
         sem::AlterObjSubCommand,
-        syn::{ListOpt, Opt},
-        test_helpers::{SynBuilder, column_attributes as test_helpers},
+        test_helpers::{alter_syntax, column_attributes as test_helpers},
     };
 
     #[test]
     fn standalone_semantic_command_api_resolves_column_attributes() -> testresult::TestResult {
         let context = test_helpers::seed("CREATE TABLE t(a integer)", "17")?;
-        let node = SynBuilder::new().parse("ALTER TABLE t ALTER a SET STATISTICS 42");
-        let statement = node.as_alter_table_stmt().as_inner().unwrap();
-        let commands = statement.get_cmds().as_inner().unwrap();
-        let command = commands[0].as_alter_table_cmd().as_inner().unwrap();
-        let subtype = command.get_subtype().as_inner().unwrap();
-        let (command, context) = AlterObjSubCommand::analyze_alter_table_cmd(
-            context,
-            &test_helpers::table_name(),
-            command,
-            subtype,
-            &::sql_fun_core::IVec::default(),
-        )?;
+        let syntax = alter_syntax::command("ALTER TABLE t ALTER a SET STATISTICS 42")?;
+        let (command, context) =
+            AlterObjSubCommand::from_ast_and_report(&syntax, context, &test_helpers::table_name())?;
         let change = command.column_attribute_change().unwrap();
         assert!(change.can_apply());
         assert_eq!(

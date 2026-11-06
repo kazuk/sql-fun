@@ -1,16 +1,10 @@
-use crate::{sem::ColumnRename, syn::Constraint as SynConstraint};
+use crate::sem::ColumnRename;
 use sql_fun_core::IVec;
 
 use crate::{
     names::{ColumnName, TableName},
-    sem::{
-        AnalysisError, AnalysisProblem, Constraint, CreateIndex, ImplicitChange, ParseContext,
-        create_index::IndexElementCollection,
-    },
-    syn::ListOpt,
+    sem::{AnalysisError, CreateIndex, ImplicitChange, create_index::IndexElementCollection},
 };
-
-use crate::sem::constraint::AnalyzeConstraint;
 
 /// analyzed primary key constraint
 #[derive(Debug, Clone)]
@@ -70,45 +64,5 @@ impl PrimaryKeyConstraint {
     #[must_use]
     pub const fn keys(&self) -> &IVec<ColumnName> {
         &self.keys
-    }
-}
-
-impl<TParseContext> AnalyzeConstraint<TParseContext> for PrimaryKeyConstraint
-where
-    TParseContext: ParseContext,
-{
-    fn analyze(
-        context: &mut TParseContext,
-        target_table: Option<&TableName>,
-        constraint: SynConstraint,
-    ) -> Result<Constraint, AnalysisError> {
-        let name = constraint.get_conname();
-        let Some(keys) = constraint
-            .get_keys()
-            .map_values(|v| v.as_string().get_sval())
-        else {
-            AnalysisError::raise_unexpected_none("constraint.keys")?
-        };
-        let keys: Vec<_> = keys.into_iter().map(ColumnName::from).collect();
-
-        if let Some(table_name) = target_table {
-            if let Some(table) = context.get_table(table_name).cloned() {
-                for key_col_name in &keys {
-                    if !table.has_column(key_col_name) {
-                        context.report_analysis_problem(
-                            AnalysisProblem::column_not_found_in_table(table_name, key_col_name),
-                        )?;
-                    }
-                }
-            } else {
-                context.report_analysis_problem(AnalysisProblem::relation_not_found(table_name))?;
-            }
-        }
-
-        Ok(Constraint::PrimaryKey(Self {
-            name,
-            table: target_table.cloned(),
-            keys: keys.into(),
-        }))
     }
 }

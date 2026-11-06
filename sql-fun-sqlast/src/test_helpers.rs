@@ -2,6 +2,7 @@
 #![cfg(test)]
 
 pub(crate) mod alter_index;
+pub(crate) mod alter_syntax;
 #[cfg(feature = "sqlite")]
 pub(crate) mod alter_table;
 pub(crate) mod analysis_cache;
@@ -86,6 +87,7 @@ pub(crate) mod search_path;
 pub(crate) mod selected_metadata;
 pub(crate) mod serial;
 pub(crate) mod set_operations;
+pub(crate) mod source_syntax;
 #[cfg(feature = "sqlite")]
 pub(crate) mod sqlite_from_groups;
 #[cfg(feature = "sqlite")]

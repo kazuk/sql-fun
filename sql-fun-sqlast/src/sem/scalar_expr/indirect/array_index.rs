@@ -1,15 +1,12 @@
 use crate::{
     ast::Dialect,
     sem::{
-        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
+        AnalysisError, ParseContext, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         scalar_expr::indirect::IndirectionExpr,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::{AIndices, Opt, ScanToken},
 };
-
-use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArrayIndex {
@@ -89,26 +86,6 @@ impl ArrayIndex {
         } else {
             Some(element)
         }
-    }
-
-    pub fn analyze_index<TParseContext>(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        arg: SemScalarExpr,
-        indices: &AIndices,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(uidx) = indices.get_uidx().as_inner() else {
-            AnalysisError::raise_unexpected_none("aindicies.uidx")?
-        };
-        let (rexpr, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, scalar_context, uidx, tokens)?;
-        context = new_context;
-        let arg = Self::array_index(arg, rexpr, &mut context)?;
-        Ok((arg, context))
     }
 }
 

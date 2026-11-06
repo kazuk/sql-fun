@@ -1,5 +1,8 @@
-use crate::AstAndContextPair;
 use crate::context::{BaseParseContext as _, MutSourcePathWithSpan as _};
+use crate::{
+    AstAndContextPair, CacheContext, StringSpan,
+    ast::{Dialect, Statement, StatementNode},
+};
 
 use crate::names::{ColumnName, SchemaName};
 use crate::sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SelectStatement, SemAst};
@@ -38,12 +41,14 @@ fn selected_context() -> TestParseContext {
 
 pub(crate) fn analyze(sql: &str) -> Result<(SelectStatement, TestParseContext), AnalysisError> {
     let context = selected_context();
-    let statement = SqliteSynBuilder.parse_as_stmt(sql);
-    let AstAndContextPair(ast, context) = SemAst::semantic_analysis_sqlite_stmt(
-        context,
-        statement,
-        &::sql_fun_core::IVec::default(),
-    )?;
+    let syntax = SqliteSynBuilder.parse_as_stmt(sql);
+    let statement = Statement::from_node(
+        StatementNode::try_from(&syntax)?,
+        Dialect::sqlite(),
+        StringSpan::new(0, sql.len()),
+    );
+    let AstAndContextPair(ast, context) =
+        SemAst::from_ast(&statement, context, &mut CacheContext::new())?;
     assert_eq!(
         context.metadata().connector().as_deref(),
         Some("selected-connector")

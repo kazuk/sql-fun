@@ -105,10 +105,7 @@ mod test_analyze_scalar_expr_reports_missing_function {
             FromClause, FunctionParam, OverloadVariant, PgBuiltInType, ScalarAnalysisContext,
             SemScalarExpr, WithClause,
         },
-        syn::{Node, NodeInner, NodeList},
-        test_helpers::{
-            SynBuilder, TestParseContext, function_syntax::func_name_tokens, test_context,
-        },
+        test_helpers::{TestParseContext, function_syntax, test_context},
     };
 
     use ::testresult::TestResult;
@@ -119,22 +116,15 @@ mod test_analyze_scalar_expr_reports_missing_function {
     ) -> TestResult {
         test_context.set_get_search_path_result(&[SchemaName::from("public")]);
 
-        let builder = SynBuilder::new();
-        let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));
-        let args = NodeList::from(vec![arg_expr]);
-        let func_name_node = builder.as_string_node(builder.string("missing_func"));
-        let funcname = NodeList::from(vec![func_name_node]);
-        let func_call = builder.func_call(funcname, args);
-
-        let tokens = func_name_tokens();
+        let syntax = function_syntax::call("missing_func")?;
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let (expr, context) = SemScalarExpr::analyze_scaler_expr(
-            test_context,
+        let expr = SemScalarExpr::from_ast(
+            &syntax,
+            &mut test_context,
             &ScalarAnalysisContext::new(&with_clause, &from_clause),
-            Node::from(NodeInner::from(func_call)),
-            &tokens,
         )?;
+        let context = test_context;
 
         assert_eq!(1, context.reported_problem_count());
         let SemScalarExpr::FuncCall(func_call_expr) = expr else {
@@ -166,22 +156,15 @@ mod test_analyze_scalar_expr_reports_missing_function {
         let overload = OverloadVariant::new(&Some(int4.clone()), &params, false, false);
         test_context.setup_function("test_func", std::slice::from_ref(&overload));
 
-        let builder = SynBuilder::new();
-        let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));
-        let args = NodeList::from(vec![arg_expr]);
-        let func_name_node = builder.as_string_node(builder.string("test_func"));
-        let funcname = NodeList::from(vec![func_name_node]);
-        let func_call = builder.func_call(funcname, args);
-
-        let tokens = func_name_tokens();
+        let syntax = function_syntax::call("test_func")?;
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let (expr, context) = SemScalarExpr::analyze_scaler_expr(
-            test_context,
+        let expr = SemScalarExpr::from_ast(
+            &syntax,
+            &mut test_context,
             &ScalarAnalysisContext::new(&with_clause, &from_clause),
-            Node::from(NodeInner::from(func_call)),
-            &tokens,
         )?;
+        let context = test_context;
 
         assert_eq!(0, context.reported_problem_count());
         let SemScalarExpr::FuncCall(func_call_expr) = expr else {

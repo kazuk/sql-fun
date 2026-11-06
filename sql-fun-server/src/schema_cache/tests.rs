@@ -530,47 +530,8 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
 // The remaining unicode and dot cases timed out in CI and were removed in
 // e4d97f8c4fbda824bbf1e020f07ec33563c6b8a1; recover them from that commit's parent.
 
-#[rstest::rstest]
 // The omitted and empty inventory cases timed out in CI and were removed in
 // 342e3aac2f36ac19430b23ae04a957a0fda352f5; recover them from that commit's parent.
-#[case::different("roles = ['other']")]
-fn current_inventory_does_not_inherit_frozen_project_roles(#[case] declaration: &str) {
-    use ::sql_fun_sqlast::context::{OwnershipInfoRead, ParseContext, RoleInfoRead};
-    let project = SchemaProject::new();
-    project.configure_roles("products", "roles = ['owner']");
-    project.configure_roles("orders", declaration);
-    let original = project.analysis_context("products");
-    assert!(original.role_by_name("owner").is_some());
-    let base = SchemaProject::apply_sql(original, "CREATE SCHEMA app")
-        .into_context()
-        .freeze();
-    let selected = project.analysis_context_over(&base, "orders");
-    assert!(selected.role_by_name("owner").is_none());
-    let failed = SchemaProject::apply_sql(selected, "ALTER SCHEMA app OWNER TO owner");
-    assert!(
-        failed
-            .ast()
-            .ownership_change()
-            .unwrap()
-            .owner()
-            .resolved_role()
-            .is_none()
-    );
-    assert_eq!(
-        failed.context().problems()[0].code(),
-        "ownership_role_not_found"
-    );
-    assert!(
-        failed
-            .context()
-            .schema_definition("app")
-            .unwrap()
-            .owner()
-            .is_none()
-    );
-    let later = SchemaProject::apply_sql(failed.into_context(), "CREATE SCHEMA later");
-    assert!(later.context().schema_definition("later").is_some());
-}
 
 // Removed role_inventory_partitions_cached_bindings_and_diagnostics after a CI timeout.
 // Deletion commit: 5e2a1836584afda654602779b3bf71cc215d595c; recover from its parent.

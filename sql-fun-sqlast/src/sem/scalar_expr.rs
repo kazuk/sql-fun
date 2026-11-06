@@ -69,12 +69,11 @@ use crate::{
     },
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition,
-        ColumnCollection as SemColumnCollection, ColumnRename, DeleteRowColumn, DeleteRowVersion,
-        FromClause, FunctionModifiers, InputTypeConstraint, MergeRecordRole,
-        MinMaxExpr as SemMinMaxExpr, OverloadVariant, ParameterConstraints, ParseContext,
-        PgBuiltInType, QueryNameResolution, QueryProblem, ResolutionFailure, ResolvedOperator,
-        TypeDefinition as SemTypeDefinition, TypeReference, WildcardQualifiers,
-        WildcardRewriteError, WithClause,
+        ColumnCollection as SemColumnCollection, ColumnRename, CommonType, DeleteRowColumn,
+        DeleteRowVersion, FromClause, FunctionModifiers, InputTypeConstraint, MergeRecordRole,
+        OverloadVariant, ParameterConstraints, ParseContext, PgBuiltInType, QueryNameResolution,
+        QueryProblem, ResolutionFailure, ResolvedOperator, TypeDefinition as SemTypeDefinition,
+        TypeReference, WildcardQualifiers, WildcardRewriteError, WithClause,
         create_table::ColumnDefinition,
         parameter_resolution::ParameterResolution,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -384,6 +383,23 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// Type used by common-type selection, preserving SQL unknown literals.
+    pub(crate) fn common_type_input(&self) -> Option<TypeReference> {
+        if let Some(named) = self.as_named_argument() {
+            return named.value().common_type_input();
+        }
+        if let Some(collate) = self.as_collate() {
+            return collate.argument().common_type_input();
+        }
+        if self
+            .as_const()
+            .is_some_and(|constant| constant.is_null() || constant.as_string().is_some())
+        {
+            return Some(CommonType::unknown());
+        }
+        self.get_type()
+    }
+
     /// Available SQL identity without deparsing or resolving the expression again.
     pub(crate) fn diagnostic_identity(&self) -> Option<String> {
         match self {
@@ -1773,8 +1789,8 @@ impl SemScalarExpr {
         left: Self,
         right: Self,
     ) -> (Self, Self) {
-        let left_unknown = SemMinMaxExpr::input_type(&left) == Some(SemMinMaxExpr::unknown());
-        let right_unknown = SemMinMaxExpr::input_type(&right) == Some(SemMinMaxExpr::unknown());
+        let left_unknown = Self::common_type_input(&left) == Some(CommonType::unknown());
+        let right_unknown = Self::common_type_input(&right) == Some(CommonType::unknown());
         let left_target = if right_unknown {
             Some(PgBuiltInType::text())
         } else {
@@ -1818,7 +1834,7 @@ impl SemScalarExpr {
         }) {
             known.clone()
         } else {
-            SemMinMaxExpr::base_type(context, known)
+            CommonType::base_type(context, known)
         }
     }
 }

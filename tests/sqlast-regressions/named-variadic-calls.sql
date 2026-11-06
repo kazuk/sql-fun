@@ -19,3 +19,9 @@ CREATE FUNCTION polyout(value anyelement, OUT x anyelement, OUT y text)
 LANGUAGE SQL AS 'SELECT value, ''label''::text';
 CREATE FUNCTION uuid_value(value uuid) RETURNS uuid LANGUAGE SQL AS 'SELECT value';
 CREATE FUNCTION uuid_array(value uuid[]) RETURNS uuid[] LANGUAGE SQL AS 'SELECT value';
+CREATE FUNCTION compatible_array(a anycompatiblearray, b anycompatiblearray)
+RETURNS anycompatiblearray LANGUAGE SQL AS 'SELECT a';
+CREATE FUNCTION compatible_variadic(VARIADIC xs anycompatiblearray)
+RETURNS anycompatiblearray LANGUAGE SQL AS 'SELECT xs';
+CREATE FUNCTION compatible_nonarray(a anycompatiblenonarray, b anycompatible)
+RETURNS anycompatible LANGUAGE SQL AS 'SELECT a';

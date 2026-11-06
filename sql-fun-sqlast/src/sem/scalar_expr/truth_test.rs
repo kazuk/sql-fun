@@ -1,6 +1,7 @@
+use crate::sem::CommonType;
 use crate::sem::{
-    AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
-    ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
+    AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, ParseContext,
+    PgBuiltInType, SemScalarExpr, TypeReference,
     parameter_resolution::ParameterResolution,
     problem::TruthTestProblem,
     scalar_expr::SemScalarExprNode,
@@ -32,8 +33,8 @@ impl TruthTestExpr {
             types: InputTypeConstraint::exact(&PgBuiltInType::bool()),
             node: None,
         };
-        if let Some(ty) = MinMaxExpr::input_type(argument) {
-            if ty == MinMaxExpr::unknown() {
+        if let Some(ty) = SemScalarExpr::common_type_input(argument) {
+            if ty == CommonType::unknown() {
                 if let Some(literal) = argument.as_const()
                     && let Some(text) = literal.as_string()
                     && !Self::valid_boolean_input(text)
@@ -232,7 +233,7 @@ impl TruthTestExpr {
                 .canonicalize_type_ref(ty)
                 .unwrap_or_else(|| ty.clone())
         };
-        MinMaxExpr::base_type(context, &canonical)
+        CommonType::base_type(context, &canonical)
             .implicit_match_context(&PgBuiltInType::bool(), context)
             .is_some_and(|cast| cast.use_in_implicit())
     }

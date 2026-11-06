@@ -4,9 +4,9 @@ use crate::sem::parameter_constraints::environment::InferenceEnvironment;
 use crate::{
     CacheContext,
     ast::Dialect,
-    context::BaseParseContext,
+    context::{BaseParseContext, CastInfoRead},
     sem::{
-        CastContext, ParseContext, TypeReference,
+        CastContext, CommonType, ParseContext, TypeReference,
         overload_rank::OverloadRank,
         parameter_constraints::{
             ConstraintGraph, InputTypeConstraint, SignatureAlternative, default_types,
@@ -348,6 +348,7 @@ struct CallFacts {
     concrete: RankedSignatures,
     arrays: Vec<Signature>,
     simple_functions: Vec<Signature>,
+    compatible_functions: Vec<Signature>,
     array_casts: ArrayCastRanks,
 }
 
@@ -389,10 +390,10 @@ impl CallFacts {
             .collect();
         let mut facts = Self {
             postgres_defaults: context.dialect() == Dialect::postgres(),
-            environment: if signatures
-                .iter()
-                .any(Signature::is_simple_function_template)
-            {
+            environment: if signatures.iter().any(|signature| {
+                signature.is_simple_function_template()
+                    || signature.is_compatible_function_template()
+            }) {
                 Some(Arc::new(InferenceEnvironment::new(context)))
             } else {
                 None
@@ -402,6 +403,11 @@ impl CallFacts {
             simple_functions: signatures
                 .iter()
                 .filter(|signature| signature.is_simple_function_template())
+                .cloned()
+                .collect(),
+            compatible_functions: signatures
+                .iter()
+                .filter(|signature| signature.is_compatible_function_template())
                 .cloned()
                 .collect(),
             array_casts: ArrayCastRanks::default(),
@@ -467,6 +473,7 @@ impl CallFacts {
     fn supplies_input_context(&self) -> bool {
         self.arrays.is_empty()
             && self.simple_functions.is_empty()
+            && self.compatible_functions.is_empty()
             && (self.concrete.len() == 1 || !self.concrete.accepts_default_inputs())
     }
 
@@ -475,7 +482,10 @@ impl CallFacts {
     }
 
     const fn has_declarations(&self) -> bool {
-        !self.concrete.is_empty() || !self.arrays.is_empty() || !self.simple_functions.is_empty()
+        !self.concrete.is_empty()
+            || !self.arrays.is_empty()
+            || !self.simple_functions.is_empty()
+            || !self.compatible_functions.is_empty()
     }
 
     fn result_types(&self) -> InputTypeConstraint {
@@ -483,6 +493,10 @@ impl CallFacts {
             .simple_functions
             .iter()
             .any(|signature| signature.result().is_simple_infer_arg())
+            || self
+                .compatible_functions
+                .iter()
+                .any(|signature| signature.result().is_common_infer_arg())
         {
             return InputTypeConstraint::any();
         }
@@ -490,6 +504,7 @@ impl CallFacts {
             self.concrete.result_types().into_iter().chain(
                 self.arrays
                     .iter()
+                    .chain(&self.compatible_functions)
                     .map(|signature| signature.result().clone()),
             ),
         )
@@ -497,6 +512,9 @@ impl CallFacts {
 
     fn contextual_inputs(&self, result: &InputTypeConstraint) -> Option<Vec<InputTypeConstraint>> {
         if result.is_any()
+            || self.compatible_functions.iter().any(|signature| {
+                signature.result().is_common_infer_arg() || result.allows(signature.result())
+            })
             || self
                 .arrays
                 .iter()
@@ -510,6 +528,88 @@ impl CallFacts {
             return None;
         }
         Some(viable.input_domains())
+    }
+
+    fn compatible_position(&self, index: usize) -> bool {
+        self.compatible_functions.iter().any(|signature| {
+            signature
+                .inputs()
+                .get(index)
+                .is_some_and(TypeReference::is_common_infer_arg)
+        })
+    }
+
+    fn compatible_candidates(&self, inputs: &[InputTypeConstraint]) -> HashSet<TypeReference> {
+        let known: HashSet<_> = inputs
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| self.compatible_position(*index))
+            .filter_map(|(_, input)| input.admissible_types())
+            .flatten()
+            .filter(|ty| **ty != CommonType::unknown())
+            .cloned()
+            .collect();
+        if known.is_empty() {
+            return default_types().into_iter().collect();
+        }
+        let mut candidates = known.clone();
+        if let Some(environment) = &self.environment {
+            let context = environment.context();
+            for ty in &known {
+                if !ty.is_dynamic() {
+                    candidates.extend(context.get_implicit_castable(ty));
+                    candidates.extend(context.declared_implicit_cast_sources(ty));
+                }
+            }
+        }
+        candidates
+    }
+
+    /// Supply witnesses only after SQL-derived propagation has finished.
+    fn prepare_compatible_inputs(
+        &self,
+        inputs: &mut [InputTypeConstraint],
+        parameters: &[bool],
+        defaults: bool,
+    ) -> Option<bool> {
+        let unseeded = !self.compatible_functions.is_empty()
+            && inputs
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| self.compatible_position(*index))
+                .all(|(_, input)| {
+                    input.is_any()
+                        || input.admissible_types().is_some_and(|types| {
+                            types.iter().all(|ty| *ty == CommonType::unknown())
+                        })
+                });
+        let needs_witnesses =
+            inputs
+                .iter()
+                .zip(parameters)
+                .enumerate()
+                .any(|(index, (input, parameter))| {
+                    self.compatible_position(index) && input.is_any() && *parameter
+                });
+        if needs_witnesses {
+            if !defaults {
+                return None;
+            }
+            let candidates = self.compatible_candidates(inputs);
+            for (index, (input, parameter)) in inputs.iter_mut().zip(parameters).enumerate() {
+                if self.compatible_position(index) && *parameter && input.is_any() {
+                    *input = InputTypeConstraint::types(candidates.iter().cloned());
+                }
+            }
+        }
+        Some(unseeded)
+    }
+
+    fn has_unresolved_compatible_inputs(&self, inputs: &[InputTypeConstraint]) -> bool {
+        inputs
+            .iter()
+            .enumerate()
+            .any(|(index, input)| self.compatible_position(index) && input.is_any())
     }
 
     fn alternatives(
@@ -557,8 +657,67 @@ impl CallFacts {
                 );
             }
         }
+        if let Some(environment) = &self.environment {
+            let context = environment.context();
+            for template in &self.compatible_functions {
+                Self::instantiate_compatible(&context, template, inputs, &mut signatures);
+            }
+        }
         signatures.retain_inputs(inputs);
         signatures
+    }
+
+    fn instantiate_compatible(
+        context: &impl ParseContext,
+        template: &Signature,
+        inputs: &[InputTypeConstraint],
+        signatures: &mut RankedSignatures,
+    ) {
+        let mut assignments = vec![vec![None; inputs.len()]];
+        for (index, declared) in template.inputs().iter().enumerate() {
+            if !declared.is_common_infer_arg() {
+                continue;
+            }
+            let Some(types) = inputs[index].admissible_types() else {
+                return;
+            };
+            assignments = assignments
+                .into_iter()
+                .flat_map(|assignment| {
+                    types.iter().map(move |ty| {
+                        let mut assignment = assignment.clone();
+                        assignment[index] = Some(ty.clone());
+                        assignment
+                    })
+                })
+                .collect();
+        }
+        let mut sources: HashSet<_> = inputs
+            .iter()
+            .filter_map(InputTypeConstraint::admissible_types)
+            .flatten()
+            .cloned()
+            .chain(default_types())
+            .collect();
+        for declared in template.inputs() {
+            if !declared.is_common_infer_arg() && !declared.is_dynamic() {
+                sources.insert(declared.clone());
+                sources.extend(context.declared_implicit_cast_sources(declared));
+            }
+        }
+        let mut cache = CacheContext::new();
+        for assignment in assignments {
+            let Some(signature) = template.instantiate_compatible(context, &assignment) else {
+                continue;
+            };
+            let mut ranked = RankedSignature::prepare(context, &mut cache, &signature, &sources);
+            for (index, source) in assignment.iter().enumerate() {
+                if let Some(source) = source {
+                    ranked.sources[index].retain(|candidate, _| candidate == source);
+                }
+            }
+            signatures.0.push(ranked);
+        }
     }
 }
 
@@ -650,6 +809,22 @@ impl CallConstraint {
                     .flatten(),
             );
         }
+        let Some(compatible_default_inference) =
+            facts.prepare_compatible_inputs(&mut inputs, &self.parameters, defaults)
+        else {
+            return false;
+        };
+        if facts.has_unresolved_compatible_inputs(&inputs) {
+            if defaults {
+                graph.unsupported_inference.push(self.operation.clone());
+                graph.restrict(
+                    *self.nodes.last().expect("call result"),
+                    &facts.result_types(),
+                );
+                return true;
+            }
+            return false;
+        }
         if inputs.iter().all(InputTypeConstraint::is_any)
             && let Some(contextual) = facts.contextual_inputs(&result)
         {
@@ -690,7 +865,10 @@ impl CallConstraint {
             return true;
         }
         let alternatives = facts.alternatives(&inputs, &result);
-        if default_inference && alternatives.is_empty() && facts.has_declarations() {
+        if (default_inference || compatible_default_inference)
+            && alternatives.is_empty()
+            && facts.has_declarations()
+        {
             // Missing default witnesses do not establish invalid SQL. Keep the
             // relationship for explicit assignment inspection and report the
             // still-unresolved application inputs at the normal boundary.

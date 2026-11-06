@@ -1,8 +1,9 @@
+use crate::sem::CommonType;
 use crate::{
     context::ParseContext,
     sem::{
-        AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
-        SemScalarExpr, TypeReference,
+        AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, SemScalarExpr,
+        TypeReference,
         parameter_resolution::ParameterResolution,
         problem::ArrayProblem,
         scalar_expr::SemScalarExprNode,
@@ -33,7 +34,8 @@ impl ArrayExpr {
             explicit_target: target.cloned(),
             multidimensional: values.iter().any(|value| {
                 value.as_array().is_some()
-                    || MinMaxExpr::input_type(value).is_some_and(|ty| ty.is_array() == Some(true))
+                    || SemScalarExpr::common_type_input(value)
+                        .is_some_and(|ty| ty.is_array() == Some(true))
             }),
             node: None,
         };
@@ -43,7 +45,7 @@ impl ArrayExpr {
             let element = value.operand_target(target);
             if let Some(source) = values
                 .iter()
-                .filter_map(MinMaxExpr::input_type)
+                .filter_map(SemScalarExpr::common_type_input)
                 .find(|source| !Self::can_explicitly_coerce(context, source, &element))
             {
                 value.fail(context, ArrayProblem::incompatible(&source, &element))?;
@@ -53,13 +55,16 @@ impl ArrayExpr {
             }
         } else if values
             .iter()
-            .all(|value| MinMaxExpr::input_type(value).is_some())
+            .all(|value| SemScalarExpr::common_type_input(value).is_some())
         {
-            let mut inputs: Vec<_> = values.iter().filter_map(MinMaxExpr::input_type).collect();
+            let mut inputs: Vec<_> = values
+                .iter()
+                .filter_map(SemScalarExpr::common_type_input)
+                .collect();
             if !inputs.windows(2).all(|pair| pair[0] == pair[1]) {
                 inputs = inputs.iter().map(Self::selection_type).collect();
             }
-            match MinMaxExpr::select_common_type(context, &inputs) {
+            match CommonType::select_common_type(context, &inputs) {
                 Ok(element) => {
                     let target = element.array_type();
                     value.types = InputTypeConstraint::exact(&target);
@@ -129,7 +134,7 @@ impl ArrayExpr {
     fn constraint_values(&self) -> Vec<SemScalarExpr> {
         let mut values = Vec::with_capacity(self.values.len());
         for value in &self.values {
-            let ty = MinMaxExpr::input_type(value);
+            let ty = SemScalarExpr::common_type_input(value);
             if let Some(ty) = ty
                 && ty.is_dynamic()
             {
@@ -150,7 +155,7 @@ impl ArrayExpr {
         target: &TypeReference,
     ) -> bool {
         if Self::selection_type(source) == Self::selection_type(target)
-            || MinMaxExpr::can_coerce(context, source, target)
+            || CommonType::can_coerce(context, source, target)
             || (!source.is_dynamic()
                 && !target.is_dynamic()
                 && context.get_explicit_cast(source, target).is_some())
@@ -174,7 +179,7 @@ impl ArrayExpr {
             let pending =
                 !finalized && value.constraint_node().is_some() && value.get_type().is_none();
             let needs_coercion = value.get_type().as_ref() != Some(&element)
-                || MinMaxExpr::input_type(value) == Some(MinMaxExpr::unknown());
+                || SemScalarExpr::common_type_input(value) == Some(CommonType::unknown());
             if !pending && needs_coercion {
                 *value = if self.explicit_target.is_some() {
                     SemScalarExpr::explicit_cast(value, &element)

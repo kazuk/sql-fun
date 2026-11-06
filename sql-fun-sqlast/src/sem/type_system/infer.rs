@@ -1,7 +1,7 @@
 use crate::{
     context::BaseParseContext,
     sem::{
-        ParseContext, TypeReference,
+        CommonType, ParseContext, TypeReference,
         type_system::{
             TypeError,
             func_params::{FunctionParameterTrait, ParameterBindResult},
@@ -10,8 +10,6 @@ use crate::{
 };
 
 use std::collections::HashSet;
-
-use ::sql_fun_core::IVec;
 
 /// Simple-family substitution retains both element constraints and array identity.
 pub struct SimpleInferResult {
@@ -239,12 +237,13 @@ impl SimpleInferContext {
 #[derive(Default)]
 pub struct CommonInferContext {
     require_infer: bool,
-    element_types: HashSet<TypeReference>,
+    require_non_array: bool,
+    element_types: Vec<TypeReference>,
 }
 
 impl CommonInferContext {
     pub fn push_compat_element(&mut self, ty: &TypeReference) {
-        self.element_types.insert(ty.clone());
+        self.element_types.push(ty.clone());
     }
 
     pub fn push_compat_array(
@@ -252,8 +251,11 @@ impl CommonInferContext {
         array_ty: &TypeReference,
         catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
-        if let Some(element) = catalog.get_array_item_type(array_ty) {
-            self.element_types.insert(element);
+        if *array_ty == CommonType::unknown() {
+            self.push_compat_element(array_ty);
+            Ok(())
+        } else if let Some(element) = catalog.get_array_item_type(array_ty) {
+            self.element_types.push(element);
             Ok(())
         } else {
             Err(TypeError::RequireArray(array_ty.clone()))
@@ -268,6 +270,7 @@ impl CommonInferContext {
         if catalog.get_array_item_type(ty).is_some() {
             Err(TypeError::RequireNonArray(ty.clone()))
         } else {
+            self.require_non_array = true;
             self.push_compat_element(ty);
             Ok(())
         }
@@ -361,18 +364,6 @@ mod test_common_push_input_param {
 }
 
 impl CommonInferContext {
-    fn common_types(castables: &IVec<HashSet<TypeReference>>) -> HashSet<TypeReference> {
-        let mut iter = castables.iter();
-        let Some(first) = iter.next() else {
-            return HashSet::new();
-        };
-        let mut common = first.clone();
-        for s in iter {
-            common.retain(|t| s.contains(t));
-        }
-        common
-    }
-
     /// gets common infer result
     pub fn get_inference_result<TParseContext>(
         &self,
@@ -385,120 +376,17 @@ impl CommonInferContext {
     }
 }
 
-#[cfg(test)]
-mod test_common_get_inference_result {
-    use crate::{
-        sem::{
-            CastContext, CastDefinition, TypeReference,
-            type_system::{TypeError, infer::CommonInferContext},
-        },
-        test_helpers::TestParseContext,
-    };
-
-    use std::collections::HashSet;
-
-    use ::testresult::TestResult;
-
-    #[test]
-    fn picks_candidate_with_highest_score() -> TestResult {
-        let mut context = CommonInferContext::default();
-        let int4 = TypeReference::from_master_type_name("int4");
-        let int8 = TypeReference::from_master_type_name("int8");
-        context.push_compat_element(&int4);
-        context.push_compat_element(&int8);
-
-        let mut parse_context = TestParseContext::default();
-        let mut int4_castables = HashSet::new();
-        int4_castables.insert(int4.clone());
-        int4_castables.insert(int8.clone());
-        parse_context.set_get_implicit_castable_result(&int4, &int4_castables);
-        let mut int8_castables = HashSet::new();
-        int8_castables.insert(int4.clone());
-        int8_castables.insert(int8.clone());
-        parse_context.set_get_implicit_castable_result(&int8, &int8_castables);
-
-        parse_context.set_get_implicit_cast_result(
-            &int4,
-            &int4,
-            Some(CastDefinition::new(CastContext::NoConversion)),
-        );
-        parse_context.set_get_implicit_cast_result(
-            &int8,
-            &int4,
-            Some(CastDefinition::new(CastContext::Implicit)),
-        );
-        parse_context.set_get_implicit_cast_result(
-            &int4,
-            &int8,
-            Some(CastDefinition::new(CastContext::Implicit)),
-        );
-        parse_context.set_get_implicit_cast_result(
-            &int8,
-            &int8,
-            Some(CastDefinition::new(CastContext::ImplicitPrefeerd)),
-        );
-
-        let result = context.get_inference_result(&parse_context)?;
-
-        assert_eq!(result, int4);
-        Ok(())
-    }
-
-    #[test]
-    fn reports_error_when_no_implicit_castable() -> TestResult {
-        let mut context = CommonInferContext::default();
-        let int4 = TypeReference::from_master_type_name("int4");
-        context.push_compat_element(&int4);
-        let parse_context = TestParseContext::default();
-
-        assert!(matches!(
-            context.get_inference_result(&parse_context),
-            Err(TypeError::CommonInferNoImplicitCastable())
-        ));
-        Ok(())
-    }
-}
-
 impl CommonInferContext {
     pub(crate) fn infer_from_catalog<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
     ) -> Result<TypeReference, TypeError> {
-        let mut castables: Vec<HashSet<TypeReference>> = Vec::new();
-
-        // enumerate cast definitions
-        for source_type in &self.element_types {
-            castables.push(context.get_implicit_castable(source_type));
+        let result = CommonType::select_common_type(context, &self.element_types)
+            .map_err(|_| TypeError::CommonInferNoImplicitCastable())?;
+        if self.require_non_array && context.get_array_item_type(&result).is_some() {
+            return Err(TypeError::RequireNonArray(result));
         }
-
-        let candidates = Self::common_types(&castables.into());
-
-        if candidates.is_empty() {
-            TypeError::common_infer_no_implicit_castable()?;
-        }
-        if candidates.len() == 1 {
-            return Ok(candidates.iter().next().unwrap().clone());
-        }
-
-        let mut scoreboard = Vec::new();
-        for candidate in candidates {
-            let mut score = 0i32;
-            for source_type in &self.element_types {
-                let Some(cast) = context.get_implicit_cast(source_type, &candidate) else {
-                    TypeError::unexpected_cast_not_found()?;
-                    TypeError::never();
-                };
-
-                score += cast.context().overload_priority_score();
-            }
-            scoreboard.push((score, candidate));
-        }
-        let max_score = scoreboard.iter().map(|c| c.0).max().unwrap();
-        let results: Vec<_> = scoreboard.iter().filter(|v| v.0 == max_score).collect();
-        if results.len() != 1 {
-            TypeError::common_infer_ambiguous()?;
-        }
-        Ok(results[0].1.clone())
+        Ok(result)
     }
 
     pub const fn set_require_infer(&mut self) {
@@ -529,5 +417,33 @@ impl CommonInferContext {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_common_get_inference_result {
+    use crate::{
+        sem::{PgBuiltInType, type_system::infer::CommonInferContext},
+        test_helpers::common_types as test_helpers,
+    };
+
+    #[rstest::rstest]
+    #[case::small_first(false)]
+    #[case::large_first(true)]
+    fn mixed_integers_infer_the_implicit_target(#[case] reverse: bool) {
+        let mut context = CommonInferContext::default();
+        let mut inputs = [PgBuiltInType::int4(), PgBuiltInType::int8()];
+        if reverse {
+            inputs.reverse();
+        }
+        for input in &inputs {
+            context.push_compat_element(input);
+        }
+        assert_eq!(
+            context
+                .get_inference_result(&test_helpers::context())
+                .unwrap(),
+            PgBuiltInType::int8()
+        );
     }
 }

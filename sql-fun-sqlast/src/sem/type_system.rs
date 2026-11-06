@@ -25,8 +25,8 @@ use crate::{
     context::ParseContext,
     names::ColumnName,
     sem::{
-        ColumnCollection, ColumnDefinition, CreateCompositeType, SemScalarExpr, TypeDefinition,
-        TypeReference, create_comp_type::CompositeFieldCollection,
+        ColumnCollection, ColumnDefinition, CommonType, CreateCompositeType, SemScalarExpr,
+        TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
     },
 };
 
@@ -36,10 +36,27 @@ use self::func_params::ParameterBindResult;
 pub struct ArgumentBindingCollection {
     types: VecDeque<Option<TypeReference>>,
     names: VecDeque<Option<String>>,
+    common_types: VecDeque<Option<TypeReference>>,
     explicit_variadic: bool,
 }
 
 impl ArgumentBindingCollection {
+    pub(crate) fn common_literal_types(&self) -> Self {
+        let mut arguments = self.clone();
+        arguments.types = self.common_types.clone();
+        arguments
+    }
+
+    pub(crate) fn common_literal_rank_types(&self) -> Self {
+        let mut arguments = self.clone();
+        for (ty, common) in arguments.types.iter_mut().zip(&self.common_types) {
+            if common.as_ref() == Some(&CommonType::unknown()) {
+                *ty = None;
+            }
+        }
+        arguments
+    }
+
     pub(crate) fn types(&self) -> impl Iterator<Item = Option<&TypeReference>> {
         self.types.iter().map(Option::as_ref)
     }
@@ -49,6 +66,10 @@ impl ArgumentBindingCollection {
             types: expr_list
                 .iter()
                 .map(ScalarExprSemScalarExpr::get_type)
+                .collect(),
+            common_types: expr_list
+                .iter()
+                .map(|expression| expression.common_type_input())
                 .collect(),
             names: expr_list
                 .iter()
@@ -67,11 +88,13 @@ impl ArgumentBindingCollection {
         let ty = self.types.pop_front();
         if ty.is_some() {
             self.names.pop_front();
+            self.common_types.pop_front();
         }
         ty
     }
 
     pub fn push(&mut self, arg_type: Option<TypeReference>) {
+        self.common_types.push_back(arg_type.clone());
         self.types.push_back(arg_type);
         self.names.push_back(None);
     }

@@ -988,5 +988,269 @@
         }
       ]
     }
+  },
+  {
+    "name": "compatible_mixed_integer_bigint",
+    "sql": "SELECT compatible(1,2::bigint)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_mixed_bigint_integer",
+    "sql": "SELECT compatible(2::bigint,1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_mixed_named",
+    "sql": "SELECT compatible(b=>2::bigint,a=>1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_varchar_bpchar",
+    "sql": "SELECT compatible('a'::varchar,'b'::bpchar)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "varchar",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_bpchar_varchar",
+    "sql": "SELECT compatible('a'::bpchar,'b'::varchar)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bpchar",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_named_order",
+    "sql": "SELECT compatible(b=>'a'::bpchar,a=>'b'::varchar)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bpchar",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_unknown_literals",
+    "sql": "SELECT compatible('a','b')",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_unknown_nulls",
+    "sql": "SELECT compatible(NULL,NULL)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_incompatible_categories",
+    "sql": "SELECT compatible(1,'x'::text)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_unknown_and_integer",
+    "sql": "SELECT compatible('1',2)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_array_unknown",
+    "sql": "SELECT compatible_array('{1}', ARRAY[2::bigint])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible_array",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_array_unknown_nulls",
+    "sql": "SELECT compatible_array(NULL,NULL)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible_array",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_variadic_mixed",
+    "sql": "SELECT compatible_variadic(1,2::bigint)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible_variadic",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_variadic_explicit",
+    "sql": "SELECT compatible_variadic(VARIADIC ARRAY[1::bigint])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible_variadic",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_nonarray_rejects_array_result",
+    "sql": "SELECT compatible_nonarray(NULL,ARRAY[1])",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "compatible_nonarray",
+          "nullability": "unknown"
+        }
+      ]
+    }
   }
 ]

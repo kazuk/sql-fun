@@ -525,6 +525,18 @@ impl ConstraintGraph {
         operation: &str,
     ) {
         self.resume_collection();
+        if let [signature] = signatures
+            && signature.is_scalar_common_function()
+        {
+            let common = self.common_type(context, &nodes[..nodes.len() - 1], false, operation);
+            let result = *nodes.last().expect("call result");
+            if signature.result().is_any_compatible_array() {
+                self.project(common, result, TypeProjection::construct_array());
+            } else {
+                self.equal(common, result);
+            }
+            return;
+        }
         let inputs: Vec<_> = nodes[..nodes.len() - 1]
             .iter()
             .map(|node| self.domain(*node).clone())

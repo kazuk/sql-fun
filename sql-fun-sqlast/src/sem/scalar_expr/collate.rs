@@ -1,9 +1,10 @@
+use crate::sem::CommonType;
 use crate::{
     StringSpan,
     ast::Dialect,
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, CatalogNameLookup, MinMaxExpr, ParseContext, SemScalarExpr,
+        AnalysisError, AnalysisProblem, CatalogNameLookup, ParseContext, SemScalarExpr,
         TypeReference,
         problem::CollateProblem,
         scalar_expr::SemScalarExprNode,
@@ -271,12 +272,12 @@ impl CollateExpr {
         if context.dialect() != Dialect::postgres() {
             return Ok(());
         }
-        let Some(ty) = MinMaxExpr::input_type(&self.argument) else {
+        let Some(ty) = SemScalarExpr::common_type_input(&self.argument) else {
             return Ok(());
         };
         // Unknown literals are legal here; resolving their type is the owning
         // expression's job. Missing catalog facts do not prove inapplicability.
-        if ty == MinMaxExpr::unknown() || self.checked_type.as_ref() == Some(&ty) {
+        if ty == CommonType::unknown() || self.checked_type.as_ref() == Some(&ty) {
             return Ok(());
         }
         if let Some(collatable) = ty.collation_capability(context) {

@@ -1,10 +1,11 @@
+use crate::sem::CommonType;
 use crate::{
     ast::{Call, Dialect, Expr},
     context::ParseContext,
     names::ColumnName,
     sem::{
-        AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
-        SemScalarExpr, TypeReference, WildcardQualifiers, WildcardRewriteError,
+        AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, SemScalarExpr,
+        TypeReference, WildcardQualifiers, WildcardRewriteError,
         parameter_resolution::ParameterResolution,
         scalar_expr::SemScalarExprNode,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -77,13 +78,13 @@ impl CoalesceExpr {
         }
         if arguments
             .iter()
-            .all(|arg| MinMaxExpr::input_type(arg).is_some())
+            .all(|arg| SemScalarExpr::common_type_input(arg).is_some())
         {
             let inputs: Vec<_> = arguments
                 .iter()
-                .filter_map(MinMaxExpr::input_type)
+                .filter_map(SemScalarExpr::common_type_input)
                 .collect();
-            match MinMaxExpr::select_common_type(context, &inputs) {
+            match CommonType::select_common_type(context, &inputs) {
                 Ok(target) => {
                     value.coalesce_type = Some(target.clone());
                     value.types = Some(InputTypeConstraint::exact(&target));
@@ -394,7 +395,7 @@ impl CoalesceExpr {
     fn coerce(&mut self, target: &TypeReference) {
         for argument in &mut self.arg_exprs {
             if argument.get_type().as_ref() != Some(target)
-                || MinMaxExpr::input_type(argument) == Some(MinMaxExpr::unknown())
+                || SemScalarExpr::common_type_input(argument) == Some(CommonType::unknown())
             {
                 *argument = SemScalarExpr::wrap_implicit_cast(target, argument);
             }

@@ -1,3 +1,4 @@
+use crate::sem::CommonType;
 use crate::{
     CacheContext, StringSpan,
     ast::{
@@ -762,7 +763,7 @@ impl SemScalarExpr {
         } else {
             target
         };
-        let expected = MinMaxExpr::base_type(context, &target);
+        let expected = CommonType::base_type(context, &target);
         let mut argument = if context.dialect() == Dialect::postgres()
             && resolution.is_resolved()
             && expected.is_array() == Some(true)

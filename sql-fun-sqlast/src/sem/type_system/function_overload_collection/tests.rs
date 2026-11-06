@@ -491,3 +491,101 @@ fn deferred_variadic_any_keeps_concrete_overload_correlation(
     );
     Ok(())
 }
+
+// The analyzed call must retain joint source types and its polymorphic result.
+#[test]
+fn compatible_unanchored_parameters_keep_correlated_assignments() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_vector(
+        "SELECT vf($1,$2)",
+        "anycompatible, anycompatible",
+        "anycompatible",
+    )?;
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::int8()),
+    ])));
+    assert!(!constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::text()),
+    ])));
+    let uuid = TypeReference::from_master_type_name("uuid");
+    assert!(constraints.allows(&BTreeMap::from([(1, uuid.clone()), (2, uuid)])));
+    let result = constraints.result_column(0).unwrap();
+    assert!(!result.is_any());
+    assert!(result.allows(&PgBuiltInType::int4()));
+    assert!(result.allows(&PgBuiltInType::int8()));
+    assert!(result.single_type().is_none());
+    Ok(())
+}
+
+#[test]
+fn compatible_anchored_parameter_admits_multiple_input_types() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_vector(
+        "SELECT vf($1,2::bigint)",
+        "anycompatible, anycompatible",
+        "anycompatible",
+    )?;
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int8())])));
+    assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+    Ok(())
+}
+
+#[test]
+fn compatible_result_constraints_preserve_input_correlation() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_compatible("SELECT accept_integer(vf($1,$2))")?;
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::int4()),
+    ])));
+    assert!(!constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::int8()),
+    ])));
+    Ok(())
+}
+
+#[test]
+fn compatible_unknown_literal_does_not_anchor_parameter_to_text() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_compatible("SELECT vf($1,'1')")?;
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+    Ok(())
+}
+
+#[test]
+fn compatible_variadic_parameters_infer_array_result() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_vector(
+        "SELECT vf($1,$2)",
+        "VARIADIC anycompatiblearray",
+        "anycompatiblearray",
+    )?;
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::int8()),
+    ])));
+    let result = constraints.result_column(0).unwrap();
+    assert!(result.allows(&PgBuiltInType::int8().array_type()));
+    Ok(())
+}
+
+#[test]
+fn compatible_unknown_literal_keeps_concrete_overload_ranking() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze(
+        "SELECT f('a',$1)",
+        "anycompatible, integer",
+        "text, integer",
+        false,
+    )?;
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+    let result = constraints.result_column(0).unwrap();
+    assert!(result.allows(&PgBuiltInType::int4()));
+    assert!(!result.allows(&PgBuiltInType::text()));
+    Ok(())
+}

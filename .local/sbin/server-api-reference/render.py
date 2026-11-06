@@ -19,8 +19,7 @@ AVAILABILITY = {
     "analyze_query": True,
     "list_object": False,
 }
-BEGIN = "<!-- BEGIN GENERATED SERVER API METHODS -->"
-END = "<!-- END GENERATED SERVER API METHODS -->"
+METHOD_REFERENCE = "  - [Method reference](api/methods.md)"
 
 
 def markdown_text(value):
@@ -135,16 +134,15 @@ def main():
     for method in methods:
         render_method(method, template, workdir, target / f"{method['contract']['name']}.md")
     navigation = "\n".join(
-        f"- [{name}{'' if AVAILABILITY[name] else ' (unavailable)'}](api/methods/{name}.md)"
+        f"    - [{name}{'' if AVAILABILITY[name] else ' (unavailable)'}](api/methods/{name}.md)"
         for name in names
     )
     summary = book / "SUMMARY.md"
     text = summary.read_text(encoding="utf-8")
-    if text.count(BEGIN) != 1 or text.count(END) != 1:
-        raise ValueError("expected one generated-method navigation marker pair")
-    before, rest = text.split(BEGIN)
-    _, after = rest.split(END)
-    summary.write_text(before + BEGIN + "\n" + navigation + "\n" + END + after, encoding="utf-8")
+    if text.count(METHOD_REFERENCE) != 1:
+        raise ValueError("expected one method reference chapter in the summary")
+    summary.write_text(text.replace(METHOD_REFERENCE, METHOD_REFERENCE + "\n" + navigation),
+                       encoding="utf-8")
 
 
 if __name__ == "__main__":

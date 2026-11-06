@@ -12,7 +12,6 @@ class Page(HTMLParser):
         super().__init__()
         self.ids = set()
         self.links = []
-        self.all_links = []
         self.main_depth = 0
         self.feed(path.read_text(encoding="utf-8"))
 
@@ -23,7 +22,6 @@ class Page(HTMLParser):
         if "id" in attrs:
             self.ids.add(attrs["id"])
         if tag == "a" and "href" in attrs:
-            self.all_links.append(attrs["href"])
             if self.main_depth:
                 self.links.append(attrs["href"])
 
@@ -32,11 +30,55 @@ class Page(HTMLParser):
             self.main_depth -= 1
 
 
+class Navigation(HTMLParser):
+    """Record the chapter ancestors from mdBook's rendered nested list."""
+
+    def __init__(self, path):
+        super().__init__()
+        self.chapters = []
+        self.entries = {}
+        self.feed(path.read_text(encoding="utf-8"))
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "ol":
+            self.chapters.append(None)
+        elif tag == "li" and self.chapters:
+            self.chapters[-1] = None
+        elif tag == "a" and self.chapters:
+            href = dict(attrs).get("href")
+            if href:
+                self.chapters[-1] = href
+                self.entries.setdefault(href, []).append(tuple(self.chapters[:-1]))
+
+    def handle_endtag(self, tag):
+        if tag == "ol":
+            self.chapters.pop()
+
+
+def check_navigation(root, paths):
+    navigation = Navigation(root / "toc.html").entries
+    parent = "api/server-api.html"
+    methods = "api/methods.html"
+    expected = {
+        parent: (),
+        "api/initialize.html": (parent,),
+        "api/check-analysis-design.html": (parent,),
+        methods: (parent,),
+    }
+    expected.update({f"api/methods/{path.name}": (parent, methods) for path in paths})
+    for href, ancestors in expected.items():
+        if navigation.get(href) != [ancestors]:
+            raise ValueError(f"incorrect Server API navigation hierarchy: {href}")
+    actual_methods = {href for href in navigation if href.startswith("api/methods/")}
+    if actual_methods != {href for href in expected if href.startswith("api/methods/")}:
+        raise ValueError("method navigation does not match generated chapters")
+
+
 def main():
     root = Path(sys.argv[1]).resolve()
-    paths = sorted((root / "api").glob("*.html"))
-    paths.extend(sorted((root / "api" / "methods").glob("*.html")))
-    if not paths or not (root / "api" / "methods").is_dir():
+    method_paths = sorted((root / "api" / "methods").glob("*.html"))
+    paths = sorted((root / "api").glob("*.html")) + method_paths
+    if not method_paths:
         raise ValueError("rendered Server API chapters are missing")
     cache = {}
 
@@ -45,10 +87,7 @@ def main():
             cache[path] = Page(path)
         return cache[path]
 
-    expected = {f"api/methods/{path.name}" for path in (root / "api" / "methods").glob("*.html")}
-    navigation = [link for link in page(root / "toc.html").all_links if link.startswith("api/methods/")]
-    if len(navigation) != len(expected) or set(navigation) != expected:
-        raise ValueError("method navigation does not match generated chapters")
+    check_navigation(root, method_paths)
 
     for source in paths:
         for link in page(source).links:

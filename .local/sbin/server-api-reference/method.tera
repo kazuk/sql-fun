@@ -2,8 +2,6 @@
 
 {{ summary }}
 
-{{ availability }}
-
 [Connection and authentication](../initialize.md) · [Schema and collection workflow](../check-analysis-design.md)
 
 {{ metadata }}

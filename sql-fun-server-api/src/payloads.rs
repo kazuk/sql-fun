@@ -11,7 +11,7 @@ mod analyze_query;
 mod describe_table;
 mod echo;
 mod initialize_schema;
-mod list_objects;
+mod object_kind;
 mod tokenize_sql;
 mod traversal;
 
@@ -32,10 +32,7 @@ pub use self::{
     initialize_schema::{
         EngineDialect, EngineVersion, ExtensionSpec, InitializeSchemaArgs, SchemaContext,
     },
-    list_objects::{
-        ListObjectArgs, NameQuery, ObjectKind, ObjectQuery, ObjectSummary, ObjectSummaryField,
-        StringPred,
-    },
+    object_kind::ObjectKind,
 };
 
 use std::path::PathBuf;

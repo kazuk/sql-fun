@@ -88,12 +88,12 @@ string `"2.0"`. An explicitly invalid version is rejected.
 `echo` requires `params` to be an object or array. Both can contain nested JSON
 values, including null. Scalar or null parameters are rejected. Other accepted
 method names are `initialize_schema_context`, `read_collection`,
-`release_collection`, `tokenize_sql`, `analyze_query`, `list_object`, and
-`describe_table`, with parameters matching their public API argument types.
+`release_collection`, `tokenize_sql`, `analyze_query`, and `describe_table`,
+with parameters matching their public API argument types.
 The server dispatches `echo`, `tokenize_sql`, `initialize_schema_context`,
 `read_collection`, `release_collection`, and `analyze_query`. The CLI accepts
-`list_object` and `describe_table`, but the server does not dispatch them and
-returns an unknown-method error. See the
+`describe_table`, but the server does not dispatch it and returns an
+unknown-method error. See the
 [schema context and query analysis workflow](check-analysis-design.md) for
 initialization and analysis examples.
 

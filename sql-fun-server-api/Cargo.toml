@@ -21,7 +21,6 @@ sqlite = ["sql-fun-core/sqlite"]
 
 [dependencies]
 anyhow = { workspace = true, optional = true }
-async-trait.workspace = true
 clap = { workspace = true, optional = true }
 derive-getters.workspace = true
 schemars = { workspace = true, optional = true }

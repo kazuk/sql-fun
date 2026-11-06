@@ -3252,7 +3252,6 @@ name = "sql-fun-server-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "clap",
  "derive-getters",
  "rstest",

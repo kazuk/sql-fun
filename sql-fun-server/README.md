@@ -1,6 +1,15 @@
 # sql-fun-server
 
-JSON RPC server for `sql-fun`
+The JSON-RPC service executable for `sql-fun` SQL analysis and schema caching.
+Applications normally use [`sql-fun-client`](https://crates.io/crates/sql-fun-client):
+its `connect()` API handles server discovery, conditional launch, connection,
+and authentication. The CLI uses the same client functionality. See the
+[Server API Reference](https://kazuk.github.io/sql-fun/api/server-api.html) for
+the protocol and the [installation guide](https://kazuk.github.io/sql-fun/installation.html)
+for setup.
+
+Manual startup is an operational or development option; it is not a prerequisite
+for a client that can launch the server.
 
 ## Security Notice
 

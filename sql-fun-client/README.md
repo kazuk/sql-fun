@@ -1,24 +1,28 @@
 # `sql-fun-client`
 
+A Rust client for the [`sql-fun-server`](https://crates.io/crates/sql-fun-server)
+JSON-RPC service. See the [Rust API documentation](https://docs.rs/sql-fun-client)
+and the [Server API Reference](https://kazuk.github.io/sql-fun/api/server-api.html).
+
 Connect to a per-user `sql-fun-server` on the same Linux host. Callers explicitly
 choose an absolute server executable and a user namespace. The client reads
 `/tmp/<user>/sql-fun-server.pid`, starts a detached server only when registration
 is absent, and authenticates before returning a connection. The user must be a
 single nonempty path component; it is also passed as `USER` to launched commands.
 
-```rust,no_run
+```rust
 use sql_fun_client::{ConnectionOptions, connect};
 
-# async fn example() -> Result<(), Box<dyn std::error::Error>> {
-let options = ConnectionOptions::builder()
-    .server_executable("/opt/sql-fun/bin/sql-fun-server")
-    .user("alice")
-    .build();
-let client = connect(&options).await?;
-println!("{}", client.peer_addr()?);
-drop(client);
-# Ok(())
-# }
+async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    let options = ConnectionOptions::builder()
+        .server_executable("/opt/sql-fun/bin/sql-fun-server")
+        .user("alice")
+        .build();
+    let client = connect(&options).await?;
+    println!("{}", client.peer_addr()?);
+    drop(client);
+    Ok(())
+}
 ```
 
 The builder requires both executable and user before `.build()`; its path and
@@ -47,7 +51,8 @@ retries share one monotonic deadline. Each connection/initialization attempt is
 also bounded. Initialization validates the JSON-RPC version, matching request ID,
 and `result: "OK"`. TCP connection alone does not establish readiness.
 
-The self-contained example demonstrates the public connection API:
+The repository contains a self-contained example of the public connection API.
+Run it from a repository checkout:
 
 ```sh
 cargo build -p sql-fun-server
@@ -73,8 +78,8 @@ is preserved: the client never signals the registered process, deletes its file,
 or launches a replacement over it. Crash leftovers, zombies and inconsistent
 tokens can therefore require operator-assisted recovery. Verify the intended
 server and registration before cleanup and stop other startups during that work.
-Do not act on an unverified PID. Safe automatic recovery is tracked in issue #415;
-atomic server registration publication is a separate improvement in issue #407.
+Do not act on an unverified PID. Safe automatic recovery is tracked in [issue #415](https://github.com/kazuk/sql-fun/issues/415);
+atomic server registration publication is a separate improvement in [issue #407](https://github.com/kazuk/sql-fun/issues/407).
 Until that improvement lands, discovery during the brief registration-write
 window can fail with a malformed-record error. This is an accepted MVP limitation;
 it does not prevent normal launch, authentication or reuse once writing completes.
@@ -88,27 +93,27 @@ arriving out of order. Valid JSON-RPC error responses are delivered to callbacks
 Use `response.into_result()` to handle server errors or serialize the response
 with Serde to retain its JSON-RPC envelope and ID.
 
-```rust,no_run
-# async fn example(
-#     mut client: sql_fun_client::TcpJsonRpcClientAsync,
-# ) -> Result<(), Box<dyn std::error::Error>> {
-client
-    .invoke_method(
-        "rpc.discover",
-        &serde_json::json!({}),
-        |response| async move {
-            // Handle application failures here; the client cannot receive them.
-            match response.into_result() {
-                Ok(value) => println!("{value}"),
-                Err(error) => eprintln!("{error}"),
-            }
-            Ok(())
-        },
-    )
-    .await?;
-client.finish().await?;
-# Ok(())
-# }
+```rust
+async fn example(
+    mut client: sql_fun_client::TcpJsonRpcClientAsync,
+) -> Result<(), Box<dyn std::error::Error>> {
+    client
+        .invoke_method(
+            "rpc.discover",
+            &serde_json::json!({}),
+            |response| async move {
+                // Handle application failures here; the client cannot receive them.
+                match response.into_result() {
+                    Ok(value) => println!("{value}"),
+                    Err(error) => eprintln!("{error}"),
+                }
+                Ok(())
+            },
+        )
+        .await?;
+    client.finish().await?;
+    Ok(())
+}
 ```
 
 Callbacks own their responses, must be `Send + 'static`, and return
@@ -139,27 +144,31 @@ collection handles from JSON keys. The original callback receives exactly one
 items, have been read and any required releases have succeeded. Submission errors
 before acceptance return directly and do not invoke the callback.
 
-```rust,no_run
-# async fn example(
-#     mut client: sql_fun_client::TcpJsonRpcClientAsync,
-#     params: serde_json::Value,
-# ) -> Result<(), Box<dyn std::error::Error>> {
-client.invoke_typed(
-    "initialize_schema_context",
-    &params,
-    |response: Result<sql_fun_client::payloads::SchemaContext, _>| async move {
-        match response {
-            Ok(context) => {
-                println!("{} diagnostics", context.problems().items().len());
-            }
-            Err(error) => eprintln!("{error}"),
-        }
-        Ok(())
-    },
-).await?;
-client.finish().await?;
-# Ok(())
-# }
+```rust
+use sql_fun_client::payloads::SchemaContext;
+
+async fn example(
+    mut client: sql_fun_client::TcpJsonRpcClientAsync,
+    params: serde_json::Value,
+) -> Result<(), Box<dyn std::error::Error>> {
+    client
+        .invoke_typed(
+            "initialize_schema_context",
+            &params,
+            |response: Result<SchemaContext, _>| async move {
+                match response {
+                    Ok(context) => {
+                        println!("{} diagnostics", context.problems().items().len());
+                    }
+                    Err(error) => eprintln!("{error}"),
+                }
+                Ok(())
+            },
+        )
+        .await?;
+    client.finish().await?;
+    Ok(())
+}
 ```
 
 Typed completion materializes the **entire collection in client memory**. A
@@ -203,10 +212,3 @@ The client emits `tracing` INFO events after a request is written (`request_id`,
 JSON-RPC error responses). Response events omit `method`. Parameters, payloads,
 and authentication tokens are never recorded by the client. The consuming
 application installs/configures its own tracing subscriber.
-
-Integration tests run in the standard workspace nextest suite. Their heavy
-fixtures prebuild the actual server in the dev profile with matching
-SQLite features before timing any connection, and use unique fixture-owned user
-namespaces. They call the library directly and do not execute the example.
-The example is compiled by the standard lint step's all-targets check.
-No developer registration is used.

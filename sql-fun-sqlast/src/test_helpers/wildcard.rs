@@ -150,19 +150,19 @@ impl ResultShapeAssertions for ResultColumnCollection {
 use crate::sem::{MergeRecordRole, ResultColumn};
 
 pub(crate) trait RetainedColumnsAssertions {
-    fn assert_retained_names(&self, expected: &str);
-    fn assert_merge_role(&self, expected: MergeRecordRole);
+    fn assert_retained_names(self, expected: &str);
+    fn assert_merge_role(self, expected: MergeRecordRole);
 }
-impl RetainedColumnsAssertions for [ResultColumn] {
-    fn assert_retained_names(&self, expected: &str) {
-        let names: Vec<_> = self
-            .iter()
-            .map(|column| column.column_name().as_ref().unwrap().as_str())
-            .collect();
+impl<'a, I: Iterator<Item = &'a ResultColumn>> RetainedColumnsAssertions for I {
+    fn assert_retained_names(self, expected: &str) {
+        let mut names = Vec::new();
+        for column in self {
+            names.push(column.column_name().as_ref().unwrap().as_str());
+            assert!(column.expression().is_some());
+        }
         assert_eq!(names.join(","), expected);
-        assert!(self.iter().all(|column| column.expression().is_some()));
     }
-    fn assert_merge_role(&self, expected: MergeRecordRole) {
+    fn assert_merge_role(self, expected: MergeRecordRole) {
         for column in self {
             assert_eq!(
                 column
@@ -190,7 +190,10 @@ impl WildcardGroupsAssertions for WildcardExpansionCollection {
     }
     fn assert_relation_schemas(&self, schemas: &[&str]) {
         for (index, group) in self.groups().iter().enumerate() {
-            let reference = group.columns()[0]
+            let reference = group
+                .columns()
+                .next()
+                .unwrap()
                 .expression()
                 .unwrap()
                 .table_column_reference()

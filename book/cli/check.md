@@ -246,10 +246,11 @@ These options are passed to `cargo expand` for selected packages:
 - `--manifest-path <PATH>`: supply a manifest to `cargo expand`. Package
   selection still uses Cargo metadata from the current workspace.
 
-`--frozen`, `--locked`, and `--offline` are accepted by the CLI but are not
-currently passed to Cargo. Do not rely on them to enforce a lockfile or offline
-operation. Apart from `SQL_FUN_CHECK_PROGRESS`, the options specific to `check`
-have no environment variable equivalents.
+The `--frozen`, `--locked`, and `--offline` options are passed to `cargo expand`
+and to `cargo metadata` when selecting default or workspace packages. Cargo and
+cargo-expand interpret these options according to their own behavior. Apart from
+`SQL_FUN_CHECK_PROGRESS`, the options specific to `check` have no environment
+variable equivalents.
 
 ## Progress output
 

@@ -18,6 +18,17 @@ Installing or upgrading a generation is a separate operation.
 Install the PostgreSQL client tools (`psql`) on the machine running sql-fun
 for both connection sources.
 
+## Command reference
+
+```text
+sql-fun extract <COMMAND>
+```
+
+Choose [`catalog`](extract/catalog.md), [`export-script`](extract/export-script.md),
+or [`import-extensions`](extract/import-extensions.md). `-h` / `--help` prints
+help. Root-level [common options](README.md#common-options) precede `extract`.
+Each operation's reference describes its arguments and exit status.
+
 ## From a Docker image
 
 Install Docker CLI and provide access to a Docker daemon:

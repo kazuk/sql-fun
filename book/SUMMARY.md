@@ -67,19 +67,18 @@
 
 - [Batch query support](./sql-rewrite/batching.md)
 
-## `sql-fun` command line reference
+## CLI Reference
 
-### Subcommands
-
-- [init](./cli/init.md) sub command
-- [Extract PostgreSQL metadata](cli/extract.md)
-- [check](./cli/check.md) sub command
-- [Analyze SQL files](cli/analyze.md)
-- [Test SQL contracts](cli/test.md)
-<!-- Empty links mark draft chapters in mdBook. -->
-<!-- rumdl-disable MD042 -->
-- [api-help]()
-<!-- rumdl-enable MD042 -->
+- [CLI Reference and common options](cli/README.md)
+  - [init](cli/init.md)
+  - [analyze](cli/analyze.md)
+  - [test](cli/test.md)
+  - [check](cli/check.md)
+  - [extract](cli/extract.md)
+    - [extract catalog](cli/extract/catalog.md)
+    - [extract export-script](cli/extract/export-script.md)
+    - [extract import-extensions](cli/extract/import-extensions.md)
+  - [api](cli/api.md)
 
 ## Server API
 

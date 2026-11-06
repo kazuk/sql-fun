@@ -4,6 +4,17 @@
 or creating query lockfiles. It uses `sql-fun-server` and an installed builtin
 catalog; it does not execute the SQL or require a live database or `cargo-expand`.
 
+```text
+sql-fun [COMMON OPTIONS] analyze [OPTIONS] [SQL]
+```
+
+Use [common options](README.md#common-options) before `analyze`. Exactly one of
+`SQL` or `--sql-file <FILE[#JSONPath]>` is required. `--schema-level` accepts
+`builtin`, `default`, `extensions`, or `project` (the default).
+`--no-column-access` omits access analysis, and `--diagnostics-to-stderr` copies
+SQL diagnostics to stderr. `-h` / `--help` prints help. These command-specific
+options have no environment variable equivalents.
+
 The datasource is selected by the global `--datasource` option, then by
 `SQL_FUN_DATASOURCE`, or otherwise by the name `default`. Configuring a
 datasource named `default` selects it for use when no other name is supplied.

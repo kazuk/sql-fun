@@ -4,17 +4,8 @@ use crate::{
 };
 use sql_fun_core::InitializeArgs;
 
-/// daemon control args
-#[derive(clap::Parser, Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DaemonControlArgs {
-    /// daemon extension name
-    daemon_name: String,
-    /// daemon arguments
-    daemon_args: Vec<String>,
-}
-
 /// CLI Subcommand args
-#[derive(clap::Subcommand, Debug, Clone, Default)]
+#[derive(clap::Subcommand, Debug, Clone)]
 pub enum CliSubCommand {
     /// Stream JSON Lines requests to the authenticated per-user server
     Api(ApiArgs),
@@ -27,19 +18,6 @@ pub enum CliSubCommand {
 
     /// Extract `PostgreSQL` catalogs or import extension files
     Extract(ExtractArgs),
-
-    /// Get versions
-    #[default]
-    Versions,
-
-    /// Start daemon extension
-    Start(DaemonControlArgs),
-    /// Stop daemon extension
-    Stop(DaemonControlArgs),
-    /// Show status of daemon extension
-    Status(DaemonControlArgs),
-    /// Restart daemon extension
-    Restart(DaemonControlArgs),
 
     /// External subcommand (captured undefined commands)
     #[clap(external_subcommand)]
@@ -122,7 +100,7 @@ impl CliSubCommand {
             Self::Initialize(args) => Ok(initialize(common, args, metadata_file_from_cli).await?),
             Self::Check(args) => Ok(args.execute(common).await?),
             Self::Extract(args) => args.execute().await,
-            _ => unreachable!("expected builtin command"),
+            Self::External(_) => unreachable!("expected builtin command"),
         }
     }
 
@@ -138,13 +116,8 @@ impl CliSubCommand {
                     u8::try_from(exit_code).unwrap_or(u8::MAX),
                 ))
             }
-            Self::Start(_daemon_control_args) => todo!(),
-            Self::Stop(_daemon_control_args) => todo!(),
-            Self::Status(_daemon_control_args) => todo!(),
-            Self::Restart(_daemon_control_args) => todo!(),
             Self::Initialize(_initialize_args) => todo!(),
             Self::Check(_check_args) => todo!(),
-            Self::Versions => todo!(),
             Self::Api(_) => unreachable!("builtin api"),
             Self::Analyze(_) | Self::Test(_) => unreachable!("builtin direct SQL"),
             Self::Extract(_) => unreachable!("builtin extraction"),
@@ -161,32 +134,23 @@ impl CliSubCommand {
     /// binary name expects
     #[must_use]
     pub fn binary_names(&self) -> Vec<String> {
-        let (only_daemon, name) = match self {
-            Self::Start(daemon_control_args)
-            | Self::Stop(daemon_control_args)
-            | Self::Status(daemon_control_args)
-            | Self::Restart(daemon_control_args) => (true, daemon_control_args.daemon_name.clone()),
+        let name = match self {
             Self::External(args) => {
                 let Some(name) = args.first() else {
                     return Vec::new();
                 };
-                (false, name.clone())
+                name.clone()
             }
-            Self::Initialize(_) => (false, "init".to_string()),
-            Self::Check(_) => (false, "check".to_string()),
-            Self::Analyze(_) => (false, "analyze".to_string()),
-            Self::Test(_) => (false, "test".to_string()),
-            Self::Extract(_) => (false, "extract".to_string()),
-            Self::Versions => (false, "versions".to_string()),
-            Self::Api(_) => (false, "api".to_string()),
+            Self::Initialize(_) => "init".to_string(),
+            Self::Check(_) => "check".to_string(),
+            Self::Analyze(_) => "analyze".to_string(),
+            Self::Test(_) => "test".to_string(),
+            Self::Extract(_) => "extract".to_string(),
+            Self::Api(_) => "api".to_string(),
         };
-        if only_daemon {
-            vec![Self::daemon_binary_name(&name)]
-        } else {
-            vec![
-                Self::external_binary_name(&name),
-                Self::daemon_binary_name(&name),
-            ]
-        }
+        vec![
+            Self::external_binary_name(&name),
+            Self::daemon_binary_name(&name),
+        ]
     }
 }

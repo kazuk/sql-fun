@@ -235,14 +235,8 @@ requires `curl` or `wget` with TLS support and trusted certificates. See
 [initialization](cli/init.md#diagnostic-theme) for retaining or editing a theme.
 
 Choose the PostgreSQL engine or a configured PostgreSQL datasource, the home
-directory, a source, and the versions you need (currently 17 and 18). For a
-non-interactive initialization of a specific version:
-
-```console
-sql-fun init --yes --install-default-theme --engines postgres \
-  --sql-fun-home "$HOME/.sql-fun" \
-  --docker --engine-versions 17
-```
+directory, a source, and the versions you need (currently 17 and 18). See the
+[init reference](cli/init.md) for non-interactive usage and all options.
 
 Set your datasource's `version` to the matching major. Initialization stores
 metadata under `<chosen-home>/postgres/<version>/` (suggested home `~/.sql-fun`),

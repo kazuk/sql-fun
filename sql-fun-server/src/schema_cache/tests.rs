@@ -532,6 +532,8 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
 
 // The omitted and empty inventory cases timed out in CI and were removed in
 // 342e3aac2f36ac19430b23ae04a957a0fda352f5; recover them from that commit's parent.
+// The remaining different case timed out in CI and was removed in
+// 13e11bcc4e8d30278cc5e46ffbf2e845c27cb46e; recover it from that commit's parent.
 
 // Removed role_inventory_partitions_cached_bindings_and_diagnostics after a CI timeout.
 // Deletion commit: 5e2a1836584afda654602779b3bf71cc215d595c; recover from its parent.

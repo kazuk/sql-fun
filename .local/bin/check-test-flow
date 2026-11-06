@@ -297,18 +297,25 @@ function run_lint() {
   RUST_LOG=error taplo lint
 }
 
-function run_server_api_spec() {
+function run_server_api_spec() (
   require_command jq
   echo "== Generate server API spec document"
+  local temporary
+  temporary=$(mktemp -d)
+  trap 'rm -rf "$temporary"' EXIT
   cargo run -p sql-fun-server-api --features openrpc-schema,bin-deps \
     --bin openrpc-spec -- \
-    --output-path "${GIT_ROOT}/server_api_spec.json" \
-    --force
+    --output-path "${temporary}/server_api_spec.json"
   # Consume the freshly generated schema so enum changes cannot hide behind a
   # stale tracked spec. Reuse this step in the standard local flow and CI.
   "${GIT_ROOT}/.local/sbin/check-access-kind-docs" \
-    "${GIT_ROOT}/server_api_spec.json" "${GIT_ROOT}/book/access-kinds.md"
-}
+    "${temporary}/server_api_spec.json" "${GIT_ROOT}/book/access-kinds.md"
+  if ! cmp -s "${temporary}/server_api_spec.json" "${GIT_ROOT}/server_api_spec.json"; then
+    echo "server_api_spec.json is out of date; regenerate it with openrpc-spec" >&2
+    diff -u "${GIT_ROOT}/server_api_spec.json" "${temporary}/server_api_spec.json" || true
+    return 1
+  fi
+)
 
 function run_deny() {
   echo "== check dependencies"
@@ -323,6 +330,8 @@ function run_dependency_updates() {
 function run_doc() {
   require_command mdbook
   require_command python3
+  require_command jq
+  require_command tera
   # Validate before mdBook can create missing chapter files.
   python3 "${GIT_ROOT}/.local/sbin/check-diagnostic-reference"
   echo "== Document build"

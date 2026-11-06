@@ -84,17 +84,12 @@
 
 ## `sql-fun` server api reference
 
-### methods
+- [Connection and authentication](api/initialize.md)
+- [Schema context and query analysis](api/check-analysis-design.md)
 
-- [initialize method](./api/initialize.md)
-- [Schema context and check analysis API design](./api/check-analysis-design.md)
-- [initialized notification](./api/initialized.md)
-- [list-tables method](./api/list-tables.md)
-<!-- Empty links mark draft chapters in mdBook. -->
-<!-- rumdl-disable MD042 -->
-- [describe-table method]()
-- [validate-sql method]()
-<!-- rumdl-enable MD042 -->
+### Method reference
+<!-- BEGIN GENERATED SERVER API METHODS -->
+<!-- END GENERATED SERVER API METHODS -->
 
 ## SQL diagnostic reference
 

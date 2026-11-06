@@ -12,6 +12,31 @@ use crate::{
     },
 };
 
+/// Wildcard projection groups recorded by a single semantic analysis.
+#[derive(Clone, Debug, Default)]
+pub struct WildcardExpansionCollection(Vec<WildcardExpansion>);
+
+impl WildcardExpansionCollection {
+    /// Groups in analysis order, including nested query scopes and duplicates.
+    pub fn groups(&self) -> &[WildcardExpansion] {
+        &self.0
+    }
+
+    /// Number of recorded wildcard groups.
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether no wildcard groups were recorded.
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(crate) fn push(&mut self, expansion: WildcardExpansion) {
+        self.0.push(expansion);
+    }
+}
+
 /// The ordered semantic output of one source wildcard projection.
 ///
 /// Lexical offsets are relative to the parser input for the owning statement.

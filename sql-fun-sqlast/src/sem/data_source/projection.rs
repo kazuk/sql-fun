@@ -1066,9 +1066,9 @@ mod test_wildcard_projection_metadata {
         );
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].location(), sql.find('*'));
-        assert!(groups[0].is_table_dependent());
-        assert_eq!(groups[0].columns().len(), 2);
+        assert_eq!(groups.groups()[0].location(), sql.find('*'));
+        assert!(groups.groups()[0].is_table_dependent());
+        assert_eq!(groups.groups()[0].columns().len(), 2);
     }
 
     #[test]
@@ -1078,7 +1078,7 @@ mod test_wildcard_projection_metadata {
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 1);
         assert_eq!(
-            groups[0].reference_at(0),
+            groups.groups()[0].reference_at(0),
             Some(["j".to_owned(), "id".to_owned()].as_slice())
         );
     }
@@ -1094,10 +1094,10 @@ mod test_wildcard_projection_metadata {
         .unwrap();
         let groups = context.analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].location(), None);
-        assert!(!groups[0].is_table_dependent());
+        assert_eq!(groups.groups()[0].location(), None);
+        assert!(!groups.groups()[0].is_table_dependent());
         assert_eq!(
-            groups[0].columns()[0]
+            groups.groups()[0].columns()[0]
                 .column_name()
                 .as_ref()
                 .unwrap()
@@ -1123,7 +1123,7 @@ mod test_wildcard_projection_metadata {
         );
         let groups = context.analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].is_table_dependent(), table_dependent);
+        assert_eq!(groups.groups()[0].is_table_dependent(), table_dependent);
     }
 
     #[rstest::rstest]
@@ -1142,7 +1142,7 @@ mod test_wildcard_projection_metadata {
             "{:?}",
             context.reported_problems()
         );
-        let group = &context.analysis_state().wildcard_expansions()[0];
+        let group = &context.analysis_state().wildcard_expansions().groups()[0];
         let [source] = group.rows_sources() else {
             panic!("one resolved ROWS FROM source")
         };
@@ -1177,8 +1177,8 @@ mod test_wildcard_projection_metadata {
         );
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 1);
-        assert!(groups[0].is_table_dependent());
-        assert!(groups[0].columns().is_empty());
+        assert!(groups.groups()[0].is_table_dependent());
+        assert!(groups.groups()[0].columns().is_empty());
     }
 
     #[test]
@@ -1195,7 +1195,7 @@ mod test_wildcard_projection_metadata {
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 2);
         assert_eq!(
-            groups[0].columns()[0]
+            groups.groups()[0].columns()[0]
                 .column_name()
                 .as_ref()
                 .unwrap()
@@ -1203,7 +1203,7 @@ mod test_wildcard_projection_metadata {
             "aid"
         );
         assert_eq!(
-            groups[1].columns()[0]
+            groups.groups()[1].columns()[0]
                 .column_name()
                 .as_ref()
                 .unwrap()
@@ -1223,21 +1223,21 @@ mod test_wildcard_projection_metadata {
             analyzed.context().reported_problems()
         );
         let groups = analyzed.context().analysis_state().wildcard_expansions();
-        let source = &groups[0].source_projections()[0];
+        let source = &groups.groups()[0].source_projections()[0];
         assert_eq!(source.alias(), "j");
         source
             .columns()
             .assert_retained_names("id,only_a,id,only_b,aid");
-        assert_eq!(groups[0].source_ordinal_at(0), Some(("j", 4)));
-        assert_eq!(groups[0].source_ordinal_at(1), Some(("j", 0)));
-        assert_eq!(groups[0].source_ordinal_at(3), Some(("j", 2)));
+        assert_eq!(groups.groups()[0].source_ordinal_at(0), Some(("j", 4)));
+        assert_eq!(groups.groups()[0].source_ordinal_at(1), Some(("j", 0)));
+        assert_eq!(groups.groups()[0].source_ordinal_at(3), Some(("j", 2)));
     }
 
     #[test]
     fn unaliased_same_local_relations_retain_component_qualifiers() {
         let analyzed = source_namespace_statement("SELECT * FROM a.t FULL JOIN b.t USING(id)");
         let groups = analyzed.context().analysis_state().wildcard_expansions();
-        let qualifiers = groups[0].qualifiers();
+        let qualifiers = groups.groups()[0].qualifiers();
         assert_eq!(
             qualifiers
                 .reference_for(
@@ -1256,7 +1256,10 @@ mod test_wildcard_projection_metadata {
                 .unwrap(),
             ["b", "t"]
         );
-        assert_eq!(groups[0].reference_at(1).unwrap(), ["a", "t", "only_a"]);
+        assert_eq!(
+            groups.groups()[0].reference_at(1).unwrap(),
+            ["a", "t", "only_a"]
+        );
     }
 
     #[test]
@@ -1269,7 +1272,7 @@ mod test_wildcard_projection_metadata {
             analyzed.context().reported_problems()
         );
         let groups = analyzed.context().analysis_state().wildcard_expansions();
-        let outer = &groups[0].source_projections()[0];
+        let outer = &groups.groups()[0].source_projections()[0];
         let inner = &outer.source_projections()[0];
         assert_eq!(outer.alias(), "j");
         assert_eq!(inner.alias(), "j");
@@ -1291,16 +1294,22 @@ mod test_wildcard_projection_metadata {
         );
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(
-            groups[0].columns()[0].col_type(),
+            groups.groups()[0].columns()[0].col_type(),
             &Some(crate::sem::PgBuiltInType::int4())
         );
         assert_eq!(
-            groups[0].columns()[1].col_type(),
+            groups.groups()[0].columns()[1].col_type(),
             &Some(crate::sem::PgBuiltInType::int8())
         );
-        assert_eq!(groups[0].typed_record_at(0).unwrap().column(), "id");
-        assert_eq!(groups[0].typed_record_at(1).unwrap().column(), "other");
-        assert_eq!(groups[0].typed_record_at(0).unwrap().alias(), "j");
+        assert_eq!(
+            groups.groups()[0].typed_record_at(0).unwrap().column(),
+            "id"
+        );
+        assert_eq!(
+            groups.groups()[0].typed_record_at(1).unwrap().column(),
+            "other"
+        );
+        assert_eq!(groups.groups()[0].typed_record_at(0).unwrap().alias(), "j");
     }
 
     #[test]
@@ -1313,7 +1322,11 @@ mod test_wildcard_projection_metadata {
             "{:?}",
             analyzed.context().reported_problems()
         );
-        let group = &analyzed.context().analysis_state().wildcard_expansions()[0];
+        let group = &analyzed
+            .context()
+            .analysis_state()
+            .wildcard_expansions()
+            .groups()[0];
         assert_eq!(group.source_ordinal_at(0), Some(("k", 0)));
         assert_eq!(
             group.reference_at(0),

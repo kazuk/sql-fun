@@ -244,7 +244,9 @@ pub use {
         },
         variable_set::{VariableSet, analyze_variable_set},
         view_like::ViewLike,
-        wildcard_expansion::{WildcardExpansion, WildcardRewriteError},
+        wildcard_expansion::{
+            WildcardExpansion, WildcardExpansionCollection, WildcardRewriteError,
+        },
     },
     crate::error::AnalysisError,
 };

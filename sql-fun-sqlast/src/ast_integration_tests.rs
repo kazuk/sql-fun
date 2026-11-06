@@ -787,7 +787,7 @@ mod test_wildcard_analysis_round_trip {
         ast::Dialect,
         context::ParseContext,
         parse_statements,
-        sem::{SemAst, WildcardExpansion},
+        sem::SemAst,
         test_helpers::{create_cache_context, query::source_namespace_statement},
     };
 
@@ -829,11 +829,12 @@ mod test_wildcard_analysis_round_trip {
             .unwrap();
         let analyzed =
             SemAst::from_ast(&statement, original.into_context(), &mut cache_context).unwrap();
-        WildcardExpansion::rewrite(
-            analyzed.context().analysis_state().wildcard_expansions(),
-            &mut statement,
-        )
-        .unwrap();
+        analyzed
+            .context()
+            .analysis_state()
+            .wildcard_expansions()
+            .rewrite(&mut statement)
+            .unwrap();
         let output = statement.deparse_sql(Dialect::postgres()).unwrap();
         let reparsed = parse_statements(&output, Dialect::postgres())
             .next()

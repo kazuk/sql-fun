@@ -1,6 +1,8 @@
 //! Per-analysis bookkeeping owned by the common parse context.
 
-use crate::sem::{WildcardExpansion, scalar_expr::grouping::GroupingAnalysis};
+use crate::sem::{
+    WildcardExpansion, WildcardExpansionCollection, scalar_expr::grouping::GroupingAnalysis,
+};
 
 use crate::sem::AnalysisProblem;
 
@@ -15,13 +17,13 @@ pub struct AnalysisState {
     has_parameters: bool,
     problems: Vec<AnalysisProblem>,
     grouping: GroupingAnalysis,
-    wildcard_expansions: Vec<WildcardExpansion>,
+    wildcard_expansions: WildcardExpansionCollection,
 }
 
 impl AnalysisState {
     /// Wildcard groups recorded by this analysis, including nested query scopes.
     /// Groups remain available after analysis completes and reset at the next run.
-    pub fn wildcard_expansions(&self) -> &[WildcardExpansion] {
+    pub const fn wildcard_expansions(&self) -> &WildcardExpansionCollection {
         &self.wildcard_expansions
     }
 

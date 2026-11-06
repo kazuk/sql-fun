@@ -8,8 +8,8 @@ use serde_json::Value;
 use sql_fun_client::{
     ConnectionOptions, JsonRpcResponse, TcpJsonRpcClientAsync,
     payloads::{
-        AnalyzeQueryArgs, DescribeTableArgs, EchoArgs, InitializeSchemaArgs, ListObjectArgs,
-        ReadCollectionArgs, ReleaseCollectionArgs,
+        AnalyzeQueryArgs, DescribeTableArgs, EchoArgs, InitializeSchemaArgs, ReadCollectionArgs,
+        ReleaseCollectionArgs,
     },
 };
 use tokio::{
@@ -159,7 +159,6 @@ impl ApiInput {
             "read_collection" => typed::<ReadCollectionArgs>(params),
             "release_collection" => typed::<ReleaseCollectionArgs>(params),
             "analyze_query" => typed::<AnalyzeQueryArgs>(params),
-            "list_object" => typed::<ListObjectArgs>(params),
             "describe_table" => typed::<DescribeTableArgs>(params),
             _ => anyhow::bail!("unknown API method {method}"),
         }
@@ -205,7 +204,6 @@ mod test_input {
         "analyze_query",
         r#"{"context_handle":"c","query":{"Text":"select 1"}}"#
     )]
-    #[case::list("list_object", r#"{"predicate":{"Kind":"All"},"extra_fields":[]}"#)]
     #[case::describe("describe_table", r#"{"schema_name":"public","local_name":"t"}"#)]
     #[case::positional("describe_table", r#"["public","t"]"#)]
     fn uses_public_argument_types(#[case] method: &str, #[case] params: &str) {
@@ -225,7 +223,6 @@ mod test_input {
             "read_collection",
             "release_collection",
             "analyze_query",
-            "list_object",
             "describe_table"
         )]
         method: &str,

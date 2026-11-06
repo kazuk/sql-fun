@@ -1,8 +1,7 @@
 # Method reference
 
-The method pages in the navigation describe the server's declared request and
-result schemas. An unavailable method is declared but is not dispatched by the
-server. Authenticate the connection before calling an available method; see
+The method pages in the navigation describe the server's request and result
+schemas. Authenticate the connection before calling a method; see
 [connection and authentication](initialize.md).
 
 Schemas are shown as JSON Schema. Follow the links below each schema to inspect

@@ -13,7 +13,7 @@ pub struct Collection<T> {
     /// offset of items
     offset: usize,
 
-    /// When true, client must be call `SqlFunServerApi::release_collection`
+    /// When true, the client must call `release_collection`.
     require_release: bool,
 
     /// collection items

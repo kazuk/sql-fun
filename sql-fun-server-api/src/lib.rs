@@ -10,11 +10,7 @@ pub use self::collection_management::Collection;
 #[cfg(feature = "openrpc-schema")]
 pub use self::rpc_schema::register_methods;
 
-use crate::payloads::{
-    AnalyzeQueryArgs, AnalyzeQueryResponse, CollectionHandle, DescribeTableArgs,
-    DescribeTableResponse, EchoArgs, InitializeSchemaArgs, ListObjectArgs, ObjectSummary,
-    ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, SqlToken, TokenizeSqlArgs,
-};
+use crate::payloads::CollectionHandle;
 
 use std::{convert::Infallible, error::Error as StdError};
 
@@ -117,79 +113,16 @@ impl SqlFunServerApiError {
     }
 }
 
-/// `sql-fun` Server API functions
-#[async_trait::async_trait]
-pub trait SqlFunServerApi {
-    /// Tokenize original SQL with an explicit dialect, without schema analysis.
-    /// Returned pages include trivia/comments and require collection release.
-    async fn tokenize_sql(
-        &self,
-        args: TokenizeSqlArgs,
-    ) -> Result<Collection<SqlToken>, SqlFunServerApiError>;
-
-    /// Return object or array parameters unchanged for transport diagnostics.
-    async fn echo(&self, args: EchoArgs) -> Result<serde_json::Value, SqlFunServerApiError>;
-
-    /// Initialize schema-aware query analysis context
-    async fn initialize_schema_context(
-        &self,
-        args: InitializeSchemaArgs,
-    ) -> Result<SchemaContext, SqlFunServerApiError>;
-
-    /// Read a collection
-    ///
-    /// When server returns multiple items, server keeps scrollable collection,
-    /// [`SqlFunServerApi::read_collection`] reads items in collection.
-    ///
-    /// # Return value
-    ///
-    /// returns [`Collection<T>`], T depends collection item type
-    ///
-    async fn read_collection(
-        &self,
-        args: ReadCollectionArgs,
-    ) -> Result<serde_json::Value, SqlFunServerApiError>;
-
-    /// Release a collection
-    ///
-    /// When server returns collection, server keeps scrollable collection,
-    /// [`SqlFunServerApi::release_collection`] release a server side collection.
-    ///
-    async fn release_collection(
-        &self,
-        args: ReleaseCollectionArgs,
-    ) -> Result<(), SqlFunServerApiError>;
-
-    /// analyze query
-    async fn analyze_query(
-        &self,
-        args: AnalyzeQueryArgs,
-    ) -> Result<AnalyzeQueryResponse, SqlFunServerApiError>;
-
-    /// list schema objects
-    async fn list_objects(
-        &self,
-        args: ListObjectArgs,
-    ) -> Result<Collection<ObjectSummary>, SqlFunServerApiError>;
-
-    /// describe a table
-    async fn describe_table(
-        &self,
-        args: DescribeTableArgs,
-    ) -> Result<DescribeTableResponse, SqlFunServerApiError>;
-}
-
 #[cfg(feature = "openrpc-schema")]
 mod rpc_schema {
-
-    /// JSON-RPC method definition for `initialize_schema_context` method
-    use crate::AnalyzeQueryArgs;
     use crate::{
-        AnalyzeQueryResponse, Collection, EchoArgs, InitializeSchemaArgs, ListObjectArgs,
-        ObjectSummary, ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, SqlToken,
-        TokenizeSqlArgs,
+        Collection,
+        payloads::{
+            AnalyzeQueryArgs, AnalyzeQueryResponse, EchoArgs, InitializeSchemaArgs,
+            ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, SqlToken, TokenizeSqlArgs,
+        },
     };
-    use typed_openrpc::RpcMethod;
+    use ::typed_openrpc::RpcMethod;
 
     pub struct InitializeSchemaContextMethod;
 
@@ -249,16 +182,6 @@ mod rpc_schema {
         type Result = AnalyzeQueryResponse;
     }
 
-    pub struct ListObjectMethod;
-
-    impl RpcMethod for ListObjectMethod {
-        const NAME: &'static str = "list_object";
-        const SUMMARY: &'static str = "list schema objects";
-
-        type Params = ListObjectArgs;
-        type Result = Collection<ObjectSummary>;
-    }
-
     /// register all JSON-RPC methods
     pub fn register_methods(registry: &mut typed_openrpc::Registry) {
         registry.register_method::<EchoMethod>();
@@ -267,7 +190,6 @@ mod rpc_schema {
         registry.register_method::<ReadCollectionMethod>();
         registry.register_method::<ReleaseCollectionMethod>();
         registry.register_method::<AnalyzeQueryMethod>();
-        registry.register_method::<ListObjectMethod>();
     }
 }
 

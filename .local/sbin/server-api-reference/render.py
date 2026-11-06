@@ -8,17 +8,6 @@ import sys
 from pathlib import Path
 
 
-# These are transport availability facts, not copies of schema definitions.
-# Reconcile new declarations against the server dispatcher before publishing.
-AVAILABILITY = {
-    "echo": True,
-    "tokenize_sql": True,
-    "initialize_schema_context": True,
-    "read_collection": True,
-    "release_collection": True,
-    "analyze_query": True,
-    "list_object": False,
-}
 METHOD_REFERENCE = "  - [Method reference](api/methods.md)"
 
 
@@ -88,8 +77,6 @@ def render_method(method, template, workdir, destination):
     name = contract["name"]
     if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
         raise ValueError(f"unsafe method name: {name!r}")
-    if name not in AVAILABILITY:
-        raise ValueError(f"confirm server dispatch before documenting method: {name}")
     schemas = []
     for index, param in enumerate(method["parameters"]):
         descriptor = param["descriptor"]
@@ -110,8 +97,6 @@ def render_method(method, template, workdir, destination):
     context = {
         "name": markdown_text(name),
         "summary": markdown_text(contract.get("summary") or ""),
-        "availability": ("Available after authentication." if AVAILABILITY[name] else
-                         "**Unavailable:** this method is declared in OpenRPC but is not dispatched by the server."),
         "metadata": json_block(metadata) if metadata else "",
         "schemas": schemas,
     }
@@ -127,16 +112,13 @@ def main():
     document = json.loads(spec.read_text(encoding="utf-8"))
     methods = document["methods"]
     names = [method["contract"]["name"] for method in methods]
-    if len(names) != len(set(names)) or set(names) != set(AVAILABILITY):
-        raise ValueError("OpenRPC method set changed; reconcile it with server dispatch")
+    if len(names) != len(set(names)):
+        raise ValueError("duplicate OpenRPC method names")
     target = book / "api" / "methods"
     target.mkdir(parents=True, exist_ok=False)
     for method in methods:
         render_method(method, template, workdir, target / f"{method['contract']['name']}.md")
-    navigation = "\n".join(
-        f"    - [{name}{'' if AVAILABILITY[name] else ' (unavailable)'}](api/methods/{name}.md)"
-        for name in names
-    )
+    navigation = "\n".join(f"    - [{name}](api/methods/{name}.md)" for name in names)
     summary = book / "SUMMARY.md"
     text = summary.read_text(encoding="utf-8")
     if text.count(METHOD_REFERENCE) != 1:

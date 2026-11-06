@@ -1,10 +1,10 @@
+use crate::sem::CommonType;
 use crate::{
     ast::Dialect,
     names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, MinMaxExpr,
-        ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr,
-        TypeReference,
+        AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, ParameterConstraints,
+        ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         problem::DistinctProblem,
         scalar_expr::{ScalarConstExpr, SemScalarExprNode},
@@ -47,7 +47,7 @@ impl DeferredEquality {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut operands = self.operands.clone();
         for operand in &mut operands {
-            if MinMaxExpr::input_type(operand) == Some(MinMaxExpr::unknown()) {
+            if SemScalarExpr::common_type_input(operand) == Some(CommonType::unknown()) {
                 *operand = parameters.operation(
                     "unknown comparison literal",
                     std::slice::from_ref(operand),
@@ -514,7 +514,7 @@ impl DistinctExpr {
         }
         let has_unknown = [&left, &right]
             .into_iter()
-            .any(|value| MinMaxExpr::input_type(value) == Some(MinMaxExpr::unknown()));
+            .any(|value| SemScalarExpr::common_type_input(value) == Some(CommonType::unknown()));
         let deferred = left.requires_argument_type() || right.requires_argument_type();
         if has_unknown && deferred {
             return Ok(DistinctComparison::deferred(left, right, binding));

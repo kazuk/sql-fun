@@ -4,7 +4,7 @@ use crate::{
     context::SchemaFileContext,
     names::{FullName, SchemaName},
     parse_statements,
-    sem::{CastContext, CastDefinition, SemAst, TypeReference},
+    sem::{CastContext, CastDefinition, SemAst, TypeCategory, TypeDefinition, TypeReference},
     test_helpers::{TestParseContext, create_cache_context, scalar_catalog::schema_from_base},
 };
 
@@ -22,6 +22,7 @@ fn context() -> SchemaFileContext {
         "float8",
         "text",
         "bool",
+        "uuid",
         "record",
         "name",
         "any",
@@ -34,6 +35,23 @@ fn context() -> SchemaFileContext {
     ] {
         let ty = TypeReference::from_master_type_name(name);
         base.setup_type(ty.clone());
+        let category = match name {
+            "int2" | "int4" | "int8" | "float8" | "oid" => Some('N'),
+            "text" | "name" => Some('S'),
+            "bool" => Some('B'),
+            _ => None,
+        };
+        if let Some(category) = category {
+            let name = ty.full_name().expect("nominal type");
+            base.set_get_type_impl_result(
+                name,
+                &TypeDefinition::builtin_with_category(
+                    name,
+                    Some(TypeCategory::try_from(category).unwrap()),
+                    None,
+                ),
+            );
+        }
         base.add_implicit_castable(&ty, &ty);
     }
     for (vector, element) in [("int2vector", "int2"), ("oidvector", "oid")] {
@@ -167,6 +185,27 @@ pub(crate) fn analyze_variadic_any(
         context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
+    Ok(SemAst::from_ast(
+        &parse_statements(query, Dialect::postgres())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
+}
+
+pub(crate) fn analyze_compatible(
+    query: &str,
+) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+    let mut cache_context = create_cache_context();
+    let mut context = context();
+    for statement in parse_statements(
+        "CREATE FUNCTION vf(anycompatible, anycompatible) RETURNS anycompatible LANGUAGE sql AS 'SELECT $1'; \
+         CREATE FUNCTION accept_integer(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+        Dialect::postgres(),
+    ) {
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
+    }
     Ok(SemAst::from_ast(
         &parse_statements(query, Dialect::postgres())
             .next()

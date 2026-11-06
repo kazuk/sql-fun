@@ -1,7 +1,8 @@
+use crate::sem::CommonType;
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, MinMaxExpr, ParseContext, PgBuiltInType, SemScalarExpr,
+        AnalysisError, ParseContext, PgBuiltInType, SemScalarExpr,
         scalar_expr::arith_expr::{
             AllBinaryCallSite, UndefinedOperatorAllCallSite, binary::BinaryCastCandidate,
         },
@@ -558,7 +559,7 @@ impl super::ArithExpr {
         let (Some(left_type), Some(array_type)) = (lexpr.get_type(), rexpr.get_type()) else {
             return Ok((Self::deferred_all_operator(name, lexpr, rexpr), context));
         };
-        let array_type = MinMaxExpr::base_type(context, &array_type);
+        let array_type = CommonType::base_type(context, &array_type);
         let Some(element_type) = context.get_array_item_type(&array_type) else {
             rexpr.require_array_resolved(context)?;
             return UndefinedOperatorAllCallSite::undefined_operator_all_resolved(

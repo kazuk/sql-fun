@@ -23,8 +23,12 @@ alternatives do not authorize choosing a client binding. See
 limits.
 
 Supported PostgreSQL polymorphic families include simple anyelement/anyarray
-relationships and compatible-family common types. Typed arrays and anonymous row
-values can participate in these calls. Concrete-versus-polymorphic candidate
+relationships and compatible-family common types. Compatible inputs are matched
+to a common type using their supplied order and implicit conversions. For example,
+an `integer` and a `bigint` input can produce a `bigint` result. Parameter-dependent
+calls retain possible input and result types until their bindings are established.
+Typed arrays and anonymous row values can participate in these calls.
+Concrete-versus-polymorphic candidate
 ranking remains significant even when both declarations accept an operand. A
 structural match alone does not select the overload. Unresolved polymorphic
 relationships are deferred where supported; requiring an unbounded catalog

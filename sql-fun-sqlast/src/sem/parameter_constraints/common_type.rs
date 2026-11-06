@@ -1,6 +1,7 @@
 //! Owned common-type facts and relationships for initially unrestricted inputs.
 //! These are inference data, not a second catalog or analysis environment.
 
+use crate::sem::CommonType;
 use crate::{
     context::CastInfoRead,
     sem::{
@@ -61,10 +62,10 @@ impl CommonTypeFacts {
                 .unwrap_or_else(|| ty.clone())
         };
         let base = Self::catalog_base_type(context, &canonical);
-        let category = if let Ok(category) = MinMaxExpr::category(context, ty) {
+        let category = if let Ok(category) = CommonType::category(context, ty) {
             Some(category)
         } else {
-            MinMaxExpr::category(context, &base).ok()
+            CommonType::category(context, &base).ok()
         };
         let targets = if base.is_dynamic() {
             HashSet::new()
@@ -166,7 +167,7 @@ impl CommonTypeFacts {
     }
 
     fn coerce(&self, source: &TypeReference, target: &TypeReference) -> bool {
-        if source == target || *source == MinMaxExpr::unknown() {
+        if source == target || *source == CommonType::unknown() {
             return true;
         }
         // Mirror context-backed coercion: target domains accept conversions
@@ -200,16 +201,16 @@ impl CommonTypeFacts {
         }
         let left = self.base(left);
         let right = self.base(right);
-        if left == MinMaxExpr::unknown() {
+        if left == CommonType::unknown() {
             return Some(right);
         }
-        if right == MinMaxExpr::unknown() {
+        if right == CommonType::unknown() {
             return Some(left);
         }
         if left == right {
             return Some(left);
         }
-        MinMaxExpr::select_candidate(
+        CommonType::select_candidate(
             &left,
             &right,
             self.category(&left)?,
@@ -225,7 +226,7 @@ impl CommonTypeFacts {
         let context = self.environment.context();
         let mut types: HashSet<_> = seeds
             .into_iter()
-            .filter(|ty| *ty != MinMaxExpr::unknown())
+            .filter(|ty| *ty != CommonType::unknown())
             .collect();
         if expand_sources {
             // A concrete SQL/assignment target justifies its incoming conversions.
@@ -248,7 +249,7 @@ impl CommonTypeFacts {
 #[cfg(test)]
 mod test_common_type_facts {
     use crate::{
-        sem::{MinMaxExpr, TypeReference, parameter_constraints::common_type::CommonTypeFacts},
+        sem::{CommonType, TypeReference, parameter_constraints::common_type::CommonTypeFacts},
         test_helpers::common_types as test_helpers,
     };
 
@@ -277,11 +278,11 @@ mod test_common_type_facts {
         let result: TypeReference = result.parse().unwrap();
         let context = test_helpers::domain_context();
         assert_eq!(
-            MinMaxExpr::select_common_type(&context, &[left.clone(), right.clone()]).unwrap(),
+            CommonType::select_common_type(&context, &[left.clone(), right.clone()]).unwrap(),
             result
         );
-        assert!(MinMaxExpr::can_coerce(&context, &left, &result));
-        assert!(MinMaxExpr::can_coerce(&context, &right, &result));
+        assert!(CommonType::can_coerce(&context, &left, &result));
+        assert!(CommonType::can_coerce(&context, &right, &result));
 
         let mut facts = CommonTypeFacts::prepare(&context);
         drop(context);
@@ -343,7 +344,7 @@ impl CommonTypeConstraint {
             .flatten()
             .cloned()
             .collect::<Vec<_>>();
-        let unseeded = seeds.iter().all(|ty| *ty == MinMaxExpr::unknown());
+        let unseeded = seeds.iter().all(|ty| *ty == CommonType::unknown());
         if unseeded {
             if !defaults
                 || !facts.permits_defaults()
@@ -399,7 +400,7 @@ impl CommonTypeConstraint {
         let mut unordered = None;
         let candidate_types = graph.domain(candidate).clone();
         for source in candidate_types.admissible_types().unwrap_or(&[]) {
-            let target = if *source == MinMaxExpr::unknown() {
+            let target = if *source == CommonType::unknown() {
                 PgBuiltInType::text()
             } else {
                 source.clone()
@@ -462,7 +463,7 @@ mod tests {
         ast::Dialect,
         parse_statements,
         sem::{
-            MinMaxExpr, PgBuiltInType, SemAst, TypeReference,
+            CommonType, PgBuiltInType, SemAst, TypeReference,
             parameter_constraints::{
                 ConstraintGraph, InputTypeConstraint, ParameterConstraints, TypeProjection,
             },
@@ -662,7 +663,7 @@ mod tests {
     fn late_result_constraints_propagate_to_sources() {
         let mut graph = ConstraintGraph::default();
         let source = graph.parameter(1);
-        let unknown = graph.node(&InputTypeConstraint::exact(&MinMaxExpr::unknown()));
+        let unknown = graph.node(&InputTypeConstraint::exact(&CommonType::unknown()));
         let result = graph.common_type(
             &test_helpers::context(),
             &[source, unknown],

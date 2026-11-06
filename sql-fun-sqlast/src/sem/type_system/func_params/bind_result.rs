@@ -121,6 +121,27 @@ impl ParameterBindResult {
         Some(inputs)
     }
 
+    pub(crate) fn common_inputs(bindings: &[Self]) -> Vec<bool> {
+        let mut inputs = Vec::new();
+        for binding in bindings {
+            match binding {
+                Self::One(_, parameter) => inputs.push(
+                    parameter
+                        .get_type()
+                        .is_some_and(TypeReference::is_common_infer_arg),
+                ),
+                Self::VariadicParam(arguments, parameter) => inputs.extend(std::iter::repeat_n(
+                    parameter
+                        .get_type()
+                        .is_some_and(TypeReference::is_common_infer_arg),
+                    arguments.len(),
+                )),
+                Self::NoInputParam(_) => {}
+            }
+        }
+        inputs
+    }
+
     pub(crate) fn unrestricted_inputs(bindings: &[Self]) -> Vec<usize> {
         let mut positions = Vec::new();
         let mut offset = 0;
@@ -147,6 +168,8 @@ impl ParameterBindResult {
                 let ty = parameter.get_type()?;
                 let ty = if ty.is_array() == Some(true) {
                     ty.element_type()
+                } else if ty.is_any_compatible_array() {
+                    TypeReference::from_master_type_name("anycompatible")
                 } else {
                     ty.clone()
                 };
@@ -188,6 +211,11 @@ impl ParameterBindResult {
                 Some(rank)
             }
         }
+    }
+
+    pub(crate) fn is_common_argument(&self) -> bool {
+        self.call_argument_type()
+            .is_some_and(|ty| ty.is_common_infer_arg())
     }
 
     fn call_argument_type(&self) -> Option<TypeReference> {
@@ -234,6 +262,17 @@ impl ParameterBindResult {
         catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         match self {
+            Self::VariadicParam(arguments, parameter)
+                if parameter
+                    .get_type()
+                    .is_some_and(TypeReference::is_any_compatible_array) =>
+            {
+                context.set_require_infer();
+                for argument in arguments.iter().flatten() {
+                    context.push_compat_element(argument);
+                }
+                Ok(())
+            }
             Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
                 fp.collect_common(context, catalog, self)
             }

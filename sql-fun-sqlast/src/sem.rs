@@ -11,6 +11,7 @@ mod cast;
 mod client_type;
 mod column_constraints;
 mod column_rename;
+mod common_type;
 pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
 mod constraint;
@@ -73,6 +74,7 @@ mod with_typmod;
 pub(crate) use self::conflict_info::infer_from_catalog;
 pub(crate) use self::{
     alter_table::AlterObjSubCommand,
+    common_type::CommonType,
     constraint::{ConstraintNames, ForeignKeyConstraint, UniqueConstraint},
     create_comp_type::CompositeFieldDefinition,
     create_index::IndexElementCollection,

@@ -266,11 +266,19 @@ impl FunctionOverloadCollection {
 
     fn overload_rank(
         bindings: &[ParameterBindResult],
+        literal_bindings: &[ParameterBindResult],
         declarations: &[ParameterBindResult],
         context: &impl BaseParseContext,
     ) -> Option<OverloadRank> {
         let mut rank = OverloadRank::default();
-        for (binding, declaration) in std::iter::zip(bindings, declarations) {
+        for ((binding, literal), declaration) in
+            std::iter::zip(bindings, literal_bindings).zip(declarations)
+        {
+            let binding = if declaration.is_common_argument() {
+                literal
+            } else {
+                binding
+            };
             rank = rank + binding.overload_rank(context, declaration)?;
         }
         Some(rank)
@@ -293,6 +301,15 @@ impl FunctionOverloadCollection {
         context: &TCatalog,
         arg_types: &ArgumentBindingCollection,
     ) -> Option<OverloadVariant> {
+        self.resolve_from_catalog_with_common_inputs(context, arg_types)
+            .map(|(overload, _)| overload)
+    }
+
+    pub(crate) fn resolve_from_catalog_with_common_inputs<TCatalog: BaseParseContext>(
+        &self,
+        context: &TCatalog,
+        arg_types: &ArgumentBindingCollection,
+    ) -> Option<(OverloadVariant, Vec<bool>)> {
         let mut candidates = Vec::new();
 
         'overload: for overload in &self.overloads {
@@ -312,7 +329,10 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            let Ok(()) = Self::infer_common(&declared_bindings, &mut overload, context) else {
+            let Ok(common_bindings) = overload.bind_args(arg_types.common_literal_types()) else {
+                continue 'overload;
+            };
+            let Ok(()) = Self::infer_common(&common_bindings, &mut overload, context) else {
                 continue 'overload;
             };
 
@@ -321,20 +341,26 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            let Some(score) = Self::overload_rank(&bind_result, &declared_bindings, context) else {
+            let Ok(literal_bindings) = overload.bind_args(arg_types.common_literal_rank_types())
+            else {
                 continue 'overload;
             };
-
-            candidates.push((overload, score));
+            let Some(score) =
+                Self::overload_rank(&bind_result, &literal_bindings, &declared_bindings, context)
+            else {
+                continue 'overload;
+            };
+            let common_inputs = ParameterBindResult::common_inputs(&declared_bindings);
+            candidates.push((overload, score, common_inputs));
         }
 
-        let best = candidates.iter().map(|(_, rank)| *rank).max()?;
-        let mut best_candidates = candidates.into_iter().filter(|(_, rank)| *rank == best);
-        let (overload, _) = best_candidates.next()?;
+        let best = candidates.iter().map(|(_, rank, _)| *rank).max()?;
+        let mut best_candidates = candidates.into_iter().filter(|(_, rank, _)| *rank == best);
+        let (overload, _, common_inputs) = best_candidates.next()?;
         if best_candidates.next().is_some() {
             None
         } else {
-            Some(overload)
+            Some((overload, common_inputs))
         }
     }
 }
@@ -358,9 +384,23 @@ impl FunctionOverloadCollection {
                 continue;
             }
             let declared_bindings = bindings;
-            if Self::infer_simple(&declared_bindings, &mut overload, catalog).is_err()
-                || Self::infer_common(&declared_bindings, &mut overload, catalog).is_err()
-            {
+            if Self::infer_simple(&declared_bindings, &mut overload, catalog).is_err() {
+                continue;
+            }
+            if arguments.types().any(|ty| ty.is_none()) {
+                let Some(inputs) = ParameterBindResult::constraint_inputs(&declared_bindings)
+                else {
+                    continue;
+                };
+                if let Some(result) = overload.scaler_ret_type()
+                    && let Some(template) =
+                        Signature::compatible_function_template(&inputs, &result)
+                {
+                    signatures.push(template);
+                    continue;
+                }
+            }
+            if Self::infer_common(&declared_bindings, &mut overload, catalog).is_err() {
                 continue;
             }
             let Ok(bindings) = overload.bind_args(arguments.clone()) else {

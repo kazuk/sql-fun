@@ -3,7 +3,7 @@ use crate::{
     context::ParseContext as ContextParseContext,
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, FunctionModifiers, FunctionOverloadCollection,
+        AnalysisError, AnalysisProblem, CommonType, FunctionModifiers, FunctionOverloadCollection,
         FunctionParam, InputTypeConstraint, OverloadVariant, ParseContext, QueryNameResolution,
         SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
@@ -72,13 +72,16 @@ impl FuncCallExpr {
                 context.report_analysis_problem(AnalysisProblem::call_argument(problem))?;
                 invalid = true;
             } else if !arguments.iter().any(SemScalarExpr::requires_argument_type) {
-                if let Some(overload) = candidates.resolve_from_catalog(context, &types) {
-                    let bound = Self::cast_call_operands(
+                if let Some((overload, common_inputs)) =
+                    candidates.resolve_from_catalog_with_common_inputs(context, &types)
+                {
+                    let bound = Self::cast_common_call_operands(
                         context,
                         name,
                         &arguments.to_vec().into(),
                         &overload,
                         explicit_variadic,
+                        &common_inputs,
                     )?;
                     call.retain_signature(&overload, &bound);
                 } else {
@@ -441,6 +444,7 @@ impl FuncCallExpr {
         Ok(invalid)
     }
 
+    #[cfg(test)]
     fn cast_operand_expression<TParseContext>(
         context: &mut TParseContext,
         func_name: &FullName,
@@ -450,15 +454,16 @@ impl FuncCallExpr {
     where
         TParseContext: ParseContext,
     {
-        Self::cast_call_operands(context, func_name, arg_exprs, overload, false)
+        Self::cast_common_call_operands(context, func_name, arg_exprs, overload, false, &[])
     }
 
-    pub(super) fn cast_call_operands(
+    pub(super) fn cast_common_call_operands(
         context: &mut impl ParseContext,
         func_name: &FullName,
         arg_exprs: &IVec<SemScalarExpr>,
         overload: &OverloadVariant,
         explicit_variadic: bool,
+        common_inputs: &[bool],
     ) -> Result<IVec<FuncCallArgs>, AnalysisError> {
         let types = ArgumentBindingCollection::from_expr_list(arg_exprs)
             .with_explicit_variadic(explicit_variadic);
@@ -474,8 +479,15 @@ impl FuncCallExpr {
             } else {
                 overload.call_argument(index)
             };
-            let arg =
-                Self::cast_call_value(context, func_name, index, arg, arg_def, explicit_variadic)?;
+            let arg = Self::cast_call_value(
+                context,
+                func_name,
+                index,
+                arg,
+                arg_def,
+                explicit_variadic,
+                common_inputs.get(index).copied().unwrap_or(false),
+            )?;
 
             args.push(FuncCallArgs::new(&arg, &arg_def.cloned()));
         }
@@ -488,6 +500,7 @@ impl FuncCallExpr {
         argument: &SemScalarExpr,
         argument_definition: Option<&FunctionParam>,
         explicit_variadic: bool,
+        common_input: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut arg = argument.clone();
         if let Some(arg_definition) = argument_definition
@@ -504,19 +517,25 @@ impl FuncCallExpr {
                     "type {arg_def_type} not found in context"
                 ))?
             };
-            if let Some(cast) = arg_val_type.implicit_match_context(&arg_def_type, context) {
-                if !cast.is_no_conversion() && arg_val_type != arg_def_type {
-                    arg = if let Some(named) = arg.as_named_argument() {
-                        SemScalarExpr::named_argument(
-                            named.name(),
-                            &SemScalarExpr::wrap_implicit_cast(&arg_def_type, named.value()),
-                            &named.source_span().copied(),
-                        )
-                    } else {
-                        SemScalarExpr::wrap_implicit_cast(&arg_def_type, &arg)
-                    };
-                }
-            } else {
+            let needs_cast =
+                if common_input && arg.common_type_input() == Some(CommonType::unknown()) {
+                    Some(true)
+                } else {
+                    arg_val_type
+                        .implicit_match_context(&arg_def_type, context)
+                        .map(|cast| !cast.is_no_conversion() && arg_val_type != arg_def_type)
+                };
+            if needs_cast == Some(true) {
+                arg = if let Some(named) = arg.as_named_argument() {
+                    SemScalarExpr::named_argument(
+                        named.name(),
+                        &SemScalarExpr::wrap_implicit_cast(&arg_def_type, named.value()),
+                        &named.source_span().copied(),
+                    )
+                } else {
+                    SemScalarExpr::wrap_implicit_cast(&arg_def_type, &arg)
+                };
+            } else if needs_cast.is_none() {
                 context.report_analysis_problem(
                     AnalysisProblem::function_arg_implicit_cast_not_found(
                         func_name, index, t, &arg,
@@ -644,12 +663,16 @@ impl FuncCallExpr {
             if arguments.iter().any(SemScalarExpr::requires_argument_type) {
                 return Ok(Self::deferred(name, arguments));
             }
-            if let Some(overload) = overloads.resolve_from_catalog(context, &arg_types) {
-                let args = Self::cast_operand_expression(
+            if let Some((overload, common_inputs)) =
+                overloads.resolve_from_catalog_with_common_inputs(context, &arg_types)
+            {
+                let args = Self::cast_common_call_operands(
                     context,
                     name,
                     &arguments.to_vec().into(),
                     &overload,
+                    false,
+                    &common_inputs,
                 )?;
                 return Ok(SemScalarExpr::function_call(&Self::new(
                     name,

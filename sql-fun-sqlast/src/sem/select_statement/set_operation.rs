@@ -1,9 +1,10 @@
+use crate::sem::CommonType;
 use crate::{
     ast::Dialect,
     sem::{
         AccessKind, AnalysisError, AnalysisProblem, ConstrainedExpr, InputTypeConstraint,
-        InsertTarget, MinMaxExpr, ParameterConstraints, ParseContext, QueryProblem,
-        ResultColumnCollection, SelectStatement, SemScalarExpr, TypeReference,
+        InsertTarget, ParameterConstraints, ParseContext, QueryProblem, ResultColumnCollection,
+        SelectStatement, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
@@ -119,7 +120,7 @@ impl SetColumnResult {
     fn coerce(&mut self, inputs: &[SemScalarExpr; 2]) {
         let target = self.types.single_type();
         for (coercion, input) in self.coercions.iter_mut().zip(inputs) {
-            *coercion = if MinMaxExpr::input_type(input) != target {
+            *coercion = if SemScalarExpr::common_type_input(input) != target {
                 target.clone()
             } else {
                 None
@@ -260,9 +261,10 @@ impl SetOperationQuery {
                 .map(InputTypeConstraint::exact)
                 .unwrap_or_else(InputTypeConstraint::any);
         } else if result.failure.is_none()
-            && let [Some(left), Some(right)] = inputs.each_ref().map(MinMaxExpr::input_type)
+            && let [Some(left), Some(right)] =
+                inputs.each_ref().map(SemScalarExpr::common_type_input)
         {
-            match MinMaxExpr::select_common_type(context, &[left, right]) {
+            match CommonType::select_common_type(context, &[left, right]) {
                 Ok(target) => {
                     result.types = InputTypeConstraint::exact(&target);
                     result.coerce(inputs);

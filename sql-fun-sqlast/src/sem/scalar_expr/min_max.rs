@@ -1,6 +1,6 @@
 use crate::sem::{
-    AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, ParseContext,
-    PgBuiltInType, SemScalarExpr, TypeReference,
+    AnalysisError, AnalysisProblem, CommonType, InputTypeConstraint, ParameterConstraints,
+    ParseContext, SemScalarExpr, TypeReference,
     parameter_resolution::ParameterResolution,
     problem::MinMaxProblem,
     scalar_expr::SemScalarExprNode,
@@ -31,8 +31,14 @@ impl MinMaxExpr {
         };
         if arguments.is_empty() {
             context.report_analysis_problem(AnalysisProblem::min_max(MinMaxProblem::empty()))?;
-        } else if arguments.iter().all(|arg| Self::input_type(arg).is_some()) {
-            let inputs: Vec<_> = arguments.iter().filter_map(Self::input_type).collect();
+        } else if arguments
+            .iter()
+            .all(|arg| SemScalarExpr::common_type_input(arg).is_some())
+        {
+            let inputs: Vec<_> = arguments
+                .iter()
+                .filter_map(SemScalarExpr::common_type_input)
+                .collect();
             match Self::common_type(context, &inputs) {
                 Ok(ty) => {
                     value.types = InputTypeConstraint::exact(&ty);
@@ -62,147 +68,8 @@ impl MinMaxExpr {
         self.node
     }
 
-    pub(crate) fn input_type(value: &SemScalarExpr) -> Option<TypeReference> {
-        if let Some(collate) = value.as_collate() {
-            return Self::input_type(collate.argument());
-        }
-        // Bare PostgreSQL strings and NULL have type unknown, unlike typed
-        // strings or the legacy generic constant accessor's text approximation.
-        if value
-            .as_const()
-            .is_some_and(|constant| constant.is_null() || constant.as_string().is_some())
-        {
-            return Some(Self::unknown());
-        }
-        value.get_type()
-    }
-    pub(crate) fn unknown() -> TypeReference {
-        TypeReference::from_master_type_name("unknown")
-    }
-
-    pub(crate) fn base_type(context: &impl ParseContext, ty: &TypeReference) -> TypeReference {
-        // An array of domains is an array type, not itself a domain.
-        if ty.is_array() == Some(true) {
-            return ty.clone();
-        }
-        let mut base = ty.clone();
-        let mut seen = std::collections::HashSet::new();
-        while !base.is_dynamic() && base.is_array() != Some(true) && seen.insert(base.clone()) {
-            let Some(definition) = context.get_type_impl(
-                base.full_name()
-                    .expect("owned definitions are handled before nominal lookup"),
-            ) else {
-                break;
-            };
-            let Some(reference) = definition.domain_base() else {
-                break;
-            };
-            base = reference.clone();
-        }
-        base
-    }
-
-    pub(crate) fn category(
-        context: &impl ParseContext,
-        ty: &TypeReference,
-    ) -> Result<(char, bool), MinMaxProblem> {
-        if ty.is_array() == Some(true) {
-            return Ok(('A', false));
-        }
-        let definition = if let Some(definition) = ty.type_definition() {
-            Some(definition)
-        } else {
-            context.get_type_impl(
-                ty.full_name()
-                    .expect("owned definitions are handled before nominal lookup"),
-            )
-        };
-        let category = if let Some(definition) = definition {
-            definition.category(context)
-        } else {
-            None
-        };
-        let category = category.ok_or_else(|| MinMaxProblem::missing_type_facts(ty))?;
-        if ty.is_dynamic() {
-            return Ok((category.code(), false));
-        }
-        // Preference originates in a declared conversion. Domain-source
-        // reductions preserve that declaration's target preference; discovering
-        // every nominal domain cannot add a preferred target.
-        let preferred = context
-            .declared_implicit_cast_sources(ty)
-            .into_iter()
-            .any(|source| {
-                context
-                    .get_implicit_cast(&source, ty)
-                    .is_some_and(|cast| cast.is_implicit_preferred())
-            });
-        Ok((category.code(), preferred))
-    }
-
-    pub(crate) fn can_coerce(
-        context: &impl ParseContext,
-        source: &TypeReference,
-        target: &TypeReference,
-    ) -> bool {
-        if source == target || *source == Self::unknown() {
-            return true;
-        }
-        // Coercion into a domain uses its base type too. This checks conversion
-        // applicability without replacing the nominal common-type candidate.
-        let source = Self::base_type(context, source);
-        let target = Self::base_type(context, target);
-        if source == target || source.implicit_match_context(&target, context).is_some() {
-            return true;
-        }
-        if source.is_array() == Some(true) && target.is_array() == Some(true) {
-            return Self::can_coerce(context, &source.element_type(), &target.element_type());
-        }
-        false
-    }
-
-    // Candidate selection does not validate conversions yet: a later input
-    // can change the candidate. The final target must accept every operand.
-    pub(crate) fn next_candidate(
-        context: &impl ParseContext,
-        candidate: &TypeReference,
-        input: &TypeReference,
-    ) -> Result<TypeReference, MinMaxProblem> {
-        if *candidate == Self::unknown() {
-            return Ok(input.clone());
-        }
-        if *input == Self::unknown() {
-            return Ok(candidate.clone());
-        }
-        Self::select_candidate(
-            candidate,
-            input,
-            Self::category(context, candidate)?,
-            Self::category(context, input)?,
-            Self::can_coerce(context, candidate, input),
-            Self::can_coerce(context, input, candidate),
-        )
-    }
-
-    pub(crate) fn select_candidate(
-        candidate: &TypeReference,
-        input: &TypeReference,
-        (category, preferred): (char, bool),
-        (input_category, _): (char, bool),
-        forward: bool,
-        backward: bool,
-    ) -> Result<TypeReference, MinMaxProblem> {
-        if category != input_category {
-            return Err(MinMaxProblem::incompatible(candidate, input));
-        }
-        if !preferred && forward && !backward {
-            return Ok(input.clone());
-        }
-        Ok(candidate.clone())
-    }
-
     pub(crate) fn ordered(context: &impl ParseContext, ty: &TypeReference) -> Option<bool> {
-        let base = Self::base_type(context, ty);
+        let base = CommonType::base_type(context, ty);
         if base.is_array() == Some(true) {
             return Self::ordered(context, &base.element_type());
         }
@@ -227,7 +94,7 @@ impl MinMaxExpr {
         if direct == Some(true) {
             return direct;
         }
-        let (category, _) = Self::category(context, &base).ok()?;
+        let (category, _) = CommonType::category(context, &base).ok()?;
         let range_family = category == 'R';
         let family = if range_family && base.is_range() {
             Some("anyrange")
@@ -254,7 +121,7 @@ impl MinMaxExpr {
         context: &impl ParseContext,
         inputs: &[TypeReference],
     ) -> Result<TypeReference, MinMaxProblem> {
-        let target = Self::select_common_type(context, inputs)?;
+        let target = CommonType::select_common_type(context, inputs)?;
         match Self::ordered(context, &target) {
             Some(true) => {}
             Some(false) => return Err(MinMaxProblem::not_ordered(&target)),
@@ -286,40 +153,10 @@ mod comparison_knowledge_tests {
 }
 
 impl MinMaxExpr {
-    /// PostgreSQL ordered common-type selection, without comparison requirements.
-    pub(crate) fn select_common_type(
-        context: &impl ParseContext,
-        inputs: &[TypeReference],
-    ) -> Result<TypeReference, MinMaxProblem> {
-        let Some(first) = inputs.first() else {
-            return Err(MinMaxProblem::empty());
-        };
-        let target = if *first != Self::unknown() && inputs.iter().all(|ty| ty == first) {
-            first.clone()
-        } else {
-            let mut candidate = Self::unknown();
-            for input in inputs {
-                candidate =
-                    Self::next_candidate(context, &candidate, &Self::base_type(context, input))?;
-            }
-            if candidate == Self::unknown() {
-                PgBuiltInType::text()
-            } else {
-                candidate
-            }
-        };
-        for input in inputs {
-            if !Self::can_coerce(context, input, &target) {
-                return Err(MinMaxProblem::incompatible(input, &target));
-            }
-        }
-        Ok(target)
-    }
-
     fn coerce(&mut self, target: &TypeReference) {
         for argument in &mut self.arguments {
             if argument.get_type().as_ref() != Some(target)
-                || Self::input_type(argument) == Some(Self::unknown())
+                || SemScalarExpr::common_type_input(argument) == Some(CommonType::unknown())
             {
                 *argument = SemScalarExpr::wrap_implicit_cast(target, argument);
             }

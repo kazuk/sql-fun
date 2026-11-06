@@ -1,10 +1,11 @@
+use crate::sem::CommonType;
 use crate::{
     ast::Dialect,
     names::{AliasName, OperatorName, TableName},
     sem::{
         AnalysisError, AnalysisProblem, ArithExpr, BinaryOperatorDefinition, InputTypeConstraint,
-        MinMaxExpr, OperatorDefinition, ParameterConstraints, ParseContext, PgBuiltInType,
-        ResolvedOperator, SelectStatement, SemScalarExpr, TypeReference,
+        OperatorDefinition, ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator,
+        SelectStatement, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         problem::MembershipProblem,
         scalar_expr::{SemScalarExprNode, arith_expr::UndefinedOperatorCallSite},
@@ -174,7 +175,7 @@ impl MembershipComparison {
                 // A literal paired with an unresolved parameter gets its SQL
                 // target from the comparison, not the literal's display type.
                 for operand in [&mut left, &mut right] {
-                    if MinMaxExpr::input_type(operand) == Some(MinMaxExpr::unknown()) {
+                    if SemScalarExpr::common_type_input(operand) == Some(CommonType::unknown()) {
                         *operand = parameters.operation(
                             "membership literal",
                             std::slice::from_ref(operand),
@@ -545,11 +546,14 @@ impl MembershipExpr {
             for index in &common_indices {
                 inputs.push(values[*index].clone());
             }
-            let types: Option<Vec<_>> = inputs.iter().map(MinMaxExpr::input_type).collect();
+            let types: Option<Vec<_>> = inputs
+                .iter()
+                .map(SemScalarExpr::common_type_input)
+                .collect();
             if let Some(types) = types {
                 // A scalar-array common type is optional. PostgreSQL falls back
                 // to independent comparisons when the list has no common type.
-                if let Ok(ty) = MinMaxExpr::select_common_type(context, &types)
+                if let Ok(ty) = CommonType::select_common_type(context, &types)
                     && !ty.is_record()
                 {
                     target = Some(ty);
@@ -809,7 +813,7 @@ impl<C: ParseContext> SemanticVisitorMut for UnknownOutput<'_, C> {
     fn output(&mut self, _name: &str, value: &mut SemScalarExpr) {
         if self.context.dialect() == Dialect::postgres()
             && self.depth == 1
-            && MinMaxExpr::input_type(value) == Some(MinMaxExpr::unknown())
+            && SemScalarExpr::common_type_input(value) == Some(CommonType::unknown())
         {
             *value = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::text(), value);
         }

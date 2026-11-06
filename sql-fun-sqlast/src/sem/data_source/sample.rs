@@ -1,7 +1,8 @@
+use crate::sem::CommonType;
 use crate::{
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, DataSource, MinMaxExpr, ParseContext, SamplingMethodLookup,
+        AnalysisError, AnalysisProblem, DataSource, ParseContext, SamplingMethodLookup,
         SemScalarExpr, TypeReference,
         problem::TableSampleProblem,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -625,13 +626,13 @@ impl SamplingInput {
         let Some(target) = &self.target else {
             return Ok(());
         };
-        let Some(source) = MinMaxExpr::input_type(&self.expression) else {
+        let Some(source) = SemScalarExpr::common_type_input(&self.expression) else {
             return Ok(());
         };
         if self.checked_type.as_ref() == Some(&source) {
             return Ok(());
         }
-        let valid = source == MinMaxExpr::unknown()
+        let valid = source == CommonType::unknown()
             || source == *target
             || source.assignment_match_context(target, context).is_some();
         self.checked_type = Some(source.clone());

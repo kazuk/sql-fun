@@ -10,8 +10,8 @@ use crate::{
     names::{ColumnName, OperatorName},
     sem::{
         AliasSpec, AnalysisProblem, ArraySubqueryExpr, ColumnCollection, ColumnDefinition,
-        ColumnReferenceExpr, DeleteStatement, InsertStatement, InsertTarget, MembershipExpr,
-        MergeStatement, MinMaxExpr, ParseContext, PgBuiltInType, QueryName, QueryOrder,
+        ColumnReferenceExpr, CommonType, DeleteStatement, InsertStatement, InsertTarget,
+        MembershipExpr, MergeStatement, ParseContext, PgBuiltInType, QueryName, QueryOrder,
         QueryWindow, ResolvedOperator, ResultColumnCollection, SelectStatement, SetOperationQuery,
         TableSampleSource, TruthTestExpr, UpdateStatement, parameter_constraints::TypeProjection,
         problem::MinMaxProblem,
@@ -25,7 +25,7 @@ use crate::{
         AnalysisError, ConstrainedExpr, ConstraintGraph, InputTypeConstraint, ParameterConstraints,
         SemScalarExpr, SignatureAlternative, TypeReference,
         overload_rank::OverloadRank,
-        type_system::{ArgumentBindingCollection, SimpleInferResult},
+        type_system::{ArgumentBindingCollection, CommonInferContext, SimpleInferResult},
     },
 };
 use std::collections::BTreeMap;
@@ -498,7 +498,7 @@ impl<'cache> ParameterResolution<'cache> {
         let node = self.input(condition);
         // Bare NULL/string literals have PostgreSQL unknown type and can be
         // coerced to boolean. Parameters instead retain their source domain.
-        if MinMaxExpr::input_type(condition) != Some(MinMaxExpr::unknown()) {
+        if SemScalarExpr::common_type_input(condition) != Some(CommonType::unknown()) {
             self.graph.restrict(
                 node,
                 &InputTypeConstraint::types(self.cache.cast_sources(
@@ -917,7 +917,19 @@ impl<'cache> ParameterResolution<'cache> {
         let result = self.operation(name, arguments, &InputTypeConstraint::any(), None);
         let mut nodes = Vec::new();
         for argument in arguments {
-            nodes.push(self.input(argument));
+            let unknown_literal = signatures
+                .iter()
+                .any(Signature::is_compatible_function_template)
+                && argument.constraint_node().is_none()
+                && argument.common_type_input() == Some(CommonType::unknown());
+            if unknown_literal {
+                nodes.push(
+                    self.graph
+                        .node(&InputTypeConstraint::exact(&CommonType::unknown())),
+                );
+            } else {
+                nodes.push(self.input(argument));
+            }
         }
         nodes.push(result.constraint_node().expect("operation has node"));
         self.graph
@@ -981,11 +993,11 @@ impl<'cache> ParameterResolution<'cache> {
         use crate::sem::MinMaxExpr;
         let mut choices = std::collections::HashSet::new();
         for argument in arguments {
-            if let Some(ty) = MinMaxExpr::input_type(argument)
-                && ty != MinMaxExpr::unknown()
+            if let Some(ty) = SemScalarExpr::common_type_input(argument)
+                && ty != CommonType::unknown()
             {
                 choices.insert(ty.clone());
-                choices.extend(context.get_implicit_castable(&MinMaxExpr::base_type(context, &ty)));
+                choices.extend(context.get_implicit_castable(&CommonType::base_type(context, &ty)));
             }
             if let Some(node) = argument.constraint_node()
                 && let Some(types) = self.graph.domain(node).admissible_types()
@@ -1007,7 +1019,7 @@ impl<'cache> ParameterResolution<'cache> {
                 .map(|argument| {
                     argument.constraint_node().unwrap_or_else(|| {
                         self.graph
-                            .node(&InputTypeConstraint::exact(&MinMaxExpr::unknown()))
+                            .node(&InputTypeConstraint::exact(&CommonType::unknown()))
                     })
                 })
                 .collect();
@@ -1028,7 +1040,7 @@ impl<'cache> ParameterResolution<'cache> {
                 node
             } else {
                 self.graph.node(
-                    &MinMaxExpr::input_type(argument)
+                    &SemScalarExpr::common_type_input(argument)
                         .as_ref()
                         .map(InputTypeConstraint::exact)
                         .unwrap_or_else(InputTypeConstraint::any),
@@ -1050,10 +1062,10 @@ impl<'cache> ParameterResolution<'cache> {
                     let selected = if left == right {
                         Ok(left.clone())
                     } else {
-                        MinMaxExpr::next_candidate(
+                        CommonType::next_candidate(
                             context,
-                            &MinMaxExpr::base_type(context, left),
-                            &MinMaxExpr::base_type(context, right),
+                            &CommonType::base_type(context, left),
+                            &CommonType::base_type(context, right),
                         )
                     };
                     if let Ok(target) = selected {
@@ -1076,7 +1088,7 @@ impl<'cache> ParameterResolution<'cache> {
         let mut targets = Vec::new();
         let mut unordered = None;
         for source in candidate_types.admissible_types().unwrap_or(&[]) {
-            let target = if *source == MinMaxExpr::unknown() {
+            let target = if *source == CommonType::unknown() {
                 PgBuiltInType::text()
             } else {
                 source.clone()
@@ -1121,7 +1133,7 @@ impl<'cache> ParameterResolution<'cache> {
                     .admissible_types()
                     .unwrap_or(&[])
                     .iter()
-                    .filter(|source| MinMaxExpr::can_coerce(context, source, target))
+                    .filter(|source| CommonType::can_coerce(context, source, target))
                     .cloned();
                 alternatives.push(SignatureAlternative::new(&[
                     InputTypeConstraint::types(sources),
@@ -1479,6 +1491,66 @@ impl Signature {
         self.unrestricted_inputs.contains(&index)
     }
 
+    pub(crate) fn compatible_function_template(
+        inputs: &[TypeReference],
+        result: &TypeReference,
+    ) -> Option<Self> {
+        if !inputs.iter().any(TypeReference::is_common_infer_arg)
+            || inputs.iter().chain([result]).any(|ty| {
+                ty.is_simple_infer_arg()
+                    || ty.is_any_compatible_range()
+                    || ty.is_any_compatible_multi_range()
+            })
+        {
+            return None;
+        }
+        let mut signature = Self::new(inputs, result);
+        signature.declared_inputs = Some(inputs.to_vec());
+        Some(signature)
+    }
+
+    pub(crate) fn is_compatible_function_template(&self) -> bool {
+        self.declared_inputs.is_some() && self.inputs.iter().any(TypeReference::is_common_infer_arg)
+    }
+
+    pub(crate) fn is_scalar_common_function(&self) -> bool {
+        self.is_compatible_function_template()
+            && !self.inputs.is_empty()
+            && self.inputs.iter().all(TypeReference::is_any_compatible)
+            && (self.result.is_any_compatible() || self.result.is_any_compatible_array())
+    }
+
+    pub(crate) fn instantiate_compatible(
+        &self,
+        context: &impl ParseContext,
+        sources: &[Option<TypeReference>],
+    ) -> Option<Self> {
+        let mut infer = CommonInferContext::default();
+        for (declared, source) in self.inputs.iter().zip(sources) {
+            if declared.is_common_infer_arg() {
+                infer
+                    .push_input_param(declared, source.as_ref()?, context)
+                    .ok()?;
+            }
+        }
+        let result = infer.get_inference_result(context).ok()?;
+        let mut signature = self.clone();
+        for input in &mut signature.inputs {
+            input.apply_common_infer_result(&result);
+        }
+        signature.result.apply_common_infer_result(&result);
+        if signature
+            .inputs
+            .iter()
+            .chain([&signature.result])
+            .all(|ty| !ty.is_simple_infer_arg() && !ty.is_common_infer_arg())
+        {
+            Some(signature)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn simple_function_template(
         inputs: &[TypeReference],
         declarations: &[TypeReference],
@@ -1567,6 +1639,21 @@ impl Signature {
         }
         if self.accepts_any_type(index) {
             return Some(OverloadRank::default());
+        }
+        if *source == CommonType::unknown()
+            && let Some(declared_inputs) = &self.declared_inputs
+        {
+            if declared_inputs[index].is_common_infer_arg() {
+                return Some(OverloadRank::default());
+            }
+            // Other declarations retain the literal's previous text-based
+            // overload ranking when a compatible template is also present.
+            return OverloadRank::function_argument(
+                catalog,
+                Some(&PgBuiltInType::text()),
+                Some(&self.inputs[index]),
+                Some(&declared_inputs[index]),
+            );
         }
         if let Some(declared_inputs) = &self.declared_inputs {
             OverloadRank::function_argument(

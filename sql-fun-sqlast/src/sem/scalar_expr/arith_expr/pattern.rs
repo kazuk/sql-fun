@@ -1,8 +1,8 @@
+use crate::sem::CommonType;
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, InputTypeConstraint, MinMaxExpr, ParseContext, ResolvedOperator,
-        SemScalarExpr,
+        AnalysisError, InputTypeConstraint, ParseContext, ResolvedOperator, SemScalarExpr,
         parameter_resolution::ParameterResolution,
         scalar_expr::arith_expr::ArithExpr,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -39,7 +39,7 @@ impl PatternExpr {
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         let mut operands = self.operands.clone();
         for operand in &mut operands {
-            if MinMaxExpr::input_type(operand) == Some(MinMaxExpr::unknown()) {
+            if SemScalarExpr::common_type_input(operand) == Some(CommonType::unknown()) {
                 *operand = parameters.operation(
                     "unknown pattern literal",
                     std::slice::from_ref(operand),
@@ -200,7 +200,7 @@ impl ArithExpr {
         };
         let unknown = [&left, &right]
             .into_iter()
-            .any(|value| MinMaxExpr::input_type(value) == Some(MinMaxExpr::unknown()));
+            .any(|value| SemScalarExpr::common_type_input(value) == Some(CommonType::unknown()));
         if unknown && (left.requires_argument_type() || right.requires_argument_type()) {
             let binding = ResolvedOperator::resolve(context, name, true, true);
             return Ok(SemScalarExpr::arithmetic(Self::Pattern(Box::new(

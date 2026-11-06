@@ -184,7 +184,7 @@ See the regressions for [#673](https://github.com/kazuk/sql-fun/issues/673) in
 
 [`scalar_expr/array.rs`](../../sql-fun-sqlast/src/sem/scalar_expr/array.rs)
 retains every operand, output type domains, and element coercions. It reuses the
-ordered common-type selection in `MinMaxExpr` without requiring GREATEST/LEAST's
+ordered common-type selection in `CommonType` without requiring GREATEST/LEAST's
 comparison implementation. An explicit array cast supplies the element target
 to nested and empty constructors before analysis. Constructor-specific typing
 failures retain an empty domain and structured `ArrayProblem` diagnostics rather

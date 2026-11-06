@@ -1,11 +1,12 @@
+use crate::sem::CommonType;
 use crate::{
     ast::{
         ColumnConstraint as AstColumnConstraint, Dialect, TableConstraint as AstTableConstraint,
     },
     names::TableName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnRename, CreateTable, MinMaxExpr, ParseContext,
-        PgBuiltInType, ScalarAnalysisContext, SemScalarExpr, TruthTestExpr,
+        AnalysisError, AnalysisProblem, ColumnRename, CreateTable, ParseContext, PgBuiltInType,
+        ScalarAnalysisContext, SemScalarExpr, TruthTestExpr,
         problem::CheckProblem,
         traversal::{ColumnRenamer, SemanticVisitorMut},
     },
@@ -158,8 +159,8 @@ impl<C: ParseContext> SemanticVisitorMut for CheckExpression<'_, C> {
         if self.context.dialect() != Dialect::postgres() {
             return Ok(());
         }
-        let problem = if let Some(ty) = MinMaxExpr::input_type(expression) {
-            if ty == MinMaxExpr::unknown() {
+        let problem = if let Some(ty) = SemScalarExpr::common_type_input(expression) {
+            if ty == CommonType::unknown() {
                 if let Some(literal) = expression.as_const()
                     && let Some(text) = literal.as_string()
                     && !TruthTestExpr::valid_boolean_input(text)

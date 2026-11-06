@@ -1,10 +1,10 @@
+use crate::sem::CommonType;
 use crate::{
     ast::Dialect,
     names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, MinMaxExpr,
-        ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr,
-        TypeReference,
+        AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, ParameterConstraints,
+        ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         scalar_expr::SemScalarExprNode,
         traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
@@ -335,7 +335,7 @@ impl CaseExpr {
 
     fn coerce(value: &mut SemScalarExpr, target: &TypeReference) {
         if value.get_type().as_ref() != Some(target)
-            || MinMaxExpr::input_type(value) == Some(MinMaxExpr::unknown())
+            || SemScalarExpr::common_type_input(value) == Some(CommonType::unknown())
         {
             *value = SemScalarExpr::wrap_implicit_cast(target, value);
         }
@@ -462,7 +462,8 @@ impl CaseExpr {
             // Eager typing keeps the result available to enclosing resolvers.
             // Parameter-dependent errors retain the existing graph diagnostic.
             let pending = |value: &SemScalarExpr| {
-                MinMaxExpr::input_type(value).is_none() || value.constraint_node().is_some()
+                SemScalarExpr::common_type_input(value).is_none()
+                    || value.constraint_node().is_some()
             };
             let dependent = argument.as_ref().is_some_and(pending)
                 || otherwise
@@ -473,9 +474,12 @@ impl CaseExpr {
                     .iter()
                     .any(|arm| pending(&arm.when_value) || arm.result.constraint_node().is_some());
             let results = value.ordered_results();
-            let inputs: Option<Vec<_>> = results.iter().map(MinMaxExpr::input_type).collect();
+            let inputs: Option<Vec<_>> = results
+                .iter()
+                .map(SemScalarExpr::common_type_input)
+                .collect();
             if let Some(inputs) = inputs {
-                match MinMaxExpr::select_common_type(context, &inputs) {
+                match CommonType::select_common_type(context, &inputs) {
                     Ok(target) => {
                         value.case_expr_type = Some(target.clone());
                         value.types = if dependent {

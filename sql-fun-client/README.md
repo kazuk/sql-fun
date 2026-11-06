@@ -99,8 +99,8 @@ async fn example(
 ) -> Result<(), Box<dyn std::error::Error>> {
     client
         .invoke_method(
-            "rpc.discover",
-            &serde_json::json!({}),
+            "echo",
+            &serde_json::json!({"message": "hello"}),
             |response| async move {
                 // Handle application failures here; the client cannot receive them.
                 match response.into_result() {

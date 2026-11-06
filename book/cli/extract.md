@@ -26,7 +26,7 @@ sql-fun extract <COMMAND>
 
 Choose [`catalog`](extract/catalog.md), [`export-script`](extract/export-script.md),
 or [`import-extensions`](extract/import-extensions.md). `-h` / `--help` prints
-help. Root-level [common options](README.md#common-options) precede `extract`.
+help. Root-level [common options](index.md#common-options) precede `extract`.
 Each operation's reference describes its arguments and exit status.
 
 ## From a Docker image

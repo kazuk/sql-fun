@@ -47,7 +47,7 @@ Application schemas and migrations remain managed by your own tools.
 sql-fun [COMMON OPTIONS] init [OPTIONS]
 ```
 
-[Common options](README.md#common-options) precede `init`. The options below
+[Common options](index.md#common-options) precede `init`. The options below
 follow `init`; its `--datasource` and `--sql-fun-home` are distinct from the
 common options of the same name.
 

@@ -23,4 +23,4 @@ The bundle and extracted catalog must match the PostgreSQL release. Success
 exits with status 0; validation and I/O failures exit nonzero, and invalid CLI
 usage exits with status 2. See [the extraction guide](../extract.md) for bundle
 requirements, output safety, and the administrator workflow. Root-level
-[common options](../README.md#common-options) precede `extract`.
+[common options](../index.md#common-options) precede `extract`.

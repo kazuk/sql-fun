@@ -31,4 +31,4 @@ SQL_FUN_DATABASE_URL='host=db.example.org dbname=postgres user=catalog_reader' \
 Success exits with status 0; extraction and I/O failures exit nonzero, while
 invalid CLI usage exits with status 2. See the [extraction guide](../extract.md)
 for permissions, security, output publication, cleanup, and Docker examples. See
-[common options](../README.md#common-options) for root-level options.
+[common options](../index.md#common-options) for root-level options.

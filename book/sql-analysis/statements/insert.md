@@ -42,7 +42,7 @@ and production INSERT end-to-end verification remain tracked in
 [#581](https://github.com/kazuk/sql-fun/issues/581). Successful
 collation/operator-class lookup alone does not establish those INSERT
 capabilities. DO UPDATE remains explicitly unimplemented
-([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
+([#1024](https://github.com/kazuk/sql-fun/issues/1024)); it does not produce a
 successful INSERT analysis, including later actions in SQLite UPSERT chains.
 
 View-target eligibility and defaults are described once in [CREATE

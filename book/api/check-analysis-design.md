@@ -297,11 +297,13 @@ Analysis does not execute DDL or retain its schema changes for subsequent statem
 MERGE uses the existing analyzer, including RETURNING. TRUNCATE retains its
 classification even though common-AST conversion is currently unavailable.
 
-Existing SQLAST `todo!()` paths remain explicitly unimplemented, including
-special operators (#513), TABLESAMPLE, ON CONFLICT DO UPDATE (#474), and some
-CASE common-type selections. The RPC neither catches these panics nor converts
-them into ordinary diagnostics or unknown metadata. PostgreSQL is the first
-end-to-end target; SQLite schema initialization is not yet available here.
+Some parameter-dependent `ANY`/`ALL` array comparisons and `NULLIF` expressions
+can terminate analysis ([#513](https://github.com/kazuk/sql-fun/issues/513)).
+`ON CONFLICT DO UPDATE` analysis is unimplemented
+([#1024](https://github.com/kazuk/sql-fun/issues/1024)). When either path
+panics, the server process aborts rather than returning a diagnostic or an RPC
+error. PostgreSQL is the first end-to-end target; SQLite schema initialization
+is not yet available here.
 
 ### 4. Display diagnostics
 

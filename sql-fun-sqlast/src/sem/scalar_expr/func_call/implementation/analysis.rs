@@ -73,7 +73,7 @@ impl FuncCallExpr {
                 invalid = true;
             } else if !arguments.iter().any(SemScalarExpr::requires_argument_type) {
                 if let Some((overload, common_inputs)) =
-                    candidates.resolve_from_catalog_with_common_inputs(context, &types)
+                    candidates.resolve_in_context_with_common_inputs(context, &types)
                 {
                     let bound = Self::cast_common_call_operands(
                         context,
@@ -664,7 +664,7 @@ impl FuncCallExpr {
                 return Ok(Self::deferred(name, arguments));
             }
             if let Some((overload, common_inputs)) =
-                overloads.resolve_from_catalog_with_common_inputs(context, &arg_types)
+                overloads.resolve_in_context_with_common_inputs(context, &arg_types)
             {
                 let args = Self::cast_common_call_operands(
                     context,

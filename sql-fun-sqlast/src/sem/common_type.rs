@@ -1,7 +1,7 @@
 //! PostgreSQL common-type selection and coercion shared by SQL consumers.
 
 use crate::{
-    context::BaseParseContext,
+    context::ParseContext,
     sem::{PgBuiltInType, TypeReference, problem::MinMaxProblem},
 };
 
@@ -12,7 +12,7 @@ impl CommonType {
         TypeReference::from_master_type_name("unknown")
     }
 
-    pub(crate) fn base_type(context: &impl BaseParseContext, ty: &TypeReference) -> TypeReference {
+    pub(crate) fn base_type(context: &impl ParseContext, ty: &TypeReference) -> TypeReference {
         // An array of domains is an array type, not itself a domain.
         if ty.is_array() == Some(true) {
             return ty.clone();
@@ -35,7 +35,7 @@ impl CommonType {
     }
 
     pub(crate) fn category(
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         ty: &TypeReference,
     ) -> Result<(char, bool), MinMaxProblem> {
         if ty.is_array() == Some(true) {
@@ -73,7 +73,7 @@ impl CommonType {
     }
 
     pub(crate) fn can_coerce(
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         source: &TypeReference,
         target: &TypeReference,
     ) -> bool {
@@ -94,7 +94,7 @@ impl CommonType {
     }
 
     pub(crate) fn next_candidate(
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         candidate: &TypeReference,
         input: &TypeReference,
     ) -> Result<TypeReference, MinMaxProblem> {
@@ -133,7 +133,7 @@ impl CommonType {
 
     /// PostgreSQL ordered common-type selection, without comparison requirements.
     pub(crate) fn select_common_type(
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         inputs: &[TypeReference],
     ) -> Result<TypeReference, MinMaxProblem> {
         let Some(first) = inputs.first() else {

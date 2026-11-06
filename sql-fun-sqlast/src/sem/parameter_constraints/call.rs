@@ -4,7 +4,7 @@ use crate::sem::parameter_constraints::environment::InferenceEnvironment;
 use crate::{
     CacheContext,
     ast::Dialect,
-    context::{BaseParseContext, CastInfoRead},
+    context::{BaseParseContext, CastInfoRead, TypeInfoRead},
     sem::{
         CastContext, CommonType, ParseContext, TypeReference,
         overload_rank::OverloadRank,
@@ -540,29 +540,73 @@ impl CallFacts {
     }
 
     fn compatible_candidates(&self, inputs: &[InputTypeConstraint]) -> HashSet<TypeReference> {
-        let known: HashSet<_> = inputs
-            .iter()
-            .enumerate()
-            .filter(|(index, _)| self.compatible_position(*index))
-            .filter_map(|(_, input)| input.admissible_types())
-            .flatten()
-            .filter(|ty| **ty != CommonType::unknown())
-            .cloned()
-            .collect();
+        let environment = self
+            .environment
+            .as_ref()
+            .expect("compatible templates retain their analysis environment");
+        let context = environment.context();
+        let mut known = HashSet::new();
+        for signature in &self.compatible_functions {
+            for (declared, input) in signature.inputs().iter().zip(inputs) {
+                if !declared.is_common_infer_arg() {
+                    continue;
+                }
+                for ty in input.admissible_types().unwrap_or(&[]) {
+                    if *ty == CommonType::unknown() {
+                        continue;
+                    }
+                    if declared.is_any_compatible_array() {
+                        if let Some(element) = context.get_array_item_type(ty) {
+                            known.insert(element);
+                        }
+                    } else {
+                        known.insert(ty.clone());
+                    }
+                }
+            }
+        }
         if known.is_empty() {
             return default_types().into_iter().collect();
         }
         let mut candidates = known.clone();
-        if let Some(environment) = &self.environment {
-            let context = environment.context();
-            for ty in &known {
-                if !ty.is_dynamic() {
-                    candidates.extend(context.get_implicit_castable(ty));
-                    candidates.extend(context.declared_implicit_cast_sources(ty));
-                }
+        for ty in &known {
+            if !ty.is_dynamic() {
+                candidates.extend(context.get_implicit_castable(ty));
+                candidates.extend(context.declared_implicit_cast_sources(ty));
             }
         }
         candidates
+    }
+
+    fn compatible_input_candidates(
+        &self,
+        index: usize,
+        elements: &HashSet<TypeReference>,
+        unseeded: bool,
+    ) -> InputTypeConstraint {
+        let mut candidates = HashSet::new();
+        for declared in self
+            .compatible_functions
+            .iter()
+            .filter_map(|signature| signature.inputs().get(index))
+        {
+            if declared.is_any_compatible_array() {
+                candidates.extend(elements.iter().map(TypeReference::array_type));
+            } else if declared.is_common_infer_arg() {
+                candidates.extend(elements.iter().cloned());
+            }
+        }
+        let defaults = default_types();
+        candidates.extend(
+            self.concrete
+                .sources_for_argument(index)
+                .into_iter()
+                .filter(|ty| !unseeded || defaults.contains(ty)),
+        );
+        if self.concrete.accepts_unrestricted_argument(index) {
+            candidates.extend(defaults);
+        }
+        InputTypeConstraint::types(candidates)
     }
 
     /// Supply witnesses only after SQL-derived propagation has finished.
@@ -598,7 +642,7 @@ impl CallFacts {
             let candidates = self.compatible_candidates(inputs);
             for (index, (input, parameter)) in inputs.iter_mut().zip(parameters).enumerate() {
                 if self.compatible_position(index) && *parameter && input.is_any() {
-                    *input = InputTypeConstraint::types(candidates.iter().cloned());
+                    *input = self.compatible_input_candidates(index, &candidates, unseeded);
                 }
             }
         }

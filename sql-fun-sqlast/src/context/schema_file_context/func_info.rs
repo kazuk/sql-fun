@@ -58,12 +58,11 @@ impl FunctionInfoRead for SchemaCatalog {
         }
     }
     fn function_returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
-        let arguments = overload.input_bindings();
         for definition in self.functions.definitions(name) {
-            let selected = definition
+            if definition
                 .overloads()
-                .resolve_from_catalog(self, &arguments);
-            if selected.as_ref() == Some(overload) {
+                .contains_instantiation(overload, self)
+            {
                 return definition.is_table_function();
             }
         }
@@ -77,17 +76,14 @@ impl FunctionInfoRead for SchemaCatalog {
         {
             return *preserves;
         }
-        // Recover the producer signature through the existing overload binder:
-        // parameter inference specializes polymorphic signatures, while source
-        // properties continue to belong to their original overload identity.
-        let arguments = overload.input_bindings();
+        // A resolved overload may be a polymorphic instantiation of its
+        // declaration. Its row-preservation property belongs to that declaration.
         for ((function, signature), preserves) in &self.function_view_rows {
-            if function == name {
-                let candidate = FunctionOverloadCollection::new(std::slice::from_ref(signature))
-                    .resolve_from_catalog(self, &arguments);
-                if candidate.as_ref() == Some(overload) {
-                    return *preserves;
-                }
+            if function == name
+                && FunctionOverloadCollection::new(std::slice::from_ref(signature))
+                    .contains_instantiation(overload, self)
+            {
+                return *preserves;
             }
         }
         self.base.function_preserves_view_rows(name, overload)
@@ -119,6 +115,52 @@ mod test_expression_classification {
         names::FullName,
         test_helpers::{ownership::apply_ownership_sql, sampling::schema_context},
     };
+
+    #[rstest::rstest]
+    #[case::simple("anyelement", "anyelement", "1", false)]
+    #[case::compatible_set("anycompatible", "SETOF anycompatible", "1", true)]
+    #[case::compatible_variadic("VARIADIC anycompatiblearray", "anycompatible", "1,2", false)]
+    fn instantiated_signature_keeps_declared_properties_after_freeze(
+        #[case] parameters: &str,
+        #[case] result: &str,
+        #[case] argument: &str,
+        #[case] returns_set: bool,
+    ) -> testresult::TestResult {
+        use crate::test_helpers::function_overloads as test_helpers;
+
+        let analyzed =
+            test_helpers::analyze_vector(&format!("SELECT vf({argument})"), parameters, result)?;
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        let overload = query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_function_call()
+            .unwrap()
+            .overload()
+            .clone()
+            .unwrap();
+        let name = FullName::with_schema("public", "vf");
+        assert_eq!(
+            analyzed.context().function_returns_set(&name, &overload),
+            returns_set
+        );
+        assert_eq!(
+            analyzed
+                .context()
+                .function_preserves_view_rows(&name, &overload),
+            !returns_set
+        );
+        let frozen = analyzed.into_context().freeze();
+        assert_eq!(frozen.function_returns_set(&name, &overload), returns_set);
+        assert_eq!(
+            frozen.function_preserves_view_rows(&name, &overload),
+            !returns_set
+        );
+        Ok(())
+    }
 
     #[rstest::rstest]
     #[case::scalar("integer", "", false, true)]

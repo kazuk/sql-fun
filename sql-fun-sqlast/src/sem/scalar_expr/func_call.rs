@@ -416,7 +416,7 @@ mod implementation {
             if let Some(candidates) = &self.candidates
                 && !arguments.iter().any(SemScalarExpr::requires_argument_type)
                 && let Some((overload, common_inputs)) = FunctionOverloadCollection::new(candidates)
-                    .resolve_from_catalog_with_common_inputs(context, &types)
+                    .resolve_in_context_with_common_inputs(context, &types)
             {
                 let args = FuncCallExpr::cast_common_call_operands(
                     context,

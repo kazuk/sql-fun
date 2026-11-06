@@ -323,7 +323,7 @@ impl DataSource {
                 UndefinedTableFuncDataSource::from_name(name, arguments, alias),
             ));
         };
-        let Some(overload) = overloads.resolve_from_catalog(context, &arg_types) else {
+        let Some(overload) = overloads.resolve_in_context(context, &arg_types) else {
             context.report_analysis_problem(
                 AnalysisProblem::parameter_type_mismatch_for_table_function(name, &arg_types),
             )?;

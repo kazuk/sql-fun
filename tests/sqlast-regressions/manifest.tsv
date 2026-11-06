@@ -5,7 +5,7 @@ casts	builtin	-	9	17,18
 vectors	builtin	-	4	18
 arrays-metadata	builtin	-	21	17,18
 arrays-names	builtin	-	5	17,18
-arrays-parameters	builtin	-	5	17,18
+arrays-parameters	builtin	-	8	17,18
 arrays-diagnostics	builtin	-	11	17,18
 arrays-consumers	builtin	-	15	17,18
 arrays-records	builtin	-	4	17,18

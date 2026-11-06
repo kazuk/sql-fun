@@ -212,7 +212,6 @@ impl ResultColumnCollection {
                         &results,
                         first,
                         table.is_base_table(),
-                        &[],
                     ));
             } else {
                 results.append_resolved_target(target, context, scope)?;

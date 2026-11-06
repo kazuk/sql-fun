@@ -37,6 +37,44 @@ impl WildcardExpansionCollection {
     }
 }
 
+/// One resolved output and the metadata needed to reproduce its projection.
+#[derive(Clone, Debug)]
+struct WildcardProjectionColumn {
+    result: ResultColumn,
+    reference: Option<Vec<String>>,
+    source_ordinal: Option<(String, usize)>,
+    typed_record: Option<WildcardTypedRecord>,
+}
+
+impl WildcardProjectionColumn {
+    const fn new(result: ResultColumn) -> Self {
+        Self {
+            result,
+            reference: None,
+            source_ordinal: None,
+            typed_record: None,
+        }
+    }
+
+    fn retain_origin(&mut self, column: &ProjectionColumn<'_>, reference: Option<Vec<String>>) {
+        self.reference = reference;
+        self.typed_record = column.typed_record();
+        self.source_ordinal = column
+            .source_ordinal()
+            .map(|(alias, ordinal)| (alias.to_owned(), ordinal));
+    }
+
+    fn reference(&self) -> Option<&[String]> {
+        self.reference.as_deref()
+    }
+
+    fn source_ordinal(&self) -> Option<(&str, usize)> {
+        self.source_ordinal
+            .as_ref()
+            .map(|(alias, ordinal)| (alias.as_str(), *ordinal))
+    }
+}
+
 /// The ordered semantic output of one source wildcard projection.
 ///
 /// Lexical offsets are relative to the parser input for the owning statement.
@@ -45,14 +83,12 @@ impl WildcardExpansionCollection {
 #[derive(Clone, Debug)]
 pub struct WildcardExpansion {
     location: Option<usize>,
-    columns: Vec<ResultColumn>,
+    columns: Vec<WildcardProjectionColumn>,
     table_dependent: bool,
     source_scope_depth: usize,
-    references: Vec<Option<Vec<String>>>,
+    // Source-wide and nested data has its own cardinality, independent of columns.
     source_projections: Vec<WildcardSourceProjection>,
-    source_ordinals: Vec<Option<(String, usize)>>,
     qualifiers: WildcardQualifiers,
-    typed_records: Vec<Option<WildcardTypedRecord>>,
     rows_sources: WildcardRowsSources,
 }
 
@@ -62,18 +98,19 @@ impl WildcardExpansion {
         results: &ResultColumnCollection,
         first: usize,
         table_dependent: bool,
-        references: &[Option<Vec<String>>],
     ) -> Self {
         Self {
             location,
-            columns: results.cloned_suffix(first),
+            columns: results
+                .suffix(first)
+                .iter()
+                .cloned()
+                .map(WildcardProjectionColumn::new)
+                .collect(),
             table_dependent,
             source_scope_depth: 0,
-            references: references.to_vec(),
             source_projections: Vec::new(),
-            source_ordinals: Vec::new(),
             qualifiers: WildcardQualifiers::default(),
-            typed_records: Vec::new(),
             rows_sources: WildcardRowsSources::default(),
         }
     }
@@ -84,8 +121,8 @@ impl WildcardExpansion {
     }
 
     /// Resolved columns in their original projection order, including duplicates.
-    pub fn columns(&self) -> &[ResultColumn] {
-        &self.columns
+    pub fn columns(&self) -> impl ExactSizeIterator<Item = &ResultColumn> + DoubleEndedIterator {
+        self.columns.iter().map(|column| &column.result)
     }
 
     pub(crate) const fn source_scope_depth(&self) -> usize {
@@ -95,16 +132,18 @@ impl WildcardExpansion {
         self.source_scope_depth = depth;
     }
 
+    #[cfg(test)]
     pub(crate) fn reference_at(&self, index: usize) -> Option<&[String]> {
-        self.references.get(index)?.as_deref()
+        self.columns.get(index)?.reference()
     }
 
     pub(crate) fn retain_source_projections(&mut self, projections: &[WildcardSourceProjection]) {
         self.source_projections = projections.to_vec();
     }
 
+    #[cfg(test)]
     pub(crate) fn typed_record_at(&self, index: usize) -> Option<&WildcardTypedRecord> {
-        self.typed_records.get(index)?.as_ref()
+        self.columns.get(index)?.typed_record.as_ref()
     }
     pub(crate) const fn qualifiers(&self) -> &WildcardQualifiers {
         &self.qualifiers
@@ -113,22 +152,21 @@ impl WildcardExpansion {
     pub(crate) fn rows_sources(&self) -> &[WildcardRowsSource] {
         self.rows_sources.sources()
     }
-    pub(crate) fn retain_projection_origin(&mut self, column: &ProjectionColumn<'_>) {
-        column.collect_rows_sources(&mut self.rows_sources);
-        self.typed_records.push(column.typed_record());
-        column.collect_qualifiers(&mut self.qualifiers);
-        let ordinal = if let Some((alias, ordinal)) = column.source_ordinal() {
-            Some((alias.to_owned(), ordinal))
-        } else {
-            None
-        };
-        self.source_ordinals.push(ordinal);
+    pub(crate) fn retain_projection_origins(
+        &mut self,
+        columns: &[ProjectionColumn<'_>],
+        binding_qualifier: Option<&AliasName>,
+    ) {
+        assert_eq!(self.columns.len(), columns.len());
+        for (record, column) in self.columns.iter_mut().zip(columns) {
+            record.retain_origin(column, column.projection_reference(binding_qualifier));
+            column.collect_rows_sources(&mut self.rows_sources);
+            column.collect_qualifiers(&mut self.qualifiers);
+        }
     }
+    #[cfg(test)]
     pub(crate) fn source_ordinal_at(&self, index: usize) -> Option<(&str, usize)> {
-        self.source_ordinals
-            .get(index)?
-            .as_ref()
-            .map(|(alias, ordinal)| (alias.as_str(), *ordinal))
+        self.columns.get(index)?.source_ordinal()
     }
 
     pub(crate) fn source_projections(&self) -> &[WildcardSourceProjection] {
@@ -145,12 +183,10 @@ impl WildcardExpansion {
 #[derive(Clone, Debug)]
 pub(crate) struct WildcardSourceProjection {
     alias: String,
-    columns: Vec<ResultColumn>,
-    references: Vec<Option<Vec<String>>>,
+    columns: Vec<WildcardProjectionColumn>,
+    // Qualifiers, nested projections and ROWS FROM sources belong to the source.
     qualifiers: WildcardQualifiers,
-    source_ordinals: Vec<Option<(String, usize)>>,
     source_projections: Vec<Self>,
-    typed_records: Vec<Option<WildcardTypedRecord>>,
     rows_sources: WildcardRowsSources,
 }
 
@@ -159,11 +195,8 @@ impl WildcardSourceProjection {
         Self {
             alias: alias.as_str().to_owned(),
             columns: Vec::new(),
-            references: Vec::new(),
             qualifiers: WildcardQualifiers::default(),
-            source_ordinals: Vec::new(),
             source_projections: Vec::new(),
-            typed_records: Vec::new(),
             rows_sources: WildcardRowsSources::default(),
         }
     }
@@ -172,18 +205,12 @@ impl WildcardSourceProjection {
         column: &ProjectionColumn<'_>,
         expression: &SemScalarExpr,
     ) {
-        self.columns
-            .push(ResultColumn::resolved(column.name(), expression));
-        self.references.push(column.visible_reference());
-        self.typed_records.push(column.typed_record());
+        let result = ResultColumn::resolved(column.name(), expression);
+        let mut record = WildcardProjectionColumn::new(result);
+        record.retain_origin(column, column.visible_reference());
+        self.columns.push(record);
         column.collect_qualifiers(&mut self.qualifiers);
         column.collect_rows_sources(&mut self.rows_sources);
-        let ordinal = if let Some((alias, ordinal)) = column.source_ordinal() {
-            Some((alias.to_owned(), ordinal))
-        } else {
-            None
-        };
-        self.source_ordinals.push(ordinal);
     }
     pub(crate) fn retain_source_projections(&mut self, projections: &[Self]) {
         self.source_projections = projections.to_vec();
@@ -191,17 +218,12 @@ impl WildcardSourceProjection {
     pub(crate) fn rows_sources(&self) -> &[WildcardRowsSource] {
         self.rows_sources.sources()
     }
-    pub(crate) fn typed_record_at(&self, index: usize) -> Option<&WildcardTypedRecord> {
-        self.typed_records.get(index)?.as_ref()
-    }
     pub(crate) fn source_projections(&self) -> &[Self] {
         &self.source_projections
     }
+    #[cfg(test)]
     pub(crate) fn source_ordinal_at(&self, index: usize) -> Option<(&str, usize)> {
-        self.source_ordinals
-            .get(index)?
-            .as_ref()
-            .map(|(alias, ordinal)| (alias.as_str(), *ordinal))
+        self.columns.get(index)?.source_ordinal()
     }
     pub(crate) const fn qualifiers(&self) -> &WildcardQualifiers {
         &self.qualifiers
@@ -209,11 +231,11 @@ impl WildcardSourceProjection {
     pub(crate) fn alias(&self) -> &str {
         &self.alias
     }
-    pub(crate) fn columns(&self) -> &[ResultColumn] {
-        &self.columns
-    }
-    pub(crate) fn reference_at(&self, index: usize) -> Option<&[String]> {
-        self.references.get(index)?.as_deref()
+    #[cfg(test)]
+    pub(crate) fn columns(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &ResultColumn> + DoubleEndedIterator {
+        self.columns.iter().map(|column| &column.result)
     }
 }
 

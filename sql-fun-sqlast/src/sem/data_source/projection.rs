@@ -362,7 +362,10 @@ impl<'a> ProjectionColumn<'a> {
             self.bind(context, scope)
         }
     }
-    fn projection_reference(&self, binding_qualifier: Option<&AliasName>) -> Option<Vec<String>> {
+    pub(crate) fn projection_reference(
+        &self,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Option<Vec<String>> {
         if let Some(alias) = binding_qualifier {
             Some(vec![
                 alias.as_str().to_owned(),
@@ -834,12 +837,10 @@ impl<'a> WildcardProjection<'a> {
         binding_qualifier: Option<&AliasName>,
     ) -> Result<bool, AnalysisError> {
         let first = results.len();
-        let mut references = Vec::new();
         let mut sources = ProjectionSources::default();
         for column in &self.columns {
             let expression = column.bind_projection(context, scope, binding_qualifier)?;
             results.push_expanded(column.name(), expression);
-            references.push(column.projection_reference(binding_qualifier));
             column.collect_projection_sources(&mut sources);
         }
         if self
@@ -849,13 +850,10 @@ impl<'a> WildcardProjection<'a> {
         {
             results.mark_join_sensitive_star_since(first);
         }
-        let mut expansion =
-            WildcardExpansion::new(location, results, first, self.table_dependent, &references);
+        let mut expansion = WildcardExpansion::new(location, results, first, self.table_dependent);
         expansion.retain_source_scope(self.source_scope_depth);
         expansion.retain_source_projections(&sources.resolve(context, scope)?);
-        for column in &self.columns {
-            expansion.retain_projection_origin(column);
-        }
+        expansion.retain_projection_origins(&self.columns, binding_qualifier);
         context.analysis_state_mut().record_wildcard(expansion);
         Ok(self.source_found)
     }
@@ -1097,7 +1095,10 @@ mod test_wildcard_projection_metadata {
         assert_eq!(groups.groups()[0].location(), None);
         assert!(!groups.groups()[0].is_table_dependent());
         assert_eq!(
-            groups.groups()[0].columns()[0]
+            groups.groups()[0]
+                .columns()
+                .next()
+                .unwrap()
                 .column_name()
                 .as_ref()
                 .unwrap()
@@ -1178,7 +1179,7 @@ mod test_wildcard_projection_metadata {
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 1);
         assert!(groups.groups()[0].is_table_dependent());
-        assert!(groups.groups()[0].columns().is_empty());
+        assert_eq!(groups.groups()[0].columns().len(), 0);
     }
 
     #[test]
@@ -1195,7 +1196,10 @@ mod test_wildcard_projection_metadata {
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(groups.len(), 2);
         assert_eq!(
-            groups.groups()[0].columns()[0]
+            groups.groups()[0]
+                .columns()
+                .next()
+                .unwrap()
                 .column_name()
                 .as_ref()
                 .unwrap()
@@ -1203,7 +1207,10 @@ mod test_wildcard_projection_metadata {
             "aid"
         );
         assert_eq!(
-            groups.groups()[1].columns()[0]
+            groups.groups()[1]
+                .columns()
+                .next()
+                .unwrap()
                 .column_name()
                 .as_ref()
                 .unwrap()
@@ -1294,11 +1301,11 @@ mod test_wildcard_projection_metadata {
         );
         let groups = analyzed.context().analysis_state().wildcard_expansions();
         assert_eq!(
-            groups.groups()[0].columns()[0].col_type(),
+            groups.groups()[0].columns().next().unwrap().col_type(),
             &Some(crate::sem::PgBuiltInType::int4())
         );
         assert_eq!(
-            groups.groups()[0].columns()[1].col_type(),
+            groups.groups()[0].columns().nth(1).unwrap().col_type(),
             &Some(crate::sem::PgBuiltInType::int8())
         );
         assert_eq!(

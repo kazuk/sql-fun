@@ -216,8 +216,8 @@ impl ResultColumnCollection {
             .collect()
     }
 
-    pub(crate) fn cloned_suffix(&self, first: usize) -> Vec<ResultColumn> {
-        self.0[first..].to_vec()
+    pub(crate) fn suffix(&self, first: usize) -> &[ResultColumn] {
+        &self.0[first..]
     }
 
     pub(crate) fn has_pending_stars(&self) -> bool {

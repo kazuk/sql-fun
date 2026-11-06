@@ -157,21 +157,12 @@ impl WildcardSourceProjection {
     fn rewrite_targets(&self) -> Result<Vec<Target>, WildcardRewriteError> {
         let bindings = self.qualifiers();
         let mut targets = Vec::new();
-        for (index, column) in self.columns().iter().enumerate() {
-            let expression = if let Some(record) = self.typed_record_at(index) {
-                typed_record_reference(record)
-            } else if let Some((alias, ordinal)) = self.source_ordinal_at(index) {
-                ordinal_reference(alias, ordinal)
-            } else if let Some(parts) = self.reference_at(index) {
-                Expr::projection_column(&Name::from_parts(parts))
-            } else {
-                let Some(expression) = column.expression() else {
-                    return Err(WildcardRewriteError::invalid(
-                        "duplicate-label source has no resolved expression",
-                    ));
-                };
-                expression.projection_expression(bindings)?
-            };
+        for record in &self.columns {
+            let column = &record.result;
+            let expression = record.projection_expression(
+                bindings,
+                "duplicate-label source has no resolved expression",
+            )?;
             let Some(name) = column.column_name() else {
                 return Err(WildcardRewriteError::invalid(
                     "duplicate-label source has no output name",

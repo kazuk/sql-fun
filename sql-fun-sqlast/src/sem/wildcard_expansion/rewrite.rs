@@ -11,7 +11,10 @@ use crate::{
         Expr, Name, Statement, Target,
         projection::{ProjectionReplacements, ProjectionScopes},
     },
-    sem::{WildcardExpansion, WildcardExpansionCollection},
+    sem::{
+        WildcardExpansion, WildcardExpansionCollection,
+        wildcard_expansion::{WildcardProjectionColumn, WildcardQualifiers},
+    },
 };
 
 impl WildcardExpansionCollection {
@@ -205,7 +208,7 @@ mod tests {
     fn missing_parser_location_is_rejected_without_edit() {
         use crate::sem::{ResultColumnCollection, WildcardExpansion};
         let mut owner = statement("SELECT * FROM t");
-        let group = WildcardExpansion::new(None, &ResultColumnCollection::default(), 0, true, &[]);
+        let group = WildcardExpansion::new(None, &ResultColumnCollection::default(), 0, true);
         let mut groups = WildcardExpansionCollection::default();
         groups.push(group);
         let before = owner.deparse_sql(Dialect::postgres()).unwrap();
@@ -414,21 +417,10 @@ impl WildcardExpansion {
     fn rewrite_targets(&self) -> Result<Vec<Target>, WildcardRewriteError> {
         let bindings = self.qualifiers();
         let mut targets = Vec::new();
-        for (index, column) in self.columns().iter().enumerate() {
-            let expression = if let Some(record) = self.typed_record_at(index) {
-                typed_record_reference(record)
-            } else if let Some((alias, ordinal)) = self.source_ordinal_at(index) {
-                ordinal_reference(alias, ordinal)
-            } else if let Some(parts) = self.reference_at(index) {
-                Expr::projection_column(&Name::from_parts(parts))
-            } else {
-                let Some(expression) = column.expression() else {
-                    return Err(WildcardRewriteError::invalid(
-                        "wildcard result has no resolved expression",
-                    ));
-                };
-                expression.projection_expression(bindings)?
-            };
+        for record in &self.columns {
+            let column = &record.result;
+            let expression = record
+                .projection_expression(bindings, "wildcard result has no resolved expression")?;
             let Some(alias) = column.column_name() else {
                 return Err(WildcardRewriteError::invalid(
                     "wildcard result has no output name",
@@ -437,5 +429,26 @@ impl WildcardExpansion {
             targets.push(Target::projection(&expression, alias.as_str()));
         }
         Ok(targets)
+    }
+}
+
+impl WildcardProjectionColumn {
+    fn projection_expression(
+        &self,
+        bindings: &WildcardQualifiers,
+        missing_expression: &str,
+    ) -> Result<Expr, WildcardRewriteError> {
+        if let Some(record) = self.typed_record.as_ref() {
+            Ok(typed_record_reference(record))
+        } else if let Some((alias, ordinal)) = self.source_ordinal() {
+            Ok(ordinal_reference(alias, ordinal))
+        } else if let Some(parts) = self.reference() {
+            Ok(Expr::projection_column(&Name::from_parts(parts)))
+        } else {
+            let Some(expression) = self.result.expression() else {
+                return Err(WildcardRewriteError::invalid(missing_expression));
+            };
+            expression.projection_expression(bindings)
+        }
     }
 }

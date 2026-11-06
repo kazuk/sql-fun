@@ -22,7 +22,9 @@ independently.
 SQLite explicit expression COLLATE currently reports a not-found diagnostic even
 for BINARY, NOCASE and RTRIM. This applies to projections SQLite itself could
 execute without using the collation. This is a limit of sql-fun expression
-analysis, not evidence that these names are invalid SQLite SQL.
+analysis, not evidence that these names are invalid SQLite SQL. Resolving SQLite
+expression collation names is tracked in
+[issue #1028](https://github.com/kazuk/sql-fun/issues/1028).
 
 [INSERT conflict targets](../statements/insert.md) use a separate collation
 lookup that knows SQLite's built-in names and explicitly declared custom names.

@@ -1,93 +1,24 @@
-# sql-fun-sqlast
+# `sql-fun-sqlast`
 
-Semantic analysis for PostgreSQL and SQLite used by [sql-fun](https://crates.io/crates/sql-fun).
+The SQL parsing and semantic-analysis engine used by
+[`sql-fun`](https://crates.io/crates/sql-fun). PostgreSQL is supported; SQLite
+support is under development and requires the `sqlite` feature. Parser
+acceptance and semantic analysis support differ: see the
+[SQL Analysis Reference](https://kazuk.github.io/sql-fun/sql-analysis.html).
 
-Rust applications can also use the crate directly. `parse_statements(sql, dialect)`
-returns an iterator of per-statement results in the public `sql_fun_sqlast::ast`
-namespace. It handles statement boundaries, retains unresolved names, and requires
-no schema or metadata files. PostgreSQL statement syntax errors permit iteration
-to continue when a trustworthy boundary is available. Inspect
-`ParseStatementError::is_recoverable()` to distinguish them from terminal
-boundary-discovery failures. Enable the `sqlite` feature for SQLite input.
+For SQL analysis without coupling to the engine's Rust AST and semantic model,
+prefer the server's JSON-RPC API, normally accessed through
+[`sql-fun-client`](https://crates.io/crates/sql-fun-client). Direct use of this
+crate is suitable for deep engine integration, such as custom SQL rewriters or
+extensions not exposed by the server, as well as experiments and one-off tools.
 
-The common AST provides read-only WITH/CTE inspection and checked CTE insertion
-for application read/write queries. `Statement::deparse_sql(dialect)` renders the
-complete edited tree as PostgreSQL or SQLite SQL without the original input or
-catalog lookup. Numbered parameter indices, repetitions, and gaps are preserved.
-Rendering requires the statement’s explicitly selected dialect and returns
-structured errors for invalid or unsupported syntax. See the crate API
-documentation for parsing, error handling, mutation, and rendering examples.
-The existing semantic analysis APIs remain available separately.
+The Rust API evolves as database versions, SQL syntax, and analysis features
+change. Long-lived direct consumers should expect frequent upgrades and migration
+work. Breaking releases follow SemVer, but API stabilization or a 1.0 release is
+not a project goal. Contributions upstream may reduce independent maintenance
+without freezing the engine API.
 
-The default-enabled `workaround_turso_9791` feature preserves SQLite type
-spellings that affect declared types and CAST affinity. It takes effect only with
-`sqlite`; it does not enable SQLite itself. To evaluate the upstream parser,
-disable default features and enable `sqlite`. That evaluation path uses the
-upstream parser directly and can change type semantics while
-[Turso issue #9791](https://github.com/tursodatabase/turso/issues/9791) remains
-unresolved. Cargo unifies features across dependents: every dependent must leave
-the workaround disabled for the upstream path to be selected.
-
-External SQLite parser errors may be returned verbatim, including
-implementation-oriented formatting. This applies to common parsing with
-`--no-default-features --features sqlite` and the legacy
-`SqliteDialect::parse` and `parse_schema_snapshot` APIs. Dependency error wording
-is not a stable sql-fun contract. This limitation does not exempt sql-fun-owned
-`DiagnosticMessage` or structured analysis diagnostics; see the crate API
-documentation for the diagnostic boundary.
-
-See the [installation prerequisites](../book/installation.md) for the native
-compiler and clang requirements when building from source.
-
-UPDATE analysis retains the destination and writable assignment bindings, FROM
-sources, WHERE, and RETURNING metadata. PostgreSQL UPDATE RETURNING can supply
-CTE columns; SQLite supports WITH before UPDATE, but not UPDATE inside a CTE.
-DEFAULT remains distinct from an expression, and row-subquery assignments retain
-the full query and selected output position. Inspect results with
-`SemAst::as_update()` and `UpdateStatement` accessors. SQLite RETURNING follows
-SQLite visibility rules: target aliases and FROM sources are not visible there.
-
-For PostgreSQL `WHERE CURRENT OF`, callers establish portal bindings through
-`ParseContext::bind_cursor(name, &CursorInfo::new(target, updatable))`.
-`resolve_cursor(name)` looks up a specific portal; `remove_cursor(name)` removes
-its binding. The context provider owns storage and lifecycle bookkeeping.
-The optional target is a qualified relation identity; optional update eligibility
-records only known static facts. `UpdateStatement::current_of()` retains the
-portal name and binding, including missing bindings with an UPDATE diagnostic.
-Known target mismatches and static ineligibility are diagnosed. Portal names are
-session scoped and distinct from PL/pgSQL `refcursor` variable names; callers must
-resolve procedural variables before supplying bindings. Cursor position and
-lifetime remain execution-time concerns. Session bindings survive statement
-analysis and are not part of frozen schema catalogs.
-
-Schema catalogs retain explicitly loaded view, trigger, rule and default DDL.
-`ViewWriteEvaluation::new(&mut context)` evaluates an already-bound View `FullName`
-from its actual semantic definition and effective associated Trigger/Rule
-references. `insert`, `update`, and `evaluate` expose independent operation
-results. `ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` use this
-same service, reporting failures through the active `ParseContext`.
-Frozen contexts store analysis results; writable-view analysis requires an
-active `ParseContext`.
-`ViewInsertInfoRead` and
-`ViewUpdateInfoRead` retrieve optional registered capabilities without
-performing analysis. PostgreSQL automatic views preserve nested direct-column
-lineage and assignment restrictions; INSTEAD OF triggers and INSTEAD rules have
-independent operation and RETURNING capabilities. SQLite requires matching
-INSTEAD OF triggers, including UPDATE OF column applicability, and rejects view
-UPSERT. Materialized views remain read-only. View conflict inference preserves
-actual underlying arbiter identities rather than inventing view indexes.
-
-Frozen catalogs share source facts without sharing mutable layer changes. No
-trigger function or rule action is executed. Evaluation does not interpret
-opaque procedural bodies; trigger/rule SQL rendering and broader ALTER VIEW
-processing are separate work. See [SQL analysis](../book/sql-analysis.md) for the
-supported mechanisms and conflict-inference limitations.
-
-PostgreSQL `CREATE RULE` produces `SemAst::rule()`: a named analyzed definition
-with its resolved target, event, condition, ordered actions and dependencies.
-`RuleInfoRead::rule` looks up a `RuleIdentity`; table/view `rules()` links
-resolve the effective definitions in a schema layer. Rule names are local to
-their owning relation. `OR REPLACE` updates that identity without duplicating
-its link. Analysis binds OLD/NEW to target columns and never executes actions.
-See [CREATE RULE definitions](../book/sql-analysis/statements/rules.md)
-for validation and current boundaries.
+See the [Rust API documentation](https://docs.rs/sql-fun-sqlast) for parsing,
+mutation, analysis, feature flags, limitations, and examples. The
+[installation guide](https://kazuk.github.io/sql-fun/installation.html) describes
+native build prerequisites.

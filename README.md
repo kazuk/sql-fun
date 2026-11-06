@@ -14,7 +14,7 @@ If you're writing raw SQL and want your tools to help more: this is it.
 ---
 
 ✨ For Rust developers, `sql-fun` provides the **best developer experience** by
-integrating directly with proc-macros to generate strongly typed async functions
+integrating directly with proc-macros to generate strongly typed functions
 at compile time.  
 For other ecosystems, `sql-fun` can be used as a
 **stand-alone SQL semantic validator** and linter, and may serve as a backend
@@ -26,14 +26,10 @@ for language-specific code generators (Go, Python, TypeScript, …).
 statements.
 
 - It is designed for **PostgreSQL** and **SQLite**:
-  - for PostgreSQL
-    - SQL is parsed using `pg_query`, 'official engine extracted' full
-      PostgreSQL parser.
-      - You can use the full range of PostgreSQL syntax with no limitations.
-  - for SQLite
-    - SQL is parsed using `turso_parser`.
-      - Compatible with SQLite: see
-        [`turso`](https://github.com/tursodatabase/turso).
+  - PostgreSQL SQL is parsed using `pg_query`. Parser acceptance and semantic
+    analysis support are separate; see the [SQL Analysis Reference](https://kazuk.github.io/sql-fun/sql-analysis.html).
+  - SQLite SQL is parsed using `turso_parser`. SQLite support is under
+    development; see the [parser limitations](https://kazuk.github.io/sql-fun/sql-analysis.html#sqlite-parser-limitations).
   - `sql-fun` makes SQL embedded in applications statically verifiable,
     including syntax checks and optional schema-aware analysis.
 - It provides a command-line tool for schema inspection and query analysis:
@@ -48,14 +44,15 @@ statements.
   - This keeps the tool lightweight, focused, and reliable.
 - For Rust developers, `sql-fun` integrates with proc-macros:
   - Generates strongly typed functions at **compile time**.
-  - Requires **no runtime dependencies** in your application.
-  - Compatible with `tokio-postgres`, the primary runtime `sql-fun` targets.
+  - Adds no runtime library of its own; generated functions use your database
+    driver and supporting dependencies.
+  - Targets `tokio-postgres` and, with the `sqlite` feature, `rusqlite`.
 
 SQLite support is under development and requires the `sqlite` feature.
 
 ## Installation
 
-See the [installation guide](book/installation.md) for the proc-macro, CLI, and
+See the [installation guide](https://kazuk.github.io/sql-fun/installation.html) for the proc-macro, CLI, and
 server setup. `sql-fun check` also requires `cargo-expand` on `PATH`; it is not
 installed automatically with the CLI.
 
@@ -116,4 +113,4 @@ If it's useful to you, it might be useful to others.
 You can share it in a PR, an issue, or just drop a link in a discussion thread.
 
 For setup, development workflow, and pull request guidelines, see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/kazuk/sql-fun/blob/main/CONTRIBUTING.md).

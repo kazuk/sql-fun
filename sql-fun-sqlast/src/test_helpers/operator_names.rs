@@ -1,13 +1,14 @@
 //! Parser and catalog fixtures for operator identity contracts.
 
 use crate::{
+    ast::Name,
     context::ParseContext,
     names::{OperatorName, SchemaName},
     sem::{
         AnalysisError, BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType,
         SelectStatement, UnaryOperatorDefinition,
     },
-    syn::{ListOpt, NodeListOpt},
+    syn::{ListOpt, Node, NodeListOpt},
     test_helpers::{
         SynBuilder, TestParseContext,
         ast_query::{AnalysisFixture, postgres},
@@ -15,8 +16,8 @@ use crate::{
     },
 };
 
-pub(crate) fn parsed_name(sql: &str) -> NodeListOpt {
-    SynBuilder::new()
+pub(crate) fn parsed_name(sql: &str) -> Name {
+    let nodes = SynBuilder::new()
         .parse(sql)
         .as_select_stmt()
         .get_target_list()
@@ -24,7 +25,52 @@ pub(crate) fn parsed_name(sql: &str) -> NodeListOpt {
         .as_res_target()
         .get_val()
         .as_a_expr()
-        .get_name()
+        .get_name();
+    let parts = nodes
+        .map_values(|node| node.as_string().get_sval())
+        .expect("operator names");
+    Name::from_parts(&parts)
+}
+
+/// Keep fabricated malformed parser-node cases out of semantic tests.
+pub(crate) fn malformed_names() -> Vec<Name> {
+    let builder = SynBuilder::new();
+    [
+        builder.empty_node_list(),
+        builder.as_node_list(&[Node::none()]),
+        builder.string_node_list(&[""]),
+        builder.as_node_list(&[
+            builder.as_string_node(builder.string("a")),
+            Node::none(),
+            builder.as_string_node(builder.string("+")),
+        ]),
+    ]
+    .into_iter()
+    .map(|nodes| {
+        let nodes = NodeListOpt::from(&nodes);
+        let components = nodes.as_inner().unwrap_or_default();
+        let malformed_node = components
+            .iter()
+            .any(|node| node.as_string().get_sval().is_none());
+        let converted = Name::try_from(nodes);
+        if malformed_node {
+            assert!(
+                converted.is_err(),
+                "non-string parser node must be rejected"
+            );
+        } else {
+            assert!(
+                converted.is_ok(),
+                "string components must reach name validation"
+            );
+        }
+        let parts = components
+            .into_iter()
+            .map(|node| node.as_string().get_sval().unwrap_or_default())
+            .collect::<Vec<_>>();
+        Name::from_parts(&parts)
+    })
+    .collect()
 }
 
 pub(crate) fn addition_context(schema: Option<&str>) -> TestParseContext {

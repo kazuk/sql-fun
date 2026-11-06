@@ -343,8 +343,11 @@ impl SchemaProject {
             Path::new("roles.sql"),
             &::sql_fun_sqlast::StringSpan::new(0, sql.len()),
         ));
-        let syntax = ::sql_fun_sqlast::PostgresDialect::parse(sql).unwrap();
-        let tokens = ::sql_fun_sqlast::PostgresDialect::scan(sql).unwrap();
-        SemAst::semantic_analysis(context, syntax, &tokens).unwrap()
+        let syntax =
+            ::sql_fun_sqlast::parse_statements(sql, ::sql_fun_sqlast::ast::Dialect::postgres())
+                .next()
+                .expect("statement")
+                .unwrap();
+        SemAst::from_ast(&syntax, context, &mut ::sql_fun_sqlast::CacheContext::new()).unwrap()
     }
 }

@@ -11,15 +11,12 @@ pub use self::{
 };
 pub(crate) use self::{cursor::DeletePredicate, destination::DeleteDestination};
 use crate::{
-    CacheContext,
-    ast::{Delete, Dialect, StatementNode, TryFromWithTokens},
     names::{ColumnName, TableName},
     sem::{
-        AccessKind, AnalysisError, ColumnDefinition, FromClause, ParseContext, QueryCte,
-        ResultColumnCollection, SemAst, SemScalarExpr,
+        AccessKind, AnalysisError, ColumnDefinition, FromClause, QueryCte, ResultColumnCollection,
+        SemScalarExpr,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::DeleteStmt,
 };
 
 /// An analyzed DELETE, including its destination, sources and RETURNING outputs.
@@ -174,25 +171,6 @@ impl DeleteStatement {
         visitor.dml_returning(&self.returning)?;
         Ok(())
     }
-}
-
-/// Analyze PostgreSQL DELETE through the common AST and ParseContext.
-///
-/// # Errors
-/// Returns an error when syntax conversion or semantic analysis fails.
-pub fn analyze_delete_statement<T: ParseContext>(
-    mut context: T,
-    _parent_schema: &Option<String>,
-    syn: DeleteStmt,
-) -> Result<(SemAst, T), AnalysisError> {
-    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-    let syntax = Delete::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = SemAst::from_ast_node(
-        &StatementNode::Delete(syntax),
-        &mut context,
-        &mut CacheContext::new(),
-    )?;
-    Ok((statement, context))
 }
 
 impl DeleteStatement {

@@ -1,12 +1,10 @@
 use crate::{
     CacheContext,
-    ast::{Schema, TryFromWithTokens},
+    ast::Schema,
     sem::{AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst},
-    syn::{CreateSchemaStmt, ScanToken},
 };
-use sql_fun_core::IVec;
 
-/// analyzed [`crate::syn::CreateSchemaStmt`]
+/// Analyzed CREATE SCHEMA statement.
 #[derive(Debug, Clone)]
 pub struct CreateSchema {
     if_not_exists: bool,
@@ -47,22 +45,6 @@ impl CreateSchema {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    /// analyze [`crate::syn::CreateSchemaStmt`]
-    pub fn analyze_create_schema<TParseContext>(
-        context: TParseContext,
-        syn: CreateSchemaStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply(
-            &Schema::try_from_with_tokens(&syn, tokens)?,
-            context,
-            &mut CacheContext::new(),
-        )
     }
 }
 

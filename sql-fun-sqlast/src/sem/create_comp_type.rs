@@ -1,14 +1,12 @@
 mod ddl;
 
 use crate::{
-    ast::{CompositeType, postgres::required},
     context::ParseContext,
     names::{ColumnName, FullName, TableName},
     sem::{
-        AnalysisError, AstAndContextPair, CatalogNameLookup, ColumnCollection, ColumnDefinition,
-        DeclarationCollation, Nullable, OwnerSpecification, TypeReference, WithTypmod,
+        AnalysisError, CatalogNameLookup, ColumnCollection, ColumnDefinition, DeclarationCollation,
+        Nullable, OwnerSpecification, TypeReference, WithTypmod,
     },
-    syn::{ColumnDef, CompositeTypeStmt, ListOpt, Opt},
 };
 use std::convert::Infallible;
 
@@ -57,7 +55,7 @@ impl CompositeFieldCollection {
     }
 }
 
-/// analyzed [`crate::syn::CompositeTypeStmt`]
+/// Analyzed CREATE TYPE AS statement.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateCompositeType {
     #[serde(skip)]
@@ -135,23 +133,6 @@ impl CreateCompositeType {
             fields: fields.clone(),
         }
     }
-
-    /// analyze [`crate::syn::CompositeTypeStmt`]
-    #[tracing::instrument(skip(context, _parent_schema, syn))]
-    pub fn analyze_create_comp_type<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: CompositeTypeStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        use crate::ast::TryFromWithTokens;
-        Self::from_ast_and_apply(
-            &CompositeType::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?,
-            context,
-        )
-    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -218,27 +199,6 @@ impl CompositeFieldDefinition {
     }
 }
 
-impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
-    type Error = AnalysisError;
-
-    fn try_from(value: &ColumnDef) -> Result<Self, Self::Error> {
-        let name = value.get_colname();
-        let Some(t) = value.get_type_name().as_inner() else {
-            AnalysisError::raise_unexpected_none("columndef.type_name")?
-        };
-        let full_name = FullName::try_from(t)?;
-        let type_ref = TypeReference::concrete_type_ref(&full_name, false);
-
-        Ok(Self {
-            name,
-            field_type: Some(type_ref),
-            declaration_collation: DeclarationCollation::default(),
-            requested_type: None,
-            is_not_null: Some(value.get_is_not_null()),
-        })
-    }
-}
-
 // Ownership changes do not change SQL type identity or the existing serialized type format.
 impl PartialEq for CreateCompositeType {
     fn eq(&self, other: &Self) -> bool {
@@ -250,26 +210,6 @@ impl std::hash::Hash for CreateCompositeType {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         std::hash::Hash::hash(&self.type_ref, state);
         std::hash::Hash::hash(&self.fields, state);
-    }
-}
-
-impl TryFrom<&CompositeTypeStmt> for CreateCompositeType {
-    type Error = AnalysisError;
-
-    fn try_from(value: &CompositeTypeStmt) -> Result<Self, Self::Error> {
-        let typevar = required(
-            value.get_typevar().as_inner(),
-            "composite_type_stmt.typevar",
-        )?;
-        let fields = required(
-            value.get_coldeflist().map(|fields| fields.as_column_def()),
-            "composite_type_stmt.coldeflist",
-        )?;
-        let mut composite_fields = CompositeFieldCollection::default();
-        for field in fields {
-            composite_fields.push(CompositeFieldDefinition::try_from(&field)?);
-        }
-        Ok(Self::new(&FullName::try_from(typevar)?, &composite_fields))
     }
 }
 

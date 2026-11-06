@@ -5,7 +5,10 @@
 //! entry point from parser output into this crate's SQLite syntax and semantic
 //! analysis layers.
 
-use crate::{SqlFileSnapshot, ast::Dialect as AstDialect};
+use crate::{
+    CacheContext, SqlFileSnapshot,
+    ast::{Dialect as AstDialect, Statement, StatementNode},
+};
 
 use crate::{
     AstAndContextPair, ParseDumpFileError, ParsedSchemaDump, StringSpan,
@@ -345,9 +348,11 @@ impl SqliteDialect {
             context.set_statement_span(statement_span);
             context.set_diagnostic_source(statement_text);
             let syn = statement.cmd;
-            let tokens = Self::scan(statement_text)?;
+            let _tokens = Self::scan(statement_text)?;
+            let node = StatementNode::from_schema_statement(&syn.into_statement())?;
+            let statement = Statement::from_node(node, AstDialect::sqlite(), statement_span);
             let AstAndContextPair(sem, rcontext) =
-                SemAst::semantic_analysis_sqlite(context, syn, &tokens)?;
+                SemAst::from_ast(&statement, context, &mut CacheContext::new())?;
             sem_results.push(sem);
             context = rcontext;
         }

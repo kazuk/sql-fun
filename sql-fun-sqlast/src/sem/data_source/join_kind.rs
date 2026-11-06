@@ -1,8 +1,4 @@
-use crate::{
-    ast::JoinKind as AstJoinKind,
-    sem::{AnalysisError, Nullable},
-    syn::{JoinType, JoinTypeOpt, Opt},
-};
+use crate::{ast::JoinKind as AstJoinKind, sem::Nullable};
 
 /// table join kind
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -27,31 +23,6 @@ pub enum JoinKind {
     UniqueInner,
     /// unique outer join  (may be not use in SQL syntax)
     UniqueOuter,
-}
-
-impl TryFrom<JoinTypeOpt> for JoinKind {
-    type Error = AnalysisError;
-
-    fn try_from(value: JoinTypeOpt) -> Result<Self, Self::Error> {
-        let Some(join_ty) = value.as_inner() else {
-            AnalysisError::raise_unexpected_none("join_type")?
-        };
-        match join_ty {
-            JoinType::JoinInner => Ok(Self::Inner),
-            JoinType::JoinLeft => Ok(Self::Left),
-            JoinType::JoinFull => Ok(Self::Full),
-            JoinType::JoinRight => Ok(Self::Right),
-            JoinType::JoinSemi => Ok(Self::Semi),
-            JoinType::JoinRightSemi => Ok(Self::RightSemi),
-            JoinType::JoinAnti => Ok(Self::Anti),
-            JoinType::JoinRightAnti => Ok(Self::RightAnti),
-            JoinType::JoinUniqueOuter => Ok(Self::UniqueOuter),
-            JoinType::JoinUniqueInner => Ok(Self::UniqueInner),
-            JoinType::Undefined | JoinType::OptionNone => {
-                AnalysisError::raise_unexpected_none("join_type")?
-            }
-        }
-    }
 }
 
 impl JoinKind {

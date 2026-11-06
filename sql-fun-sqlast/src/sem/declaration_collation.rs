@@ -249,14 +249,22 @@ mod tests {
 
     #[test]
     fn public_composite_analysis_entry_point_validates_fields() -> testresult::TestResult {
-        use crate::{sem::CreateCompositeType, syn::Opt, test_helpers::SynBuilder};
-        let syntax = SynBuilder::new()
-            .parse(r#"CREATE TYPE public.rejected AS (value integer COLLATE "C")"#);
-        let pair = CreateCompositeType::analyze_create_comp_type(
-            context(Some(false)),
-            &None,
-            syntax.as_composite_type_stmt().as_inner().unwrap(),
-        )?;
+        use crate::{
+            ast::{Dialect, StatementNode},
+            parse_statements,
+            sem::CreateCompositeType,
+        };
+        let syntax = parse_statements(
+            r#"CREATE TYPE public.rejected AS (value integer COLLATE "C")"#,
+            Dialect::postgres(),
+        )
+        .next()
+        .unwrap()?
+        .into_test_node();
+        let StatementNode::CompositeType(syntax) = syntax else {
+            panic!("composite syntax")
+        };
+        let pair = CreateCompositeType::from_ast_and_apply(&syntax, context(Some(false)))?;
         assert!(
             pair.context()
                 .get_type_impl(&FullName::with_schema("public", "rejected"))

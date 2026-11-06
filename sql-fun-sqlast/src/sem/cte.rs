@@ -1,6 +1,6 @@
 mod ast;
 use crate::{
-    ast::{Dialect, TryFromWithTokens, With},
+    ast::Dialect,
     context::ParseContext,
     names::{ColumnName, CteName, FullName},
     sem::{
@@ -9,12 +9,9 @@ use crate::{
         create_table::ColumnDefinition,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::{ScanToken, WithClauseOpt},
 };
 
 use std::collections::HashMap;
-
-use ::sql_fun_core::IVec;
 
 /// CTE query item types
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -160,7 +157,7 @@ impl CteStatement {
     }
 }
 
-/// analyzed [`crate::syn::WithClauseOpt`]
+/// Analyzed WITH clause.
 #[derive(Debug, Clone, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WithClause(HashMap<CteName, CteStatement>);
 
@@ -217,20 +214,6 @@ impl WithClause {
     /// insert named CTE item
     pub fn insert(&mut self, name: &CteName, statement: CteStatement) {
         self.0.insert(name.clone(), statement);
-    }
-
-    /// analyze [`crate::syn::WithClauseOpt`]
-    pub fn analyze<TParseContext>(
-        mut context: TParseContext,
-        syn: WithClauseOpt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = With::try_from_with_tokens(syn, tokens)?;
-        let result = Self::from_ast_top_level(&syntax, &mut context);
-        Ok((result?, context))
     }
 }
 

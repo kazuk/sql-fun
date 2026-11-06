@@ -5,7 +5,6 @@ use crate::{
         data_source::TableFunctionOutput,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::FuncCall,
 };
 
 use ::sql_fun_core::IVec;
@@ -16,17 +15,6 @@ pub struct UndefinedTableFuncDataSource {
     args: IVec<SemScalarExpr>,
     alias: AliasSpec,
     output: TableFunctionOutput,
-}
-
-impl super::DataSource {
-    /// create datasource for undefined table function
-    pub(crate) fn undefined_table_function(
-        call: &FuncCall,
-        arg_exprs: IVec<SemScalarExpr>,
-        alias_name: &AliasSpec,
-    ) -> Result<Self, AnalysisError> {
-        UndefinedTableFuncDataSource::new_data_source(call, arg_exprs, alias_name)
-    }
 }
 
 impl UndefinedTableFuncDataSource {
@@ -41,21 +29,6 @@ impl UndefinedTableFuncDataSource {
 
     pub const fn alias(&self) -> &AliasSpec {
         &self.alias
-    }
-
-    pub(super) fn new_data_source(
-        func_call: &FuncCall,
-        args: IVec<SemScalarExpr>,
-        alias: &AliasSpec,
-    ) -> Result<DataSource, AnalysisError> {
-        let func_name = FullName::try_from(func_call.get_funcname())?;
-
-        Ok(DataSource::UndefinedTableFunc(Self {
-            func_name,
-            args,
-            alias: alias.clone(),
-            output: TableFunctionOutput::default(),
-        }))
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {

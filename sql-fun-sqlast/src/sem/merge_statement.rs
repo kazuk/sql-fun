@@ -5,17 +5,14 @@ mod view_support;
 pub(crate) use self::destination::MergeDestination;
 pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
 use crate::{
-    CacheContext,
-    ast::{Dialect, Merge, StatementNode},
+    ast::Dialect,
     names::{ColumnName, TableName},
     sem::{
         AccessKind, AnalysisError, ColumnDefinition, FromClause, InsertClauseSemantics,
-        InsertTarget, InsertValue, ParseContext, QueryCte, ResultColumnCollection, SemAst,
-        SemScalarExpr, UpdateAssignment, UpdateAssignmentCollection,
-        ViewMergeSupport as SemViewMergeSupport,
+        InsertTarget, InsertValue, ParseContext, QueryCte, ResultColumnCollection, SemScalarExpr,
+        UpdateAssignment, UpdateAssignmentCollection, ViewMergeSupport as SemViewMergeSupport,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::MergeStmt,
 };
 
 /// The rows for which a MERGE action is eligible.
@@ -459,26 +456,6 @@ impl MergeStatement {
         visitor.dml_returning(&self.returning)?;
         self.clauses.visit(visitor)
     }
-}
-
-/// Analyze PostgreSQL MERGE through the common AST and ParseContext.
-///
-/// # Errors
-/// Returns an error when syntax conversion or semantic analysis fails.
-pub fn analyze_merge_statement<T: ParseContext>(
-    mut context: T,
-    _parent_schema: &Option<String>,
-    syn: MergeStmt,
-) -> Result<(SemAst, T), AnalysisError> {
-    use crate::ast::TryFromWithTokens;
-    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-    let syntax = Merge::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = SemAst::from_ast_node(
-        &StatementNode::Merge(syntax),
-        &mut context,
-        &mut CacheContext::new(),
-    )?;
-    Ok((statement, context))
 }
 
 impl MergeStatement {

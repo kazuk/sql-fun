@@ -337,3 +337,70 @@ impl FullName {
         }
     }
 }
+
+impl std::str::FromStr for FullName {
+    type Err = AnalysisError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse_components(s).ok_or_else(|| AnalysisError::type_name_format(&s))
+    }
+}
+
+#[cfg(test)]
+mod canonical_parse_tests {
+    use crate::names::FullName;
+
+    #[test]
+    fn canonical_spelling_is_injective_and_reversible() -> testresult::TestResult {
+        // Enumerate valid qualification shapes over adversarial component values.
+        // This is one invariant check over the entire generated name set.
+        let values = ["", "a", "A", "a.b", "a\"b", "a:b", "a[]", "é", "select"];
+        let mut spellings = std::collections::HashMap::new();
+        let mut check = |name: FullName| -> testresult::TestResult {
+            let spelling = name.to_string();
+            assert_eq!(spelling.parse::<FullName>()?, name);
+            assert!(spellings.insert(spelling, name).is_none());
+            Ok(())
+        };
+        for name in values {
+            check(FullName::from_local_name(name))?;
+            for schema in values {
+                check(FullName::with_schema(schema, name))?;
+                for catalog in values {
+                    check(FullName::with_catalog(catalog, schema, name))?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::local("Mixed", FullName::from_local_name("Mixed"))]
+    #[case::quoted_dot(r#""a.b".c"#, FullName::with_schema("a.b", "c"))]
+    #[case::local_dot(r#"a."b.c""#, FullName::with_schema("a", "b.c"))]
+    #[case::three(
+        r#""my.db"."a.b"."c.d""#,
+        FullName::with_catalog("my.db", "a.b", "c.d")
+    )]
+    #[case::quoted_empty(r#""".x"#, FullName::with_schema("", "x"))]
+    fn canonical_parser_preserves_components(
+        #[case] input: &str,
+        #[case] expected: FullName,
+    ) -> testresult::TestResult {
+        assert_eq!(input.parse::<FullName>()?, expected);
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::empty("")]
+    #[case::missing_local("a.")]
+    #[case::missing_schema(".a")]
+    #[case::catalog_only("a..b")]
+    #[case::too_many("a.b.c.d")]
+    #[case::unclosed(r#""a"#)]
+    #[case::trailing(r#""a"b"#)]
+    #[case::unquoted_space("a b")]
+    fn malformed_names_are_rejected(#[case] input: &str) {
+        assert!(input.parse::<FullName>().is_err());
+    }
+}

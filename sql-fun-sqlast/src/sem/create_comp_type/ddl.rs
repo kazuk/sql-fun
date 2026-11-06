@@ -74,13 +74,12 @@ impl CompositeFieldDefinition {
 #[cfg(test)]
 mod test_composite_field_resolution {
     use crate::{
-        ast::{TryFromWithTokens, ddl::CompositeType},
+        ast::{Dialect, StatementNode},
         names::{FullName, TableName},
+        parse_statements,
         sem::{CompositeFieldDefinition, PgBuiltInType, TypeReference},
-        syn::Opt,
-        test_helpers::{SynBuilder, TestParseContext},
+        test_helpers::TestParseContext,
     };
-    use ::sql_fun_core::IVec;
 
     #[rstest::rstest]
     #[case::array("integer[]", true)]
@@ -88,14 +87,15 @@ mod test_composite_field_resolution {
     #[case::bound("integer[3]", true)]
     #[case::scalar("integer", false)]
     fn retains_declared_array_identity(#[case] declaration: &str, #[case] is_array: bool) {
-        let syntax = SynBuilder::new().parse(&format!(
-            "CREATE TYPE public.array_value AS (items {declaration})"
-        ));
-        let composite = CompositeType::try_from_with_tokens(
-            &syntax.as_composite_type_stmt().as_inner().unwrap(),
-            &IVec::default(),
-        )
-        .unwrap();
+        let sql = format!("CREATE TYPE public.array_value AS (items {declaration})");
+        let syntax = parse_statements(&sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node();
+        let StatementNode::CompositeType(composite) = syntax else {
+            panic!("composite syntax")
+        };
         let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
         let field = CompositeFieldDefinition::from_ast(

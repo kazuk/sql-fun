@@ -28,6 +28,7 @@ impl RelationAlteration {
         Self::from_ast_and_apply_with_source(ast, context, source.as_ref())
     }
 
+    #[cfg(test)]
     pub(crate) fn from_ast_and_apply_at<TContext: ParseContext>(
         ast: &AstAlterRelation,
         context: TContext,
@@ -70,13 +71,9 @@ impl RelationAlteration {
 mod test_analyze_alter_table_statement {
     use crate::{
         AstAndContextPair,
-        names::FullName,
-        sem::{AlterTable, SemAst, SourcePathWithSpan},
-        syn::{AliasOpt, NodeInner, ObjectType},
-        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
+        sem::{RelationAlteration, SemAst, SourcePathWithSpan},
+        test_helpers::{TestParseContext, alter_syntax, source_span, test_context},
     };
-
-    use sql_fun_core::IVec;
 
     use testresult::TestResult;
 
@@ -87,26 +84,9 @@ mod test_analyze_alter_table_statement {
     ) -> TestResult {
         test_context.setup_table("table1", &[], &source_span);
 
-        let builder = SynBuilder::new();
-        let relation = builder.range_var(
-            &FullName::with_schema("public", "table1"),
-            &AliasOpt::none(),
-        );
-        let cmd = builder.alter_table_cmd_set_column_default(
-            "col1",
-            NodeInner::AConst(builder.const_int4(10)).into(),
-        );
-        let cmds = builder.as_node_list(&[NodeInner::AlterTableCmd(cmd).into()]);
-        let alter_table_stmt =
-            builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable);
-        let tokens = IVec::default();
-        let AstAndContextPair(res, ctx) = AlterTable::analyze_alter_table_statement(
-            test_context,
-            &None,
-            alter_table_stmt,
-            &tokens,
-            &source_span,
-        )?;
+        let syntax = alter_syntax::default_statement()?;
+        let AstAndContextPair(res, ctx) =
+            RelationAlteration::from_ast_and_apply_at(&syntax, test_context, &source_span)?;
         let SemAst::AlterTable(at) = res else {
             panic!("unexpected type {res:?}")
         };
@@ -308,7 +288,7 @@ mod test_analyze_sqlite_alter_table_reports_missing_relation {
     use crate::{
         AstAndContextPair,
         ast::Dialect,
-        sem::{AlterTable, SemAst, SourcePathWithSpan},
+        sem::{RelationAlteration, SemAst, SourcePathWithSpan},
         test_helpers::{
             TestParseContext,
             alter_table::{parse_sqlite_alter_table, sqlite_context},
@@ -319,11 +299,11 @@ mod test_analyze_sqlite_alter_table_reports_missing_relation {
     #[cfg(feature = "sqlite")]
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_missing_relation(source_span: SourcePathWithSpan) {
-        let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
+        let alter_table = parse_sqlite_alter_table("alter table users rename to members");
         let context = TestParseContext::default().with_dialect(Dialect::sqlite());
 
         let AstAndContextPair(res, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+            RelationAlteration::from_ast_and_apply_at(&alter_table, context, &source_span)
                 .expect("sqlite alter table should analyze");
         let SemAst::AlterTable(at) = res else {
             panic!("unexpected type {res:?}")
@@ -335,13 +315,13 @@ mod test_analyze_sqlite_alter_table_reports_missing_relation {
     #[cfg(feature = "sqlite")]
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_existing_relation(source_span: SourcePathWithSpan) {
-        let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
+        let alter_table = parse_sqlite_alter_table("alter table users rename to members");
         let mut context = sqlite_context();
         context.setup_table("users", &[], &source_span);
         context.setup_table("members", &[], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+            RelationAlteration::from_ast_and_apply_at(&alter_table, context, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
@@ -432,7 +412,7 @@ mod test_analyze_sqlite_alter_table_reports_missing_column {
     #[cfg(feature = "sqlite")]
     use crate::{
         AstAndContextPair,
-        sem::{AlterTable, SourcePathWithSpan},
+        sem::{RelationAlteration, SourcePathWithSpan},
         test_helpers::{
             alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
             source_span,
@@ -442,13 +422,13 @@ mod test_analyze_sqlite_alter_table_reports_missing_column {
     #[cfg(feature = "sqlite")]
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_missing_column(source_span: SourcePathWithSpan) {
-        let (alter_table, tokens) =
+        let alter_table =
             parse_sqlite_alter_table("alter table users rename column missing to renamed");
         let mut context = sqlite_context();
         context.setup_table("users", &[make_column("name")], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+            RelationAlteration::from_ast_and_apply_at(&alter_table, context, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
@@ -458,8 +438,7 @@ mod test_analyze_sqlite_alter_table_reports_missing_column {
     fn test_analyze_sqlite_alter_table_reports_rename_target_column_exists(
         source_span: SourcePathWithSpan,
     ) {
-        let (alter_table, tokens) =
-            parse_sqlite_alter_table("alter table users rename column name to email");
+        let alter_table = parse_sqlite_alter_table("alter table users rename column name to email");
         let mut context = sqlite_context();
         context.setup_table(
             "users",
@@ -468,7 +447,7 @@ mod test_analyze_sqlite_alter_table_reports_missing_column {
         );
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+            RelationAlteration::from_ast_and_apply_at(&alter_table, context, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }

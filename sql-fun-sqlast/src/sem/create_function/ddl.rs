@@ -122,27 +122,27 @@ impl CreateFunction {
 #[cfg(test)]
 mod test_honors_the_explicit_null_input_choice {
     use crate::{
-        ast::{TryFromWithTokens, ddl::Function},
+        ast::{Dialect, StatementNode},
+        parse_statements,
         sem::CreateFunction,
-        syn::Opt,
-        test_helpers::{SynBuilder, TestParseContext},
+        test_helpers::TestParseContext,
     };
-
-    use ::sql_fun_core::IVec;
 
     #[rstest::rstest]
     #[case::called_on_null("CALLED ON NULL INPUT", false)]
     #[case::returns_null("RETURNS NULL ON NULL INPUT", true)]
     #[case::strict("STRICT", true)]
     fn honors_the_explicit_null_input_choice(#[case] option: &str, #[case] expected: bool) {
-        let syntax = SynBuilder::new().parse(&format!(
-            "CREATE FUNCTION f() RETURNS integer LANGUAGE sql {option} AS 'SELECT 1'"
-        ));
-        let function = Function::try_from_with_tokens(
-            &syntax.as_create_function_stmt().as_inner().unwrap(),
-            &IVec::default(),
-        )
-        .unwrap();
+        let sql =
+            format!("CREATE FUNCTION f() RETURNS integer LANGUAGE sql {option} AS 'SELECT 1'");
+        let syntax = parse_statements(&sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node();
+        let StatementNode::Function(function) = syntax else {
+            panic!("CREATE FUNCTION syntax")
+        };
         let mut context = TestParseContext::default();
         let resolved = CreateFunction::from_ast(&function, &mut context).unwrap();
         assert_eq!(

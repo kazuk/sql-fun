@@ -28,21 +28,10 @@ pub use self::{
     primary_key_constraint::PrimaryKeyColumnConstraint,
     unique_constraint::UniqueColumnConstraint,
 };
-#[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::ColumnConstraint as SqliteColumnConstraint};
-#[cfg(any(test, feature = "sqlite"))]
-use crate::{ast::ColumnConstraint as AstColumnConstraint, sem::ParseContext};
-#[cfg(test)]
-use crate::{
-    ast::TryFromWithTokens,
-    syn::{Constraint as SynConstraint, ScanToken},
-};
 use crate::{
     names::{ColumnName, TableName},
     sem::{AnalysisError, ColumnRename, traversal::SemanticVisitorMut},
 };
-#[cfg(any(test, feature = "sqlite"))]
-use ::sql_fun_core::IVec;
 
 /// common behavior for column constraints
 pub trait ColumnConstraintTrait {
@@ -551,48 +540,5 @@ mod test_column_constraint_trait_for_column_constraint {
         assert_eq!("column_one", column_constraint.column_name().as_str());
         assert!(column_constraint.as_collate().is_some());
         Ok(())
-    }
-}
-
-#[cfg(test)]
-impl ColumnConstraint {
-    pub(crate) fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &SynConstraint,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_report(
-            &AstColumnConstraint::try_from_with_tokens(syn, tokens)?,
-            context,
-            table_name,
-            column_name,
-        )
-    }
-}
-
-impl ColumnConstraint {
-    /// analyze [`crate::syn::sqlite::ColumnConstraint`]
-    #[cfg(feature = "sqlite")]
-    pub fn analyze_sqlite_column_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &SqliteColumnConstraint,
-        _tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_report(
-            &AstColumnConstraint::try_from(syn)?,
-            context,
-            table_name,
-            column_name,
-        )
     }
 }

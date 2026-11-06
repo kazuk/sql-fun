@@ -1,26 +1,18 @@
 use crate::SqliteDialect;
 #[cfg(feature = "sqlite")]
-use crate::SqliteToken;
-#[cfg(feature = "sqlite")]
-use crate::ast::Dialect;
+use crate::ast::{AlterRelation, Dialect};
 use crate::names::{ColumnName, FullName, SchemaName};
 use crate::sem::{ColumnDefinition, TypeReference};
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::AlterTable as SqliteAlterTable;
 use crate::test_helpers::TestParseContext;
-use ::sql_fun_core::IVec;
 
 #[cfg(feature = "sqlite")]
-pub(crate) fn parse_sqlite_alter_table<'a>(
-    sql: &'a str,
-) -> (SqliteAlterTable, IVec<SqliteToken<'a>>) {
+pub(crate) fn parse_sqlite_alter_table(sql: &str) -> AlterRelation {
     let cmd = SqliteDialect::parse(sql)
         .expect("sqlite parse should succeed")
         .expect("statement should exist");
-    let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
     let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
     let alter_table = stmt.into_alter_table().expect("ALTER TABLE statement");
-    (alter_table, tokens)
+    AlterRelation::try_from(&alter_table).expect("common ALTER TABLE syntax")
 }
 
 #[cfg(feature = "sqlite")]

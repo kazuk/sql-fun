@@ -453,7 +453,9 @@ use crate::test_helpers::alter_index as test_helpers;
 #[case::zero("ALTER INDEX idx ALTER COLUMN 0 SET STATISTICS 100")]
 #[case::ordinal_limit("ALTER INDEX idx ALTER COLUMN 32768 SET STATISTICS 100")]
 fn parser_rejects_column_numbers_outside_the_postgresql_syntax_range(#[case] sql: &str) {
-    assert!(crate::PostgresDialect::parse(sql).is_err());
+    assert!(crate::test_helpers::ast_query::postgres_syntax_rejected(
+        sql
+    ));
 }
 
 #[test]

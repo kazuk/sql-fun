@@ -47,11 +47,11 @@ pub use self::{
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
 use crate::{
-    ast::Dialect,
-    context::{FrozenBaseContext, ParseContext, SchemaFileContext},
+    ast::{Dialect, Statement, StatementNode, TryFromWithTokens},
+    context::{FrozenBaseContext, GetSourcePathWithSpanOpt, ParseContext, SchemaFileContext},
     parse_statements::split_postgres_statements,
     sem::{AnalysisError, SemAst},
-    syn::{ParseResult, ScanToken},
+    syn::{ListOpt, ParseResult, ScanToken},
 };
 
 use sql_fun_core::IVec;
@@ -233,8 +233,19 @@ impl PostgresDialect {
             context.set_diagnostic_source(statement);
             let syn = Self::parse(statement)?;
             let tokens = Self::scan(statement)?;
+            let Some(_) = context.get_source_path_with_span() else {
+                AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
+                AnalysisError::never();
+            };
+            let node =
+                StatementNode::try_from_with_tokens(&syn.get_stmts().get(0).get_stmt(), &tokens)?;
+            let statement = Statement::from_node(
+                node,
+                Dialect::postgres(),
+                StringSpan::new(0, statement.len()),
+            );
             let AstAndContextPair(sem, rcontext) =
-                SemAst::semantic_analysis(context, syn, &tokens)?;
+                SemAst::from_ast(&statement, context, &mut CacheContext::new())?;
             sem_results.push(sem);
             context = rcontext;
         }

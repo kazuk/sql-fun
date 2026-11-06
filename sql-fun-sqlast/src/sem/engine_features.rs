@@ -370,21 +370,25 @@ impl EngineFeatureValidation {
 #[cfg(all(test, feature = "sqlite"))]
 mod sqlite_feature_tests {
     use crate::{
-        ast::{Dialect, Table, TryFromWithTokens},
+        ast::{Dialect, StatementNode},
+        parse_statements,
         sem::EngineFeatureValidation,
-        syn::Opt,
-        test_helpers::{SynBuilder, TestParseContext},
+        test_helpers::TestParseContext,
     };
 
     #[test]
     fn virtual_column_has_no_postgres_version_requirement() {
-        let parser = SynBuilder::new();
-        let raw = parser.parse("CREATE TABLE t (id int, v int GENERATED ALWAYS AS (1) VIRTUAL)");
-        let table = Table::try_from_with_tokens(
-            &raw.as_create_stmt().as_inner().unwrap(),
-            &::sql_fun_core::IVec::default(),
+        let syntax = parse_statements(
+            "CREATE TABLE t (id int, v int GENERATED ALWAYS AS (1) VIRTUAL)",
+            Dialect::postgres(),
         )
-        .unwrap();
+        .next()
+        .unwrap()
+        .unwrap()
+        .into_test_node();
+        let StatementNode::Table(table) = syntax else {
+            panic!("CREATE TABLE syntax")
+        };
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         assert!(EngineFeatureValidation::table(&table, &mut context).unwrap());
         assert_eq!(context.reported_problem_count(), 0);

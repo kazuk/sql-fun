@@ -1,14 +1,9 @@
-use crate::{
-    sem::{
-        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
-        parameter_resolution::ParameterResolution,
-        scalar_expr::indirect::IndirectionExpr,
-        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
-    },
-    syn::{AIndices, Node, Opt, ScanToken},
+use crate::sem::{
+    AnalysisError, ParseContext, SemScalarExpr, TypeReference,
+    parameter_resolution::ParameterResolution,
+    scalar_expr::indirect::IndirectionExpr,
+    traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
 };
-
-use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArraySlice {
@@ -85,43 +80,6 @@ impl ArraySlice {
         Ok(IndirectionExpr::ArraySlice(Box::new(Self::new(
             array, lower, upper,
         ))))
-    }
-
-    fn analyze_index<TParseContext>(
-        context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        index: Node,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Option<SemScalarExpr>, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(index) = index.as_inner() else {
-            return Ok((None, context));
-        };
-        let (lexpr, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, scalar_context, index, tokens)?;
-        Ok((Some(lexpr), new_context))
-    }
-
-    pub fn analyze_slice<TParseContext>(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        arg: SemScalarExpr,
-        indices: AIndices,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let (lexpr, new_context) =
-            Self::analyze_index(context, scalar_context, indices.get_lidx(), tokens)?;
-        context = new_context;
-        let (rexpr, new_context) =
-            Self::analyze_index(context, scalar_context, indices.get_uidx(), tokens)?;
-        context = new_context;
-        let arg = Self::array_slice(arg, lexpr, rexpr, &mut context)?;
-        Ok((arg, context))
     }
 }
 

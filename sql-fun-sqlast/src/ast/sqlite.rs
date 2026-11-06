@@ -57,6 +57,25 @@ impl TryFrom<&syn::Stmt> for StatementNode {
     }
 }
 
+impl StatementNode {
+    /// Preserve the schema loader's existing unsupported-statement boundaries.
+    pub(crate) fn from_schema_statement(value: &syn::Stmt) -> Result<Self, AnalysisError> {
+        match value {
+            supported @ (syn::Stmt::AlterTable(_)
+            | syn::Stmt::CreateTable(_)
+            | syn::Stmt::DropTable(_)
+            | syn::Stmt::CreateTrigger(_)
+            | syn::Stmt::DropTrigger(_)
+            | syn::Stmt::CreateView(_)
+            | syn::Stmt::Select(_)
+            | syn::Stmt::Update(_)
+            | syn::Stmt::Delete(_)
+            | syn::Stmt::Insert(_)) => Self::try_from(supported),
+            _ => todo!(),
+        }
+    }
+}
+
 impl From<&syn::DropTableStatement> for DropTable {
     fn from(value: &syn::DropTableStatement) -> Self {
         Self::new(

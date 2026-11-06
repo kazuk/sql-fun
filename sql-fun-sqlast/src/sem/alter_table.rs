@@ -1,22 +1,14 @@
 mod ddl;
 
-#[cfg(feature = "sqlite")]
 use crate::{
-    SqliteToken,
-    syn::sqlite::{AlterTable as SqliteAlterTable, AlterTableBody},
-};
-use crate::{
-    ast::{AlterCommand, AlterRelation, TryFromWithTokens},
     context::GetSourcePathWithSpan,
     names::{ColumnName, TableName, ViewName},
     sem::{
-        AlterColumnAttributes, AnalysisError, AnalysisProblem, AstAndContextPair, ColumnDefinition,
-        ColumnRename, Constraint, ConstraintNames, CreateTable, CreateView, OwnerSpecification,
-        ParseContext, RelationAlteration, SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
+        AlterColumnAttributes, AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename,
+        Constraint, ConstraintNames, CreateTable, CreateView, OwnerSpecification, ParseContext,
+        SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
     },
-    syn::{AlterTableCmd, AlterTableStmt, AlterTableType, ScanToken},
 };
-use sql_fun_core::IVec;
 
 /// analyzed alter table statement
 #[derive(Debug, Clone, derive_getters::Getters)]
@@ -162,61 +154,6 @@ impl AlterTable {
             resolved_target: None,
         }
     }
-    /// analyze [`crate::syn::AlterTableStmt`]
-    pub fn analyze_alter_table_statement<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: AlterTableStmt,
-        tokens: &IVec<ScanToken>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        RelationAlteration::from_ast_and_apply_at(
-            &AlterRelation::try_from_with_tokens(&syn, tokens)?,
-            context,
-            source_span,
-        )
-    }
-
-    /// analyze [`crate::syn::AlterTableStmt`]
-    #[tracing::instrument(skip(context, _parent_schema, syn))]
-    pub fn analyze_alter_statement<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: AlterTableStmt,
-        tokens: &IVec<ScanToken>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        RelationAlteration::from_ast_and_apply_at(
-            &AlterRelation::try_from_with_tokens(&syn, tokens)?,
-            context,
-            source_span,
-        )
-    }
-
-    /// analyze [`crate::syn::sqlite::AlterTable`]
-    #[cfg(feature = "sqlite")]
-    #[tracing::instrument(skip(context, syn))]
-    pub fn analyze_alter_table<TParseContext>(
-        context: TParseContext,
-        syn: SqliteAlterTable,
-        tokens: &IVec<SqliteToken<'_>>,
-        source_span: &SourcePathWithSpan,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        RelationAlteration::from_ast_and_apply_at(
-            &AlterRelation::try_from(&syn)?,
-            context,
-            source_span,
-        )
-    }
 }
 
 /// analyzed alter view statement
@@ -232,23 +169,6 @@ impl AlterView {
             view: view.clone(),
             commands: commands.to_vec(),
         }
-    }
-    /// analyze [`crate::syn::AlterTableStmt`]
-    #[tracing::instrument(skip(context, _parent_schema, syn))]
-    pub fn analyze_alter_view_statement<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        as_matview: bool,
-        syn: AlterTableStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        RelationAlteration::from_ast_and_apply(
-            &AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
-                .with_view_kind(as_matview),
-            context,
-        )
     }
 }
 
@@ -367,72 +287,6 @@ impl AlterObjSubCommand {
     }
     pub(crate) fn drop_column(column: &ColumnName) -> Self {
         Self::DropColumn(column.clone())
-    }
-}
-
-#[cfg(test)]
-pub fn analyze_alter_obj_change_owner<TParseContext>(
-    _context: &TParseContext,
-    cmd: AlterTableCmd,
-) -> Result<AlterObjSubCommand, AnalysisError> {
-    let Some(new_owner) = cmd.get_newowner().get_rolename() else {
-        AnalysisError::raise_unexpected_none("alter_table_cmd.newwoner")?
-    };
-    Ok(AlterObjSubCommand::resolved_owner(
-        &OwnerSpecification::named(&new_owner),
-    ))
-}
-
-impl AlterObjSubCommand {
-    #[cfg(test)]
-    fn analyze_alter_obj_column_default<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        cmd: AlterTableCmd,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_report(
-            &AlterCommand::try_from_with_tokens(&cmd, tokens)?,
-            context,
-            table_name,
-        )
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl AlterObjSubCommand {
-    pub fn analyze_alter_table_body<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        body: &AlterTableBody,
-        _tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_report(&AlterCommand::try_from(body)?, context, table_name)
-    }
-}
-
-impl AlterObjSubCommand {
-    pub fn analyze_alter_table_cmd<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        cmd: AlterTableCmd,
-        _subtyp: AlterTableType,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_report(
-            &AlterCommand::try_from_with_tokens(&cmd, tokens)?,
-            context,
-            table_name,
-        )
     }
 }
 

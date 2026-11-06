@@ -4,19 +4,13 @@ mod settings;
 
 pub use self::settings::IndexStorageValue;
 
-#[cfg(test)]
-use crate::syn::IndexElem;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::SortOrder as SqliteSortOrder;
 use crate::{
-    ast::{Index as AstIndex, TryFromWithTokens},
     names::{ColumnName, FullName, TableName},
     sem::{
-        AnalysisError, AstAndContextPair, ColumnRename, ParseContext, SemScalarExpr,
+        AnalysisError, ColumnRename, SemScalarExpr,
         problem::IndexProblemKind,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
     },
-    syn::{IndexStmt, ScanToken},
 };
 
 use sql_fun_core::IVec;
@@ -28,19 +22,6 @@ pub enum SortOrder {
     Asc,
     /// dessending
     Desc,
-}
-
-#[cfg(feature = "sqlite")]
-impl From<SqliteSortOrder> for SortOrder {
-    fn from(value: SqliteSortOrder) -> Self {
-        #[cfg(feature = "sqlite")]
-        use crate::syn::sqlite::SortOrder;
-
-        match value {
-            SortOrder::Asc => Self::Asc,
-            SortOrder::Desc => Self::Desc,
-        }
-    }
 }
 
 /// `IndexElement` has column or expression
@@ -187,7 +168,7 @@ impl IndexElementCollection {
     }
 }
 
-/// analyzed [`crate::syn::IndexStmt`]
+/// Analyzed CREATE INDEX statement.
 #[derive(Debug, Clone)]
 pub struct CreateIndex {
     if_not_exists: bool,
@@ -423,39 +404,5 @@ impl CreateIndex {
     #[must_use]
     pub const fn name(&self) -> &FullName {
         &self.name
-    }
-}
-
-#[cfg(test)]
-impl CreateIndex {
-    fn analyze_index_elem<TContext: ParseContext>(
-        mut context: TContext,
-        keys: Vec<IndexElem>,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(IndexElementCollection, TContext), AnalysisError> {
-        use crate::ast::IndexExpression;
-        let keys = keys
-            .iter()
-            .map(|key| IndexExpression::try_from_with_tokens(key, tokens))
-            .collect::<Result<Vec<_>, _>>()?;
-        context.begin_parameter_type_analysis();
-        let result = Self::elements_from_ast(&keys, &mut context);
-        let elements = context.finish_analysis(result)?;
-        Ok((elements, context))
-    }
-}
-
-impl CreateIndex {
-    /// analyze [`crate::syn::IndexStmt`]
-    pub fn analyze_index_stmt<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: IndexStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_apply(&AstIndex::try_from_with_tokens(&syn, tokens)?, context)
     }
 }

@@ -3,7 +3,7 @@ mod conflict_info;
 
 use crate::{
     AstAndContextPair, StringSpan,
-    ast::{CreateTableMode, Dialect, ObjectKind},
+    ast::{CreateTableMode, Dialect, ObjectKind, QueryBody},
     context::{
         BaseParseContext, ConflictMasters, CursorBindings, DiagnosticContext, FrozenBaseContext,
         FunctionInfoRead, FunctionInfoWrite, GetSourcePathWithSpanOpt, IndexInfoRead,
@@ -19,14 +19,15 @@ use crate::{
         CatalogNameLookup, ColumnDefinition, Comment, CreateCompositeType, CreateDomain,
         CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateRule, CreateSchema,
         CreateSequence, CreateTable, CreateTableAs, CreateTrigger, CreateView, CursorInfo,
-        DropTable, FromClause, FunctionOverloadCollection, InsertArbiter, InsertInferenceModifiers,
-        Kind, OperatorDefinition, OverloadVariant, OwnedObjectDefinition, ParameterConstraints,
-        Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan, TriggerIdentity,
-        TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport, ViewInsertSupport, ViewLike,
-        ViewMergeSupport, ViewUpdateSupport, WithClause, ownership::model_definitions,
-        problem::TriggerProblem, search_path::expand_search_path_inst,
+        DataSource, DropTable, FromClause, FunctionOverloadCollection, InsertArbiter,
+        InsertInferenceModifiers, Kind, OperatorDefinition, OverloadVariant, OwnedObjectDefinition,
+        ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan,
+        TriggerIdentity, TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport,
+        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport, WithClause,
+        ownership::model_definitions, problem::TriggerProblem,
+        search_path::expand_search_path_inst,
     },
-    test_helpers::{SynBuilder, source_span},
+    test_helpers::{ast_query, source_span},
 };
 use std::collections::{HashMap, HashSet};
 
@@ -837,13 +838,12 @@ impl TestParseContext {
     pub fn scalar_scope_from_sql(from_sql: &str) -> Result<(FromClause, Self), AnalysisError> {
         let mut context = Self::default();
         context.set_source_path_with_span(&source_span());
-        let syn = SynBuilder::new().parse(&format!("select 1 from {from_sql}"));
-        FromClause::analyze(
-            context,
-            &WithClause::default(),
-            syn.as_select_stmt().get_from_clause(),
-            &sql_fun_core::IVec::default(),
-        )
+        let syntax = ast_query::postgres(&format!("select 1 from {from_sql}"))?;
+        let QueryBody::Select(select) = syntax.body() else {
+            unreachable!("SELECT fixture")
+        };
+        let from = DataSource::from_ast_list(select.from(), &mut context, &WithClause::default())?;
+        Ok((from, context))
     }
 }
 

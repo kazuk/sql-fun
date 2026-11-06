@@ -1,8 +1,5 @@
 mod ddl;
-#[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::ColumnDefinition as SqliteColumnDefinition};
 use crate::{
-    ast::{Column, TryFromWithTokens},
     names::{ColumnName, FullName as NamesFullName, TableName},
     sem::{
         AnalysisError, CatalogNameLookup, ColumnConstraint, ColumnNullabilityConstraint,
@@ -10,9 +7,7 @@ use crate::{
         ParseContext, SemScalarExpr, TypeReference, WithTypmod,
         traversal::{ColumnRenamer, SemanticVisitorMut},
     },
-    syn::{ColumnDef, ScanToken},
 };
-use sql_fun_core::IVec;
 
 /// column definitions
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -369,36 +364,5 @@ impl ColumnDefinition {
 
     pub(crate) fn insert_inline_check(&mut self, index: usize, check: &ColumnConstraint) {
         self.constraints.insert(index, check.clone());
-    }
-
-    /// analyze [`crate::syn::ColumnDef`]
-    pub fn analyze_column_def<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_def: &ColumnDef,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_report(
-            &Column::try_from_with_tokens(column_def, tokens)?,
-            context,
-            table_name,
-        )
-    }
-
-    /// analyze [`crate::syn::sqlite::ColumnDefinition`]
-    #[cfg(feature = "sqlite")]
-    pub fn analyze_column_definition<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        syn: &SqliteColumnDefinition,
-        _tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_and_report(&Column::try_from(syn)?, context, table_name)
     }
 }

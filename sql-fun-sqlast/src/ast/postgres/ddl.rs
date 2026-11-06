@@ -61,7 +61,7 @@ impl TryFromWithTokens<&syn::RenameStmt> for AlterRelation {
             };
         Ok(Self {
             only: kind.supports_only() && only,
-            name: Name::from(&relation),
+            name: Name::try_from(&relation)?,
             kind,
             commands: vec![command],
             if_exists: value.get_missing_ok(),

@@ -12,6 +12,7 @@ use crate::{
 };
 
 impl ColumnDefinition {
+    #[cfg(test)]
     pub(crate) fn from_ast_and_report<TContext: ParseContext>(
         ast: &AstColumn,
         mut context: TContext,
@@ -22,7 +23,145 @@ impl ColumnDefinition {
         let column = context.finish_analysis(result)?;
         Ok((column, context))
     }
+}
 
+#[cfg(all(test, feature = "sqlite"))]
+#[cfg(test)]
+mod test_analyze_sqlite_column_definition_collects_constraints {
+    use crate::test_helpers::column_definition::create_table_statement;
+
+    use crate::{
+        ast::Table,
+        names::{FullName, TableName},
+        sem::{
+            SemScalarExpr,
+            create_table::column_def::{ColumnConstraint, ColumnDefinition},
+        },
+        test_helpers::column_definition::setup_context,
+    };
+
+    use assert_matches::assert_matches;
+
+    #[rstest::rstest]
+    fn analyze_sqlite_column_definition_collects_constraints(create_table_statement: Table) {
+        let table_name = TableName::from(
+            FullName::from_ast_name(create_table_statement.name())
+                .expect("table name should convert into semantic table name"),
+        );
+        let mut context = setup_context();
+
+        let (id_col, new_context) = ColumnDefinition::from_ast_and_report(
+            &create_table_statement.columns()[0],
+            context,
+            &table_name,
+        )
+        .expect("id column should analyze");
+        context = new_context;
+        assert_eq!(id_col.constraints().len(), 3);
+        assert_matches!(id_col.constraints()[0], ColumnConstraint::PrimaryKey(_));
+        assert_matches!(id_col.constraints()[1], ColumnConstraint::Nullability(_));
+        assert_matches!(id_col.constraints()[2], ColumnConstraint::Unique(_));
+        assert_eq!(id_col.is_not_null(), Some(true));
+
+        let (name_col, new_context) = ColumnDefinition::from_ast_and_report(
+            &create_table_statement.columns()[1],
+            context,
+            &table_name,
+        )
+        .expect("name column should analyze");
+        context = new_context;
+        assert_eq!(name_col.constraints().len(), 2);
+        let Some(default) = &name_col.constraints()[0].as_default() else {
+            panic!("expected string default constraint");
+        };
+        let Some(const_value) = default.expr().as_const() else {
+            panic!("expect const string")
+        };
+        let Some(value) = const_value.as_string() else {
+            panic!("expect const string")
+        };
+        assert_eq!(value, "guest");
+
+        let Some(collate) = &name_col.constraints()[1].as_collate() else {
+            panic!("expected collate constraint")
+        };
+        assert_eq!(collate.collation_name(), "nocase");
+
+        let (active_col, new_context) = ColumnDefinition::from_ast_and_report(
+            &create_table_statement.columns()[2],
+            context,
+            &table_name,
+        )
+        .expect("active column should analyze");
+        context = new_context;
+        assert_eq!(active_col.constraints().len(), 1);
+
+        let Some(check_constraint) = &active_col.constraints()[0].as_check() else {
+            panic!("expected check constraint")
+        };
+        assert_matches!(check_constraint.expr(), SemScalarExpr::Boolean(_));
+
+        let (created_at_col, context) = ColumnDefinition::from_ast_and_report(
+            &create_table_statement.columns()[3],
+            context,
+            &table_name,
+        )
+        .expect("created_at column should analyze");
+        assert_eq!(created_at_col.constraints().len(), 1);
+        let Some(default) = &created_at_col.constraints()[0].as_default() else {
+            panic!("default constraint")
+        };
+        let Some(sql_value) = default.expr().as_sql_value() else {
+            panic!("expected SqlValue")
+        };
+        let Ok(time_prec) = sql_value.as_current_timestamp() else {
+            panic!("expected current_timestamp")
+        };
+        assert!(time_prec.is_none());
+
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
+#[cfg(all(test, feature = "sqlite"))]
+#[cfg(test)]
+mod test_analyze_sqlite_column_definition_reports_unknown_collation {
+    use crate::test_helpers::column_definition::parse_create_table;
+
+    use crate::{
+        names::{FullName, TableName},
+        sem::{ColumnConstraint, ColumnDefinition},
+        test_helpers::column_definition::setup_context,
+    };
+
+    #[test]
+    fn analyze_sqlite_column_definition_reports_unknown_collation() {
+        let sql = "create table users (name text collate custom)";
+        let create_table = parse_create_table(sql);
+        let table_name = TableName::from(
+            FullName::from_ast_name(create_table.name())
+                .expect("table name should convert into semantic table name"),
+        );
+
+        let (column_def, context) = ColumnDefinition::from_ast_and_report(
+            &create_table.columns()[0],
+            setup_context(),
+            &table_name,
+        )
+        .expect("column definition should analyze");
+
+        assert_eq!(column_def.constraints().len(), 1);
+        match &column_def.constraints()[0] {
+            ColumnConstraint::Collate(collate) => {
+                assert_eq!(collate.collation_name(), "custom")
+            }
+            _ => panic!("expected collate constraint"),
+        }
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+}
+
+impl ColumnDefinition {
     pub(crate) fn from_ast_standalone(
         ast: &AstColumn,
         context: &mut impl ParseContext,
@@ -161,118 +300,6 @@ impl ColumnDefinition {
             column.push_constraint(constraint);
         }
         Ok(())
-    }
-}
-
-#[cfg(all(test, feature = "sqlite"))]
-#[cfg(test)]
-mod test_analyze_sqlite_column_definition_collects_constraints {
-    use crate::test_helpers::column_definition::create_table_statement;
-
-    use crate::{
-        SqliteToken,
-        names::TableName,
-        sem::{
-            SemScalarExpr,
-            create_table::column_def::{ColumnConstraint, ColumnDefinition},
-        },
-        test_helpers::column_definition::setup_context,
-    };
-
-    #[cfg(feature = "sqlite")]
-    use crate::syn::sqlite::CreateTableStatement;
-
-    use assert_matches::assert_matches;
-
-    use sql_fun_core::IVec;
-
-    #[rstest::rstest]
-    fn analyze_sqlite_column_definition_collects_constraints<'a>(
-        create_table_statement: (CreateTableStatement, IVec<SqliteToken<'a>>),
-    ) {
-        let (create_table, tokens) = create_table_statement;
-        let Some(body) = create_table.body().as_columns_and_constraint() else {
-            panic!("expected column-based create table body");
-        };
-
-        let table_name = TableName::try_from(create_table.table_name())
-            .expect("table name should convert into semantic table name");
-        let mut context = setup_context();
-
-        let (id_col, new_context) = ColumnDefinition::analyze_column_definition(
-            context,
-            &table_name,
-            &body.columns()[0],
-            &tokens,
-        )
-        .expect("id column should analyze");
-        context = new_context;
-        assert_eq!(id_col.constraints().len(), 3);
-        assert_matches!(id_col.constraints()[0], ColumnConstraint::PrimaryKey(_));
-        assert_matches!(id_col.constraints()[1], ColumnConstraint::Nullability(_));
-        assert_matches!(id_col.constraints()[2], ColumnConstraint::Unique(_));
-        assert_eq!(id_col.is_not_null(), Some(true));
-
-        let (name_col, new_context) = ColumnDefinition::analyze_column_definition(
-            context,
-            &table_name,
-            &body.columns()[1],
-            &tokens,
-        )
-        .expect("name column should analyze");
-        context = new_context;
-        assert_eq!(name_col.constraints().len(), 2);
-        let Some(default) = &name_col.constraints()[0].as_default() else {
-            panic!("expected string default constraint");
-        };
-        let Some(const_value) = default.expr().as_const() else {
-            panic!("expect const string")
-        };
-        let Some(value) = const_value.as_string() else {
-            panic!("expect const string")
-        };
-        assert_eq!(value, "guest");
-
-        let Some(collate) = &name_col.constraints()[1].as_collate() else {
-            panic!("expected collate constraint")
-        };
-        assert_eq!(collate.collation_name(), "nocase");
-
-        let (active_col, new_context) = ColumnDefinition::analyze_column_definition(
-            context,
-            &table_name,
-            &body.columns()[2],
-            &tokens,
-        )
-        .expect("active column should analyze");
-        context = new_context;
-        assert_eq!(active_col.constraints().len(), 1);
-
-        let Some(check_constraint) = &active_col.constraints()[0].as_check() else {
-            panic!("expected check constraint")
-        };
-        assert_matches!(check_constraint.expr(), SemScalarExpr::Boolean(_));
-
-        let (created_at_col, context) = ColumnDefinition::analyze_column_definition(
-            context,
-            &table_name,
-            &body.columns()[3],
-            &tokens,
-        )
-        .expect("created_at column should analyze");
-        assert_eq!(created_at_col.constraints().len(), 1);
-        let Some(default) = &created_at_col.constraints()[0].as_default() else {
-            panic!("default constraint")
-        };
-        let Some(sql_value) = default.expr().as_sql_value() else {
-            panic!("expected SqlValue")
-        };
-        let Ok(time_prec) = sql_value.as_current_timestamp() else {
-            panic!("expected current_timestamp")
-        };
-        assert!(time_prec.is_none());
-
-        assert_eq!(context.reported_problem_count(), 0);
     }
 }
 

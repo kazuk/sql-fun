@@ -1,5 +1,4 @@
 use crate::{
-    ast::{FromItem, TryCollectFromWithTokens},
     context::ParseContext,
     names::{AliasName, ColumnName, FullName},
     sem::{
@@ -10,10 +9,7 @@ use crate::{
         },
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::{NodeListOpt, ScanToken},
 };
-
-use ::sql_fun_core::IVec;
 
 /// semantic representation for `FROM` clause
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -357,21 +353,6 @@ impl FromClause {
     /// add data source
     pub fn push(&mut self, source: DataSource) {
         self.0.push(source);
-    }
-
-    /// analyze from-cluse [`crate::syn::NodeListOpt`]
-    pub fn analyze<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        syn: NodeListOpt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = FromItem::try_collect_from_with_tokens(syn, tokens)?;
-        let result = DataSource::from_ast_list(&syntax, &mut context, with_clause);
-        Ok((result?, context))
     }
 
     /// Resolve a unique visible alias. Missing or ambiguous aliases return `None`.

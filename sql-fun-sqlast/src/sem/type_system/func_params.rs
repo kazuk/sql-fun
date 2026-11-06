@@ -1,4 +1,3 @@
-mod analyze;
 mod bind_result;
 mod in_out_param;
 mod in_param;
@@ -24,7 +23,6 @@ use crate::{
             TypeError,
         },
     },
-    syn::{FunctionParameter, ScanToken},
 };
 use ::sql_fun_core::IVec;
 
@@ -50,15 +48,6 @@ where
     fn param_type(&self) -> Option<&TypeReference>;
     fn default_expr(&self) -> Option<&SemScalarExpr>;
     fn is_input_param(&self) -> bool;
-
-    fn from_syn<TParseContext>(
-        context: TParseContext,
-        param: FunctionParameter,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(FunctionParam, TParseContext), AnalysisError>
-    where
-        Self: Sized,
-        TParseContext: ParseContext;
 
     fn bind_arg(
         &self,
@@ -218,24 +207,6 @@ impl FunctionParam {
             Self::Table(p) => p.append_returning_column(column_collection),
             _ => {}
         }
-    }
-
-    /// analyze output parameter as column collection
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AnalysisError`] if any parameter fails to parse.
-    pub fn collect_output_params_as_columns(
-        params: &Vec<FunctionParameter>,
-    ) -> Result<Option<ColumnCollection>, AnalysisError> {
-        let mut columns = Vec::new();
-        for param in params {
-            if Self::is_output_param(param)? {
-                let value = Self::analyze_as_column_definition(param)?;
-                columns.push(value);
-            }
-        }
-        Ok(Some(ColumnCollection::new(columns)))
     }
 
     /// bind argument to function parameter
@@ -451,6 +422,7 @@ mod test_variadic_any_castability {
 // Analysis owned by the semantic definitions in this module.
 
 impl FunctionParam {
+    #[cfg(test)]
     pub(crate) fn from_ast_and_report<TContext: ParseContext>(
         ast: &AstFunctionParameter,
         mut context: TContext,
@@ -460,7 +432,81 @@ impl FunctionParam {
         let parameter = context.finish_analysis(result)?;
         Ok((parameter, context))
     }
+}
 
+#[cfg(test)]
+mod test_function_parameter_modes {
+    use testresult::TestResult;
+
+    use crate::{
+        ast::ddl::ParameterMode,
+        names::{FullName, LocalName, SchemaName},
+        sem::{FunctionParam, TypeDefinition},
+        test_helpers::{TestParseContext, function_syntax::parameter, test_context},
+    };
+
+    #[rstest::rstest]
+    #[case(ParameterMode::In)]
+    #[case(ParameterMode::Out)]
+    #[case(ParameterMode::InOut)]
+    #[case(ParameterMode::Variadic)]
+    #[case(ParameterMode::Table)]
+    fn test_analyze(mut test_context: TestParseContext, #[case] mode: ParameterMode) -> TestResult {
+        test_context.set_get_search_path_result(&[
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let int4_name = FullName::new(
+            &None,
+            &Some(SchemaName::from("pg_catalog")),
+            &LocalName::from("int4"),
+        );
+        let int4_type = TypeDefinition::builtin(&int4_name, None);
+        test_context.set_get_type_impl_result(&int4_name, &int4_type);
+        let func_param = parameter("param", mode);
+        FunctionParam::from_ast_and_report(&func_param, test_context)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_function_param_analyze_as_column_definition {
+    use testresult::TestResult;
+
+    use crate::{
+        ast::ddl::ParameterMode,
+        names::ColumnName,
+        names::{FullName, LocalName, SchemaName},
+        sem::{ColumnCollection, FunctionParam, TypeDefinition},
+        test_helpers::{TestParseContext, function_syntax::parameter, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_analyze_as_column_definition(mut test_context: TestParseContext) -> TestResult {
+        test_context.set_get_search_path_result(&[
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let int4_name = FullName::new(
+            &None,
+            &Some(SchemaName::from("pg_catalog")),
+            &LocalName::from("int4"),
+        );
+        let int4_type = TypeDefinition::builtin(&int4_name, None);
+        test_context.set_get_type_impl_result(&int4_name, &int4_type);
+        let func_param = parameter("param", ParameterMode::Out);
+        let (func_param, _) = FunctionParam::from_ast_and_report(&func_param, test_context)?;
+        let mut columns = ColumnCollection::new(Vec::new());
+        func_param.append_returning_column(&mut columns);
+        let _column_def = columns
+            .get_column_def(&ColumnName::from("param"))
+            .expect("output column");
+        assert!(matches!(func_param, FunctionParam::Out(_)));
+        Ok(())
+    }
+}
+
+impl FunctionParam {
     pub(crate) fn from_ast(
         ast: &AstFunctionParameter,
         context: &mut impl ParseContext,
@@ -483,51 +529,6 @@ impl FunctionParam {
             &param_type,
             &default,
         ))
-    }
-}
-
-#[cfg(test)]
-mod test_function_parameter_modes {
-    use sql_fun_core::IVec;
-
-    use testresult::TestResult;
-
-    use crate::{
-        names::{FullName, LocalName, SchemaName},
-        sem::{FunctionParam, TypeDefinition},
-        syn::FunctionParameterMode,
-        test_helpers::{SynBuilder, TestParseContext, test_context},
-    };
-
-    #[rstest::rstest]
-    #[case(FunctionParameterMode::FuncParamIn)]
-    #[case(FunctionParameterMode::FuncParamOut)]
-    #[case(FunctionParameterMode::FuncParamInout)]
-    #[case(FunctionParameterMode::FuncParamVariadic)]
-    #[case(FunctionParameterMode::FuncParamTable)]
-    fn test_analyze(
-        mut test_context: TestParseContext,
-        #[case] mode: FunctionParameterMode,
-    ) -> TestResult {
-        test_context.set_get_search_path_result(&[
-            SchemaName::from("public"),
-            SchemaName::from("pg_catalog"),
-        ]);
-        let int4_name = FullName::new(
-            &None,
-            &Some(SchemaName::from("pg_catalog")),
-            &LocalName::from("int4"),
-        );
-        let int4_type = TypeDefinition::builtin(&int4_name, None);
-        test_context.set_get_type_impl_result(&int4_name, &int4_type);
-        let builder = SynBuilder::new();
-        let arg_type = builder.type_name(&["int4"]);
-
-        let func_param = builder.function_parameter("param", arg_type.into(), mode);
-        let tokens = IVec::default();
-
-        FunctionParam::analyze(test_context, func_param, &tokens)?;
-        Ok(())
     }
 }
 

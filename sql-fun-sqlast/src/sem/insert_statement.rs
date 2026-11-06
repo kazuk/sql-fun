@@ -9,17 +9,15 @@ pub use self::{
 };
 pub(crate) use self::{ast::InsertTargetBinding, destination::InsertDestination};
 use crate::{
-    CacheContext,
-    ast::{ConflictClause, Dialect, Insert, StatementNode, TryFromWithTokens},
+    ast::{ConflictClause, Dialect},
     names::{ColumnName, TableName},
     sem::{
         AccessKind, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnDefinition,
-        ParseContext, QueryCte, ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr,
+        ParseContext, QueryCte, ResultColumnCollection, SelectStatement, SemScalarExpr,
         TypeReference,
         problem::InsertProblemKind,
         traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
     },
-    syn::InsertStmt,
 };
 
 mod arbiter;
@@ -708,25 +706,6 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
         }
         Ok(())
     }
-}
-
-/// Analyze a PostgreSQL INSERT through the common AST and ParseContext.
-pub fn analyze_insert_statement<TParseContext>(
-    mut context: TParseContext,
-    _parent_schema: &Option<String>,
-    syn: InsertStmt,
-) -> Result<(SemAst, TParseContext), AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-    let syntax = Insert::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = SemAst::from_ast_node(
-        &StatementNode::Insert(syntax),
-        &mut context,
-        &mut CacheContext::new(),
-    )?;
-    Ok((statement, context))
 }
 
 impl InsertStatement {

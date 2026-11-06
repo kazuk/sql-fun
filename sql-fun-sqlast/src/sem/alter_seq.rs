@@ -1,14 +1,13 @@
 use crate::{
-    ast::{AlterRelation, AlterSequence as AstAlterSequence, TryFromWithTokens},
+    ast::AlterSequence as AstAlterSequence,
     names::{FullName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, AstAndContextPair, CreateSequence, ParseContext,
-        RelationAlteration, SemAst, alter_table::AlterObjSubCommand,
+        AnalysisError, AnalysisProblem, AstAndContextPair, CreateSequence, ParseContext, SemAst,
+        alter_table::AlterObjSubCommand,
     },
-    syn::{AlterSeqStmt, AlterTableStmt, Opt},
 };
 
-/// analyzed [`crate::syn::AlterSeqStmt`]
+/// Analyzed ALTER SEQUENCE statement.
 #[derive(Debug, Clone, derive_getters::Getters)]
 pub struct AlterSequence {
     seq_name: FullName,
@@ -31,47 +30,6 @@ impl AlterSequence {
             commands: commands.to_vec(),
             owned_by: None,
         }
-    }
-
-    /// analyze [`crate::syn::AlterSeqStmt`]
-    pub fn analyze_alter_seq<TParseContext>(
-        mut context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: AlterSeqStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(seq) = syn.get_sequence().as_inner() else {
-            AnalysisError::raise_unexpected_none("AlterSeqStmt.sequence")?
-        };
-        let seq = FullName::try_from(seq)?;
-
-        let alter_seq = Self {
-            seq_name: seq,
-            commands: Default::default(),
-            owned_by: None,
-        };
-        context = context.apply_alter_sequence(&alter_seq)?;
-        Ok(AstAndContextPair::new(
-            SemAst::AlterSequence(alter_seq),
-            context,
-        ))
-    }
-
-    /// analyze [`crate::syn::AlterTableStmt`]
-    pub fn analyze_alter_seq_statement<TParseContext>(
-        context: TParseContext,
-        _parent_schema: &Option<String>,
-        syn: AlterTableStmt,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        RelationAlteration::from_ast_and_apply(
-            &AlterRelation::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?,
-            context,
-        )
     }
 }
 

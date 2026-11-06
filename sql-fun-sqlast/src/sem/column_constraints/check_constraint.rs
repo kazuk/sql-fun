@@ -1,20 +1,14 @@
-#[cfg(feature = "sqlite")]
+#[cfg(test)]
+use crate::sem::{EngineFeatureValidation, ParseContext, ScalarAnalysisContext};
+
 use crate::{
-    SqliteToken,
-    ast::{ColumnConstraint as AstColumnConstraint, Expr},
-    syn::sqlite::CheckColumnConstraint as SqliteCheckColumnConstraint,
-};
-use crate::{
-    ast::{Column as AstColumn, TableConstraint, TryFromWithTokens},
+    ast::{Column as AstColumn, TableConstraint},
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, CheckConstraint, ColumnConstraint, ColumnConstraintKind,
-        ColumnConstraintTrait, ColumnRename, EngineFeatureValidation, ParseContext,
-        ScalarAnalysisContext, SemScalarExpr, traversal::SemanticVisitorMut,
+        ColumnConstraintTrait, ColumnRename, SemScalarExpr, traversal::SemanticVisitorMut,
     },
-    syn::{Constraint, ScanToken},
 };
-use sql_fun_core::IVec;
 
 /// column value constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
@@ -129,49 +123,6 @@ impl ColumnConstraintTrait for CheckColumnConstraint {
     }
 }
 
-impl CheckColumnConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        Self::from_ast_legacy_inline(
-            &TableConstraint::try_from_with_tokens(syn, tokens)?,
-            context,
-            table_name,
-            column_name,
-        )
-    }
-
-    /// analyze [`crate::syn::sqlite::CheckColumnConstraint`]
-    #[cfg(feature = "sqlite")]
-    pub fn analyze_constraint_sqlite<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &SqliteCheckColumnConstraint,
-        _tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let syntax = AstColumnConstraint::check(&Expr::try_from(syn.expr())?);
-        let (check, context) = Self::from_ast_legacy_inline(
-            &TableConstraint::unnamed_check(&syntax),
-            context,
-            table_name,
-            column_name,
-        )?;
-        Ok((ColumnConstraint::check(check), context))
-    }
-}
-
 impl ColumnConstraint {
     /// create Check variant
     pub const fn check(value: CheckColumnConstraint) -> Self {
@@ -191,6 +142,7 @@ impl ColumnConstraint {
 // Analysis owned by the semantic definitions in this module.
 
 impl CheckColumnConstraint {
+    #[cfg(test)]
     pub(crate) fn from_ast_legacy_inline<TContext: ParseContext>(
         ast: &TableConstraint,
         mut context: TContext,

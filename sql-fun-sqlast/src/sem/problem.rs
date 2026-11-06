@@ -18,7 +18,6 @@ use crate::{
         SemScalarExpr as SemSemScalarExpr, TriggerIdentity, TypeDefinition,
         TypeReference as SemTypeReference, type_system::ArgumentBindingCollection,
     },
-    syn::{AExprKind, TypeName},
 };
 use ::sql_fun_core::analysis_problem as diagnostic;
 
@@ -111,35 +110,6 @@ impl From<&ArgumentBindingCollection> for diagnostic::ArgumentBindingCollection 
         )
     }
 }
-impl From<&AExprKind> for diagnostic::AExprKind {
-    fn from(value: &AExprKind) -> Self {
-        use crate::syn::AExprKind as Kind;
-        let description = match value {
-            Kind::AexprOp => "operator",
-            Kind::AexprOpAny => "ANY comparison",
-            Kind::AexprOpAll => "ALL comparison",
-            Kind::AexprDistinct => "IS DISTINCT FROM",
-            Kind::AexprNotDistinct => "IS NOT DISTINCT FROM",
-            Kind::AexprNullif => "NULLIF",
-            Kind::AexprIn => "IN",
-            Kind::AexprLike => "LIKE",
-            Kind::AexprIlike => "ILIKE",
-            Kind::AexprSimilar => "SIMILAR TO",
-            Kind::AexprBetween => "BETWEEN",
-            Kind::AexprNotBetween => "NOT BETWEEN",
-            Kind::AexprBetweenSym => "BETWEEN SYMMETRIC",
-            Kind::AexprNotBetweenSym => "NOT BETWEEN SYMMETRIC",
-            Kind::Undefined => "unrecognized operator expression",
-            Kind::OptionNone => "unspecified operator expression",
-        };
-        Self::new(description)
-    }
-}
-impl From<AExprKind> for diagnostic::AExprKind {
-    fn from(value: AExprKind) -> Self {
-        Self::from(&value)
-    }
-}
 impl From<&AliasName> for diagnostic::AliasName {
     fn from(value: &AliasName) -> Self {
         Self::new(&value.to_string())
@@ -178,11 +148,6 @@ impl From<&SemKind> for diagnostic::Kind {
 impl From<SemKind> for diagnostic::Kind {
     fn from(value: SemKind) -> Self {
         Self::from(&value)
-    }
-}
-impl From<&TypeName> for diagnostic::TypeName {
-    fn from(value: &TypeName) -> Self {
-        Self::new(&value.full_name().to_string())
     }
 }
 impl From<&StringSpan> for diagnostic::StringSpan {

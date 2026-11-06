@@ -1483,12 +1483,9 @@ mod test_source_columns_remain_visible_in_nested_scalar_expressions {
     use crate::{
         context::MutSourcePathWithSpan,
         names::ColumnName,
-        sem::{PgBuiltInType, SourcePathWithSpan, select_statement::SelectStatementNode},
-        syn::Opt,
-        test_helpers::{SynBuilder, TestParseContext, source_span},
+        sem::{PgBuiltInType, SelectStatement, SourcePathWithSpan},
+        test_helpers::{TestParseContext, ast_query, create_cache_context, source_span},
     };
-
-    use ::sql_fun_core::IVec;
 
     #[rstest::rstest]
     fn source_columns_remain_visible_in_nested_scalar_expressions(
@@ -1498,15 +1495,11 @@ mod test_source_columns_remain_visible_in_nested_scalar_expressions {
         context.set_source_path_with_span(&source_span);
         context.setup_type(PgBuiltInType::int4());
         context.setup_type(PgBuiltInType::bool());
-        let syn = SynBuilder::new().parse(
+        let syntax = ast_query::postgres(
             "select case when true then coalesce(s.n) else n end as result \
                  from (select 42 as n) s where s.n is not null",
-        );
-        let (select, context) = SelectStatementNode::analyze_select_node(
-            context,
-            syn.as_select_stmt().as_inner().expect("select statement"),
-            &IVec::default(),
         )?;
+        let select = SelectStatement::from_ast(&syntax, &mut context, &mut create_cache_context())?;
         let column = select
             .get_result_column_def(&ColumnName::from("result"))
             .expect("result column");
@@ -1526,14 +1519,10 @@ mod test_source_columns_remain_visible_in_nested_scalar_expressions {
     ) -> testresult::TestResult {
         let mut context = TestParseContext::default();
         context.set_source_path_with_span(&source_span);
-        let syn = SynBuilder::new().parse(&format!(
+        let syntax = ast_query::postgres(&format!(
             "select {expression} as result from (select 42 as n) a, (select 43 as n) b"
-        ));
-        let (select, context) = SelectStatementNode::analyze_select_node(
-            context,
-            syn.as_select_stmt().as_inner().expect("select statement"),
-            &IVec::default(),
-        )?;
+        ))?;
+        let select = SelectStatement::from_ast(&syntax, &mut context, &mut create_cache_context())?;
         let column = select
             .get_result_column_def(&ColumnName::from("result"))
             .expect("result column");

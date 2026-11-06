@@ -1,14 +1,8 @@
-use crate::{names::TableName, sem::type_system::SimpleInferResult, syn::FunctionParameter};
-use sql_fun_core::IVec;
+use crate::{names::TableName, sem::type_system::SimpleInferResult};
 
-use crate::{
-    names::FullName,
-    sem::{
-        AnalysisError, FromClause, ParseContext, ScalarAnalysisContext, SemScalarExpr,
-        TypeReference, WithClause,
-        type_system::{ArgumentBindingCollection, TypeError},
-    },
-    syn::{Opt, ScanToken},
+use crate::sem::{
+    SemScalarExpr, TypeReference,
+    type_system::{ArgumentBindingCollection, TypeError},
 };
 
 use crate::sem::type_system::func_params::{
@@ -100,50 +94,6 @@ impl FunctionParameterTrait for FunctionParamIn {
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
         self.default_expr.as_ref()
-    }
-
-    fn from_syn<TParseContext>(
-        mut context: TParseContext,
-        param: FunctionParameter,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(FunctionParam, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let param_name = param.get_name();
-        let Some(param_type) = param.get_arg_type().as_inner() else {
-            AnalysisError::raise_unexpected_none("function_parameter.arg_type")?
-        };
-
-        let (default_expr, new_context) = if let Some(def_expr) = param.get_defexpr().as_inner() {
-            let with_clause = WithClause::default();
-            let from_clause = FromClause::default();
-            let (ex, new_context) = SemScalarExpr::analyze_scaler_expr(
-                context,
-                &ScalarAnalysisContext::new(&with_clause, &from_clause),
-                def_expr,
-                tokens,
-            )?;
-            (Some(ex), new_context)
-        } else {
-            (None, context)
-        };
-        context = new_context;
-
-        let param_type = FullName::try_from(param_type)?;
-        let param_type = if let Some(definition) = context.get_type(&param_type) {
-            definition.type_reference().cloned()
-        } else {
-            None
-        };
-        Ok((
-            FunctionParam::from(&Self {
-                name: Some(param_name),
-                param_type,
-                default_expr,
-            }),
-            context,
-        ))
     }
 
     fn bind_arg(

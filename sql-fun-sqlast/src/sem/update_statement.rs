@@ -6,16 +6,14 @@ mod view_support;
 pub use self::{cursor::UpdateCursor, view_support::ViewUpdateSupport};
 pub(crate) use self::{cursor::UpdatePredicate, destination::UpdateDestination};
 use crate::{
-    CacheContext,
-    ast::{ConflictClause, Dialect, StatementNode, TryFromWithTokens, Update},
+    ast::{ConflictClause, Dialect},
     names::{ColumnName, TableName},
     sem::{
         AccessKind, AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext,
-        QueryCte, ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
+        QueryCte, ResultColumnCollection, SelectStatement, SemScalarExpr, TypeReference,
         problem::UpdateProblemKind,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::UpdateStmt,
 };
 
 /// Resolved UPDATE assignments in SQL order.
@@ -407,25 +405,6 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
         Ok(())
     }
 }
-/// Analyze PostgreSQL UPDATE through the common AST and ParseContext.
-///
-/// # Errors
-/// Returns an error when syntax conversion or semantic analysis fails.
-pub fn analyze_update_statement<T: ParseContext>(
-    mut context: T,
-    _parent_schema: &Option<String>,
-    syn: UpdateStmt,
-) -> Result<(SemAst, T), AnalysisError> {
-    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-    let syntax = Update::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = SemAst::from_ast_node(
-        &StatementNode::Update(syntax),
-        &mut context,
-        &mut CacheContext::new(),
-    )?;
-    Ok((statement, context))
-}
-
 impl UpdateStatement {
     pub(crate) fn resolved_column(
         column: &ColumnName,

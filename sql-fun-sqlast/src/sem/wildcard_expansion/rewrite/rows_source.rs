@@ -33,7 +33,7 @@ pub(super) fn freeze(
 mod test_freeze {
     use crate::{
         sem::wildcard_expansion::rewrite::rows_source::freeze,
-        test_helpers::wildcard_rows_source::{invocation, layout, rendered},
+        test_helpers::wildcard_rows_source::{assert_parses, invocation, layout, rendered},
     };
 
     #[rstest::rstest]
@@ -57,7 +57,7 @@ mod test_freeze {
         let frozen = freeze(&resolved, source).unwrap();
         let sql = rendered(frozen);
         assert!(sql.ends_with(r#") AS "r""#), "{sql}");
-        ::pg_query::parse(&sql, ::pg_query::ParserOptions::default()).unwrap();
+        assert_parses(&sql);
         assert_eq!(
             sql.matches(r#""generate_series"(1, 2)"#).count(),
             1,
@@ -83,7 +83,7 @@ mod test_freeze {
         );
         let resolved = layout(&[&["id"], &["generate_series"]], &["id", "id"], false);
         let sql = rendered(freeze(&resolved, source).unwrap());
-        ::pg_query::parse(&sql, ::pg_query::ParserOptions::default()).unwrap();
+        assert_parses(&sql);
         assert!(sql.contains(r#"AS ("id" "int4")"#), "{sql}");
     }
 

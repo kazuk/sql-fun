@@ -1,10 +1,8 @@
 use crate::{
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ParseContext,
+        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename, ParseContext,
     },
-    syn::{ConstrType, Constraint, Opt},
 };
 
 // FIXME: exclusion constraint applies column?
@@ -46,29 +44,6 @@ impl ColumnConstraintTrait for ExclusionColumnConstraint {
 
     fn column_name(&self) -> &ColumnName {
         &self.column_name
-    }
-}
-
-impl ExclusionColumnConstraint {
-    /// analyze [`crate::syn::Constraint`]
-    pub fn analyze_constraint<TParseContext>(
-        context: TParseContext,
-        table_name: &TableName,
-        column_name: &ColumnName,
-        syn: &Constraint,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        if !matches!(contype, ConstrType::ConstrExclusion) {
-            AnalysisError::raise_unexpected_input("contype not exclusion")?;
-            AnalysisError::never()
-        }
-        Ok((Self::new(table_name, column_name), context))
     }
 }
 

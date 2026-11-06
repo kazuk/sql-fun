@@ -390,7 +390,7 @@ impl TryFrom<&syn::RangeVar> for Relation {
 
     fn try_from(value: &syn::RangeVar) -> Result<Self, Self::Error> {
         Ok(Self {
-            name: Name::from(value),
+            name: Name::try_from(value)?,
             alias: Alias::postgres(value.get_alias())?,
             inherit: value.get_inh(),
             persistence: value.get_relpersistence(),

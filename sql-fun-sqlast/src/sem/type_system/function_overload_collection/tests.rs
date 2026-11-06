@@ -589,3 +589,62 @@ fn compatible_unknown_literal_keeps_concrete_overload_ranking() -> testresult::T
     assert!(!result.allows(&PgBuiltInType::text()));
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::array_input(
+    "SELECT vf($1,1)",
+    "anycompatiblearray, anycompatible",
+    "anycompatiblearray",
+    "pg_catalog.int4[]",
+    "pg_catalog.int8[]",
+    "pg_catalog.text[]"
+)]
+#[case::element_input(
+    "SELECT vf(ARRAY[1],$1)",
+    "anycompatiblearray, anycompatible",
+    "integer",
+    "pg_catalog.int4",
+    "pg_catalog.int8",
+    "pg_catalog.text"
+)]
+fn compatible_parameter_candidates_follow_declared_shape(
+    #[case] query: &str,
+    #[case] inputs: &str,
+    #[case] result_type: &str,
+    #[case] accepted: &str,
+    #[case] widened: &str,
+    #[case] rejected: &str,
+) -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_vector(query, inputs, result_type)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(1, accepted.parse()?)])));
+    assert!(constraints.allows(&BTreeMap::from([(1, widened.parse()?)])));
+    assert!(!constraints.allows(&BTreeMap::from([(1, rejected.parse()?)])));
+    assert!(!constraints.parameter(1).unwrap().constraint().is_any());
+    Ok(())
+}
+
+#[test]
+fn compatible_array_candidates_do_not_exclude_concrete_overloads() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze(
+        "SELECT f($1,1)",
+        "anycompatiblearray, anycompatible",
+        "text, integer",
+        false,
+    )?;
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4().array_type())])));
+    let domain = constraints.parameter(1).unwrap().constraint();
+    assert!(domain.allows(&PgBuiltInType::text()));
+    assert!(domain.allows(&PgBuiltInType::int4().array_type()));
+    let result = constraints.result_column(0).unwrap();
+    assert!(result.allows(&PgBuiltInType::int4()));
+    assert!(result.allows(&PgBuiltInType::text()));
+    Ok(())
+}

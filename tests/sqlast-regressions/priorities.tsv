@@ -13,11 +13,11 @@ medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
 medium	arrays-consumers-18
-medium	arrays-diagnostics-17
 medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	bounded-parameter-inference-17
 medium	bounded-parameter-inference-18
+medium	case_semantic-18
 medium	coalesce_semantic-17
 medium	coalesce_semantic-18
 medium	collate-17
@@ -87,6 +87,7 @@ medium	table-checks-17
 medium	table-checks-18
 medium	table-renames-17
 medium	table-renames-18
+light	arrays-diagnostics-17
 light	arrays-diagnostics-18
 light	arrays-metadata-17
 light	arrays-metadata-18
@@ -98,7 +99,6 @@ light	arrays-records-17
 light	arrays-records-18
 light	bootstrap-array-expressions-18
 light	case_semantic-17
-light	case_semantic-18
 light	casts-17
 light	casts-18
 light	domain-operators-default-17

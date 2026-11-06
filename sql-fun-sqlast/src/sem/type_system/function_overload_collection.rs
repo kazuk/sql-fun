@@ -207,7 +207,9 @@ impl FunctionOverloadCollection {
         }
     }
 
-    fn infer_simple(
+    // Specialize a bound declaration; catalog property lookup can compare the
+    // resulting signature without analyzing or ranking a new SQL call.
+    fn specialize_simple(
         bind_result: &Vec<ParameterBindResult>,
         overload: &mut OverloadVariant,
         catalog: &impl BaseParseContext,
@@ -223,23 +225,43 @@ impl FunctionOverloadCollection {
         Ok(())
     }
 
+    fn infer_simple(
+        bindings: &Vec<ParameterBindResult>,
+        overload: &mut OverloadVariant,
+        context: &impl ParseContext,
+    ) -> Result<(), TypeError> {
+        Self::specialize_simple(bindings, overload, context)
+    }
+
     fn infer_common<TParseContext>(
         bind_result: &Vec<ParameterBindResult>,
         overload: &mut OverloadVariant,
         context: &TParseContext,
     ) -> Result<(), TypeError>
     where
-        TParseContext: BaseParseContext,
+        TParseContext: ParseContext,
     {
         let mut common_infer_context = CommonInferContext::default();
         for param in bind_result {
             param.collect_common(&mut common_infer_context, context)?;
         }
         if common_infer_context.is_require_infer() {
-            let inferred_type = common_infer_context.infer_from_catalog(context)?;
+            let inferred_type = common_infer_context.infer_in_context(context)?;
             overload.apply_common_infer_result(&inferred_type);
         }
         Ok(())
+    }
+
+    /// Identify the declaration of an already-instantiated signature without
+    /// resolving a new call. Catalog property lookups use this exact relation.
+    pub(crate) fn contains_instantiation(
+        &self,
+        instantiated: &OverloadVariant,
+        catalog: &impl BaseParseContext,
+    ) -> bool {
+        self.overloads
+            .iter()
+            .any(|declaration| declaration.matches_instantiation(instantiated, catalog))
     }
 
     // PostgreSQL prefers a non-variadic declaration over an expanded variadic
@@ -268,7 +290,7 @@ impl FunctionOverloadCollection {
         bindings: &[ParameterBindResult],
         literal_bindings: &[ParameterBindResult],
         declarations: &[ParameterBindResult],
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
     ) -> Option<OverloadRank> {
         let mut rank = OverloadRank::default();
         for ((binding, literal), declaration) in
@@ -293,21 +315,21 @@ impl FunctionOverloadCollection {
     where
         TParseContext: ParseContext,
     {
-        self.resolve_from_catalog(context, arg_types)
+        self.resolve_in_context(context, arg_types)
     }
 
-    pub(crate) fn resolve_from_catalog<TCatalog: BaseParseContext>(
+    pub(crate) fn resolve_in_context<TContext: ParseContext>(
         &self,
-        context: &TCatalog,
+        context: &TContext,
         arg_types: &ArgumentBindingCollection,
     ) -> Option<OverloadVariant> {
-        self.resolve_from_catalog_with_common_inputs(context, arg_types)
+        self.resolve_in_context_with_common_inputs(context, arg_types)
             .map(|(overload, _)| overload)
     }
 
-    pub(crate) fn resolve_from_catalog_with_common_inputs<TCatalog: BaseParseContext>(
+    pub(crate) fn resolve_in_context_with_common_inputs<TContext: ParseContext>(
         &self,
-        context: &TCatalog,
+        context: &TContext,
         arg_types: &ArgumentBindingCollection,
     ) -> Option<(OverloadVariant, Vec<bool>)> {
         let mut candidates = Vec::new();
@@ -371,7 +393,7 @@ mod tests;
 impl FunctionOverloadCollection {
     pub(crate) fn call_signatures(
         &self,
-        catalog: &impl BaseParseContext,
+        catalog: &impl ParseContext,
         arguments: &ArgumentBindingCollection,
     ) -> Vec<Signature> {
         let mut signatures = Vec::new();
@@ -423,6 +445,34 @@ impl FunctionOverloadCollection {
 }
 
 impl OverloadVariant {
+    fn matches_instantiation(&self, instantiated: &Self, catalog: &impl BaseParseContext) -> bool {
+        let mut specialized = self.clone();
+        let arguments = instantiated
+            .input_bindings()
+            .with_explicit_variadic(self.is_variadic());
+        let Ok(bindings) = self.bind_args(arguments) else {
+            return false;
+        };
+        if FunctionOverloadCollection::specialize_simple(&bindings, &mut specialized, catalog)
+            .is_err()
+        {
+            return false;
+        }
+        let mut common = CommonInferContext::default();
+        for binding in &bindings {
+            if binding.collect_common(&mut common, catalog).is_err() {
+                return false;
+            }
+        }
+        if common.is_require_infer() {
+            let Some(element) = common.instantiated_element() else {
+                return false;
+            };
+            specialized.apply_common_infer_result(&element);
+        }
+        &specialized == instantiated
+    }
+
     fn parameter_signature(
         &self,
         bindings: &[ParameterBindResult],

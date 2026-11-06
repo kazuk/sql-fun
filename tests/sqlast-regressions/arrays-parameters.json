@@ -86,5 +86,59 @@
         }
       ]
     }
+  },
+  {
+    "name": "compatible_family_append",
+    "sql": "SELECT array_append($1, 1) AS value",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_family_position",
+    "sql": "SELECT array_position(ARRAY[1], $1) AS value",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible_family_position_bigint",
+    "sql": "SELECT array_position(ARRAY[1], ${a:bigint}) AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
   }
 ]

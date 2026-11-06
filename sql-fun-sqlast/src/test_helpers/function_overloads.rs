@@ -83,6 +83,7 @@ fn context() -> SchemaFileContext {
     }
     for ty in [
         TypeReference::from_master_type_name("int4").array_type(),
+        TypeReference::from_master_type_name("int8").array_type(),
         TypeReference::from_master_type_name("int2").array_type(),
         TypeReference::from_full_name(FullName::with_schema("public", "control")),
         TypeReference::from_full_name(FullName::with_schema("public", "control")).array_type(),
@@ -93,6 +94,11 @@ fn context() -> SchemaFileContext {
             Some(CastDefinition::new(CastContext::no_conversion())),
         );
     }
+    base.set_get_implicit_cast_result(
+        &TypeReference::from_master_type_name("int4").array_type(),
+        &TypeReference::from_master_type_name("int8").array_type(),
+        Some(CastDefinition::new(CastContext::implicit())),
+    );
     base.set_get_implicit_cast_result(
         &TypeReference::from_master_type_name("int4"),
         &TypeReference::from_master_type_name("int2"),

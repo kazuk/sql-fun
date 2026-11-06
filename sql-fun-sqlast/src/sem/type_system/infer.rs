@@ -372,14 +372,14 @@ impl CommonInferContext {
     where
         TParseContext: ParseContext,
     {
-        self.infer_from_catalog(context)
+        self.infer_in_context(context)
     }
 }
 
 impl CommonInferContext {
-    pub(crate) fn infer_from_catalog<TCatalog: BaseParseContext>(
+    pub(crate) fn infer_in_context<TContext: ParseContext>(
         &self,
-        context: &TCatalog,
+        context: &TContext,
     ) -> Result<TypeReference, TypeError> {
         let result = CommonType::select_common_type(context, &self.element_types)
             .map_err(|_| TypeError::CommonInferNoImplicitCastable())?;
@@ -387,6 +387,18 @@ impl CommonInferContext {
             return Err(TypeError::RequireNonArray(result));
         }
         Ok(result)
+    }
+
+    /// Extract the common element from an already-instantiated signature.
+    /// Selection and coercion are unnecessary because every compatible position
+    /// has already been substituted with the same element type.
+    pub(crate) fn instantiated_element(&self) -> Option<TypeReference> {
+        let first = self.element_types.first()?;
+        if self.element_types.iter().all(|ty| ty == first) {
+            Some(first.clone())
+        } else {
+            None
+        }
     }
 
     pub const fn set_require_infer(&mut self) {

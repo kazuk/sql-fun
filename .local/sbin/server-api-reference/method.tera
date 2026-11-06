@@ -1,0 +1,16 @@
+# {{ name }}
+
+{{ summary }}
+
+{{ availability }}
+
+[Connection and authentication](../initialize.md) · [Schema and collection workflow](../check-analysis-design.md)
+
+{{ metadata }}
+{% for schema in schemas %}
+## {{ schema.heading }}
+
+{{ schema.description }}
+
+{{ schema.body }}
+{% endfor %}

@@ -71,8 +71,10 @@ SQL syntax, vendored parser files, ignored build outputs and submodules.
 See the [import convention](docs/internal-rules/rust-coding-guideline.md#importing-items)
 for permitted paths and syntax limitations.
 
-`mdbook` is required by the documentation build. The `doc` check-flow step
-builds both the Rust API documentation and the user manual.
+`mdbook`, `tera-cli` (the `tera` executable), and [`jq`](https://jqlang.org/download/)
+are required by the documentation build. The `doc` check-flow step builds both
+the Rust API documentation and the user manual. The standard CI/development
+image includes all three.
 
 `cargo-expand` is a runtime prerequisite of `sql-fun check`, which invokes
 `cargo expand` to read the generated query stubs. Install it before using the
@@ -105,9 +107,7 @@ Make sure the tool's executable directory is available on `PATH`. See the
 [Graphify installation instructions](https://github.com/Graphify-Labs/graphify#install)
 for platform-specific setup.
 
-Codex contributors also need [`jq`](https://jqlang.org/download/) on `PATH`.
-The repository's Codex pre-tool-use policy uses it to read hook input. The
-standard CI/development image already includes `jq`.
+The repository's Codex pre-tool-use policy also uses `jq` to read hook input.
 
 The full `check-test-flow` includes a `skill-lint` step that validates repository
 skills with `skill-validator`. Contributors running this flow outside the project

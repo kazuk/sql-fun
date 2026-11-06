@@ -46,10 +46,38 @@ Successful authentication returns the request's `id` and the string `"OK"`:
 {"jsonrpc":"2.0","id":1,"result":"OK"}
 ```
 
+<!-- Method pages are generated in the staged manual build. -->
+<!-- rumdl-disable MD057 -->
 After this response, the connection can send ordinary API requests using their
 existing method names and parameter shapes. The current dispatcher supports
 `initialize_schema_context`; it does not add a `sql-fun/` prefix or method
-version suffix.
+version suffix. See the [schema and query analysis workflow](check-analysis-design.md)
+and the [method reference](methods/echo.md).
+<!-- rumdl-enable MD057 -->
+
+For example, send this request on one line followed by LF:
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"echo","params":{"message":"hello"}}
+```
+
+The response echoes the parameters:
+
+```json
+{"jsonrpc":"2.0","id":2,"result":{"message":"hello"}}
+```
+
+The generated method pages show request and result schemas as JSON Schema.
+Follow the links below each schema to inspect referenced definitions. Definitions
+belong to their individual request or result schema, even when names match.
+
+## Errors
+
+After authentication, an unknown method or invalid parameters produce an
+`error` response and the connection remains usable. API execution errors also
+include structured `data` when available. The current error codes are all `0`;
+they are placeholders and do not distinguish standardized JSON-RPC errors.
+Malformed requests and framing failures can instead terminate the connection.
 
 ## Rejection and repeated initialization
 

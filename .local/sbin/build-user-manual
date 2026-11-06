@@ -5,8 +5,22 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
-mdbook build --dest-dir "$temporary/rendered"
+
+# Build from a disposable source tree: generated chapters never overwrite prose.
+book_root="$temporary/book-root"
+mkdir -p "$book_root"
+cp book.toml "$book_root/book.toml"
+cp -a book "$book_root/book"
+# The introduction includes examples from the source-tree test fixtures.
+mkdir -p "$book_root/tests/postgres-e2e"
+cp tests/postgres-e2e/inventory.{toml,hbs,md} "$book_root/tests/postgres-e2e/"
+reference="$root/.local/sbin/server-api-reference"
+jq -f "$reference/normalize.jq" server_api_spec.json > "$temporary/openrpc.json"
+python3 "$reference/render.py" "$temporary/openrpc.json" "$book_root/book" \
+  "$reference/method.tera" "$temporary"
+MDBOOK_BUILD__CREATE_MISSING=false mdbook build "$book_root" --dest-dir "$temporary/rendered"
 [[ -d "$temporary/rendered/markdown" ]] || { echo 'manual has no Markdown output' >&2; exit 1; }
+python3 "$reference/check-links.py" "$temporary/rendered/html"
 
 # Multiple renderers introduce html/ and markdown/ directories. Assemble the
 # existing artifact layout here so release consumers can archive it unchanged.

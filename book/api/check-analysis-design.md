@@ -1,7 +1,7 @@
 # Schema context and query analysis API
 
 This page describes how a client can prepare a schema context and request SQL
-analysis from `sql-fun-server`. It covers the intended API for `sql-fun check`
+analysis from `sql-fun-server`. It covers the API used by `sql-fun check`
 and other clients that need parameter descriptions, result-set columns, and
 SQL diagnostics without executing a query.
 
@@ -50,15 +50,11 @@ configuration. The intended operation makes the selected engine's builtin
 objects, selected extensions, and datasource schema dump available to
 subsequent analysis.
 
-The **initialization request** (`InitializeSchemaArgs`) contains:
-
-| Field | Meaning |
-| --- | --- |
-| `datasource` | Datasource to initialize |
-| `schema_dump` | Server-visible project dump path; required only for `project` |
-| `expected_hash` | Lowercase hexadecimal SHA-256 of the original dump text; required only for `project` |
-| `schema_level` | Optional completed prefix: `builtin`, `default`, `extensions`, or `project` |
-| `environments` | Configuration map from core configuration-transfer APIs |
+<!-- Method pages are generated in the staged manual build. -->
+<!-- rumdl-disable MD057 -->
+See the generated [`initialize_schema_context` reference](methods/initialize_schema_context.md)
+for the request and response schemas.
+<!-- rumdl-enable MD057 -->
 
 Clients transfer configuration using `sql_fun_core::SqlFunArgs::environments`
 or the depth-aware `analysis_environments` method.
@@ -83,14 +79,6 @@ overrides. The usual extension directory is
 The first successful cache service registration fixes the builtin installation
 for the server lifetime. A later request selecting a different canonical
 `SQL_FUN_HOME` is rejected; restart the server to select a different installation.
-
-The **currently declared response** (`SchemaContext`) contains:
-
-| Field | Meaning |
-| --- | --- |
-| `context_handle` | Optional opaque handle to a usable schema context |
-| `schema_dump_hash` | SHA-256 of the project dump, or null for a lower schema prefix |
-| `problems` | Collection of diagnostics from schema loading |
 
 A context handle, when provided, is passed unchanged to later analysis
 requests. The client should inspect initialization diagnostics before using
@@ -132,10 +120,13 @@ notifications. Schema cache eviction is not yet implemented.
 
 ### 2. Submit a query for analysis
 
+<!-- rumdl-disable MD057 -->
 Call `analyze_query` with the handle returned by
 `initialize_schema_context`. The server analyzes SQL against that schema;
 it does **not** execute SQL or connect to the application's database to
-fetch query results.
+fetch query results. The [method reference](methods/analyze_query.md) describes
+the request and response schemas.
+<!-- rumdl-enable MD057 -->
 
 Always supply `query`. Supply `resolved_cte_catalog` separately when using
 resolved CTE dependencies:
@@ -369,9 +360,12 @@ realization, and analysis failures remain diagnostics in the query result.
 
 ### 5. Read and release result collections
 
+<!-- rumdl-disable MD057 -->
 Some result fields are represented as `Collection<T>`. When a response
 provides a collection handle, the intended client flow is to use
-`read_collection` for remaining items and `release_collection` when done.
+[`read_collection`](methods/read_collection.md) for remaining items and
+[`release_collection`](methods/release_collection.md) when done.
+<!-- rumdl-enable MD057 -->
 
 A collection belongs to the requesting connection's session. Do not pass a
 collection handle to another connection. `read_collection` accepts
@@ -420,54 +414,6 @@ Rust source extraction, source-level reporting, lockfile policy, and cross-query
 inventory aggregation/rendering. The
 server's analysis of SQL parameters does not itself establish whether a Rust
 function's declared parameter types are compatible.
-
-## Implementation notes (temporary; remove when the API is implemented)
-
-The remainder of this page records pending design and implementation work.
-It is not part of the caller-facing API contract and should be removed once
-implementation and reference documentation cover the behavior.
-
-### Existing building blocks
-
-| Component | Present state |
-| --- | --- |
-| `sql-fun-server-api/src/initialize_schema.rs` | Implemented initialization request/response; PostgreSQL-only dialect/version enums |
-| `sql-fun-server-api/src/payloads/analyze_query.rs` | Query input and result shapes |
-| `sql-fun-sqlast` | `context::FrozenBaseContext`, layered schema loading, recoverable schema problems |
-| `sql-fun-core` | Shared `ResolvedCteCatalog` and its serialization |
-| `sql-fun-codegen` | `QueryRequirements::extract` |
-| `sql-fun-server/src/cte_realization.rs` | `realize_cte_catalog` produces a common AST and `OrderedBindings`; it is server-internal |
-| `sql-fun-server/src/lib.rs` | Connection-local initialization, query analysis and collection RPCs implemented; object-consumer handlers remain unfinished |
-| `cli/src/check.rs` | Requirements extraction, server submission, diagnostics, lockfiles and CRUD/query inventories |
-
-### Pending design and implementation decisions
-
-1. **Additional dialects:** Schema initialization currently supports PostgreSQL.
-   Any additional dialect needs its own implemented loading contract.
-2. **Context identity:** Decide whether callers need a fingerprint of the
-   *entire* semantic context in addition to `schema_dump_hash`.
-3. **Analysis inputs:** Reconcile the current `Text/File/Url` variant with
-   `ResolvedCteCatalog`, avoiding duplicate base SQL. Define whether
-   remote URL fetching is supported and its explicit authorization rules.
-4. **Analysis outputs:** Connect the realized common AST to semantic analysis
-   and executable SQL generation; identify available nullability, type
-   alternatives, provenance, and recovery information. Do not rule out legal
-   PostgreSQL or SQLite syntax merely because it is unusual.
-5. **Binding contract:** Preserve the existing server `OrderedBindings`
-   semantics throughout analysis, response serialization, and lockfile
-   generation. Check that all placeholder variants are representable.
-6. **Diagnostics:** Define source identity, positional mapping for base-query
-   and catalog-CTE spans, severity/message, and how fatal `AnalysisError`
-   differs from recoverable `AnalysisProblem` in RPC responses.
-7. **Feature consumers:** Connect query analysis and object enumeration to the
-   existing connection-local context and collection infrastructure.
-8. **End-to-end checks:** Cover schema load errors, unknown datasource/handle,
-   missing tables/columns, CTE binding order, type alternatives, multiple
-   datasources and concurrent connections, and PostgreSQL/SQLite behavior.
-
-Implementation should update the caller-facing sections to the **actual**
-wire format and remove this temporary section rather than leaving draft
-internals in the published manual.
 
 ## Schema prefix selection
 

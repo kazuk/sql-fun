@@ -78,11 +78,7 @@ is preserved: the client never signals the registered process, deletes its file,
 or launches a replacement over it. Crash leftovers, zombies and inconsistent
 tokens can therefore require operator-assisted recovery. Verify the intended
 server and registration before cleanup and stop other startups during that work.
-Do not act on an unverified PID. Safe automatic recovery is tracked in [issue #415](https://github.com/kazuk/sql-fun/issues/415);
-atomic server registration publication is a separate improvement in [issue #407](https://github.com/kazuk/sql-fun/issues/407).
-Until that improvement lands, discovery during the brief registration-write
-window can fail with a malformed-record error. This is an accepted MVP limitation;
-it does not prevent normal launch, authentication or reuse once writing completes.
+Do not act on an unverified PID. Safe automatic recovery is tracked in [issue #415](https://github.com/kazuk/sql-fun/issues/415).
 
 The async low-level `try_from` wraps a socket without authentication; use `connect`
 for the authenticated lifecycle. `invoke_method` accepts protocol-compatible JSON

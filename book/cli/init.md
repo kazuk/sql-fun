@@ -41,6 +41,35 @@ Declining returns to path editing. A supplied `--sql-fun-home` skips this
 confirmation under `--yes`; `SQL_FUN_HOME` alone does not satisfy `--yes`.
 Application schemas and migrations remain managed by your own tools.
 
+## Syntax and options
+
+```text
+sql-fun [COMMON OPTIONS] init [OPTIONS]
+```
+
+[Common options](README.md#common-options) precede `init`. The options below
+follow `init`; its `--datasource` and `--sql-fun-home` are distinct from the
+common options of the same name.
+
+| Option | Behavior |
+| --- | --- |
+| `-y`, `--yes` | Run without prompts only when all required choices are supplied explicitly. |
+| `-H`, `--sql-fun-home <PATH>` | Select the initialization home. Without it, ask interactively; `SQL_FUN_HOME` supplies a candidate, not consent. Required with `--yes`. |
+| `--install-default-theme` | Authorize downloading a missing default theme; never overwrite an existing theme. |
+| `--engines <ENGINES>...` | Choose `postgres`, `sqlite`, or both; accepts a comma-separated list. Conflicts with `--datasource`. |
+| `--datasource <NAMES>...` | Choose project datasources explicitly, requesting metadata access; accepts comma-separated names. Conflicts with `--engines`. |
+| `--database-url <CONNECTION>` | Choose an existing PostgreSQL server using a libpq connection string. Conflicts with `--docker` and Docker address options. |
+| `--docker` | Choose the registered Docker image for each PostgreSQL version; conflicts with `--database-url`. |
+| `--docker-host-address <ADDRESS>` | Address used to reach the Docker host; default `127.0.0.1`. |
+| `--docker-bind-address <ADDRESS>` | Host interface for the published port; default `127.0.0.1`. |
+| `--timeout-seconds <SECONDS>` | Positive extraction timeout for each version; default `120`. |
+| `--engine-versions <VERSIONS>...` | Choose PostgreSQL versions `17` and/or `18`; supports comma-separated, space-separated, or repeated values. Required for PostgreSQL with `--yes`. |
+| `-h`, `--help` | Print help. |
+
+The command exits with status 0 after successful setup, 1 on cancellation or
+setup failure, and 2 for invalid CLI usage. SQLite development-support setup is
+not yet implemented, including in SQLite-feature builds.
+
 ## Reviewing answers and confirming setup
 
 Press **Esc** to return to the preceding question. At the first question, Esc

@@ -13,6 +13,25 @@ Its legacy SQL-source form also uses the same input syntax as `analyze`.
 `test` does not request the optional relation/column access analysis that
 [`analyze`](analyze.md#relation-and-column-access) enables by default.
 
+## Syntax and options
+
+```text
+sql-fun [COMMON OPTIONS] test [OPTIONS] <INPUT>
+```
+
+`INPUT` is a filename, optionally followed by `#JSONPath`.
+[Common options](README.md#common-options) precede `test`.
+
+| Option | Behavior |
+| --- | --- |
+| `--schema-level <LEVEL>` | `builtin`, `default`, `extensions`, or `project`; default `project`. |
+| `--expect <FILE[#JSONPath]>` | Use a separate expectation source with legacy SQL input. |
+| `--ignore-schema-diagnostics <LEVEL>` | Continue through `warning` or `error` schema diagnostics, as described below. |
+| `--junit-xml <PATH>` | Write a JUnit report to this path. |
+| `-h`, `--help` | Print help. |
+
+These command-specific options have no environment variable equivalents.
+
 ## Named case arrays
 
 Pass a JSON, TOML, or YAML case array without `--expect` to keep each SQL input

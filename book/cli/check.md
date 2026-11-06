@@ -1,4 +1,4 @@
-# `check` sub command for `sql-fun` CLI utility
+# `sql-fun check`
 
 Check the application embedded queries and prepare to build.
 
@@ -159,6 +159,17 @@ command as described for [`api`](../api/cli-api.md). Requirements select their d
 from project metadata. Schema input follows the common `--schema-file` / `--schema`
 selection and must be visible to the server.
 
+## Syntax
+
+```text
+sql-fun [COMMON OPTIONS] check [OPTIONS]
+```
+
+There are no positional arguments. Place [common options](README.md#common-options)
+before `check`. The command returns 0 on success, 1 on validation or operational
+failure, and 2 for invalid CLI usage. A successful check does not guarantee that
+the application compiles, as described above. `-h` / `--help` prints help.
+
 ## Usage
 
 ### Application development stage
@@ -179,9 +190,10 @@ sql-fun check --validate-only
 
 ### Package selection options
 
-Default : Cargo default package to check.
+By default, checks workspace default packages that depend on `sql-fun`.
+`--workspace` and `--package` conflict.
 
-- `--workspace`: Check all package in the cargo workspace
+- `--workspace`: Check workspace packages that depend on `sql-fun`.
 - `--package <NAME>`, `-p <NAME>`: package to check
 
 ### Target selection options
@@ -195,9 +207,11 @@ Default : Cargo default package to check.
 
 ### Feature selection options
 
-- `--features FEATURE-LIST`: space or comma separated list of features
+- `-F`, `--features FEATURE-LIST`: space or comma separated list of features
 - `--all-features`: Activate all available features
 - `--no-default-features`: Do not activate the `default` features
+
+`--all-features` conflicts with `--features` and `--no-default-features`.
 
 ### Lockfile control options
 
@@ -219,6 +233,23 @@ Default : Cargo default package to check.
   inventory. The zero-extracted-query behavior described above takes precedence.
 - `--expect-schema-dump-valid`: Fail if an existing lockfile or inventory records
   a different schema-dump hash.
+
+### Compilation and manifest options
+
+These options are passed to `cargo expand` for selected packages:
+
+- `-j`, `--jobs <N>`: parallel jobs; Cargo chooses the default.
+- `--release`: use the release profile.
+- `--profile <NAME>`: use the named profile.
+- `--target <TRIPLE>`: select a compilation target.
+- `--target-dir <PATH>`: select the build-artifact directory.
+- `--manifest-path <PATH>`: supply a manifest to `cargo expand`. Package
+  selection still uses Cargo metadata from the current workspace.
+
+`--frozen`, `--locked`, and `--offline` are accepted by the CLI but are not
+currently passed to Cargo. Do not rely on them to enforce a lockfile or offline
+operation. Apart from `SQL_FUN_CHECK_PROGRESS`, the options specific to `check`
+have no environment variable equivalents.
 
 ## Progress output
 

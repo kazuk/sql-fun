@@ -20,6 +20,8 @@ like this (the client assigns the ID):
 {"jsonrpc":"2.0","id":1,"result":{"hello":[1,null,true]}}
 ```
 
+For command syntax and options, see the [`sql-fun api` CLI reference](../cli/api.md).
+
 ## Connection and launch choices
 
 `--user` selects the server namespace and overrides `USER`. Supply either;

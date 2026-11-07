@@ -1,3 +1,11 @@
+#![cfg_attr(
+    feature = "openrpc-schema",
+    expect(
+        clippy::disallowed_methods,
+        reason = "schemars generates Option::and_then for serde defaults in derived schemas"
+    )
+)]
+
 use crate::analysis_problem::{DiagnosticMetadata, TypeReference};
 
 /// Recoverable inconsistency between SQL-derived parameter requirements.

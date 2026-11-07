@@ -10,6 +10,9 @@ pub struct ParamRef {
     #[serde(skip)]
     location: Option<StringSpan>,
     constraint: InputTypeConstraint,
+    // Recollection must not feed finalized application types into SQL inputs.
+    #[serde(skip)]
+    input_constraint: Option<InputTypeConstraint>,
     #[serde(skip)]
     node: usize,
 }
@@ -21,6 +24,7 @@ impl ParamRef {
             location: None,
             node,
             constraint: constraint.clone(),
+            input_constraint: None,
         }
     }
     pub(crate) const fn with_location(mut self, location: Option<StringSpan>) -> Self {
@@ -39,6 +43,9 @@ impl ParamRef {
     pub const fn constraint(&self) -> &InputTypeConstraint {
         &self.constraint
     }
+    pub(crate) fn input_constraint(&self) -> &InputTypeConstraint {
+        self.input_constraint.as_ref().unwrap_or(&self.constraint)
+    }
     pub(crate) const fn node(&self) -> usize {
         self.node
     }
@@ -54,11 +61,13 @@ impl SemScalarExprNode for ParamRef {
 }
 
 impl ParamRef {
-    pub(super) const fn canonicalize_grouping_key(&mut self) {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
         self.node = 0;
         self.location = None;
+        self.input_constraint = None;
     }
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
+        self.input_constraint = Some(constraints.sql_node_domain(self.node).clone());
         self.constraint = if let Some(parameter) = constraints.parameter(self.position)
             && let Some(binding) = parameter.binding_type()
         {

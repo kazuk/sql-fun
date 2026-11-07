@@ -513,7 +513,7 @@ mod test_postgres_returning_defaults_unknown_parameters_to_text {
 impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn parameter_occurrence(&mut self, value: &ParamRef) -> SemScalarExpr {
         self.bindings.register(value);
-        self.parameter(value.position(), value.constraint())
+        self.parameter(value.position(), value.input_constraint())
             .with_parameter_location(value.location())
     }
 

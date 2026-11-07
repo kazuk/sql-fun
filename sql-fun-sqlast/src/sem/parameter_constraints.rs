@@ -256,6 +256,13 @@ pub struct ParameterConstraints {
 }
 
 impl ParameterConstraints {
+    pub(crate) fn sql_node_domain(&self, node: usize) -> &InputTypeConstraint {
+        self.graph
+            .as_ref()
+            .expect("inferred SQL graph")
+            .domain(node)
+    }
+
     pub(crate) fn node_domain(&self, node: usize) -> &InputTypeConstraint {
         self.application
             .as_ref()

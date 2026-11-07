@@ -24,18 +24,24 @@ pub(super) struct BindingSelections {
 enum LocalBinding {
     #[default]
     Unconstrained,
-    Requirement {
-        accepted: InputTypeConstraint,
-        identity: InputTypeConstraint,
-    },
-    Call {
-        call: Arc<LocalCall>,
-        index: usize,
-    },
-    Projection {
-        projection: TypeProjection,
-        position: u32,
-    },
+    Requirement(LocalRequirement),
+    Call(LocalCallInput),
+    Projection(LocalProjection),
+}
+
+struct LocalRequirement {
+    accepted: InputTypeConstraint,
+    identity: InputTypeConstraint,
+}
+
+struct LocalCallInput {
+    call: Arc<LocalCall>,
+    index: usize,
+}
+
+struct LocalProjection {
+    projection: TypeProjection,
+    position: u32,
 }
 
 struct LocalCall {
@@ -87,6 +93,52 @@ impl LocalOperand {
 }
 
 impl LocalBinding {
+    fn target(accepted: &InputTypeConstraint, target: &TypeReference) -> Self {
+        Self::Requirement(LocalRequirement {
+            accepted: accepted.clone(),
+            identity: InputTypeConstraint::exact(target),
+        })
+    }
+
+    fn incompatible() -> Self {
+        Self::Requirement(LocalRequirement {
+            accepted: InputTypeConstraint::types([]),
+            identity: InputTypeConstraint::types([]),
+        })
+    }
+
+    fn call_inputs(
+        arguments: &[SemScalarExpr],
+        signatures: &[Signature],
+    ) -> impl Iterator<Item = Self> {
+        let call = Arc::new(LocalCall {
+            arguments: arguments
+                .iter()
+                .map(LocalOperand::from_expression)
+                .collect(),
+            signatures: signatures.to_vec(),
+        });
+        (0..arguments.len()).map(move |index| {
+            Self::Call(LocalCallInput {
+                call: call.clone(),
+                index,
+            })
+        })
+    }
+
+    fn projection(projection: &TypeProjection, position: u32) -> Self {
+        Self::Projection(LocalProjection {
+            projection: projection.clone(),
+            position,
+        })
+    }
+
+    fn consume(&mut self, requirement: Self) {
+        if matches!(self, Self::Unconstrained) {
+            *self = requirement;
+        }
+    }
+
     fn domains(
         &self,
         context: &impl ParseContext,
@@ -95,28 +147,27 @@ impl LocalBinding {
     ) -> (InputTypeConstraint, InputTypeConstraint) {
         match self {
             Self::Unconstrained => (InputTypeConstraint::any(), InputTypeConstraint::types([])),
-            Self::Projection {
-                projection,
-                position,
-            } => {
-                let mut projection = projection.clone();
+            Self::Projection(binding) => {
+                let mut projection = binding.projection.clone();
                 let candidates = default_types()
                     .into_iter()
-                    .chain(context.get_parameter_typehint(*position as usize));
+                    .chain(context.get_parameter_typehint(binding.position as usize));
                 let accepted = InputTypeConstraint::types(
                     candidates.filter(|source| projection.prepare(context, source).is_some()),
                 );
                 (accepted, InputTypeConstraint::types([]))
             }
-            Self::Requirement { accepted, identity } => (accepted.clone(), identity.clone()),
-            Self::Call { call, index } => {
-                let inputs: Vec<_> = call
+            Self::Requirement(binding) => (binding.accepted.clone(), binding.identity.clone()),
+            Self::Call(binding) => {
+                let inputs: Vec<_> = binding
+                    .call
                     .arguments
                     .iter()
                     .enumerate()
-                    .map(|(i, argument)| argument.candidates(context, selected, i == *index))
+                    .map(|(i, argument)| argument.candidates(context, selected, i == binding.index))
                     .collect();
-                local_binding_domains(context, cache, &call.signatures, &inputs).remove(*index)
+                local_binding_domains(context, cache, &binding.call.signatures, &inputs)
+                    .remove(binding.index)
             }
         }
     }
@@ -166,9 +217,7 @@ impl BindingSelections {
         else {
             return;
         };
-        if matches!(binding, LocalBinding::Unconstrained) {
-            *binding = requirement;
-        }
+        binding.consume(requirement);
     }
 
     pub(super) fn accept_target(
@@ -177,13 +226,7 @@ impl BindingSelections {
         accepted: &InputTypeConstraint,
         target: &TypeReference,
     ) {
-        self.consume(
-            value,
-            LocalBinding::Requirement {
-                accepted: accepted.clone(),
-                identity: InputTypeConstraint::exact(target),
-            },
-        );
+        self.consume(value, LocalBinding::target(accepted, target));
     }
 
     pub(super) fn common_type(
@@ -211,13 +254,7 @@ impl BindingSelections {
             }
             Err(_) => {
                 for argument in arguments {
-                    self.consume(
-                        argument,
-                        LocalBinding::Requirement {
-                            accepted: InputTypeConstraint::types([]),
-                            identity: InputTypeConstraint::types([]),
-                        },
-                    );
+                    self.consume(argument, LocalBinding::incompatible());
                 }
             }
         }
@@ -227,10 +264,7 @@ impl BindingSelections {
         if let SemScalarExpr::Param(parameter) = argument {
             self.consume(
                 argument,
-                LocalBinding::Projection {
-                    projection: projection.clone(),
-                    position: parameter.position(),
-                },
+                LocalBinding::projection(projection, parameter.position()),
             );
         }
     }
@@ -242,21 +276,11 @@ impl BindingSelections {
         {
             return;
         }
-        let call = Arc::new(LocalCall {
-            arguments: arguments
-                .iter()
-                .map(LocalOperand::from_expression)
-                .collect(),
-            signatures: signatures.to_vec(),
-        });
-        for (index, argument) in arguments.iter().enumerate() {
-            self.consume(
-                argument,
-                LocalBinding::Call {
-                    call: call.clone(),
-                    index,
-                },
-            );
+        for (argument, requirement) in arguments
+            .iter()
+            .zip(LocalBinding::call_inputs(arguments, signatures))
+        {
+            self.consume(argument, requirement);
         }
     }
 }
@@ -330,6 +354,8 @@ mod test_application_bindings {
         test_helpers::{
             create_cache_context,
             public_analysis::{context, statement},
+            query::catalog,
+            query_array_subquery::composite_query_with_catalog,
         },
     };
     use std::collections::BTreeMap;
@@ -490,5 +516,37 @@ mod test_application_bindings {
                 .context()
                 .has_reported_problem("parameter_type_unresolved")
         );
+    }
+
+    #[test]
+    fn star_expansion_preserves_sql_admissibility_of_selected_inputs() {
+        // Deferred star expansion resumes collection after application typing.
+        // Its SQL graph must still accept alternative explicit input types.
+        let mut base = catalog();
+        base.set_get_implicit_cast_result(
+            &PgBuiltInType::int4(),
+            &PgBuiltInType::text(),
+            Some(CastDefinition::new(CastContext::explicit())),
+        );
+        let result = composite_query_with_catalog(
+            "SELECT $2::text, ARRAY(SELECT ($1).*), take_singleton($1)",
+            base,
+        );
+        let constraints = result.context().parameter_constraints();
+        assert_eq!(
+            constraints.parameter(2).unwrap().binding_type(),
+            Some(PgBuiltInType::text())
+        );
+        assert!(constraints.allows(&BTreeMap::from([(2, PgBuiltInType::int4())])));
+        let query = result.ast().clone().into_select_statemtnt().unwrap();
+        let array = query
+            .result_columns()
+            .get_column_at(1)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_array_subquery()
+            .unwrap();
+        assert_eq!(array.query().result_columns().len(), 1);
     }
 }

@@ -26,6 +26,9 @@ pub struct ApiArgs {
     /// Launch-only shell command, run in the caller's working directory.
     #[arg(long, env = "SQL_FUN_SERVER_COMMAND")]
     server_command: Option<String>,
+    /// Maximum response frame bytes, including newline (default: 4194304; 0 rejects all).
+    #[arg(long, env = "SQL_FUN_MAX_RESPONSE_BYTES", value_name = "BYTES", value_parser = parse_max_response_bytes)]
+    max_response_bytes: Option<u32>,
 }
 
 impl ApiArgs {
@@ -35,6 +38,7 @@ impl ApiArgs {
             .server_executable(executable)
             .user(&self.user)
             .maybe_server_command(self.server_command.clone())
+            .maybe_max_response_bytes(self.max_response_bytes)
             .build();
         ::sql_fun_client::connect(&options).await.context(
             "cannot connect to sql-fun-server; check USER, SQL_FUN_SERVER and the launch command",
@@ -50,6 +54,13 @@ impl ApiArgs {
         Ok(Self {
             user: std::env::var("USER").context("USER is required to connect to sql-fun-server")?,
             server_command,
+            max_response_bytes: match std::env::var("SQL_FUN_MAX_RESPONSE_BYTES") {
+                Ok(value) => Some(parse_max_response_bytes(&value).map_err(::anyhow::Error::msg)?),
+                Err(std::env::VarError::NotPresent) => None,
+                Err(error) => {
+                    return Err(error).context("SQL_FUN_MAX_RESPONSE_BYTES must be valid UTF-8");
+                }
+            },
         })
     }
 
@@ -68,6 +79,12 @@ impl ApiArgs {
         .await?;
         Ok(ExitCode::SUCCESS)
     }
+}
+
+fn parse_max_response_bytes(value: &str) -> Result<u32, String> {
+    value.parse().map_err(|_| {
+        String::from("SQL_FUN_MAX_RESPONSE_BYTES / --max-response-bytes must be an integer in 0..=4294967295 bytes")
+    })
 }
 
 fn resolve_executable(explicit: Option<std::ffi::OsString>) -> Result<PathBuf, ::anyhow::Error> {

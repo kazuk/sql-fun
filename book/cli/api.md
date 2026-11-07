@@ -15,6 +15,7 @@ settings are not used by the bridge.
 | --- | --- | --- |
 | `-u`, `--user <USER>` | `USER` | Required through the option or environment; the option takes precedence. Selects the server namespace. |
 | `--server-command <COMMAND>` | `SQL_FUN_SERVER_COMMAND` | Optional launch-only command; the option takes precedence. It runs through `/bin/sh -c` in the current directory if a server must be started. |
+| `--max-response-bytes <BYTES>` | `SQL_FUN_MAX_RESPONSE_BYTES` | Maximum authenticated response frame bytes; default 4194304 (4 MiB). The option takes precedence. |
 | `-h`, `--help` | — | Print help. |
 
 `SQL_FUN_SERVER` selects an executable path, resolved relative to the current
@@ -39,3 +40,9 @@ CLI arguments exit with status 2.
 
 For request formats, method examples, connection and session lifecycle, see
 [Using the Server API via `sql-fun api`](../api/cli-api.md).
+
+Responses exceeding the selected limit fail with a transport error and close the
+connection. Increase the limit explicitly for a valid large result, for example
+`sql-fun api --user alice --max-response-bytes 8388608` (8 MiB), and start a new
+invocation. See [response size and memory use](../api/cli-api.md#response-size-and-memory-use)
+for units, range, authentication, and resource trade-offs.

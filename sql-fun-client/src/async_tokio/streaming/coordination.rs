@@ -313,10 +313,14 @@ impl IncomingResponses {
 }
 
 impl ResponsePublisher {
-    pub(super) async fn deliver_from<R: AsyncRead + Unpin>(self, reader: R) -> Result<(), String> {
+    pub(super) async fn deliver_from<R: AsyncRead + Unpin>(
+        self,
+        reader: R,
+        max_response_bytes: u32,
+    ) -> Result<(), String> {
         let mut reader = BufReader::new(reader);
         loop {
-            match read_response(&mut reader, None).await {
+            match read_response(&mut reader, max_response_bytes).await {
                 Ok(response) => {
                     let eof = response.is_none();
                     if self

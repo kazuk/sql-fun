@@ -1,8 +1,5 @@
 pub(crate) mod streaming;
 
-#[cfg(test)]
-mod test_helpers;
-
 use crate::{CompleteResponse, CompletionContext, TypedResponseError};
 
 use self::streaming::Streaming;
@@ -13,6 +10,8 @@ use ::tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
+
+pub(crate) const DEFAULT_MAX_RESPONSE_BYTES: u32 = 4 * 1024 * 1024;
 
 /// Errors from submission, transport, or graceful completion.
 #[derive(Debug, thiserror::Error)]
@@ -63,18 +62,37 @@ pub struct TcpJsonRpcClientAsync {
     reader: Option<BufReader<TcpStream>>,
     id: u64,
     streaming: Option<Streaming>,
+    max_response_bytes: u32,
 }
 
 impl TcpJsonRpcClientAsync {
-    /// Wrap an already connected stream. This low-level operation does not authenticate.
+    /// Wrap a stream with the default 4 MiB response limit, without authentication.
     ///
     /// # Errors
     /// This constructor currently has no failure conditions.
     pub fn try_from(stream: TcpStream) -> Result<Self, std::io::Error> {
+        Self::try_from_with_max_response_bytes(stream, DEFAULT_MAX_RESPONSE_BYTES)
+    }
+
+    /// Wrap a stream with an explicit response limit in bytes, without authentication.
+    ///
+    /// The limit includes the JSON-RPC envelope and terminating newline. Zero
+    /// rejects every nonempty response; `u32::MAX` is supported. Buffers grow
+    /// with received data, without preallocating the maximum. Exceeding the
+    /// limit is a terminal transport failure; open a new connection to retry.
+    /// This is a per-frame limit, not a total memory budget.
+    ///
+    /// # Errors
+    /// This constructor currently has no failure conditions.
+    pub fn try_from_with_max_response_bytes(
+        stream: TcpStream,
+        max_response_bytes: u32,
+    ) -> Result<Self, std::io::Error> {
         Ok(Self {
             reader: Some(BufReader::new(stream)),
             id: 0,
             streaming: None,
+            max_response_bytes,
         })
     }
 
@@ -220,53 +238,15 @@ impl TcpJsonRpcClientAsync {
             let Some(reader) = self.reader.take() else {
                 return TcpJsonRpcClientAsyncError::raise_connection_closed();
             };
-            self.streaming = Some(Streaming::start(reader, self.id)?);
+            self.streaming = Some(Streaming::start(reader, self.id, self.max_response_bytes)?);
         }
         Ok(())
-    }
-
-    pub(crate) async fn invoke_bounded(
-        &mut self,
-        method: &str,
-        params: &serde_json::Value,
-        limit: usize,
-    ) -> Result<serde_json::Value, TcpJsonRpcClientAsyncError> {
-        let Some(mut reader) = self.reader.take() else {
-            return TcpJsonRpcClientAsyncError::raise_connection_closed();
-        };
-        let id = self.id;
-        let Some(next) = self.id.checked_add(1) else {
-            return Err(TcpJsonRpcClientAsyncError::connection(
-                "request IDs exhausted",
-            ));
-        };
-        self.id = next;
-        let request = JsonRpcRequest::build_request(id, method, params);
-        let mut json = ::serde_json::to_vec(&request)?;
-        json.push(b'\n');
-        reader.get_mut().write_all(&json).await?;
-        ::tracing::info!(request_id = id, method, "request written");
-        let Some(response) = read_response(&mut reader, Some(limit)).await? else {
-            return Err(
-                std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "response EOF").into(),
-            );
-        };
-        response.trace_received();
-        if response.id != id {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "response ID does not match request",
-            )
-            .into());
-        }
-        self.reader = Some(reader);
-        Ok(response.body.into_result()?)
     }
 }
 
 #[cfg(test)]
 mod streaming_tests {
-    use crate::async_tokio::test_helpers;
+    use crate::test_helpers;
     use std::time::Duration;
 
     #[rstest::rstest]
@@ -497,9 +477,49 @@ mod streaming_tests {
     }
 }
 
+impl TcpJsonRpcClientAsync {
+    pub(crate) async fn invoke_bounded(
+        &mut self,
+        method: &str,
+        params: &serde_json::Value,
+        limit: u32,
+    ) -> Result<serde_json::Value, TcpJsonRpcClientAsyncError> {
+        let Some(mut reader) = self.reader.take() else {
+            return TcpJsonRpcClientAsyncError::raise_connection_closed();
+        };
+        let id = self.id;
+        let Some(next) = self.id.checked_add(1) else {
+            return Err(TcpJsonRpcClientAsyncError::connection(
+                "request IDs exhausted",
+            ));
+        };
+        self.id = next;
+        let request = JsonRpcRequest::build_request(id, method, params);
+        let mut json = ::serde_json::to_vec(&request)?;
+        json.push(b'\n');
+        reader.get_mut().write_all(&json).await?;
+        ::tracing::info!(request_id = id, method, "request written");
+        let Some(response) = read_response(&mut reader, limit).await? else {
+            return Err(
+                std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "response EOF").into(),
+            );
+        };
+        response.trace_received();
+        if response.id != id {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "response ID does not match request",
+            )
+            .into());
+        }
+        self.reader = Some(reader);
+        Ok(response.body.into_result()?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::async_tokio::test_helpers;
+    use crate::test_helpers;
     use std::time::Duration;
 
     #[rstest::rstest]
@@ -532,6 +552,38 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
+        assert!(client.peer_addr().is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn authentication_bound_is_independent_of_response_configuration()
+    -> ::testresult::TestResult {
+        let response = format!(
+            "{}\n{}\n",
+            r#"{"jsonrpc":"2.0","id":0,"result":"OK"}"#,
+            ::serde_json::json!({"jsonrpc":"2.0", "id":1, "result":"x".repeat(16 * 1024)})
+        );
+        let mut client = test_helpers::response_peer_with_limit(response.as_bytes(), 1).await?;
+        // Even a setting smaller than the OK frame does not prevent authentication.
+        assert_eq!(
+            client
+                .invoke_bounded(
+                    "initialize",
+                    &::serde_json::json!({"sql_fun_token":"secret"}),
+                    8192
+                )
+                .await?,
+            "OK"
+        );
+        // A large authenticated setting does not remove the independent exchange bound.
+        client.max_response_bytes = u32::MAX;
+        assert!(
+            client
+                .invoke_bounded("initialize", &::serde_json::json!({}), 8192)
+                .await
+                .is_err()
+        );
         assert!(client.peer_addr().is_err());
         Ok(())
     }
@@ -610,20 +662,29 @@ mod tests {
 
 async fn read_response<R: ::tokio::io::AsyncBufRead + Unpin>(
     reader: &mut R,
-    limit: Option<usize>,
+    limit: u32,
 ) -> Result<Option<JsonRpcResponse>, TcpJsonRpcClientAsyncError> {
     let mut frame = Vec::new();
     let count = reader
-        .take(limit.map_or(u64::MAX, |limit| limit as u64 + 1))
+        .take(u64::from(limit) + 1)
         .read_until(b'\n', &mut frame)
         .await?;
     if count == 0 {
         return Ok(None);
     }
-    if limit.is_some_and(|limit| count > limit) || frame.last() != Some(&b'\n') {
+    if count as u64 > u64::from(limit) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            "incomplete or oversized response frame",
+            format!(
+                "response receive-size limit exceeded: limit {limit} bytes; observed at least {count} bytes (including framing); connection closed"
+            ),
+        )
+        .into());
+    }
+    if frame.last() != Some(&b'\n') {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "incomplete response frame",
         )
         .into());
     }

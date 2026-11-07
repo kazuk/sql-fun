@@ -159,6 +159,10 @@ command as described for [`api`](../api/cli-api.md). Requirements select their d
 from project metadata. Schema input follows the common `--schema-file` / `--schema`
 selection and must be visible to the server.
 
+`SQL_FUN_MAX_RESPONSE_BYTES` sets the authenticated response receive cap
+(default 4 MiB). See [response size and memory use](../api/cli-api.md#response-size-and-memory-use)
+for how to raise it after a size-limit error.
+
 ## Syntax
 
 ```text

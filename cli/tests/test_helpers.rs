@@ -17,3 +17,7 @@ pub(crate) mod initialization;
 #[allow(dead_code)]
 #[path = "test_helpers/check.rs"]
 pub(crate) mod check;
+
+#[allow(dead_code)]
+#[path = "../../sql-fun-client/tests/test_helpers/response_peer.rs"]
+pub(crate) mod response_peer;

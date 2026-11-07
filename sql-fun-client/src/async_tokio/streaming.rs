@@ -47,7 +47,11 @@ impl Streaming {
         }
     }
 
-    pub(super) fn start(reader: BufReader<TcpStream>, first_id: u64) -> std::io::Result<Self> {
+    pub(super) fn start(
+        reader: BufReader<TcpStream>,
+        first_id: u64,
+        max_response_bytes: u32,
+    ) -> std::io::Result<Self> {
         let address = reader.get_ref().peer_addr()?;
         let (submissions, accepted) = SubmissionQueue::channel();
         let admission = RequestAdmission::new(8);
@@ -67,7 +71,7 @@ impl Streaming {
             ids: Arc::new(AtomicU64::new(first_id)),
         };
         let worker = ConnectionTask::start(async move {
-            let result = ConnectionTransport::start(reader)
+            let result = ConnectionTransport::start(reader, max_response_bytes)
                 .drain(
                     accepted,
                     &reporter,
@@ -148,11 +152,14 @@ struct ConnectionTransport {
 }
 
 impl ConnectionTransport {
-    fn start(reader: BufReader<TcpStream>) -> Self {
+    fn start(reader: BufReader<TcpStream>, max_response_bytes: u32) -> Self {
         let (read, write) = ::tokio::io::split(reader);
         let (requests, writes) = OutgoingRequests::channel();
         let (responses, events) = IncomingResponses::channel();
-        let tasks = TransportTasks::start(writes.send_on(write), events.deliver_from(read));
+        let tasks = TransportTasks::start(
+            writes.send_on(write),
+            events.deliver_from(read, max_response_bytes),
+        );
         Self {
             requests,
             responses,

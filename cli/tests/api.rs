@@ -4,7 +4,10 @@ mod test_helpers;
 
 use self::test_helpers as api_helpers;
 
-use self::test_helpers::{heavy, responses};
+use self::test_helpers::{
+    executable::response_peer::{ResponsePeer, analysis_result},
+    heavy, responses,
+};
 use std::time::Duration;
 
 use ::tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -314,5 +317,89 @@ async fn tokenization_is_available_without_schema_or_project_discovery() -> ::te
         .await?;
     assert!(released.get("error").is_none(), "{released}");
     bridge.finish().await?;
+    Ok(())
+}
+
+// The CLI subprocess must pass its chosen cap through authentication to the client.
+#[rstest::rstest]
+#[case::default(None, None, true)]
+#[case::environment(Some("64"), None, false)]
+#[case::option(Some("8388608"), Some("64"), false)]
+#[case::option_overrides_environment(Some("64"), Some("8388608"), true)]
+#[tokio::test]
+async fn receive_limit_configuration_reaches_client(
+    #[case] environment: Option<&str>,
+    #[case] option: Option<&str>,
+    #[case] succeeds: bool,
+) -> ::testresult::TestResult {
+    let result = analysis_result(1024);
+    let peer = ResponsePeer::new(&result).await?;
+    let mut command = ::tokio::process::Command::new(test_helpers::cli_executable());
+    command
+        .args(["api", "--user", peer.user()])
+        .env("SQL_FUN_SERVER", ResponsePeer::executable())
+        .env_remove("SQL_FUN_SERVER_COMMAND")
+        .env_remove("SQL_FUN_MAX_RESPONSE_BYTES")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(true);
+    if let Some(value) = environment {
+        command.env("SQL_FUN_MAX_RESPONSE_BYTES", value);
+    }
+    if let Some(value) = option {
+        command.args(["--max-response-bytes", value]);
+    }
+    let mut child = command.spawn()?;
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(ECHO.as_bytes())
+        .await?;
+    let output = child.wait_with_output().await?;
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_eq!(output.status.success(), succeeds, "{stderr}");
+    if succeeds {
+        assert_eq!(
+            ::serde_json::from_slice::<::serde_json::Value>(&output.stdout)?["result"],
+            result
+        );
+    } else {
+        assert!(
+            stderr.contains("response receive-size limit exceeded"),
+            "{stderr}"
+        );
+        assert!(stderr.contains("limit 64 bytes"), "{stderr}");
+        assert_eq!(output.stdout, [] as [u8; 0]);
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::empty("", false)]
+#[case::malformed("large", false)]
+#[case::negative("-1", true)]
+#[case::overflow("4294967296", true)]
+#[tokio::test]
+async fn invalid_receive_limit_is_a_configuration_error(
+    #[case] value: &str,
+    #[case] via_option: bool,
+) -> ::testresult::TestResult {
+    let mut command = ::tokio::process::Command::new(test_helpers::cli_executable());
+    command
+        .args(["api", "--user", "receive-config-test"])
+        .env("SQL_FUN_SERVER", "")
+        .env_remove("SQL_FUN_MAX_RESPONSE_BYTES");
+    if via_option {
+        command.arg(format!("--max-response-bytes={value}"));
+    } else {
+        command.env("SQL_FUN_MAX_RESPONSE_BYTES", value);
+    }
+    let output = command.output().await?;
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("0..=4294967295 bytes"), "{stderr}");
+    assert_eq!(output.stdout, [] as [u8; 0]);
     Ok(())
 }

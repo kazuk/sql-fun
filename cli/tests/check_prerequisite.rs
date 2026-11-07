@@ -68,6 +68,33 @@ mod unix {
         assert!(!error.contains("no SQL queries found"), "{error}");
     }
 
+    #[tokio::test]
+    async fn check_propagates_receive_limit_environment() -> ::testresult::TestResult {
+        use crate::test_helpers::response_peer::{ResponsePeer, analysis_result};
+        let project = expanded_named_query();
+        let peer = ResponsePeer::new(&analysis_result(1024)).await?;
+        let output = ::tokio::process::Command::new(cli_executable())
+            .env_clear()
+            .env("PATH", project.path())
+            .env("SQL_FUN_HOME", project.path())
+            .env("SQL_FUN_METADATA_FILE", project.path().join("Cargo.toml"))
+            .env("USER", peer.user())
+            .env("SQL_FUN_SERVER", ResponsePeer::executable())
+            .env("SQL_FUN_MAX_RESPONSE_BYTES", "64")
+            .current_dir(project.path())
+            .args(["check", "--force-rebuild", "--package", "fixture"])
+            .output()
+            .await?;
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr)?;
+        assert!(
+            stderr.contains("response receive-size limit exceeded"),
+            "{stderr}"
+        );
+        assert!(stderr.contains("limit 64 bytes"), "{stderr}");
+        Ok(())
+    }
+
     #[test]
     fn non_executable_expand_is_reported_as_missing() {
         let tools = test_helpers::expand_tools(false);

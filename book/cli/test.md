@@ -31,6 +31,9 @@ sql-fun [COMMON OPTIONS] test [OPTIONS] <INPUT>
 | `-h`, `--help` | Print help. |
 
 These command-specific options have no environment variable equivalents.
+The shared `SQL_FUN_MAX_RESPONSE_BYTES` setting controls the authenticated
+response receive cap (default 4 MiB); see [response size and memory use](../api/cli-api.md#response-size-and-memory-use)
+for configuration and recovery after a size-limit error.
 
 ## Named case arrays
 

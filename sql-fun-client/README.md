@@ -133,13 +133,34 @@ including their reads/releases, before half-closing TCP writes. It then drains
 responses through EOF and waits for callback completion. EOF with missing responses
 is an error. Transport/protocol failures also surface through subsequent submissions
 and completion. `wait_for_failure()` permits observing terminal failure while
-waiting for further application input. After authentication, response frames have
-no fixed byte limit: catalog diagnostics can exceed 2 MiB even within one
-collection page. The client buffers each complete frame in memory. Calls after
+waiting for further application input. Calls after
 initialization have no implicit deadline. Callers can apply
 `tokio::time::timeout`. Cancelling submission before acceptance leaves no pending
 request; dropping the client or cancelling `finish` closes its socket/tasks.
 Neither completion nor drop stops the shared server.
+
+Authenticated responses have a **4 MiB (4,194,304 bytes)** default receive limit.
+Use `.max_response_bytes(8 * 1024 * 1024)` on `ConnectionOptions::builder()` to
+raise it, or `.maybe_max_response_bytes(limit)` for an optional `u32`. Existing
+`ConnectionOptions::new(...)` and `TcpJsonRpcClientAsync::try_from(stream)` use
+the default. Low-level socket users can select a limit with
+`TcpJsonRpcClientAsync::try_from_with_max_response_bytes(stream, limit)`; this
+constructor does not authenticate. The independent authentication-response bound
+remains 8,192 bytes.
+
+The range is `0..=u32::MAX` (4,294,967,295 bytes), including values below 4 MiB.
+Zero rejects all nonempty authenticated frames; it does not mean unlimited.
+The limit counts the entire JSON-RPC frame's wire bytes, including JSON escaping,
+metadata, executable SQL, and the terminating newline. On overflow, the client
+reports a transport receive-size error with the configured limit and a lower
+bound on observed bytes, then closes the connection. It cannot continue or
+resume that session. Explicitly increase the limit and open a new connection to
+retry a valid large response; no SQL change is required.
+
+The client grows its buffer as data arrives without preallocating the configured
+maximum, but still buffers each complete response. Larger limits permit greater
+memory use. JSON decoding, concurrent/queued responses, and typed collection
+materialization add allocations, so this is not a total-process memory cap.
 
 Use `invoke_typed` to explicitly select automatic completion of client-owned typed
 responses. Supply the method, parameters, and result type; this API never infers

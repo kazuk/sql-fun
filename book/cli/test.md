@@ -1,7 +1,7 @@
 # Test SQL contracts
 
 `sql-fun test` checks diagnostic-code sets and statically analyzed result columns.
-See the [diagnostic reference](../diagnostics/README.md) for code meanings and
+See the [diagnostic reference](../diagnostics/) for code meanings and
 suggested corrections.
 
 It supports both SQLAST regressions and application query-interface tests without

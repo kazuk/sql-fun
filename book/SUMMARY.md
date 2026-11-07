@@ -2,13 +2,18 @@
 
 - [Introduction](./introduction.md)
 - [Installation](./installation.md)
-- [SQLite project bootstrap](./sqlite-bootstrap.md)
+  - [SQLite project bootstrap](./sqlite-bootstrap.md)
 - [SQL Functions](./sql_functions.md)
   - [Attributes](./sql_functions/attributes.md)
   - [Function signatures](./sql_functions/signatures.md)
   - [Parameter binding](./sql_functions/parameter-binding.md)
   - [Conditional SQL](./sql_functions/conditional-sql.md)
   - [Query interruption](./sql_functions/query-interruption.md)
+  - [Reusable CTE](./reusable_cte.md)
+  - [Batch query support](./sql-rewrite/batching.md)
+  - [Aggregate Fetch without sql-fun-collector](./examples/aggregate-fetch.md)
+- [sql-fun-collector](./collector.md)
+  - [Collecting ordered rows](./sql_fun_collector.md)
 - [SQL Analysis Reference](./sql-analysis.md)
   - [Top-level statements](./sql-analysis/statements.md)
     - [SELECT](./sql-analysis/statements/select.md)
@@ -53,19 +58,7 @@
     - [CASE / COALESCE / GREATEST / LEAST](./sql-analysis/expressions/conditional.md)
     - [Arrays and rows](./sql-analysis/expressions/arrays-and-rows.md)
     - [COLLATE](./sql-analysis/expressions/collate.md)
-- [SQL access-purpose reference](./access-kinds.md)
-- [Collecting ordered rows](./sql_fun_collector.md)
-- [Reusable CTE](./reusable_cte.md)
-- [Database Performance Management](./database-performance-management.md)
-- [Design philosophies](./design-philosophies.md)
-
-## Examples
-
-- [Aggregate Fetch without sql-fun-collector](./examples/aggregate-fetch.md)
-
-## SQL re-write features
-
-- [Batch query support](./sql-rewrite/batching.md)
+  - [SQL access-purpose reference](./access-kinds.md)
 
 ## CLI Reference
 
@@ -247,3 +240,11 @@
   - [view_missing_write_metadata](diagnostics/view_missing_write_metadata.md)
   - [view_not_found](diagnostics/view_not_found.md)
   - [view_unknown_default_column](diagnostics/view_unknown_default_column.md)
+
+<!-- mdBook part titles must use level-one headings. -->
+<!-- rumdl-disable MD025 -->
+# Advanced Topics
+<!-- rumdl-enable MD025 -->
+
+- [Database Performance Management](./database-performance-management.md)
+- [Design philosophies](./design-philosophies.md)

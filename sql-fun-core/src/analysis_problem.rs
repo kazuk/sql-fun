@@ -105,7 +105,7 @@ pub enum AnalysisProblem {
     },
     /// Malformed operator-name components.
     OperatorNameSyntax(Vec<String>),
-    /// A PostgreSQL operator reference has database qualification.
+    /// A `PostgreSQL` operator reference has database qualification.
     CrossDatabaseOperatorReference(Vec<String>),
     /// Input could not be parsed, realized, hinted, analyzed, or deparsed.
     QueryAnalysis(QueryAnalysisProblem),
@@ -220,7 +220,7 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
-    /// Report an invalid PostgreSQL serial-family declaration.
+    /// Report an invalid `PostgreSQL` serial-family declaration.
     #[must_use]
     pub const fn serial(problem: SerialProblem) -> Self {
         Self::Serial(problem)

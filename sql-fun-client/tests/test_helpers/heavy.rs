@@ -110,11 +110,27 @@ impl ServerFixture {
         Ok(())
     }
 
+    pub fn change_token(&self) -> ::testresult::TestResult<::serde_json::Value> {
+        let mut record = self.registration()?;
+        record["token"] = ::serde_json::json!("mismatched-fixture-secret");
+        self.persist_registration(&record)?;
+        Ok(record)
+    }
+
     pub fn assert_detached(&self) -> ::testresult::TestResult {
         let pid = ::nix::unistd::Pid::from_raw(i32::try_from(
             self.registration()?["pid"].as_u64().unwrap(),
         )?);
         assert_eq!(::nix::unistd::getsid(Some(pid))?, pid);
+        Ok(())
+    }
+
+    pub fn pause(&self) -> ::testresult::TestResult {
+        let pid = self.registration()?["pid"].as_u64().unwrap();
+        ::nix::sys::signal::kill(
+            ::nix::unistd::Pid::from_raw(i32::try_from(pid)?),
+            ::nix::sys::signal::Signal::SIGSTOP,
+        )?;
         Ok(())
     }
 }

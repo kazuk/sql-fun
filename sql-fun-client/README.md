@@ -73,20 +73,12 @@ bounded retries with registration rereads. A replacement registration can be
 followed within the same deadline. Errors report the observable stage without
 printing tokens; initialization EOF cannot establish that the token was rejected.
 
-After bounded unsuccessful retries, the client removes registrations for exited
-or zombie servers and retries startup. For a live, unresponsive server, it checks
-the process against the selected executable, sends SIGTERM, and escalates to
-SIGKILL if needed. It verifies exit before removing the observed registration.
-Recovery and restart use the same connection deadline, so a short timeout can
-prevent recovery. A changed registration is followed rather than removed.
-
-Recovery requires Linux 5.3 or newer with pidfd support, accessible `/proc`, and
-permission to inspect and signal the server. The per-user registration directory
-and coordination file must be owned by the caller and protected from writes by
-other users. If identity or coordination cannot be verified, the client preserves
-the registration and reports an actionable error. An executable replaced since
-server startup may also prevent identity verification. Cancellation does not
-initiate termination; a signal already sent cannot be undone.
+Automatic recovery is unsupported in this MVP. An unusable existing registration
+is preserved: the client never signals the registered process, deletes its file,
+or launches a replacement over it. Crash leftovers, zombies and inconsistent
+tokens can therefore require operator-assisted recovery. Verify the intended
+server and registration before cleanup and stop other startups during that work.
+Do not act on an unverified PID. Safe automatic recovery is tracked in [issue #415](https://github.com/kazuk/sql-fun/issues/415).
 
 The async low-level `try_from` wraps a socket without authentication; use `connect`
 for the authenticated lifecycle. `invoke_method` accepts protocol-compatible JSON

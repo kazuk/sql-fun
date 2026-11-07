@@ -13,10 +13,12 @@ medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
 medium	arrays-consumers-18
+medium	arrays-diagnostics-18
 medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	case-common-types-17
 medium	case-common-types-18
+medium	coalesce_semantic-17
 medium	coalesce_semantic-18
 medium	collate-17
 medium	collate-18
@@ -45,8 +47,6 @@ medium	project-roles-17
 medium	project-roles-18
 medium	project-roles-empty-17
 medium	project-roles-empty-18
-medium	rows-17
-medium	rows-18
 medium	rows-from-17
 medium	rows-from-18
 medium	schema-composites-17
@@ -88,7 +88,6 @@ medium	table-checks-18
 medium	table-renames-17
 medium	table-renames-18
 light	arrays-diagnostics-17
-light	arrays-diagnostics-18
 light	arrays-metadata-17
 light	arrays-metadata-18
 light	arrays-names-17
@@ -102,7 +101,6 @@ light	case_semantic-17
 light	case_semantic-18
 light	casts-17
 light	casts-18
-light	coalesce_semantic-17
 light	domain-operators-default-17
 light	domain-operators-default-18
 light	membership-comparisons-17
@@ -120,6 +118,8 @@ light	pilot-18
 light	postgres18-syntax-18-18
 light	project-roles-omitted-17
 light	project-roles-omitted-18
+light	rows-17
+light	rows-18
 light	schema-delete-17
 light	schema-delete-18
 light	schema-domains-builtin-17

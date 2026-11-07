@@ -19,6 +19,7 @@ sqlite = ["sql-fun-server-api/sqlite", "sql-fun-core/sqlite"]
 bon = "3.10.1"
 derive-getters.workspace = true
 nix.workspace = true
+rustix = { version = "1.1.4", features = ["event", "process"] }
 schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true

@@ -5,6 +5,7 @@
 mod async_tokio;
 mod completion;
 mod connection;
+mod recovery;
 
 /// api payload
 pub mod payloads;

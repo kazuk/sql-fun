@@ -560,7 +560,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "A PostgreSQL operator reference has database qualification.",
+                  "description": "A `PostgreSQL` operator reference has database qualification.",
                   "type": "object",
                   "properties": {
                     "CrossDatabaseOperatorReference": {
@@ -1296,7 +1296,7 @@
               ]
             },
             "SerialProblem": {
-              "description": "An invalid PostgreSQL serial-family column declaration.",
+              "description": "An invalid `PostgreSQL` serial-family column declaration.",
               "oneOf": [
                 {
                   "description": "Serial arrays cannot be declared. Diagnostic code: `serial_array`.",
@@ -4991,7 +4991,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "A PostgreSQL operator reference has database qualification.",
+                  "description": "A `PostgreSQL` operator reference has database qualification.",
                   "type": "object",
                   "properties": {
                     "CrossDatabaseOperatorReference": {
@@ -5727,7 +5727,7 @@
               ]
             },
             "SerialProblem": {
-              "description": "An invalid PostgreSQL serial-family column declaration.",
+              "description": "An invalid `PostgreSQL` serial-family column declaration.",
               "oneOf": [
                 {
                   "description": "Serial arrays cannot be declared. Diagnostic code: `serial_array`.",

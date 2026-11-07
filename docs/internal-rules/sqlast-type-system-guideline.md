@@ -272,6 +272,10 @@ while inspection retains the original SQL requirements. An independently selecte
 binding supplies evidence for operation-specific diagnostics, including an
 inapplicable operator at a later use. Report selected types and conflicting
 requirements without erasing the binding.
+When deferred projection expansion resumes collection, parameter occurrences
+must supply their retained SQL input constraints, never their finalized
+application types. Keep that transient input state out of serialized expressions
+and grouping identity.
 
 ### Default candidates and deferred overloads
 

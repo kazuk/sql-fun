@@ -5,13 +5,19 @@ use crate::{
     names::FullName,
     parse_statements,
     sem::{CastContext, CastDefinition, OverloadVariant, PgBuiltInType, SemAst, TypeReference},
-    test_helpers::{create_cache_context, query::catalog},
+    test_helpers::{TestParseContext, create_cache_context, query::catalog},
 };
 
 /// Explicit small composite fixtures; no builtin catalog or live database.
 pub(crate) fn composite_query(sql: &str) -> AstAndContextPair<SchemaFileContext> {
+    composite_query_with_catalog(sql, catalog())
+}
+
+pub(crate) fn composite_query_with_catalog(
+    sql: &str,
+    mut base: TestParseContext,
+) -> AstAndContextPair<SchemaFileContext> {
     let mut cache_context = create_cache_context();
-    let mut base = catalog();
     for name in ["singleton", "pair", "container"] {
         let ty = TypeReference::concrete_type_ref(&FullName::with_schema("public", name), false);
         base.set_get_implicit_cast_result(

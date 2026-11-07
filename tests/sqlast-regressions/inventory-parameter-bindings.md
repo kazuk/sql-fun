@@ -147,3 +147,12 @@ must fail, even though an explicitly supplied `int8` input could satisfy the
 SQL. Both PostgreSQL 17 and 18 reject the corresponding `PREPARE ... (int4)`
 with `argument of WHERE must be type boolean, not type text`; the small function
 probes ran inside rolled-back transactions.
+
+PR #1033's review added an internal regression for resumed collection after
+composite-star expansion: `SELECT $2::text, ARRAY(SELECT ($1).*),
+take_singleton($1)`. The selected application binding of `$2` stays `text`,
+while SQL-admissibility inspection must still accept an explicit `int4` input.
+The small in-memory catalog test checks both contracts and the expanded
+single-column projection. PostgreSQL 17 and 18 accepted the corresponding
+typed PREPARE with a singleton composite and an integer input; both probes
+deallocated the statement and rolled back without executing the prepared query.

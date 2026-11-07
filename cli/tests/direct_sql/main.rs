@@ -684,3 +684,25 @@ async fn column_differences_are_readable_in_console_and_junit() -> ::testresult:
     assert!(failure.contains("\n  Actual:"), "{failure}");
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::analyze(&["analyze", "SELECT 1"], "64", "response receive-size limit exceeded")]
+#[case::test(&["test", "cases.json"], "64", "response receive-size limit exceeded")]
+#[case::invalid(&["analyze", "SELECT 1"], "4294967296", "SQL_FUN_MAX_RESPONSE_BYTES")]
+#[tokio::test]
+async fn direct_sql_propagates_receive_limit_environment(
+    #[case] options: &[&str],
+    #[case] limit: &str,
+    #[case] diagnostic: &str,
+) -> ::testresult::TestResult {
+    let output = test_helpers::request_peer::run_with_receive_limit(options, limit).await?;
+    assert!(!output.status.success());
+    // Analyze reports per-query failures on stdout; test also renders execution errors there.
+    let report = format!(
+        "{}{}",
+        String::from_utf8(output.stdout)?,
+        String::from_utf8(output.stderr)?
+    );
+    assert!(report.contains(diagnostic), "{report}");
+    Ok(())
+}

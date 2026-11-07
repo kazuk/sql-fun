@@ -7,6 +7,9 @@ mod completion;
 mod connection;
 mod recovery;
 
+#[cfg(test)]
+mod test_helpers;
+
 /// api payload
 pub mod payloads;
 mod tokenize_sql;

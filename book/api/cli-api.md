@@ -156,12 +156,36 @@ all pages and releases the retained collection before returning a validated core
 error rather than a partial stream. CLI diagnostic preparation awaits this
 operation; rendering and highlighting remain synchronous.
 
-## Response size limitation
+## Response size and memory use
 
-The authenticated client buffers complete JSON-RPC response frames and does not
-yet provide a configurable maximum receive size through its API or CLI
-([#781](https://github.com/kazuk/sql-fun/issues/781)). Large analysis responses,
-including executable SQL, can therefore consume correspondingly large memory.
-The proposed 4 MiB default in that issue is not an implemented limit or current
-configuration option. Authentication has a separate bound; it does not cap
-subsequent authenticated response frames.
+Authenticated JSON-RPC response frames have a default receive limit of
+**4 MiB (4,194,304 bytes)**. Set `SQL_FUN_MAX_RESPONSE_BYTES` to an integer byte
+count, or use `sql-fun api --max-response-bytes <BYTES>` to override that environment
+value. The environment setting also applies to `check`, `analyze`, and `test`;
+those commands do not have a corresponding command-specific option. An omitted
+setting uses the default. Empty, malformed, negative, or overflowing values are
+configuration errors.
+
+The permitted range is 0 through 4,294,967,295 bytes (`u32::MAX`), including values
+below the default. Zero rejects every nonempty authenticated response; it does
+not disable the cap. The size includes the entire serialized JSON-RPC envelope,
+metadata, diagnostics, executable SQL, JSON escaping, and the terminating newline.
+It counts wire bytes rather than Unicode characters. Authentication retains its
+independent 8,192-byte response bound.
+
+If a response exceeds the cap, the command exits with a transport receive-size
+error reporting the configured limit and at least how many bytes were observed.
+The connection closes and cannot be reused. For a valid large analysis response,
+explicitly raise the cap and start a new invocation, without changing the SQL:
+
+```sh
+sql-fun api --user alice --max-response-bytes 8388608
+# Or apply an 8 MiB cap to a SQL command:
+SQL_FUN_MAX_RESPONSE_BYTES=8388608 sql-fun analyze 'SELECT 1'
+```
+
+Buffers grow with received data; the configured maximum is not preallocated.
+The client still buffers complete responses, so higher limits permit larger
+allocations. Decoding, concurrent/queued responses, and complete collection
+materialization add memory use beyond one frame. This setting is a per-response
+resource bound, not a total-process memory budget.

@@ -21,6 +21,28 @@ pub(crate) async fn run_selection(
     env_datasource: Option<&str>,
     valid_default: Option<bool>,
 ) -> ::testresult::TestResult<(Output, Vec<Value>, Option<Value>)> {
+    run_selection_with_receive_limit(options, cli_datasource, env_datasource, valid_default, None)
+        .await
+}
+
+/// Exercise the environment-only connection setting shared by analyze and test.
+pub(crate) async fn run_with_receive_limit(
+    options: &[&str],
+    limit: &str,
+) -> ::testresult::TestResult<Output> {
+    let (output, _, _) =
+        run_selection_with_receive_limit(options, Some("products"), None, Some(true), Some(limit))
+            .await?;
+    Ok(output)
+}
+
+async fn run_selection_with_receive_limit(
+    options: &[&str],
+    cli_datasource: Option<&str>,
+    env_datasource: Option<&str>,
+    valid_default: Option<bool>,
+    receive_limit: Option<&str>,
+) -> ::testresult::TestResult<(Output, Vec<Value>, Option<Value>)> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let directory = prepare_inputs(listener.local_addr()?.port(), valid_default)?;
     let root = directory.path();
@@ -35,6 +57,10 @@ pub(crate) async fn run_selection(
         .env_remove("SQL_FUN_DATASOURCE")
         .env_remove("RUST_LOG")
         .args(["--term-color", "never", "--metadata-file", "metadata.toml"]);
+    command.env_remove("SQL_FUN_MAX_RESPONSE_BYTES");
+    if let Some(value) = receive_limit {
+        command.env("SQL_FUN_MAX_RESPONSE_BYTES", value);
+    }
     if let Some(name) = cli_datasource {
         command.args(["--datasource", name]);
     }

@@ -1,4 +1,4 @@
-use crate::async_tokio::TcpJsonRpcClientAsync;
+use crate::async_tokio::{DEFAULT_MAX_RESPONSE_BYTES, TcpJsonRpcClientAsync};
 use ::tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
@@ -6,6 +6,14 @@ use ::tokio::{
 
 /// A narrow wire fixture for framing/response validation, not lifecycle coverage.
 pub async fn response_peer(response: &[u8]) -> std::io::Result<TcpJsonRpcClientAsync> {
+    response_peer_with_limit(response, DEFAULT_MAX_RESPONSE_BYTES).await
+}
+
+/// Wrap the framing peer with an explicit post-initialization response limit.
+pub async fn response_peer_with_limit(
+    response: &[u8],
+    max_response_bytes: u32,
+) -> std::io::Result<TcpJsonRpcClientAsync> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let response = response.to_owned();
@@ -22,7 +30,10 @@ pub async fn response_peer(response: &[u8]) -> std::io::Result<TcpJsonRpcClientA
         let mut remainder = Vec::new();
         let _ = reader.read_to_end(&mut remainder).await;
     });
-    TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await?)
+    TcpJsonRpcClientAsync::try_from_with_max_response_bytes(
+        TcpStream::connect(address).await?,
+        max_response_bytes,
+    )
 }
 
 /// Respond only after write EOF, exercising submission independence and half-close.

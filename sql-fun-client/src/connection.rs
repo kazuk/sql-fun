@@ -1,4 +1,4 @@
-use crate::{TcpJsonRpcClientAsync, recovery::recover};
+use crate::{TcpJsonRpcClientAsync, async_tokio::DEFAULT_MAX_RESPONSE_BYTES, recovery::recover};
 
 use std::{
     os::unix::process::CommandExt,
@@ -23,7 +23,11 @@ const REGISTRATION_LIMIT: u16 = 8192;
 /// path component. No project metadata or executable is inferred.
 ///
 /// Prefer the builder: executable and user are required at compile time, while
-/// command and timeout may be omitted. Omitted timeout means 40 seconds.
+/// command, timeout, and response limit may be omitted. Omitted timeout means
+/// 40 seconds; the response limit defaults to 4 MiB. Use the builder's
+/// `max_response_bytes` setter for a `u32` byte limit, including the newline.
+/// A receive-size failure closes the connection; reconnect with a larger limit
+/// to retry a valid large response. This does not change the authentication bound.
 ///
 /// ```
 /// use sql_fun_client::ConnectionOptions;
@@ -57,6 +61,10 @@ pub struct ConnectionOptions {
     server_command: Option<String>,
     /// Optional positive total connection budget; omission means 40 seconds.
     timeout: Option<Duration>,
+    /// Maximum authenticated response frame bytes, including the terminating newline.
+    /// Defaults to 4 MiB. Zero rejects all responses; the authentication bound is separate.
+    #[builder(default = DEFAULT_MAX_RESPONSE_BYTES)]
+    max_response_bytes: u32,
 }
 
 impl ConnectionOptions {
@@ -78,6 +86,7 @@ impl ConnectionOptions {
             user: user.to_owned(),
             server_command: server_command.map(str::to_owned),
             timeout,
+            max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES,
         }
     }
 
@@ -345,7 +354,11 @@ impl Registration {
                 })
     }
 
-    async fn authenticate(&self, deadline: Instant) -> Result<TcpJsonRpcClientAsync, String> {
+    async fn authenticate(
+        &self,
+        deadline: Instant,
+        max_response_bytes: u32,
+    ) -> Result<TcpJsonRpcClientAsync, String> {
         let stream = timeout_at(
             deadline,
             ::tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, self.port)),
@@ -353,8 +366,9 @@ impl Registration {
         .await
         .map_err(|_| String::from("TCP connect timed out"))?
         .map_err(|error| format!("TCP connect: {error}"))?;
-        let mut client = TcpJsonRpcClientAsync::try_from(stream)
-            .map_err(|error| format!("TCP setup: {error}"))?;
+        let mut client =
+            TcpJsonRpcClientAsync::try_from_with_max_response_bytes(stream, max_response_bytes)
+                .map_err(|error| format!("TCP setup: {error}"))?;
         let response = timeout_at(
             deadline,
             client.invoke_bounded(
@@ -413,7 +427,10 @@ impl ConnectionAttempt {
             .min(deadline);
         let attempt_deadline = readiness_deadline.min(Instant::now() + ATTEMPT_TIMEOUT);
         if Instant::now() < attempt_deadline {
-            match record.authenticate(attempt_deadline).await {
+            match record
+                .authenticate(attempt_deadline, options.max_response_bytes)
+                .await
+            {
                 Ok(client) if Instant::now() < deadline => return Ok(Some(client)),
                 Ok(_) => self.last = String::from("initialize completed after connection deadline"),
                 Err(error) => self.last = error,

@@ -155,6 +155,9 @@ The existing initialization API currently supports PostgreSQL schema contexts.
 
 Server connection uses the same `USER`, `SQL_FUN_SERVER`, and
 `SQL_FUN_SERVER_COMMAND` settings as [`sql-fun api`](../api/cli-api.md).
+`SQL_FUN_MAX_RESPONSE_BYTES` sets the authenticated response receive cap
+(default 4 MiB); see [response size and memory use](../api/cli-api.md#response-size-and-memory-use)
+for configuration and recovery after a size-limit error.
 
 The command exits with status 0 if all analysis completes without error-level
 diagnostics. Warnings and advice alone succeed. Error diagnostics and execution

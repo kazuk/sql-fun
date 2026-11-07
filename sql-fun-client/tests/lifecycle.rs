@@ -2,7 +2,11 @@
 
 mod test_helpers;
 
-use self::test_helpers::{heavy, registration::RegistrationFixture};
+use self::test_helpers::{
+    heavy,
+    registration::RegistrationFixture,
+    response_peer::{ResponsePeer, analysis_result},
+};
 use ::sql_fun_client::connect;
 use std::time::{Duration, Instant};
 
@@ -266,4 +270,58 @@ impl ::sql_fun_client::CompleteResponse for ObservedContext {
     ) -> ::sql_fun_client::CompletionFuture<'a> {
         self.context.complete(context)
     }
+}
+
+// This integration contract spans public connection configuration, authentication,
+// streaming reception, callback delivery, and terminal connection reporting.
+#[rstest::rstest]
+#[case::ordinary_default(1024, None, true)]
+#[case::oversized_default(5 * 1024 * 1024, None, false)]
+#[case::raised_limit(5 * 1024 * 1024, Some(8 * 1024 * 1024), true)]
+#[case::lowered_limit(1024, Some(64), false)]
+#[tokio::test]
+async fn configured_receive_limit_controls_response_delivery(
+    #[case] sql_bytes: usize,
+    #[case] limit: Option<u32>,
+    #[case] succeeds: bool,
+) -> ::testresult::TestResult {
+    let result = analysis_result(sql_bytes);
+    let peer = ResponsePeer::new(&result).await?;
+    let mut client = connect(&peer.options(limit)).await?;
+    let (sent, received) = ::tokio::sync::oneshot::channel();
+    client
+        .invoke_method(
+            "analyze_query",
+            &::serde_json::json!({}),
+            move |response| async move {
+                let _ = sent.send(response.into_result());
+                Ok(())
+            },
+        )
+        .await?;
+    if succeeds {
+        client.finish().await?;
+        assert_eq!(received.await??, result);
+    } else {
+        let error = client.wait_for_failure().await.unwrap_err().to_string();
+        assert!(
+            error.contains("response receive-size limit exceeded"),
+            "{error}"
+        );
+        assert!(
+            error.contains(&format!("limit {} bytes", limit.unwrap_or(4 * 1024 * 1024))),
+            "{error}"
+        );
+        assert!(error.contains("observed at least"), "{error}");
+        assert!(client.peer_addr().is_err());
+        assert!(
+            client
+                .invoke_method("later", &::serde_json::json!({}), |_| async { Ok(()) })
+                .await
+                .is_err()
+        );
+        assert!(client.finish().await.is_err());
+        assert!(received.await.is_err());
+    }
+    Ok(())
 }

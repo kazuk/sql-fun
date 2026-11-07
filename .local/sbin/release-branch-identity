@@ -6,6 +6,6 @@ if [[ $# != 2 || "$1" != refs/heads/release/* || ! "$2" =~ ^[0-9a-f]{40}$ ]]; th
 fi
 scripts="$(cd "$(dirname "$0")" && pwd)"
 identity="$("$scripts/../bin/parse-release-version" "${1#refs/heads/release/}")"
-printf 'tag=%s\nversion=%s\nsnapshot=%s\nclassification=%s\nrevision=%s\n' \
+printf 'tag=%s\nversion=%s\nprerelease=%s\nclassification=%s\nrevision=%s\n' \
   "$(cut -f1 <<<"$identity")" "$(cut -f2 <<<"$identity")" \
   "$(cut -f3 <<<"$identity")" "$(cut -f4 <<<"$identity")" "$2"

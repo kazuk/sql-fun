@@ -50,7 +50,7 @@ def confirm_tag(args):
 def draft_assets(args, release, files):
     require(release['tag_name'] == args.tag, 'Release identity changed; refusing asset mutation')
     require(release['draft'], 'Release was published; refusing further draft mutation')
-    require(release['prerelease'] == (args.classification == 'snapshot'),
+    require(release['prerelease'] == (args.classification == 'prerelease'),
             f'Release classification mismatch for {args.tag}; operator correction required')
     existing = {}
     for asset in pages(args, f'releases/{release["id"]}/assets'):
@@ -88,14 +88,14 @@ def create_draft(args):
     # Consume the create response directly: a newly created draft may not yet
     # appear in the paginated Release listing (observed in live preparation).
     payload = dict(tag_name=args.tag, draft=True, name=args.tag, body=notes,
-                   prerelease=args.classification == 'snapshot')
+                   prerelease=args.classification == 'prerelease')
     result = subprocess.run(['gh', 'api', '--method', 'POST',
                              f'repos/{args.repository}/releases', '--input', '-'],
                             input=json.dumps(payload), text=True, stdout=subprocess.PIPE)
     if result.returncode == 0:
         release = json.loads(result.stdout)
         require(release['tag_name'] == args.tag and release['draft'] and
-                release['prerelease'] == (args.classification == 'snapshot'),
+                release['prerelease'] == (args.classification == 'prerelease'),
                 'Create response does not identify the intended draft')
     else:
         # A lost response may still have created the draft; accept only state

@@ -32,10 +32,11 @@ cargo binstall --strategies crate-meta-data --targets x86_64-unknown-linux-gnu \
   --version '=0.1.1' sql-fun-server
 ```
 
-For a snapshot listing CLI `0.2.0-snapshotN` and server `0.1.1-snapshotN`, use
-`--version '=0.2.0-snapshotN'` and `--version '=0.1.1-snapshotN'` respectively,
-replacing `N` with the selected release's actual suffix. These are version
-examples, not a promise that those versions have been published. Historical
+For a prerelease listing CLI `0.2.0-alpha.1` and server `0.1.1-alpha.1`, use
+`--version '=0.2.0-alpha.1'` and `--version '=0.1.1-alpha.1'` respectively.
+Use the exact component versions from the selected release's notes, including
+the full prerelease name (for example, `alpha.1`, `rc1`, or `snapshot2`). These
+are version examples, not a promise that those versions have been published. Historical
 crate versions published before this support cannot acquire the metadata.
 
 These commands retrieve project-provided binaries only and fail if unavailable;

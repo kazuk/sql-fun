@@ -2,18 +2,21 @@
 set -euo pipefail
 
 # Shared product identity grammar for release tags and release branch suffixes.
-# Output: tag, version without v, snapshot suffix, classification (TSV).
+# Output: tag, version without v, prerelease name, classification (TSV).
 tag="${1:-}"
 number='(0|[1-9][0-9]*)'
-if ! [[ "$tag" =~ ^v${number}\.${number}\.${number}(-snapshot[0-9]*)?$ ]]; then
+# SemVer prerelease syntax, restricted by project policy to names without '-'.
+# Validate identifiers without interpreting the opaque name as channels/counters.
+identifier="($number|[0-9A-Za-z]*[A-Za-z][0-9A-Za-z]*)"
+if ! [[ "$tag" =~ ^v${number}\.${number}\.${number}(-${identifier}(\.${identifier})*)?$ ]]; then
   echo "invalid project release tag: $tag" >&2
   exit 1
 fi
 version="${tag#v}"
-snapshot=""
+prerelease=""
 classification=stable
-if [[ "$version" == *-snapshot* ]]; then
-  snapshot="${version#*-}"
-  classification=snapshot
+if [[ "$version" == *-* ]]; then
+  prerelease="${version#*-}"
+  classification=prerelease
 fi
-printf '%s\t%s\t%s\t%s\n' "$tag" "$version" "$snapshot" "$classification"
+printf '%s\t%s\t%s\t%s\n' "$tag" "$version" "$prerelease" "$classification"

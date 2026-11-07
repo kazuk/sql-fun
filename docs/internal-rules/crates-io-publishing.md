@@ -17,15 +17,18 @@ The GitHub Release can be visible before crates.io or Pages completes.
 ## Release identity and source
 
 `release.tag_name` is authoritative. The shared
-`.local/bin/parse-release-version` parser accepts `vX.Y.Z`,
-`vX.Y.Z-snapshot`, and `vX.Y.Z-snapshotN` (where N is a sequence of digits).
-Numeric version components must not have leading zeros. Other prerelease names,
-build metadata, and invalid tags fail before distribution. The upstream release
+`.local/bin/parse-release-version` parser accepts `vX.Y.Z` and
+`vX.Y.Z-NAME`. The optional name is opaque and must follow SemVer prerelease
+syntax, restricted by project policy to names without hyphens. For example,
+`snapshot2`, `rc1`, `alpha.1`, and `0.3.7` are permitted names. Numeric version
+components and entirely numeric name identifiers must not have leading zeros.
+Build metadata and invalid tags fail before distribution. The upstream release
 branch suffix must equal this product tag. The merge job derives
 `refs/heads/release/<tag>` from that validated identity.
 
 Classification does not use `release.target_commitish`, `release.prerelease`,
-or a workflow input. Snapshot releases never enter the merge or Pages jobs and
+or a workflow input. The name's presence alone classifies a prerelease; its
+spelling has no effect. Prereleases never enter the merge or Pages jobs and
 never obtain a repository-write credential.
 
 The tag identifies the product release, independently of individual crate
@@ -138,7 +141,7 @@ by the workflow, rather than allowing only `main`. If environment approvals are
 configured, maintainers must satisfy them for deployment.
 
 The Pages job runs after successful crates.io distribution and stable-branch
-merge. A failed merge blocks Pages; snapshots run neither job. It downloads
+merge. A failed merge blocks Pages; prereleases run neither job. It downloads
 `sql-fun_vX.Y.Z_user-manual.tar.gz` from the triggering Release and extracts the
 mdBook output. The archive must contain the built site's `index.html` at its
 root, alongside its normal assets; #328 is the producer of this layout.
@@ -157,7 +160,7 @@ valid stable product version among published Releases. Older stable reruns skip
 deployment; GitHub's editable prerelease/latest flags do not control this choice.
 A newer release arriving during an active deployment will deploy through its
 own subsequent successful distribution job. Pages retains one latest stable
-manual; historical and snapshot manuals remain versioned Release assets.
+manual; historical and prerelease manuals remain versioned Release assets.
 
 ## Retry and validation
 

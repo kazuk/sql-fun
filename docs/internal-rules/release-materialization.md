@@ -6,12 +6,17 @@
 required normal CI. `R` is a direct child recording the materialized release
 state on that same branch. Preparation never writes to `main`.
 
-The shared project parser supplies product tag, classification and snapshot
-suffix. `.local/sbin/materialize-release-state` checks those values against the
-explicit product tag and maps them to
-`.local/bin/materialize-release-versions`; it does not introduce another mode
-or version algorithm. Each publishable crate uses its own current version and
-`workspace.metadata.next-release`, not the numeric product tag. Workspace
+The shared project parser supplies the exact product tag, `stable|prerelease`
+classification and opaque prerelease name. The name follows SemVer prerelease
+syntax with the project's additional prohibition on hyphens; classification
+reflects only whether the name is present. `.local/sbin/materialize-release-state`
+checks those values against the explicit product tag and maps them to
+`.local/bin/materialize-release-versions --release` or `--prerelease=NAME`.
+The materializer validates all resulting versions with the same project parser
+before changing any manifests and appends the name unchanged; it does not
+interpret a channel or counter or introduce another version algorithm. Each
+publishable crate uses its own current version and `workspace.metadata.next-release`,
+not the numeric product tag. Workspace
 non-publishable versions stay unchanged; dependency requirements can change.
 
 Responsibility boundaries:
@@ -62,7 +67,7 @@ receives the candidate from the single selected CI run. Downloaded inputs stay
 under `$RUNNER_TEMP/release-inputs`; the active baseline path alone is Git state.
 `steps.baseline.outputs.paths` names external `baseline-paths.txt`: exactly
 `.local/semver_baseline.tar.gz` for stable, empty for prerelease. The adopter
-owns archive validation and atomic replacement; snapshots preserve baseline
+owns archive validation and atomic replacement; prereleases preserve baseline
 bytes and modification time.
 
 `.local/sbin/release-state commit` combines those explicit lists. Stable intent

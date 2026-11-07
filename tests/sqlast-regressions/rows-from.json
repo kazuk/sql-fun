@@ -444,13 +444,15 @@
     "name": "rows_from::parameter_later_constraint",
     "sql": "SELECT r.value,$1::int FROM ROWS FROM(COALESCE($1,1)) r(value)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "value",
-          "type": null,
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
           "nullability": "nullable"
         },
         {

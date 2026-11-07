@@ -241,9 +241,7 @@
     "name": "typed_parameter",
     "sql": "SELECT ($1::leaf_dd).n AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -261,9 +259,7 @@
     "name": "nested_typed_parameter",
     "sql": "SELECT (($1::outer_d).item).n AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",

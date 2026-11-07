@@ -247,13 +247,21 @@ async fn query_rpc_reports_distinct_analysis_failures(#[case] sql: &str, #[case]
 }
 
 #[rstest::rstest]
-#[case::native("SELECT $1::text AS value", false)]
-#[case::application("SELECT ${src}::text AS value", false)]
-#[case::explicit_input("SELECT ${src:text}::text AS value", true)]
+#[case::native("SELECT $1::text AS value", true, Some("text"))]
+#[case::application("SELECT ${src}::text AS value", true, Some("text"))]
+#[case::ambiguous_first(
+    "WITH c AS (SELECT ${src} IS NULL) SELECT ${src}::text AS value",
+    false,
+    None
+)]
+#[case::explicit_input("SELECT ${src:text}::text AS value", true, Some("text"))]
+#[case::later_hint("SELECT ${src}::text AS value, ${src:int4} + 1", true, Some("int4"))]
+#[case::later_conflict("SELECT ${src}::text AS value, ${src} + 1", false, Some("text"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn query_rpc_distinguishes_input_binding_from_known_output(
     #[case] sql: &str,
     #[case] complete: bool,
+    #[case] selected: Option<&str>,
 ) {
     let project = query_project();
     // The authenticated RPC must preserve completion and diagnostic severity
@@ -277,14 +285,42 @@ async fn query_rpc_distinguishes_input_binding_from_known_output(
     let parameter = &item["parameters"]["items"][0];
     assert_eq!(parameter["parameter_index"], 1);
     let problems = item["probrems"]["items"].as_array().unwrap();
+    assert_eq!(
+        parameter["parameter_type"]["local_name"].as_str(),
+        selected,
+        "{response}"
+    );
     if complete {
-        assert_eq!(parameter["parameter_type"]["local_name"], "text");
         assert!(problems.is_empty(), "{response}");
+    } else if selected.is_some() {
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem["code"] == "binary_operator_overload_resolution_failed"),
+            "{response}"
+        );
+        assert!(
+            !problems
+                .iter()
+                .any(|problem| problem["code"] == "parameter_type_unresolved"),
+            "{response}"
+        );
+        let conflict = problems
+            .iter()
+            .find(|problem| problem["code"] == "parameter_constraint")
+            .unwrap();
+        assert_eq!(
+            conflict["presentation"]["problem"]["ParameterConstraint"]["binding"]["index"],
+            1
+        );
     } else {
         assert!(parameter["parameter_type"].is_null());
         assert_eq!(problems.len(), 1, "{response}");
         assert_eq!(problems[0]["code"], "parameter_type_unresolved");
         assert_eq!(problems[0]["severity"], "error");
+        let ambiguity = &problems[0]["presentation"]["problem"]["ParameterTypeUnresolved"];
+        assert_eq!(ambiguity["index"], 1, "{response}");
+        assert_eq!(ambiguity["candidates"].as_array().unwrap().len(), 7);
     }
     connection.end_requests().await;
     connection.finish().await.unwrap();

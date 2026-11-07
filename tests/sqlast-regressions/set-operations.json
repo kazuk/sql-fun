@@ -909,9 +909,7 @@
     "name": "explicit_input",
     "sql": "SELECT $1::integer AS x UNION SELECT 1.5",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "x",
@@ -929,9 +927,7 @@
     "name": "explicit_right_input",
     "sql": "SELECT 1.5 AS x UNION SELECT $1::integer",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "x",
@@ -1111,13 +1107,16 @@
     "name": "column_right_parameter_left",
     "sql": "SELECT ${id} AS id UNION SELECT x.id FROM set_items AS x",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "id",
-          "nullability": "nullable"
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
         }
       ]
     }
@@ -1126,13 +1125,16 @@
     "name": "column_left_parameter_right",
     "sql": "SELECT x.id FROM set_items AS x UNION SELECT ${id}",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "id",
-          "nullability": "nullable"
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
         }
       ]
     }

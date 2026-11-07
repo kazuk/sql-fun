@@ -21,9 +21,7 @@
     "name": "type_metadata_regressions::ordinary_signature_precedes_identical_variadic_expansion::parameter::reverse",
     "sql": "SELECT choose($1::numeric)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "choose",

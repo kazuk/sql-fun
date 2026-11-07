@@ -8,9 +8,9 @@ use crate::{
     ast::Dialect,
     names::{AliasName, ColumnName, FullName, OperatorName, TableName},
     sem::{
-        AccessKind, AnalysisError, CteStatement, InputTypeConstraint, InsertTarget,
-        OperatorDefinition, ParseContext, QueryProblem, ResultColumnCollection, SelectStatement,
-        SemScalarExpr, TypeReference,
+        AccessKind, AnalysisError, ArithExpr, BinaryOperatorDefinition, CteStatement,
+        InputTypeConstraint, InsertTarget, OperatorDefinition, ParseContext, QueryProblem,
+        ResultColumnCollection, SelectStatement, SemScalarExpr, TypeReference,
         parameter_resolution::{ParameterResolution, Signature},
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
@@ -990,10 +990,13 @@ pub struct ResolvedOperator {
     name: OperatorName,
     resolution: QueryNameResolution,
     signatures: Vec<Signature>,
+    #[serde(skip)]
+    application_overloads: Option<Vec<BinaryOperatorDefinition>>,
 }
 impl ResolvedOperator {
     pub(crate) fn canonicalize_grouping_key(&mut self) {
         self.signatures.clear();
+        self.application_overloads = None;
     }
 
     pub(crate) fn resolve(
@@ -1016,6 +1019,11 @@ impl ResolvedOperator {
             Self {
                 name: name.clone(),
                 resolution: QueryNameResolution::operator(name),
+                application_overloads: if context.parameter_inference_needed() {
+                    operator.binary_overloads().map(<[_]>::to_vec)
+                } else {
+                    None
+                },
                 // Parameter-free schema expressions need the lookup outcome, not
                 // a copy of every overload's inference signature.
                 signatures: if context.parameter_inference_needed() {
@@ -1029,6 +1037,7 @@ impl ResolvedOperator {
                 name: name.clone(),
                 resolution: QueryNameResolution::not_found(),
                 signatures: Vec::new(),
+                application_overloads: None,
             }
         }
     }
@@ -1039,6 +1048,35 @@ impl ResolvedOperator {
     pub const fn resolution(&self) -> &QueryNameResolution {
         &self.resolution
     }
+    pub(crate) fn validate_application_inputs(
+        &self,
+        arguments: &[SemScalarExpr],
+        context: &mut impl ParseContext,
+    ) -> Result<Option<InputTypeConstraint>, AnalysisError> {
+        if let [left, right] = arguments
+            && left.get_type().is_some()
+            && right.get_type().is_some()
+            && let Some(overloads) = &self.application_overloads
+        {
+            let resolved = ArithExpr::resolve_overload_binary(
+                context,
+                &self.name,
+                OperatorDefinition::binary(overloads),
+                left.clone(),
+                right.clone(),
+            )?;
+            let (value, _) = resolved.into_call_site_expr(context, &self.name)?;
+            return Ok(Some(
+                value
+                    .get_type()
+                    .as_ref()
+                    .map(InputTypeConstraint::exact)
+                    .unwrap_or_else(|| InputTypeConstraint::types([])),
+            ));
+        }
+        Ok(None)
+    }
+
     pub(crate) fn infer(
         &self,
         parameters: &mut ParameterResolution<'_>,

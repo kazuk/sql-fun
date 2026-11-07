@@ -18,48 +18,74 @@ typed inputs, rather than PostgreSQL's single signature inferred by an untyped
 `integer[]` result and a `bigint` input with a `bigint[]` result. PostgreSQL
 chooses `integer` when preparing that statement without parameter types.
 When several result types remain possible, analysis cannot report one definite
-result type. An explicit SQL cast can narrow the result type.
+result type. An explicit SQL cast can narrow the result type. Once an application
+input type is selected, reported result columns use that selection. Other
+explicitly typed inputs may still be SQL-admissible with different result types.
 
-Query analysis for an application must establish its input types. If SQL
-inference or a supported explicit input type hint does not establish one input
-type, it returns `parameter_type_unresolved` as an error and marks the statement
-incomplete. This applies both when several input types remain possible and when
-the SQL does not require any particular input type. If no type satisfies all
-requirements, analysis reports the conflicting uses instead.
+For application bindings, an explicit `${name:typehint}` is authoritative.
+Analysis validates that type against every use and never substitutes another
+type to make the query work. A hint applies to the parameter everywhere, even
+when written on a later occurrence.
 
-An unresolved binding does not mean the SQL is intrinsically invalid or that
-PostgreSQL could not execute it with client-supplied parameter types.
-PostgreSQL's untyped `PREPARE` signature is not automatically selected as the
-application's binding. Known result-column metadata remains available even when
-an input binding is unresolved. For example, `SELECT $1::text AS value` has a
-known `text` result but its result cast need not determine a unique source type.
+Without a hint, PostgreSQL application binding selection uses the parameter's
+**first syntactic occurrence**, including occurrences in nested queries and
+CTEs. Only that occurrence's local expression selects the input type. At a
+consuming operation, the candidates are `bool`, `int4`, `int8`, `float4`,
+`float8`, `text`, and `numeric`. These seven types are sql-fun's bounded
+selection policy, not the complete set of types PostgreSQL clients can supply.
 
-For named application parameters, `SELECT ${src:text}::text AS value` explicitly
-supplies the input type and completes with a `text` binding. Likewise,
-`record_fun(${src:text}::text)` resolves the input binding when `record_fun` has
-a `text` argument. `${src}::text` only casts the result of the parameter
-expression. Use one placeholder style per input; do not mix named placeholders
-with native `$1` parameters. Explicit hints still undergo validation against all
-uses of the parameter.
+The local operation determines which candidates it accepts: an explicit cast
+allows explicit conversions, while function and operator arguments use their
+applicable implicit conversion rules. A unique candidate requiring no
+conversion wins. If no identity candidate exists, a single remaining
+admissible candidate wins. Multiple remaining choices produce
+`parameter_type_unresolved`, listing the candidates. An occurrence with no
+input-type requirement also remains ambiguous. Later uses cannot resolve that
+ambiguity or change an earlier selection.
 
-When overloaded operations have no SQL type information for their inputs,
-PostgreSQL bind-input inference considers seven default candidates: `bool`,
-`int4`, `int8`, `float4`, `float8`, `text`, and `numeric`. This list is not a
-preference order: several surviving candidates still leave the binding
-unresolved. Unrelated catalog types do not enlarge these default candidates. SQL
-context and explicit input hints can establish other types, including arrays,
-composite types, user-defined types, and `bytea`. All occurrences of a parameter
-contribute constraints before its binding is finalized.
-Explicitly supplied input types must satisfy all SQL uses of each parameter,
-including when the supplied types are outside those inference candidates.
+```sql
+SELECT ${src}::text AS value;
+```
+
+This selects a `text` input through identity acceptance, so an additional
+`${src:text}` hint is unnecessary. The same applies when the cast supplies an
+argument to a record-returning table function. Native `$1::text` uses the same
+binding rule. Use one placeholder style per input; do not mix named
+placeholders with native `$1` parameters.
+
+```sql
+SELECT ${src}::text, ${src} + 1;
+```
+
+The first occurrence selects `text`. The later addition is checked as
+`text + integer` and reports no matching operator overload; analysis does not
+search for a different input type satisfying both occurrences. Conflicting
+uses report the selected binding and the conflicting type requirements.
+A selected binding can therefore remain known while the statement is incomplete
+because of another error.
+
+```sql
+SELECT ${src} IS NULL, ${src}::text;
+```
+
+The first occurrence does not choose an input type. The later cast cannot
+repair that ambiguity; supply an explicit `${src:text}` hint when a text
+binding is intended.
+
+Explicit hints may supply types outside the seven defaults, including arrays,
+composite types, user-defined types, and `bytea`, when accepted by the query.
+SQL-admissible input alternatives and application binding selection are separate:
+SQL that has no selected application binding is not necessarily invalid SQL.
+Known result-column metadata remains available even with an unresolved input.
+PostgreSQL's untyped `PREPARE` inference is not the definition of sql-fun's
+application binding rules.
+
 Unresolved expression results are distinct from parameter placeholders. If
 resolving them would require a catalog-wide type search, analysis reports
-`inference_candidate_space_unsupported` and leaves their types unresolved. This
-indicates a limitation of inference, not invalid SQL. Supply SQL type context or
-an input type hint to avoid that search; types established by later occurrences
-are considered before this diagnostic is emitted. For `bytea`, the protocol's
-text value format does not change its SQL type to `text`; use SQL context or an
-explicit `bytea` input hint.
+`inference_candidate_space_unsupported`. This indicates a limitation of
+inference, not invalid SQL. Supply SQL type context or an input type hint.
+For `bytea`, the protocol's text value format does not change its SQL type to
+`text`; use an explicit `bytea` input hint to select that binding.
 
 Parameters in supported ORDER BY, GROUP BY, HAVING, DISTINCT ON, LIMIT/OFFSET,
 aggregate FILTER/ordering and window expressions participate in the same query
@@ -102,4 +128,5 @@ expression would require unsupported catalog-wide inference.
 [inference_candidate_space_unsupported]: ../../diagnostics/inference_candidate_space_unsupported.md
 
 Conflicting type requirements and the absence of any type requirement are
-different conditions. Neither establishes a usable application input type.
+different conditions. A conflict does not erase an already selected application
+input type; an unconstrained first occurrence does not select one.

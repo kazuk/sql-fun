@@ -87,3 +87,63 @@ completion and error severity independently of known result columns. The Scrut
 CLI suite checks exit 1 with an unresolved application input, a later successful
 hinted input, and exit 0 when `test` expects the error and known columns. A
 passing contract test does not assert a finalized binding for its input SQL.
+
+## First-occurrence application bindings (#779)
+
+The #766 observations above are historical evidence of the redundant-hint DX
+problem. Before implementation, CLI/server binaries built from `71acf967`
+reproduced the unhinted plain-cast and record-function failures on both bundled
+PostgreSQL 17/18 catalogs. `${src:text}` completed successfully with a `text`
+parameter and the same known result columns. The additional inputs
+`SELECT ${src}::text, ${src} + 1` and
+`SELECT ${src} IS NULL, ${src}::text` both reported
+`parameter_type_unresolved` on that baseline.
+
+The current `analyze` command requires explicit file selection:
+
+```sh
+sql-fun --term-color never --metadata-file metadata-17.toml \
+  --datasource regression \
+  --schema-file tests/sqlast-regressions/schema-table-functions.sql \
+  analyze --sql-file selected-query.sql --schema-level project
+```
+
+The updated fixture retains the plain/record cases as successful `text`
+bindings without extra hints. It adds ambiguous-first, later operator rejection,
+a hint written on a later occurrence, and source-order versus semantic-traversal
+coverage. Native and named inputs share the numbered SQLAST parameter contract.
+The existing manifest runs these contracts through source and installed checks
+for both catalog versions.
+
+Existing cast, array, truth-test, comparison and DML fixtures also reflect the
+new policy. Scalar identity cases no longer expect unresolved inputs, and
+result columns use selected scalar inputs. A first unconstrained use remains
+ambiguous despite a later assignment or comparison. SQL-established arrays,
+records, UUIDs and other types outside the seven candidates remain available
+to SQL-admissibility inspection, but require an explicit input hint when no
+default candidate is accepted. Their fixtures retain known result columns and
+now assert the unresolved application binding separately.
+
+Focused Rust coverage checks first-occurrence order, authoritative resolved hints,
+retention of the selected type after rejection, and continued SQL-admissible
+assignment inspection. RPC coverage checks public parameter type and completion,
+including an ambiguous first occurrence in a CTE. Ambiguity payloads retain the
+local candidates; conflict payloads retain the parameter, selected type, and
+conflicting requirements. The CLI small-catalog contract also checks a
+successful unhinted identity cast,
+selected parameter metadata, mixed-input recovery, and the cast-only exit status.
+Parser source locations are analysis bookkeeping and
+are not added to the serialized semantic parameter contract.
+
+The PostgreSQL 17 and 18 oracles reject `PREPARE issue779_bad(text) AS
+SELECT $1::text, $1 + 1` with `operator does not exist: text + integer`.
+The prepared statement is not created, and no query is executed. The first-use
+binding policy itself is sql-fun-defined, not inferred from PREPARE behavior.
+
+An indirect predicate case retains failure of the complete application
+constraints: `binding_predicate(int4)` returns `text`, while its `int8` overload
+returns `bool`. After a first `$1::int4`, using `binding_predicate($1)` in WHERE
+must fail, even though an explicitly supplied `int8` input could satisfy the
+SQL. Both PostgreSQL 17 and 18 reject the corresponding `PREPARE ... (int4)`
+with `argument of WHERE must be type boolean, not type text`; the small function
+probes ran inside rolled-back transactions.

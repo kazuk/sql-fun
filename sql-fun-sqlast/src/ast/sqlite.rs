@@ -446,6 +446,7 @@ mod test_pattern_classification {
 impl From<&syn::Variable> for Expr {
     fn from(value: &syn::Variable) -> Self {
         Self::Parameter(Parameter {
+            location: None,
             position: value.index().get(),
             name: value.name().clone(),
             type_name: value.col_type().clone(),

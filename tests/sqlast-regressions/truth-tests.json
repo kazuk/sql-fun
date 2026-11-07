@@ -111,9 +111,7 @@
     "name": "parameter::TRUE",
     "sql": "SELECT $1 IS TRUE AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -239,9 +237,7 @@
     "name": "parameter::NOT TRUE",
     "sql": "SELECT $1 IS NOT TRUE AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -367,9 +363,7 @@
     "name": "parameter::FALSE",
     "sql": "SELECT $1 IS FALSE AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -495,9 +489,7 @@
     "name": "parameter::NOT FALSE",
     "sql": "SELECT $1 IS NOT FALSE AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -623,9 +615,7 @@
     "name": "parameter::UNKNOWN",
     "sql": "SELECT $1 IS UNKNOWN AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -751,9 +741,7 @@
     "name": "parameter::NOT UNKNOWN",
     "sql": "SELECT $1 IS NOT UNKNOWN AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -1377,9 +1365,7 @@
     "name": "parameter::nested",
     "sql": "SELECT ($1 IS TRUE) IS FALSE AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -1433,9 +1419,7 @@
     "name": "parameter::case_result",
     "sql": "SELECT CASE WHEN true THEN $1 IS TRUE ELSE false END AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -1453,9 +1437,7 @@
     "name": "parameter::case_condition",
     "sql": "SELECT CASE WHEN $1 IS TRUE THEN true ELSE false END AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -1474,7 +1456,6 @@
     "sql": "SELECT COALESCE($1 IS TRUE,false) AS result",
     "expected": {
       "diagnostics": [
-        "parameter_type_unresolved",
         "unreachable_coalesce_argument"
       ],
       "columns": [
@@ -1592,9 +1573,7 @@
     "name": "cte",
     "sql": "WITH c AS (SELECT $1 IS TRUE AS result) SELECT result FROM c",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -1612,9 +1591,7 @@
     "name": "derived",
     "sql": "SELECT result FROM (SELECT $1 IS TRUE AS result) c",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -1788,9 +1765,7 @@
     "name": "parameter::repeated",
     "sql": "SELECT $1 IS FALSE AS result, $1 IS NOT TRUE AS other",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -1872,8 +1847,9 @@
     "sql": "SELECT $1 IS TRUE AS result, $1 = 1 AS other",
     "expected": {
       "diagnostics": [
+        "binary_operator_overload_resolution_failed",
         "parameter_constraint",
-        "parameter_type_unresolved"
+        "undefined_operator"
       ],
       "columns": [
         {

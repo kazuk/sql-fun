@@ -381,7 +381,9 @@
     "name": "deferred_occurrences",
     "sql": "SELECT poly(value=>$1) FROM uuid_value(value=>$1) AS t",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "poly",
@@ -417,7 +419,9 @@
     "name": "table_inference",
     "sql": "SELECT t.* FROM poly(value=>$1) AS t, uuid_value(value=>$1) AS other",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "t",
@@ -813,7 +817,9 @@
     "name": "table_ordinality_inference",
     "sql": "SELECT t.* FROM poly(value=>$1) WITH ORDINALITY AS t, uuid_value(value=>$1) AS other",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "t",
@@ -840,7 +846,9 @@
     "name": "rows_inference",
     "sql": "SELECT t.* FROM ROWS FROM(poly(value=>$1)) AS t, uuid_value(value=>$1) AS other",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "t",
@@ -858,7 +866,9 @@
     "name": "table_output_inference",
     "sql": "SELECT t.* FROM polyout(value=>$1) AS t, uuid_value(value=>$1) AS other",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "x",
@@ -915,7 +925,9 @@
     "name": "deferred_variadic_array",
     "sql": "SELECT polyarray(VARIADIC xs=>$1) FROM uuid_array(value=>$1) AS t",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "polyarray",

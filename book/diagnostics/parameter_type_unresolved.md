@@ -6,8 +6,10 @@ Code: `parameter_type_unresolved`. Severity: Error.
 
 ## When it is reported
 
-Finalization cannot establish one application input type for a parameter. Its
-admissible domain may still contain multiple types or remain unrestricted.
+The first occurrence cannot select one application input type and no explicit
+input hint was supplied. Ambiguity reports the remaining local binding
+candidates from sql-fun's seven standard input candidates. A later use does not
+revise that choice.
 
 ## What analysis knows and does not know
 
@@ -28,18 +30,19 @@ parameter must be compatible.
 PostgreSQL 17–18 builtin schema.
 
 ```sql
-SELECT $1::text AS value;
+SELECT ${src} IS NULL, ${src}::text AS value;
 ```
 
-The result cast establishes a text result but can leave several input types
-admissible here. To explicitly choose a text input, use:
+The first occurrence imposes no input-type requirement. The later cast does not
+resolve its ambiguity. Explicitly choose a text input with:
 
 ```sql
-SELECT ${src:text}::text AS value;
+SELECT ${src:text} IS NULL, ${src}::text AS value;
 ```
 
-Named placeholders are sql-fun input syntax. Do not mix them with native
-numbered placeholders in one input.
+In contrast, `SELECT ${src}::text AS value` selects `text` at its first occurrence
+without an extra hint. Named placeholders are sql-fun input syntax. Do not mix
+them with native numbered placeholders in one input.
 
 ## Related diagnostics
 

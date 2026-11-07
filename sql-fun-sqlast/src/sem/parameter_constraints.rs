@@ -6,7 +6,7 @@ mod environment;
 mod memo;
 mod structural;
 
-pub(crate) use self::call::array_cast_ranks;
+pub(crate) use self::call::{array_cast_ranks, local_binding_domains};
 pub(crate) use self::memo::ConstraintMemo;
 pub(crate) use self::structural::TypeProjection;
 
@@ -29,7 +29,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-fn default_types() -> [TypeReference; 7] {
+pub(crate) fn default_types() -> [TypeReference; 7] {
     [
         "bool", "int4", "int8", "float4", "float8", "text", "numeric",
     ]
@@ -101,7 +101,7 @@ impl InputTypeConstraint {
         }
     }
 
-    fn intersect(&mut self, other: &Self) -> bool {
+    pub(crate) fn intersect(&mut self, other: &Self) -> bool {
         match (&mut self.0, &other.0) {
             (Some(types), Some(other)) => {
                 let before = types.len();
@@ -120,6 +120,15 @@ impl InputTypeConstraint {
         if let Some(types) = &mut self.0 {
             types.retain(|ty| !excluded.contains(ty));
         }
+    }
+
+    pub(crate) fn diagnostic_types(&self) -> Vec<::sql_fun_core::analysis_problem::TypeReference> {
+        self.0
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .map(Into::into)
+            .collect()
     }
 
     fn retain_projection(&mut self, projection: &TypeProjection, result: &Self) {
@@ -146,7 +155,7 @@ impl InputTypeConstraint {
         }
     }
 
-    fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.0.as_ref().is_some_and(Vec::is_empty)
     }
 
@@ -170,6 +179,7 @@ impl InputTypeConstraint {
 pub struct ParameterConstraint {
     position: u32,
     constraint: InputTypeConstraint,
+    binding: Option<InputTypeConstraint>,
 }
 
 impl ParameterConstraint {
@@ -177,6 +187,29 @@ impl ParameterConstraint {
         Self {
             position,
             constraint: constraint.clone(),
+            binding: None,
+        }
+    }
+
+    /// Selected application binding, distinct from admissible SQL inputs.
+    pub fn binding_type(&self) -> Option<TypeReference> {
+        self.binding_candidates().single_type()
+    }
+
+    /// Local application binding candidates; later uses never narrow this choice.
+    pub fn binding_candidates(&self) -> &InputTypeConstraint {
+        self.binding.as_ref().unwrap_or(&self.constraint)
+    }
+
+    fn unresolved_binding_problem(&self) -> Option<AnalysisProblem> {
+        let domain = self.binding_candidates();
+        if domain.single_type().is_none() && (self.binding.is_some() || !domain.is_empty()) {
+            Some(AnalysisProblem::parameter_binding_ambiguous(
+                self.position,
+                &domain.diagnostic_types(),
+            ))
+        } else {
+            None
         }
     }
 
@@ -218,11 +251,54 @@ pub struct ParameterConstraints {
     parameters: Vec<ParameterConstraint>,
     outputs: Vec<InputTypeConstraint>,
     graph: Option<ConstraintGraph>,
+    application: Option<ConstraintGraph>,
+    application_failure: Option<ParameterConstraintProblem>,
 }
 
 impl ParameterConstraints {
     pub(crate) fn node_domain(&self, node: usize) -> &InputTypeConstraint {
-        self.graph.as_ref().expect("inferred graph").domain(node)
+        self.application
+            .as_ref()
+            .or(self.graph.as_ref())
+            .expect("inferred graph")
+            .domain(node)
+    }
+
+    pub(crate) fn select_bindings(
+        &mut self,
+        selections: &BTreeMap<u32, InputTypeConstraint>,
+        memo: &mut ConstraintMemo,
+    ) {
+        for parameter in &mut self.parameters {
+            parameter.binding = selections.get(&parameter.position).cloned();
+        }
+        if selections.is_empty() {
+            return;
+        }
+        let Some(graph) = &self.graph else { return };
+        let mut application = graph.inspection.as_deref().unwrap_or(graph).clone();
+        for (position, selection) in selections {
+            if let Some(ty) = selection.single_type()
+                && let Some(node) = application.parameters.get(position).copied()
+            {
+                application.restrict(node, &InputTypeConstraint::exact(&ty));
+            }
+        }
+        // SQL-admissibility inspection keeps the original graph. Failed
+        // application validation cannot erase an already selected binding.
+        self.application_failure = application.solve_with(memo).err();
+        self.application = Some(application);
+    }
+
+    pub(crate) const fn application_failure(&self) -> Option<&ParameterConstraintProblem> {
+        self.application_failure.as_ref()
+    }
+
+    pub(crate) fn unresolved_binding_problems(&self) -> Vec<AnalysisProblem> {
+        self.parameters
+            .iter()
+            .filter_map(ParameterConstraint::unresolved_binding_problem)
+            .collect()
     }
 
     pub(crate) fn set_outputs(&mut self, outputs: &[InputTypeConstraint]) {
@@ -265,6 +341,8 @@ impl ParameterConstraints {
             parameters: graph.parameter_constraints(),
             outputs: Vec::new(),
             graph: Some(graph.clone()),
+            application: None,
+            application_failure: None,
         }
     }
 }

@@ -28,6 +28,15 @@ PostgreSQL 18 builtin catalog; no project tables are needed.
 SELECT 1 LIKE '1' AS result;
 ```
 
+A parameter binding selected earlier is retained when checking later operands:
+
+```sql
+SELECT ${src}::text, ${src} + 1;
+```
+
+Here `src` is bound as `text`; the addition has no matching overload for
+`text` and `integer`. Analysis does not select another binding to repair it.
+
 ## Related diagnostics
 
 [binary_operator_overload_ambiguous](binary_operator_overload_ambiguous.md) has

@@ -1,10 +1,13 @@
 //! Parameter inference over the name-resolved semantic tree.
 
+mod bindings;
 #[cfg(test)]
 mod case_tests;
 #[cfg(test)]
 mod indirection_tests;
 
+use self::bindings::BindingSelections;
+use crate::sem::scalar_expr::ParamRef;
 use crate::{
     CacheContext,
     names::{ColumnName, OperatorName},
@@ -213,6 +216,8 @@ impl QueryScope {
 pub(crate) struct ParameterResolution<'cache> {
     cache: &'cache mut CacheContext,
     graph: ConstraintGraph,
+    bindings: BindingSelections,
+    selected: BTreeMap<u32, InputTypeConstraint>,
     scopes: Vec<QueryScope>,
     completed: Outputs,
 }
@@ -248,22 +253,33 @@ impl<'cache> ParameterResolution<'cache> {
         Self {
             cache,
             graph: ConstraintGraph::default(),
+            bindings: BindingSelections::default(),
+            selected: BTreeMap::new(),
             scopes: Vec::new(),
             completed: Outputs::default(),
         }
     }
 
-    pub(crate) fn constraints(&self) -> ParameterConstraints {
+    pub(crate) fn constraints(&mut self) -> ParameterConstraints {
         let mut constraints = ParameterConstraints::from_graph(&self.graph);
         constraints.set_outputs(&self.completed.constraints(&self.graph));
+        constraints.select_bindings(&self.selected, self.cache.constraint_memo());
         constraints
     }
 
     fn solve(&mut self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
+        if context.dialect() == Dialect::postgres() {
+            self.selected = self.bindings.selections(context, self.cache);
+        }
         self.graph.prepare_projections(context, self.cache);
         self.graph
             .report_projection_problems(context, self.cache.constraint_memo())?;
-        if let Err(problem) = self.graph.solve_with(self.cache.constraint_memo()) {
+        if let Err(problem) = self.graph.solve_with(self.cache.constraint_memo())
+            && self
+                .bindings
+                .conflicts(context, self.cache, &self.selected)
+                .is_empty()
+        {
             ParseContext::report_analysis_problem(
                 context,
                 AnalysisProblem::parameter_constraint(problem.message()),
@@ -332,23 +348,48 @@ mod test_conflicting_uses_report_recoverable_problem {
             &mut cache_context,
         )
         .expect("ambiguity is recoverable");
-        assert_eq!(analyzed.context().reported_problem_count(), 1);
-        assert_eq!(
-            analyzed.context().reported_problems()[0].code(),
-            "parameter_constraint"
+        assert!(
+            analyzed
+                .context()
+                .has_reported_problem("parameter_constraint")
+        );
+        assert!(
+            analyzed
+                .context()
+                .has_reported_problem("binary_operator_overload_ambiguous")
         );
     }
 }
 
 impl<'cache> ParameterResolution<'cache> {
     fn complete(
-        &self,
+        &mut self,
         context: &mut impl ParseContext,
         constraints: ParameterConstraints,
     ) -> Result<ParameterConstraints, AnalysisError> {
         // RETURNING and projection expansion use provisional solves. Only the
         // completed statement can establish an unsupported inference boundary.
         self.graph.report_inference_problems(context)?;
+        let conflicts = self.bindings.conflicts(context, self.cache, &self.selected);
+        // Indirect consumers can reject a selected input even when each local
+        // parameter call accepts it (for example, an overloaded function used
+        // as a predicate). Keep that application failure as well.
+        if conflicts.is_empty()
+            && let Some(problem) = constraints.application_failure()
+            && self.graph.solve_with(self.cache.constraint_memo()).is_ok()
+        {
+            context.report_analysis_problem(AnalysisProblem::parameter_constraint(
+                problem.message(),
+            ))?;
+        }
+        for (position, selected, required) in conflicts {
+            let required = required.diagnostic_types();
+            context.report_analysis_problem(AnalysisProblem::parameter_binding_conflict(
+                position,
+                &(&selected).into(),
+                &required,
+            ))?;
+        }
         Ok(constraints)
     }
 
@@ -470,6 +511,12 @@ mod test_postgres_returning_defaults_unknown_parameters_to_text {
 }
 
 impl<'cache> ParameterResolution<'cache> {
+    pub(crate) fn parameter_occurrence(&mut self, value: &ParamRef) -> SemScalarExpr {
+        self.bindings.register(value);
+        self.parameter(value.position(), value.constraint())
+            .with_parameter_location(value.location())
+    }
+
     pub(crate) fn parameter(
         &mut self,
         position: u32,
@@ -499,14 +546,11 @@ impl<'cache> ParameterResolution<'cache> {
         // Bare NULL/string literals have PostgreSQL unknown type and can be
         // coerced to boolean. Parameters instead retain their source domain.
         if SemScalarExpr::common_type_input(condition) != Some(CommonType::unknown()) {
-            self.graph.restrict(
-                node,
-                &InputTypeConstraint::types(self.cache.cast_sources(
-                    context,
-                    &PgBuiltInType::bool(),
-                    false,
-                )),
-            );
+            let target = PgBuiltInType::bool();
+            let sources =
+                InputTypeConstraint::types(self.cache.cast_sources(context, &target, false));
+            self.bindings.accept_target(condition, &sources, &target);
+            self.graph.restrict(node, &sources);
         }
         node
     }
@@ -574,6 +618,8 @@ impl<'cache> ParameterResolution<'cache> {
         };
         let output = self.graph.node(types);
         let sources = TruthTestExpr::input_types(context);
+        self.bindings
+            .accept_target(argument, &sources, &PgBuiltInType::bool());
         self.graph.restrict(input, &sources);
         self.graph.overload(
             &[input, output],
@@ -629,7 +675,11 @@ mod test_parameter_field_remains_connected_to_its_source {
                 .get_result_column_def(&ColumnName::from("value"))
                 .unwrap()
                 .get_type_cloned(),
-            None
+            if output == 1 {
+                Some(PgBuiltInType::int4())
+            } else {
+                None
+            }
         );
         assert_eq!(
             context
@@ -710,10 +760,12 @@ impl<'cache> ParameterResolution<'cache> {
             &InputTypeConstraint::any(),
             base.is_not_null(),
         );
+        let projection = TypeProjection::member(member);
+        self.bindings.project(base, &projection);
         self.graph.project(
             source,
             result.constraint_node().expect("operation node"),
-            TypeProjection::member(member),
+            projection,
         );
         result
     }
@@ -725,14 +777,7 @@ impl<'cache> ParameterResolution<'cache> {
         slice: bool,
     ) -> SemScalarExpr {
         for bound in bounds {
-            let node = self.input(bound);
-            self.graph.restrict(
-                node,
-                &InputTypeConstraint::types(
-                    self.cache
-                        .assignment_sources(context, &PgBuiltInType::int4()),
-                ),
-            );
+            self.require_assignment(context, bound, &PgBuiltInType::int4());
         }
         let source = self.input(base);
         // Scalar reads may select NULL elements or indices outside the array.
@@ -752,6 +797,7 @@ impl<'cache> ParameterResolution<'cache> {
         } else {
             TypeProjection::array_element()
         };
+        self.bindings.project(base, &projection);
         self.graph.project(
             source,
             result.constraint_node().expect("operation node"),
@@ -836,12 +882,10 @@ impl<'cache> ParameterResolution<'cache> {
         value: &SemScalarExpr,
         target: &TypeReference,
     ) {
-        if let Some(node) = value.constraint_node() {
-            self.graph.restrict(
-                node,
-                &InputTypeConstraint::types(context.assignment_sources(target)),
-            );
-        }
+        let required = InputTypeConstraint::types(self.cache.assignment_sources(context, target));
+        let node = self.input(value);
+        self.bindings.accept_target(value, &required, target);
+        self.graph.restrict(node, &required);
     }
 
     pub(crate) fn require(
@@ -852,10 +896,10 @@ impl<'cache> ParameterResolution<'cache> {
         explicit: bool,
     ) {
         if let Some(node) = value.constraint_node() {
-            self.graph.restrict(
-                node,
-                &InputTypeConstraint::types(self.cache.cast_sources(catalog, target, explicit)),
-            );
+            let required =
+                InputTypeConstraint::types(self.cache.cast_sources(catalog, target, explicit));
+            self.bindings.accept_target(value, &required, target);
+            self.graph.restrict(node, &required);
         }
     }
 }
@@ -914,6 +958,9 @@ impl<'cache> ParameterResolution<'cache> {
         arguments: &[SemScalarExpr],
         signatures: &[Signature],
     ) -> Result<SemScalarExpr, AnalysisError> {
+        if catalog.dialect() == Dialect::postgres() {
+            self.bindings.call(arguments, signatures);
+        }
         let result = self.operation(name, arguments, &InputTypeConstraint::any(), None);
         let mut nodes = Vec::new();
         for argument in arguments {
@@ -991,6 +1038,7 @@ impl<'cache> ParameterResolution<'cache> {
         comparison: bool,
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
         use crate::sem::MinMaxExpr;
+        self.bindings.common_type(context, self.cache, arguments);
         let mut choices = std::collections::HashSet::new();
         for argument in arguments {
             if let Some(ty) = SemScalarExpr::common_type_input(argument)
@@ -1798,14 +1846,8 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Collector<'_
         Ok(())
     }
     fn subscript(&mut self, value: &SemScalarExpr) {
-        if let Some(node) = value.constraint_node() {
-            self.parameters.graph.restrict(
-                node,
-                &InputTypeConstraint::types(
-                    self.context.assignment_sources(&PgBuiltInType::int4()),
-                ),
-            );
-        }
+        self.parameters
+            .require_assignment(self.context, value, &PgBuiltInType::int4());
     }
     fn enter_dml(&mut self) {
         self.dml_depth += 1;

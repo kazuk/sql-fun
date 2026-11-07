@@ -21,9 +21,7 @@
     "name": "type_metadata_regressions::output_parameters_do_not_contribute_input_matches::parameter",
     "sql": "SELECT choose($1::numeric)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "choose",

@@ -39,7 +39,9 @@
     "name": "ast::resolve::query::tests::array_subquery::deferred_star_checks_final_output_width::one",
     "sql": "SELECT ARRAY(SELECT ($1).*) AS result, take_singleton($1)",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "result",
@@ -68,7 +70,8 @@
     "expected": {
       "diagnostics": [
         "array_subquery_columns",
-        "parameter_constraint"
+        "parameter_constraint",
+        "parameter_type_unresolved"
       ],
       "columns": [
         {
@@ -91,7 +94,9 @@
     "name": "ast::resolve::query::tests::array_subquery::deferred_star_preserves_enclosing_result_link",
     "sql": "SELECT (ARRAY(SELECT ($1).*))[1], take_singleton($1)",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "",
@@ -118,7 +123,9 @@
     "name": "ast::resolve::query::tests::array_subquery::nested_deferred_arrays_finish_after_each_projection_expands",
     "sql": "SELECT ARRAY(SELECT ((ARRAY(SELECT ($1).*))[1]).*), take_container($1)",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "array",

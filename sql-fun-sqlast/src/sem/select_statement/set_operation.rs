@@ -623,7 +623,7 @@ mod test_set_operation {
         assert!(!input.allows(&PgBuiltInType::text()));
         assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
         assert!(!output.allows(&PgBuiltInType::text()));
-        assert!(
+        assert_eq!(
             analyzed
                 .ast()
                 .select_statement()
@@ -631,8 +631,8 @@ mod test_set_operation {
                 .result_columns()
                 .get_column_at(0)
                 .unwrap()
-                .col_type()
-                .is_none()
+                .col_type(),
+            &Some(PgBuiltInType::int4())
         );
         Ok(())
     }

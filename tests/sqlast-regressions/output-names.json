@@ -219,9 +219,7 @@
     "name": "output_names::parameter_function",
     "sql": "SELECT abs($1::int4)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "abs",
@@ -239,9 +237,7 @@
     "name": "output_names::parameter_override",
     "sql": "SELECT abs($1::int4) AS chosen",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "chosen",
@@ -259,9 +255,7 @@
     "name": "output_names::parameter_scalar",
     "sql": "SELECT (SELECT abs($1::int4))",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "abs",

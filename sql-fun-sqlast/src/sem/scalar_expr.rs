@@ -1531,13 +1531,20 @@ impl SemScalarExpr {
             _ => {}
         }
     }
+    pub(crate) fn with_parameter_location(mut self, location: Option<StringSpan>) -> Self {
+        if let Self::Param(value) = &mut self {
+            *value = value.clone().with_location(location);
+        }
+        self
+    }
+
     pub(crate) fn collect_constraints(
         &mut self,
         parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         let replacement = match self {
-            Self::Param(value) => Some(parameters.parameter(value.position(), value.constraint())),
+            Self::Param(value) => Some(parameters.parameter_occurrence(value)),
             Self::ColumnRef(_) => parameters.column(self),
             Self::Arith(value) => value.collect_constraints(parameters, context)?,
             Self::FuncCall(value) => value.collect_constraints(parameters, context)?,

@@ -456,13 +456,14 @@ fn variadic_any_parameter_domains(#[case] sql: &str) -> testresult::TestResult {
 }
 
 #[rstest::rstest]
-#[case::concrete("accept_integer", "int4", "bool", "int4")]
-#[case::heterogeneous("accept_text", "bool", "int4", "text")]
+#[case::concrete("accept_integer", "int4", "bool", "int4", false)]
+#[case::heterogeneous("accept_text", "bool", "int4", "text", true)]
 fn deferred_variadic_any_keeps_concrete_overload_correlation(
     #[case] consumer: &str,
     #[case] admitted: &str,
     #[case] rejected: &str,
     #[case] result: &str,
+    #[case] conflict: bool,
     #[values(false, true)] reversed: bool,
 ) -> testresult::TestResult {
     let analyzed = test_helpers::analyze(
@@ -471,10 +472,28 @@ fn deferred_variadic_any_keeps_concrete_overload_correlation(
         "text, integer",
         reversed,
     )?;
-    assert!(
-        analyzed.context().problems().is_empty(),
+    assert_eq!(
+        analyzed.context().problems().len(),
+        usize::from(conflict),
         "{:?}",
         analyzed.context().problems()
+    );
+    if conflict {
+        assert_eq!(
+            analyzed.context().problems()[0].code(),
+            "parameter_constraint"
+        );
+    }
+    // The local concrete identity wins over unrestricted variadic acceptance;
+    // the outer consumer cannot revise it, while SQL inspection keeps alternatives.
+    assert_eq!(
+        analyzed
+            .context()
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .binding_type(),
+        Some(PgBuiltInType::int4())
     );
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(

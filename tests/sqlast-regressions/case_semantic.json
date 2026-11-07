@@ -34,8 +34,7 @@
     "sql": "SELECT CASE WHEN 1 THEN $1 ELSE 1 END",
     "expected": {
       "diagnostics": [
-        "parameter_constraint",
-        "parameter_type_unresolved"
+        "parameter_constraint"
       ],
       "columns": [
         {

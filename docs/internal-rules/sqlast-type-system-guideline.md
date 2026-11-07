@@ -230,7 +230,8 @@ owns domains, correlated alternatives, and the common propagation graph.
   signature inferred by an untyped PostgreSQL `PREPARE`. For example,
   `SELECT ARRAY[$1,1]` admits both an `int4` input with an `int4[]` result and an
   `int8` input with an `int8[]` result; an untyped PostgreSQL PREPARE selects
-  `int4`. Analysis does not choose a final wire-protocol binding.
+  `int4`. Application binding selection is retained separately from SQL admissibility,
+  as described below.
   `ParameterConstraints::result_column` exposes the output domain;
   `col_type()` may remain absent when multiple result types survive. An explicit
   SQL cast can narrow the result. See the public-boundary tests in
@@ -247,6 +248,31 @@ owns domains, correlated alternatives, and the common propagation graph.
   supply a dynamic reference containing its definition; a new concrete name
   alone cannot provide its fields. This is not a catalog snapshot API.
 
+### Application binding selection
+
+Semantic-analysis SQL already contains numbered placeholders. Names and optional
+resolved hints are associated with those numbers by the existing parameter input
+contract. Do not reconstruct the original named/native syntax or collect hints
+by occurrence inside SQLAST. A supplied hint is authoritative.
+
+For an unhinted application input, use its first syntactic SQL occurrence,
+identified by retained parser source positions rather than semantic traversal
+order. The nearest consuming operation supplies local admissibility and identity
+facts for the seven default input types. A unique identity candidate wins;
+otherwise a unique admissible candidate wins. Multiple candidates remain
+ambiguous. Subsequent occurrences validate that fixed choice; they cannot
+resolve an ambiguous first use or revise a selected type. Candidate domains
+must be bounded at construction, never filtered in diagnostic rendering.
+
+Keep application decisions separate from the SQL constraint graph and its
+`allows` inspection contract. `ParameterConstraint::binding_type` exposes the
+application decision; `constraint` continues to describe SQL admissibility.
+Application result typing uses the existing graph with selected bindings applied,
+while inspection retains the original SQL requirements. An independently selected
+binding supplies evidence for operation-specific diagnostics, including an
+inapplicable operator at a later use. Report selected types and conflicting
+requirements without erasing the binding.
+
 ### Default candidates and deferred overloads
 
 Overload constraints retain declarations and owned cast ranks in
@@ -257,8 +283,8 @@ Finite declaration requirements that cannot accept the defaults (such as
 `age`'s datetime overloads) propagate before any default alternatives.
 Only remaining unseeded parameter-placeholder inputs use the seven built-in
 default bind candidates; graph node identities preserve their semantic origin.
-Candidate order never chooses a binding, and an absent default witness does not
-establish invalid SQL.
+Candidate order never chooses a binding. Local application selection follows
+the separate rule above; an absent default witness does not establish invalid SQL.
 
 The same bound applies to deferred common-type relationships. Finish SQL-derived
 propagation before preparing finite witnesses, including equality and structural
@@ -309,16 +335,14 @@ correlations and the shared diagnostic boundary.
 Diagnostic attribution must follow the available evidence. When independently
 established operand types violate an operation's requirements, report the
 operation-specific structured problem (for example, array access on a known
-scalar). When multiple requirements on the same unresolved parameter conflict,
-the solver cannot determine which expression is erroneous. Report the
-unsatisfiable parameter constraints without arbitrarily treating one requirement
-as correct and blaming another operation. In particular:
-
-- `SELECT ($1)[1], $1::integer;` conflicts between an array requirement and
-  an integer cast; the conflict does not establish `require_array`.
-- `SELECT ($1::integer[])[$2], $2::boolean;` conflicts between an array-index
-  requirement and a boolean cast; it does not establish
-  `array_index_type_mismatch`.
+scalar). When no application input type has been selected and multiple
+requirements on
+an unresolved parameter conflict, the solver cannot determine which expression
+is erroneous. Report the unsatisfiable SQL constraints without arbitrarily
+blaming one operation. Once an input type has independently been selected by
+an explicit hint or first-occurrence local selection, validate operations with
+that fixed input and report their applicable structured diagnostics. Do not
+use later SQL constraints to revise or manufacture the binding decision.
 
 Do not preserve discarded candidates solely to manufacture operation-specific
 errors from otherwise unattributable conflicts. Constraint satisfaction and

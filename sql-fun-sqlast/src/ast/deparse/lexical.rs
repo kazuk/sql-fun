@@ -793,6 +793,7 @@ mod test_lexical_emit {
         #[case] expected: &str,
     ) {
         let parameter = Parameter {
+            location: None,
             position,
             name: None,
             type_name: None,
@@ -803,6 +804,7 @@ mod test_lexical_emit {
     #[test]
     fn preserves_repeated_sqlite_parameter_identity() {
         let parameter = Parameter {
+            location: None,
             position: 4,
             name: None,
             type_name: None,
@@ -815,6 +817,7 @@ mod test_lexical_emit {
     #[test]
     fn renders_sqlite_parameter_metadata_by_its_numbered_slot() {
         let parameter = Parameter {
+            location: None,
             position: 2,
             name: Some(":named".to_owned()),
             type_name: Some("INTEGER".to_owned()),

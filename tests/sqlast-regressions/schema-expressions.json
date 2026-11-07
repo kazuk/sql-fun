@@ -279,9 +279,7 @@
     "name": "coalesce_parameters::catalog_types_survive_inference::enum_values",
     "sql": "SELECT COALESCE($1::mood,'low'::mood)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "",

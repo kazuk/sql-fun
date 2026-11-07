@@ -513,9 +513,7 @@
                   "type": "object",
                   "properties": {
                     "ParameterTypeUnresolved": {
-                      "type": "integer",
-                      "format": "uint32",
-                      "minimum": 0
+                      "$ref": "#/$defs/ParameterBindingAmbiguity"
                     }
                   },
                   "required": [
@@ -1356,6 +1354,31 @@
                 "required"
               ]
             },
+            "ParameterBindingAmbiguity": {
+              "description": "An application input whose local binding choice is ambiguous.",
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "candidates"
+              ]
+            },
+            "TypeReference": {
+              "description": "Retained diagnostic text for `TypeReference`.",
+              "type": "string"
+            },
             "QueryAnalysisProblem": {
               "description": "A query-input or analysis-capability failure, distinct from semantic inference.",
               "type": "object",
@@ -1467,10 +1490,6 @@
                   "additionalProperties": false
                 }
               ]
-            },
-            "TypeReference": {
-              "description": "Retained diagnostic text for `TypeReference`.",
-              "type": "string"
             },
             "TruthTestProblem": {
               "description": "Invalid input to a `PostgreSQL` truth predicate.",
@@ -3261,10 +3280,45 @@
               "properties": {
                 "message": {
                   "type": "string"
+                },
+                "binding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ParameterBindingConflict"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
                 "message"
+              ]
+            },
+            "ParameterBindingConflict": {
+              "description": "Structured evidence for a use that rejects a previously selected binding.",
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "$ref": "#/$defs/TypeReference"
+                },
+                "required": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "selected",
+                "required"
               ]
             },
             "NameResolution": {
@@ -4890,9 +4944,7 @@
                   "type": "object",
                   "properties": {
                     "ParameterTypeUnresolved": {
-                      "type": "integer",
-                      "format": "uint32",
-                      "minimum": 0
+                      "$ref": "#/$defs/ParameterBindingAmbiguity"
                     }
                   },
                   "required": [
@@ -5733,6 +5785,31 @@
                 "required"
               ]
             },
+            "ParameterBindingAmbiguity": {
+              "description": "An application input whose local binding choice is ambiguous.",
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "candidates"
+              ]
+            },
+            "TypeReference": {
+              "description": "Retained diagnostic text for `TypeReference`.",
+              "type": "string"
+            },
             "QueryAnalysisProblem": {
               "description": "A query-input or analysis-capability failure, distinct from semantic inference.",
               "type": "object",
@@ -5844,10 +5921,6 @@
                   "additionalProperties": false
                 }
               ]
-            },
-            "TypeReference": {
-              "description": "Retained diagnostic text for `TypeReference`.",
-              "type": "string"
             },
             "TruthTestProblem": {
               "description": "Invalid input to a `PostgreSQL` truth predicate.",
@@ -7638,10 +7711,45 @@
               "properties": {
                 "message": {
                   "type": "string"
+                },
+                "binding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ParameterBindingConflict"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
                 "message"
+              ]
+            },
+            "ParameterBindingConflict": {
+              "description": "Structured evidence for a use that rejects a previously selected binding.",
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "$ref": "#/$defs/TypeReference"
+                },
+                "required": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "selected",
+                "required"
               ]
             },
             "NameResolution": {

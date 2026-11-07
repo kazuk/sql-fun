@@ -309,9 +309,7 @@
     "name": "an_explicit_parameter_cast_sets_the_result_type",
     "sql": "select least($1::bigint,1) as result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",

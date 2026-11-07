@@ -12,6 +12,8 @@ pub struct ConstrainedExpr {
     operation: String,
     #[serde(default)]
     operator_binding: Option<Box<ResolvedOperator>>,
+    #[serde(skip)]
+    binding_validation_pending: bool,
     #[serde(default)]
     cast_binding: Option<QueryNameResolution>,
     #[serde(default)]
@@ -39,6 +41,7 @@ impl ConstrainedExpr {
             node,
             operation: operation.to_owned(),
             operator_binding: None,
+            binding_validation_pending: false,
             cast_binding: None,
             semantic_call: None,
             indirection: None,
@@ -72,6 +75,10 @@ impl ConstrainedExpr {
         self.cast_binding.as_ref()
     }
     pub(crate) fn retain_operator_binding(&mut self, binding: &ResolvedOperator) {
+        self.binding_validation_pending = self
+            .arguments
+            .iter()
+            .any(SemScalarExpr::needs_type_inference);
         self.operator_binding = Some(Box::new(binding.clone()));
     }
     /// Completed operator lookup for a parameter-dependent operator expression.
@@ -138,6 +145,7 @@ impl ConstrainedExpr {
 impl ConstrainedExpr {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.node = 0;
+        self.binding_validation_pending = false;
         if let Some(binding) = &mut self.operator_binding {
             binding.canonicalize_grouping_key();
         }
@@ -165,6 +173,13 @@ impl ConstrainedExpr {
     ) -> Result<(), AnalysisError> {
         if let Some(binding) = &mut self.semantic_call {
             binding.finalize(context, &mut self.arguments, &mut self.not_null)?;
+        }
+        if self.binding_validation_pending
+            && let Some(binding) = &self.operator_binding
+            && let Some(types) = binding.validate_application_inputs(&self.arguments, context)?
+        {
+            self.types = types;
+            self.binding_validation_pending = false;
         }
         Ok(())
     }

@@ -2,10 +2,7 @@
 
 use crate::{
     names::FullName,
-    sem::{
-        AnalysisError, AnalysisProblem, ParameterConstraint, ParseContext as SemParseContext,
-        SemAst,
-    },
+    sem::{AnalysisError, ParseContext as SemParseContext, SemAst},
 };
 
 /// Relation identities already established by semantic analysis.
@@ -47,20 +44,11 @@ impl QueryMetadata {
     pub fn report_unresolved_parameters(
         context: &mut impl SemParseContext,
     ) -> Result<(), AnalysisError> {
-        let unresolved: Vec<_> = context
+        let unresolved = context
             .parameter_constraints()
-            .iter()
-            .filter(|parameter| {
-                let domain = parameter.constraint();
-                domain.single_type().is_none()
-                    && domain
-                        .admissible_types()
-                        .is_none_or(|types| !types.is_empty())
-            })
-            .map(ParameterConstraint::position)
-            .collect();
-        for index in unresolved {
-            context.report_problem(AnalysisProblem::parameter_type_unresolved(index))?;
+            .unresolved_binding_problems();
+        for problem in unresolved {
+            context.report_problem(problem)?;
         }
         Ok(())
     }

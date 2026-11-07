@@ -53,7 +53,7 @@ schema-views-mechanisms	project	schema-views-mechanisms.sql	20	17,18
 schema-views-precedence	project	schema-views-precedence.sql	24	17,18
 schema-views-special	project	schema-views-special.sql	8	17,18
 view-conflict-rules	project	view-conflict-rules.sql	6	17,18
-parameter-bindings	project	schema-table-functions.sql	13	17,18
+parameter-bindings	project	schema-table-functions.sql	19	17,18
 truth-tests	project	truth-tests.sql	101	17,18
 between-symmetric	project	between-symmetric.sql	55	17,18
 distinctness	project	distinctness.sql	55	17,18

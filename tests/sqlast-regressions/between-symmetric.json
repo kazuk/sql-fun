@@ -273,9 +273,7 @@
     "name": "positive::cast_parameter_0",
     "sql": "SELECT $1::int BETWEEN SYMMETRIC 3 AND 1 AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -293,9 +291,7 @@
     "name": "positive::cast_parameter_1",
     "sql": "SELECT 2 BETWEEN SYMMETRIC $1::int AND 1 AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -313,9 +309,7 @@
     "name": "positive::cast_parameter_2",
     "sql": "SELECT 2 BETWEEN SYMMETRIC 3 AND $1::int AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -373,9 +367,7 @@
     "name": "positive::nested",
     "sql": "SELECT COALESCE($1::int,2) BETWEEN SYMMETRIC 3 AND 1 AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -742,9 +734,7 @@
     "name": "negative::cast_parameter_0",
     "sql": "SELECT $1::int NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -762,9 +752,7 @@
     "name": "negative::cast_parameter_1",
     "sql": "SELECT 2 NOT BETWEEN SYMMETRIC $1::int AND 1 AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -782,9 +770,7 @@
     "name": "negative::cast_parameter_2",
     "sql": "SELECT 2 NOT BETWEEN SYMMETRIC 3 AND $1::int AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",
@@ -842,9 +828,7 @@
     "name": "negative::nested",
     "sql": "SELECT COALESCE($1::int,2) NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",

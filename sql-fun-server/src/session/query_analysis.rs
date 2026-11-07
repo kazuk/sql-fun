@@ -572,7 +572,7 @@ impl QueryResult {
         }
         let mut typed = true;
         for parameter in context.parameter_constraints().iter() {
-            let ty = optional_named_type(parameter.constraint().single_type().as_ref());
+            let ty = optional_named_type(parameter.binding_type().as_ref());
             typed &= ty.is_some();
             self.parameters.push(ParameterDescribe::new(
                 &bindings.name(parameter.position()),

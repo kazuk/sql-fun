@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""Pin or validate internal prerelease requirements using explicit Cargo metadata."""
+import argparse
+import copy
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tarfile
+import tomllib
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def dependency_tables(document):
+    for kind in ('dependencies', 'build-dependencies', 'dev-dependencies'):
+        yield (kind,), kind, document.get(kind, {})
+    for target, tables in document.get('target', {}).items():
+        for kind in ('dependencies', 'build-dependencies', 'dev-dependencies'):
+            yield ('target', target, kind), kind, tables.get(kind, {})
+
+
+def internal_package(alias, dependency, packages, manifest=None):
+    if isinstance(dependency, str):
+        dependency = {'version': dependency}
+    if dependency.get('workspace') or dependency.get('git'):
+        return None
+    package = packages.get(dependency.get('package', alias))
+    if package is not None and manifest is not None and 'path' in dependency:
+        # A same-named package outside the workspace is not an internal edge.
+        directory = (manifest.parent / dependency['path']).resolve()
+        if directory != Path(package['manifest_path']).parent.resolve():
+            return None
+    elif dependency.get('registry') not in (None, 'crates-io'):
+        return None
+    return package
+
+
+def exact_requirement(requirement, version):
+    return (isinstance(requirement, str) and
+            re.fullmatch(r'=\s*' + re.escape(version), requirement.strip()) is not None)
+
+
+def prerelease_dependencies(document, packages, manifest=None):
+    for location, kind, dependencies in dependency_tables(document):
+        for alias, dependency in dependencies.items():
+            package = internal_package(alias, dependency, packages, manifest)
+            if package is None or '-' not in package['version'].split('+', 1)[0]:
+                continue
+            version = dependency if isinstance(dependency, str) else dependency.get('version')
+            # Cargo permits unversioned dev-only paths and removes them from
+            # normalized packages. They never become registry requirements.
+            if version is None and kind == 'dev-dependencies':
+                continue
+            yield location, dependencies, alias, package, version
+
+
+def source_documents(metadata, packages):
+    root = Path(metadata['workspace_root']) / 'Cargo.toml'
+    documents = {Path(p['manifest_path']): tomllib.loads(Path(p['manifest_path']).read_text())
+                 for p in packages.values()}
+    if root not in documents:
+        documents[root] = tomllib.loads(root.read_text())
+    return documents
+
+
+def workspace_dev_only(documents):
+    # Validate inherited declarations once at their owning workspace table.
+    # An unversioned declaration used exclusively for development stays legal.
+    development = set()
+    required = set()
+    for document in documents.values():
+        for _, kind, dependencies in dependency_tables(document):
+            for alias, dependency in dependencies.items():
+                if isinstance(dependency, dict) and dependency.get('workspace'):
+                    (development if kind == 'dev-dependencies' else required).add(alias)
+    return development - required
+
+
+def source_dependencies(metadata, packages, documents):
+    root = Path(metadata['workspace_root']) / 'Cargo.toml'
+    for manifest, document in documents.items():
+        for location, table, alias, package, version in prerelease_dependencies(document, packages, manifest):
+            yield manifest, location, table, alias, package, version
+    workspace = {'dependencies': documents[root].get('workspace', {}).get('dependencies', {})}
+    dev_only = workspace_dev_only(documents)
+    for _, table, alias, package, version in prerelease_dependencies(workspace, packages, root):
+        if version is None and alias in dev_only:
+            continue
+        yield root, ('workspace', 'dependencies'), table, alias, package, version
+
+
+def check_requirement(owner, location, alias, package, version):
+    expected = '=' + package['version']
+    require(exact_requirement(version, package['version']),
+            f'{owner} [{".".join(location)}] {alias}: internal prerelease dependency on '
+            f'{package["name"]} requires {expected!r}, found {version!r}')
+
+
+def check_source(metadata, packages):
+    documents = source_documents(metadata, packages)
+    for manifest, location, _, alias, package, version in source_dependencies(metadata, packages, documents):
+        check_requirement(manifest, location, alias, package, version)
+
+
+def pin_source(metadata, packages):
+    root = Path(metadata['workspace_root']) / 'Cargo.toml'
+    documents = source_documents(metadata, packages)
+    expected = copy.deepcopy(documents)
+    dependencies = list(source_dependencies(metadata, packages, documents))
+    selected = {package['name']: package['version'] for _, _, _, _, package, version in dependencies
+                if not exact_requirement(version, package['version'])}
+    for manifest, location, _, alias, package, _ in dependencies:
+        if package['name'] not in selected:
+            continue
+        # cargo-edit also canonicalizes already-exact declarations of a
+        # selected package (for example "= 0.2.0-rc1" becomes "=0.2.0-rc1").
+        table = expected[manifest]
+        for component in location:
+            table = table[component]
+        if isinstance(table[alias], str):
+            table[alias] = '=' + package['version']
+        else:
+            table[alias]['version'] = '=' + package['version']
+    if selected:
+        command = ['cargo', 'upgrade', '--manifest-path', str(root), '--pinned', 'allow', '--recursive', 'false']
+        for name, version in sorted(selected.items()):
+            command.extend(['--package', f'{name}@={version}'])
+        # cargo-edit reports dependency updates on stdout; keep caller TSV clean.
+        subprocess.run(command, check=True, stdout=sys.stderr)
+    for manifest, document in expected.items():
+        require(tomllib.loads(manifest.read_text()) == document,
+                f'Prerelease pinning changed unexpected manifest values: {manifest}')
+    check_source(metadata, packages)
+
+
+def check_package(metadata, packages, name, version):
+    package = packages[name]
+    require(package['version'] == version, f'Package version mismatch: {name} {version}')
+    path = Path(metadata['target_directory']) / 'package' / f'{name}-{version}.crate'
+    with tarfile.open(path) as archive:
+        source = archive.extractfile(f'{name}-{version}/Cargo.toml')
+        require(source is not None, f'Missing normalized Cargo.toml: {path}')
+        document = tomllib.loads(source.read().decode())
+    require(document['package']['name'] == name and document['package']['version'] == version,
+            f'Normalized package identity mismatch: {path}')
+    for location, _, alias, target, requirement in prerelease_dependencies(document, packages):
+        check_requirement(path, location, alias, target, requirement)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('operation', choices=('pin', 'check', 'check-package'))
+    parser.add_argument('package', nargs='?')
+    parser.add_argument('version', nargs='?')
+    args = parser.parse_args()
+    require((args.package is not None and args.version is not None) if args.operation == 'check-package'
+            else args.package is None and args.version is None,
+            'Only check-package requires package and version arguments')
+    metadata = json.load(sys.stdin)
+    packages = {p['name']: p for p in metadata['packages'] if p['id'] in metadata['workspace_members']}
+    if args.operation == 'pin':
+        pin_source(metadata, packages)
+    elif args.operation == 'check':
+        check_source(metadata, packages)
+    else:
+        check_package(metadata, packages, args.package, args.version)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, KeyError, OSError, tarfile.TarError, subprocess.CalledProcessError) as error:
+        print(f'Release dependency validation failed: {error}', file=sys.stderr)
+        sys.exit(1)

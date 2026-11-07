@@ -36,6 +36,41 @@ Responsibility boundaries:
 Normal-CI packages from `S` verify that source; they are not release packages
 for materialized versions at `R`.
 
+## Internal prerelease dependencies
+
+An internal dependency targeting a prerelease crate version must use an exact
+Cargo requirement, for example `=0.2.0-rc1`. This applies to development manifests
+as well as materialized releases, independently of the opaque prerelease name
+or its SemVer ordering. Stable dependency requirements retain their existing
+policy; preparing a release does not make them exact.
+
+After calculating and setting individual package versions, the materializer
+uses cargo-edit's `cargo upgrade` with explicit exact versions, pinned updates
+enabled and recursive lockfile upgrades disabled. It preserves paths, workspace
+inheritance, aliases and other dependency settings, including non-publishable
+consumers. `.local/sbin/release-dependencies` checks the resulting TOML against
+the intended edits and shares read-only validation with the state adapter,
+publisher and source-package builder. It consumes explicit Cargo metadata and
+checks workspace declarations and normal, build, dev and target-specific
+dependencies. Versionless dev-only paths remain legal because Cargo omits them
+from published manifests.
+
+The state adapter checks final manifests before its successful changed-path
+handoff. Publication checks the whole workspace before registry lookups or any
+upload. Neither boundary repairs inconsistent manifests. The source-package
+builder also checks each archive's normalized `Cargo.toml` against the workspace
+crate versions. Its local `patch.crates-io` overrides and `--no-verify` do not
+prove registry requirements: published manifests lose paths and workspace
+inheritance, and a loose prerelease requirement can select another prerelease.
+The existing `package-metadata` check covers these archive checks without extra
+verification builds.
+
+Validation failures name the manifest or archive, dependency table, dependency,
+expected exact requirement and actual value. Correct a mutable selected source
+before preparing it; recorded state, tags and published packages remain
+immutable. A partially published release requires a separate forward-only
+release decision, not a publisher-side manifest repair.
+
 ## Explicit paths and stable state
 
 Materialization exposes external `versions` and `paths` files under

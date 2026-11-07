@@ -74,6 +74,15 @@ Before selecting `S`, ensure every publishable crate has a valid
 current version and declared bump, never the project tag's numeric version.
 It updates workspace manifests/dependency requirements and the lockfile.
 
+Internal dependencies targeting prerelease crate versions use exact Cargo
+requirements, such as `=0.2.0-rc1`, so registry resolution cannot substitute a
+different prerelease. This rule also applies to prerelease development manifests;
+the prerelease name's spelling or ordering does not change it. Stable dependency
+requirements retain their existing policy. Preparation validates these constraints
+before handing off release state, and source packaging checks the normalized
+manifests inside `.crate` archives. A constraint failure stops the operation;
+do not repair it by rewriting recorded release state, tags or published crates.
+
 Stable preparation adopts the selected baseline into
 `.local/semver_baseline.tar.gz`, then resets existing publishable crate intent
 entries to `patch` **after** calculating release versions from their old values.

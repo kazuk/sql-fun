@@ -6,8 +6,9 @@ helper="$repo_root/.local/sbin/materialize-release-state"
 test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
 workspace="$test_root/workspace"
-mkdir -p "$workspace/.local/bin" "$test_root/release-inputs"
+mkdir -p "$workspace/.local/bin" "$workspace/.local/sbin" "$test_root/release-inputs"
 cp "$repo_root/.local/bin/"{bump-version,materialize-release-versions,parse-release-version,release-crate-manifest} "$workspace/.local/bin/"
+cp "$repo_root/.local/sbin/release-dependencies" "$workspace/.local/sbin/"
 cat > "$workspace/Cargo.toml" <<'TOML'
 [workspace]
 resolver = "2"
@@ -59,7 +60,7 @@ printf 'unrelated untracked content' > "$workspace/unrelated"
 cd "$workspace"
 git init --quiet
 cargo generate-lockfile
-git add Cargo.toml Cargo.lock core api worker tool cli sql-fun-server .local/bin
+git add Cargo.toml Cargo.lock core api worker tool cli sql-fun-server .local/bin .local/sbin
 git -c user.name=Fixture -c user.email=fixture@example.invalid commit --quiet -m 'test: release workspace'
 
 expect_failure_without_mutation() {
@@ -105,8 +106,9 @@ for tag in v9.8.7 v9.8.7-snapshot v9.8.7-snapshot2; do
   cmp "$state/crates.tsv" "$test_root/consumer.tsv"
   metadata="$(cargo metadata --locked --no-deps --format-version=1)"
   [[ "$(jq -r '.packages[] | select(.name == "tool") | .version' <<<"$metadata")" == 2.3.4 ]]
-  [[ "$(taplo get --file-path Cargo.toml workspace.dependencies.core.version)" == "0.5.0$suffix" ]]
-  [[ "$(taplo get --file-path Cargo.toml workspace.dependencies.api.version)" == "1.3.0$suffix" ]]
+  exact="${prerelease:+=}"
+  [[ "$(taplo get --file-path Cargo.toml workspace.dependencies.core.version)" == "${exact}0.5.0$suffix" ]]
+  [[ "$(taplo get --file-path Cargo.toml workspace.dependencies.api.version)" == "${exact}1.3.0$suffix" ]]
   git diff --name-only > "$test_root/actual-paths"
   cmp "$state/changed-paths.txt" "$test_root/actual-paths"
   for path in Cargo.toml Cargo.lock core/Cargo.toml api/Cargo.toml worker/Cargo.toml cli/Cargo.toml sql-fun-server/Cargo.toml; do

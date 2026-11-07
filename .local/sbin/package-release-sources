@@ -5,6 +5,8 @@ GIT_ROOT="$(git rev-parse --show-toplevel)"
 crates=""
 declare -a patches=()
 crates="$("${GIT_ROOT}/.local/bin/release-crate-manifest" --with-paths)"
+metadata="$(cargo metadata --locked --no-deps --format-version=1)"
+"${GIT_ROOT}/.local/sbin/release-dependencies" check <<<"$metadata"
 
 # Cargo resolves registry dependencies even with --no-verify. Point workspace
 # dependencies at their local sources while their versions are unpublished.
@@ -19,5 +21,8 @@ while IFS=$'\t' read -r name version manifest_path; do
     echo "error: package construction failed for $name" >&2
     exit 1
   fi
+  # Local patches and --no-verify cannot prove registry requirements. Inspect
+  # the normalized manifest that Cargo actually puts in the archive.
+  "${GIT_ROOT}/.local/sbin/release-dependencies" check-package "$name" "$version" <<<"$metadata"
 done <<< "$crates"
 printf '%s\n' "$crates"

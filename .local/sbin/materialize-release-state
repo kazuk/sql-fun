@@ -59,6 +59,8 @@ mkdir -p "$state"
 "$repo_root/.local/bin/materialize-release-versions" "$mode" --output="$state/crates.tsv"
 "$helpers/release-binstall" materialize "$tag" cli/Cargo.toml sql-fun-server/Cargo.toml
 "$helpers/release-binstall" check "$tag" cli/Cargo.toml sql-fun-server/Cargo.toml
+metadata="$(cargo metadata --locked --no-deps --format-version=1)"
+"$helpers/release-dependencies" check <<<"$metadata"
 # cargo-edit may update dependency requirements in non-publishable members as
 # well as versions in publishable members. Only workspace manifests and the
 # workspace lockfile belong to this step. Nothing is staged or committed here.

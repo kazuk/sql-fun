@@ -49,6 +49,10 @@ for package in "${!expected_versions[@]}"; do
     || { echo "manifest version does not match Cargo.toml for $package" >&2; exit 1; }
 done
 
+# Validate the whole workspace before any lookup or upload, including crates
+# later in publication order. Never repair manifests during publication.
+"$repo_root/.local/sbin/release-dependencies" check <<<"$metadata"
+
 # Check all new binary mappings before publishing any package. Existing exact
 # versions retain their original manifests, even when supplied by another tag.
 declare -A version_statuses=()

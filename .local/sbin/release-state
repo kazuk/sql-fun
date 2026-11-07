@@ -101,7 +101,7 @@ def validate_record(revision, release):
             'Recorded release commit contains unowned paths')
     before = intent(manifest_at(fields['Release-Source']))
     after = intent(manifest_at(revision))
-    if release['classification'] == 'snapshot':
+    if release['classification'] == 'prerelease':
         require(before == after, 'Prerelease record changed release intent')
     else:
         expected = dict(before)

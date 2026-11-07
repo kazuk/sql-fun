@@ -44,7 +44,9 @@ all Release asset filenames use that tag while executable and package metadata
 versions remain crate versions. For example,
 `sql-fun_v0.1.0-snapshot4_amd64.deb` can contain Debian version `0.2.0~snapshot4`.
 Only the internal Debian version uses `~` in place of the CLI SemVer prerelease
-separator; no additional Debian revision is appended.
+separator; no additional Debian revision is appended. Project prerelease names
+are opaque and cannot contain hyphens. The same conversion applies to permitted
+names such as `alpha.1`, without rewriting the name.
 
 Outputs are under Cargo's target directory (including `CARGO_TARGET_DIR` overrides),
 in `distributions/<target>/`:

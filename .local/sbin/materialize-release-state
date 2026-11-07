@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Internal workflow adapter: classification and suffix come from the shared
+# Internal workflow adapter: classification and name come from the shared
 # release identity parser, never from an independent operator mode selection.
 if [[ $# != 4 ]]; then
-  echo 'usage: materialize-release-state CLASSIFICATION SNAPSHOT_SUFFIX STATE_DIRECTORY PROJECT_TAG' >&2
+  echo 'usage: materialize-release-state CLASSIFICATION PRERELEASE_NAME STATE_DIRECTORY PROJECT_TAG' >&2
   exit 1
 fi
 classification="$1"
-snapshot="$2"
+prerelease="$2"
 tag="$4"
 helpers="$(cd "$(dirname "$0")" && pwd)"
 identity="$("$helpers/../bin/parse-release-version" "$tag")"
-[[ "$(cut -f3 <<<"$identity")" == "$snapshot" && "$(cut -f4 <<<"$identity")" == "$classification" ]] || {
-  echo 'Project tag disagrees with parsed release classification/suffix' >&2
+[[ "$(cut -f3 <<<"$identity")" == "$prerelease" && "$(cut -f4 <<<"$identity")" == "$classification" ]] || {
+  echo 'Project tag disagrees with parsed release classification/name' >&2
   exit 1
 }
 case "$classification" in
   stable)
-    [[ -z "$snapshot" ]] || { echo 'Stable identity must have an empty snapshot suffix' >&2; exit 1; }
+    [[ -z "$prerelease" ]] || { echo 'Stable identity must have an empty prerelease name' >&2; exit 1; }
     mode=--release
     ;;
-  snapshot)
-    [[ -n "$snapshot" ]] || { echo 'Snapshot identity must supply its parsed suffix' >&2; exit 1; }
-    mode="--snapshot=$snapshot"
+  prerelease)
+    [[ -n "$prerelease" ]] || { echo 'Prerelease identity must supply its parsed name' >&2; exit 1; }
+    mode="--prerelease=$prerelease"
     ;;
   *) echo "Invalid parsed release classification: $classification" >&2; exit 1 ;;
 esac

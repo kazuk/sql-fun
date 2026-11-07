@@ -3,16 +3,17 @@ set -euo pipefail
 
 function usage() {
   cat <<'USAGE'
-usage: materialize-release-versions (--release | --snapshot=NAME) [--output=PATH]
+usage: materialize-release-versions (--release | --prerelease=NAME) [--output=PATH]
 
 Materialize the next release version for every publishable workspace package.
-Exactly one release mode is required. The snapshot mode appends
-`-NAME` to each next release version.
+Exactly one release mode is required. The prerelease mode appends
+`-NAME` unchanged to each next release version. NAME must be a valid SemVer
+prerelease name without hyphens, following the project release naming policy.
 USAGE
 }
 
 mode=""
-snapshot_name=""
+prerelease_name=""
 output_path=""
 
 for arg in "$@"; do
@@ -21,10 +22,10 @@ for arg in "$@"; do
       [[ -z "$mode" ]] || { echo "exactly one release mode is required" >&2; exit 1; }
       mode="release"
       ;;
-    --snapshot=*)
+    --prerelease=*)
       [[ -z "$mode" ]] || { echo "exactly one release mode is required" >&2; exit 1; }
-      mode="snapshot"
-      snapshot_name="${arg#--snapshot=}"
+      mode="prerelease"
+      prerelease_name="${arg#--prerelease=}"
       ;;
     --output=*) output_path="${arg#--output=}" ;;
     -h|--help) usage; exit 0 ;;
@@ -33,10 +34,6 @@ for arg in "$@"; do
 done
 
 [[ -n "$mode" ]] || { echo "exactly one release mode is required" >&2; usage >&2; exit 1; }
-if [[ "$mode" == "snapshot" ]] && ! [[ "$snapshot_name" =~ ^[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$ ]]; then
-  echo "invalid snapshot name: $snapshot_name" >&2
-  exit 1
-fi
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
@@ -57,9 +54,11 @@ for package in "${packages[@]}"; do
   esac
 
   next_version="$("$repo_root/.local/bin/bump-version" "$package" "$release_level")"
-  if [[ "$mode" == "snapshot" ]]; then
-    next_version+="-$snapshot_name"
+  if [[ "$mode" == "prerelease" ]]; then
+    next_version+="-$prerelease_name"
   fi
+  # Reuse the shared syntax contract for every target before changing any crate.
+  "$repo_root/.local/bin/parse-release-version" "v$next_version" > /dev/null
   next_versions["$package"]="$next_version"
 done
 

@@ -2,18 +2,23 @@
 
 Choose an explicitly selected source revision `S` from `main` for a normal
 release, or deliberately from a maintenance/fix branch for a hotfix. Push it to
-`release/vX.Y.Z`, `release/vX.Y.Z-snapshot`, or
-`release/vX.Y.Z-snapshotN` (for example, `release/v0.2.0-snapshot1`).
-Version components must not have leading zeroes. The shared project parser
-classifies stable versus snapshot; project release numbers and individual
-crate versions are separate identities. Tag pushes do not start preparation.
+`release/vX.Y.Z` for a stable release or `release/vX.Y.Z-NAME` for a prerelease
+(for example, `release/v0.2.0-alpha.1` or `release/v0.2.0-snapshot1`).
+`NAME` is opaque: no channel or numeric counter is interpreted from it. It must
+contain only nonempty dot-separated ASCII alphanumeric identifiers; entirely
+numeric identifiers must not have leading zeroes. Project policy forbids hyphens
+inside `NAME`; the version/name separator is the only permitted hyphen. Build
+metadata is not supported. Numeric version components must not have leading
+zeroes. A name's presence alone distinguishes prerelease from stable. Project
+release numbers and individual crate versions are separate identities.
+Tag pushes do not start preparation.
 
 ## Release lifecycle and implementation status
 
-| Stage | Stable release | Snapshot/prerelease | Status / owner |
+| Stage | Stable release | Prerelease | Status / owner |
 | --- | --- | --- | --- |
 | Select `S` | Successful required normal CI for the exact SHA | Same | Implemented, #326 |
-| Materialize versions | Final crate versions from declared intent | Next crate versions with selected snapshot suffix | Implemented, #325 |
+| Materialize versions | Final crate versions from declared intent | Next crate versions with unchanged prerelease name | Implemented, #325 |
 | Finalize release state | Adopt baseline and reset intent to `patch` | Preserve baseline and intent | Implemented, #329/#330 |
 | Record source `R` | Commit and push release-state changes on the release branch | Same | Implemented, #330 |
 | Release build and tag | Build/validate packages from `R`, retain assets, then tag `R` | Same | Implemented, #331 |
@@ -82,8 +87,8 @@ build/tag step. The summary reports its SHA and exact committed crate versions.
 See the internal [state handoff contract](../docs/internal-rules/release-materialization.md).
 
 The current materializer requires stable current crate versions. A newly
-selected source already containing snapshot versions fails; issue #364 tracks that
-separate lifecycle limitation. Reusing an existing recorded `R` does not rerun
+selected source already containing prerelease versions fails; issue #364 tracks
+that separate lifecycle limitation. Reusing an existing recorded `R` does not rerun
 the materializer or strip prerelease suffixes.
 
 ## Versioned manual
@@ -154,7 +159,7 @@ output stay outside the checkout.
 The run summary links the draft and records the source revisions, retained
 artifact locator and required assets. New drafts use the project tag as their
 title and contain source information plus a table of exact publishable workspace
-crate versions from `R` for review; snapshot drafts are marked
+crate versions from `R` for review; drafts with a prerelease name are marked
 prerelease. Preparation never publishes the draft.
 
 Before publishing, review the notes, stable/prerelease classification, tag and

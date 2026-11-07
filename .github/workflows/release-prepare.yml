@@ -32,7 +32,7 @@ jobs:
     outputs:
       tag: ${{ steps.identity.outputs.tag }}
       version: ${{ steps.identity.outputs.version }}
-      snapshot: ${{ steps.identity.outputs.snapshot }}
+      prerelease: ${{ steps.identity.outputs.prerelease }}
       classification: ${{ steps.identity.outputs.classification }}
       revision: ${{ steps.identity.outputs.revision }}
       source: ${{ steps.state.outputs.source }}
@@ -97,10 +97,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.identity.outputs.tag }}
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
-          RELEASE_SNAPSHOT: ${{ steps.identity.outputs.snapshot }}
+          RELEASE_PRERELEASE: ${{ steps.identity.outputs.prerelease }}
         run: |
           state="$RUNNER_TEMP/release-state"
-          .local/sbin/materialize-release-state "$RELEASE_CLASSIFICATION" "$RELEASE_SNAPSHOT" "$state" "$RELEASE_TAG"
+          .local/sbin/materialize-release-state "$RELEASE_CLASSIFICATION" "$RELEASE_PRERELEASE" "$state" "$RELEASE_TAG"
           {
             echo "versions=$state/crates.tsv"
             echo "paths=$state/changed-paths.txt"

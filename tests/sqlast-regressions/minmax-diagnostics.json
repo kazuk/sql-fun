@@ -69,7 +69,8 @@
     "expected": {
       "diagnostics": [
         "min_max_not_ordered",
-        "parameter_constraint"
+        "parameter_constraint",
+        "parameter_type_unresolved"
       ],
       "columns": [
         {
@@ -86,7 +87,8 @@
     "expected": {
       "diagnostics": [
         "min_max_not_ordered",
-        "parameter_constraint"
+        "parameter_constraint",
+        "parameter_type_unresolved"
       ],
       "columns": [
         {
@@ -103,7 +105,8 @@
     "expected": {
       "diagnostics": [
         "min_max_not_ordered",
-        "parameter_constraint"
+        "parameter_constraint",
+        "parameter_type_unresolved"
       ],
       "columns": [
         {

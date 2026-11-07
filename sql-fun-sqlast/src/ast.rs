@@ -966,6 +966,7 @@ pub(crate) struct CurrentOf {
 
 #[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Parameter {
+    location: Option<StringSpan>,
     #[getter(copy)]
     position: u32,
     name: Option<String>,

@@ -165,9 +165,7 @@
     "name": "array_access_nullability::parameter_index",
     "sql": "SELECT (ARRAY[1])[$1]",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "",
@@ -185,9 +183,7 @@
     "name": "array_access_nullability::parameter_base",
     "sql": "SELECT ($1::integer[])[1]",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "",

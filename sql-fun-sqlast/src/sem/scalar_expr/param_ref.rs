@@ -1,11 +1,14 @@
+use crate::StringSpan;
 use crate::sem::{
     InputTypeConstraint, ParameterConstraints, TypeReference, scalar_expr::SemScalarExprNode,
 };
 
-/// A numbered SQL input with its assigned or inferred SQL type domain.
+/// A numbered SQL input with its selected application type when available.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ParamRef {
     position: u32,
+    #[serde(skip)]
+    location: Option<StringSpan>,
     constraint: InputTypeConstraint,
     #[serde(skip)]
     node: usize,
@@ -15,15 +18,24 @@ impl ParamRef {
     pub(crate) fn new(position: u32, node: usize, constraint: &InputTypeConstraint) -> Self {
         Self {
             position,
+            location: None,
             node,
             constraint: constraint.clone(),
         }
+    }
+    pub(crate) const fn with_location(mut self, location: Option<StringSpan>) -> Self {
+        self.location = location;
+        self
+    }
+    pub(crate) const fn location(&self) -> Option<StringSpan> {
+        self.location
     }
     /// Original one-based parameter identity.
     pub const fn position(&self) -> u32 {
         self.position
     }
-    /// Assigned or SQL-derived input types; `any` is a successful inference result.
+    /// Types used by this occurrence, narrowed to a selected application binding.
+    /// [`ParameterConstraints`] retains the complete SQL-admissible input domain.
     pub const fn constraint(&self) -> &InputTypeConstraint {
         &self.constraint
     }
@@ -44,8 +56,15 @@ impl SemScalarExprNode for ParamRef {
 impl ParamRef {
     pub(super) const fn canonicalize_grouping_key(&mut self) {
         self.node = 0;
+        self.location = None;
     }
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
-        self.constraint = constraints.node_domain(self.node).clone();
+        self.constraint = if let Some(parameter) = constraints.parameter(self.position)
+            && let Some(binding) = parameter.binding_type()
+        {
+            InputTypeConstraint::exact(&binding)
+        } else {
+            constraints.node_domain(self.node).clone()
+        };
     }
 }

@@ -129,6 +129,38 @@ impl RankedSignature {
     }
 }
 
+/// Local input admissibility and identity, without preferred-type selection.
+/// The caller supplies the seven candidates only for unhinted placeholders.
+pub(crate) fn local_binding_domains(
+    context: &impl ParseContext,
+    cache: &mut CacheContext,
+    signatures: &[Signature],
+    inputs: &[InputTypeConstraint],
+) -> Vec<(InputTypeConstraint, InputTypeConstraint)> {
+    let facts = CallFacts::prepare(context, cache, signatures, inputs);
+    let signatures = facts.signatures(inputs);
+    (0..inputs.len())
+        .map(|index| {
+            let mut accepted = Vec::new();
+            let mut identity = Vec::new();
+            for signature in &signatures.0 {
+                for source in inputs[index].admissible_types().unwrap_or(&[]) {
+                    if signature.score(source, index).is_some() {
+                        accepted.push(source.clone());
+                        if source == &signature.signature.inputs()[index] {
+                            identity.push(source.clone());
+                        }
+                    }
+                }
+            }
+            (
+                InputTypeConstraint::types(accepted),
+                InputTypeConstraint::types(identity),
+            )
+        })
+        .collect()
+}
+
 /// Original per-source array cast calculation, shared with the session cache.
 pub(crate) fn array_cast_ranks(
     context: &impl BaseParseContext,

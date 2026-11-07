@@ -253,9 +253,7 @@
     "name": "domain_operators::parameter",
     "sql": "SELECT d = $1::integer AS result FROM distinct_values",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",

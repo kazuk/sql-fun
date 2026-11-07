@@ -249,9 +249,7 @@
     "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::projection",
     "sql": "SELECT ARRAY(SELECT $1::integer)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "array",
@@ -269,9 +267,7 @@
     "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::predicate",
     "sql": "SELECT ARRAY(SELECT 1 WHERE $1::integer IS NULL)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "array",
@@ -289,9 +285,7 @@
     "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::order",
     "sql": "SELECT ARRAY(SELECT 1 ORDER BY $1::integer)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "array",
@@ -309,9 +303,7 @@
     "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::correlated",
     "sql": "SELECT ARRAY(SELECT s.n WHERE $1::integer IS NULL) FROM (SELECT 1 AS n) s",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "array",
@@ -329,9 +321,7 @@
     "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::nested",
     "sql": "SELECT ARRAY(SELECT ARRAY(SELECT $1::integer))",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "array",
@@ -349,9 +339,7 @@
     "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::repeated",
     "sql": "SELECT ARRAY(SELECT $1::integer), $1::integer",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "array",
@@ -498,9 +486,7 @@
     "name": "ast::resolve::query::tests::array_subquery::enclosing_expressions_consume_array_result::parameter_subscript",
     "sql": "SELECT (ARRAY(SELECT $1::integer))[1]",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "",

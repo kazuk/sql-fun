@@ -268,7 +268,8 @@
     "sql": "WITH s AS (SELECT $1 n) UPDATE items SET id=s.n FROM s",
     "expected": {
       "diagnostics": [
-        "parameter_constraint"
+        "parameter_constraint",
+        "parameter_type_unresolved"
       ],
       "columns": []
     }
@@ -278,7 +279,8 @@
     "sql": "UPDATE items SET id=(SELECT $1)",
     "expected": {
       "diagnostics": [
-        "parameter_constraint"
+        "parameter_constraint",
+        "parameter_type_unresolved"
       ],
       "columns": []
     }
@@ -303,7 +305,12 @@
       "columns": [
         {
           "name": "",
-          "nullability": "unknown"
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
         }
       ]
     }
@@ -312,9 +319,7 @@
     "name": "update::reports_invalid_update::parameter_conflict",
     "sql": "UPDATE items SET id=$1,label=$1",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": []
     }
   },

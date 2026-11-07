@@ -397,10 +397,7 @@ mod test_parameter_constraints {
         assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
         let encoded =
             ::serde_json::to_value(expression(&query).as_truth_test().unwrap().argument())?;
-        assert!(
-            encoded["ImplicitCast"]["value"].get("Param").is_some(),
-            "{encoded}"
-        );
+        assert!(encoded.get("Param").is_some(), "{encoded}");
         Ok(())
     }
 

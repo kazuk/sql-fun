@@ -8,3 +8,6 @@ CREATE FUNCTION public.pair_fun() RETURNS public.pair
   LANGUAGE sql IMMUTABLE AS 'SELECT ROW(1, ''x'')::public.pair';
 CREATE FUNCTION public.identity(integer) RETURNS integer
   LANGUAGE sql IMMUTABLE AS 'SELECT $1';
+
+CREATE FUNCTION binding_predicate(i int4) RETURNS text LANGUAGE sql AS 'SELECT i::text';
+CREATE FUNCTION binding_predicate(i int8) RETURNS bool LANGUAGE sql AS 'SELECT true';

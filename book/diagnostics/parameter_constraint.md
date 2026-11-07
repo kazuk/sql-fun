@@ -7,7 +7,9 @@ Code: `parameter_constraint`. Severity: Error.
 ## When it is reported
 
 SQL-derived parameter/type requirements cannot be reconciled, or a supported
-explicit hint conflicts with those requirements.
+explicit hint conflicts with those requirements. A later use can also reject
+the binding selected at the first occurrence. In that case the diagnostic
+identifies the selected type and the conflicting type requirements.
 
 ## What analysis knows and does not know
 

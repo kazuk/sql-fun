@@ -39,9 +39,7 @@
     "name": "type_metadata_regressions::expanded_variadic_arguments_count_individually::parameter",
     "sql": "SELECT choose($1::numeric, 1)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "choose",

@@ -433,7 +433,7 @@ mod test_sampling_semantics {
             "{:?}",
             context.reported_problems()
         );
-        assert!(!context.has_reported_problem("tablesample_argument_type"));
+        assert!(context.has_reported_problem("tablesample_argument_type"));
         Ok(())
     }
 

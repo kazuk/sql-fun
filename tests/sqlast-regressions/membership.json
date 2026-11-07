@@ -471,9 +471,7 @@
     "name": "parameter-list",
     "sql": "SELECT $1 IN (1,2) AS result",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "result",

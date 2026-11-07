@@ -31,26 +31,34 @@ fn postgres_assignment_subscripts_are_legal(
 }
 
 #[rstest::rstest]
-#[case::index("SELECT ($1::integer[])[$2] AS n", false, 0)]
-#[case::slice("SELECT ($1::integer[])[$2:$3] AS n", true, 0)]
-#[case::upper_only("SELECT ($1::integer[])[:$2] AS n", true, 0)]
-#[case::lower_only("SELECT ($1::integer[])[$2:] AS n", true, 0)]
-#[case::repeated_base("SELECT ($1)[$2] AS n, $1::integer[]", false, 0)]
-#[case::repeated_base_first("SELECT $1::integer[], ($1)[$2] AS n", false, 1)]
+#[case::index("SELECT ($1::integer[])[$2] AS n", false, 0, false)]
+#[case::slice("SELECT ($1::integer[])[$2:$3] AS n", true, 0, false)]
+#[case::upper_only("SELECT ($1::integer[])[:$2] AS n", true, 0, false)]
+#[case::lower_only("SELECT ($1::integer[])[$2:] AS n", true, 0, false)]
+#[case::repeated_base("SELECT ($1)[$2] AS n, $1::integer[]", false, 0, false)]
+#[case::repeated_base_first("SELECT $1::integer[], ($1)[$2] AS n", false, 1, true)]
 fn parameterized_array_access_links_results(
     #[case] sql: &str,
     #[case] array_result: bool,
     #[case] column_index: usize,
+    #[case] conflict: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     // Only int4 identity and numeric-to-int4 assignment are needed here.
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
     let analyzed = SemAst::from_ast(&statement, test_helpers::context(), &mut cache_context)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
+    assert_eq!(
+        analyzed.context().problems().len(),
+        usize::from(conflict),
         "{:?}",
         analyzed.context().problems()
     );
+    if conflict {
+        assert_eq!(
+            analyzed.context().problems()[0].code(),
+            "parameter_constraint"
+        );
+    }
     let constraints = analyzed.context().parameter_constraints();
     let expected = SemTypeReference::concrete_type_ref(
         PgBuiltInType::int4()
@@ -101,7 +109,14 @@ fn underconstrained_array_access_preserves_structure(
     assert_eq!(domains.len(), constraints.iter().len());
     assert!(domains[0].is_any());
     assert!(!domains[1].is_any());
-    assert!(domains[1].allows(&PgBuiltInType::numeric()));
+    assert_eq!(domains[1].single_type(), Some(PgBuiltInType::int4()));
+    assert!(
+        constraints
+            .parameter(2)
+            .unwrap()
+            .constraint()
+            .allows(&PgBuiltInType::numeric())
+    );
     assert_eq!(
         query.result_columns().get_column_at(0).unwrap().col_type(),
         &None
@@ -168,13 +183,14 @@ fn surrounding_context_constrains_array_access(
 }
 
 #[rstest::rstest]
-#[case::forward("select ($1::public.point_value).n", 0)]
-#[case::deferred("select ($1).n, $1::public.point_value", 0)]
-#[case::reverse_order("select $1::public.point_value, ($1).n", 1)]
-#[case::array_element("select (($1::public.point_value[])[1]).n", 0)]
+#[case::forward("select ($1::public.point_value).n", 0, false)]
+#[case::deferred("select ($1).n, $1::public.point_value", 0, false)]
+#[case::reverse_order("select $1::public.point_value, ($1).n", 1, true)]
+#[case::array_element("select (($1::public.point_value[])[1]).n", 0, false)]
 fn composite_access_propagates_named_field_types(
     #[case] sql: &str,
     #[case] result: usize,
+    #[case] conflict: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::{names::FullName, sem::TypeReference};
     let mut cache_context = create_cache_context();
@@ -189,11 +205,18 @@ fn composite_access_propagates_named_field_types(
         SemAst::from_ast(&definition, test_helpers::context(), &mut cache_context)?.into_context();
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
     let analyzed = SemAst::from_ast(&statement, context, &mut cache_context)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
+    assert_eq!(
+        analyzed.context().problems().len(),
+        usize::from(conflict),
         "{:?}",
         analyzed.context().problems()
     );
+    if conflict {
+        assert_eq!(
+            analyzed.context().problems()[0].code(),
+            "parameter_constraint"
+        );
+    }
     let constraints = analyzed.context().parameter_constraints();
     let domain = constraints.result_column(result).unwrap();
     assert!(!domain.is_any());
@@ -594,17 +617,18 @@ fn consecutive_subscripts_retain_all_parameter_domains(
 }
 
 #[rstest::rstest]
-#[case::operator("SELECT ($1)[$2][$3] + 1", 0, false, false)]
-#[case::cast("SELECT (($1)[$2][$3])::integer", 0, false, true)]
-#[case::slice_cast("SELECT (($1)[$2][$3:])::integer[]", 0, true, false)]
-#[case::later_base("SELECT ($1)[$2][$3], $1::integer[]", 0, false, false)]
-#[case::earlier_base("SELECT $1::integer[], ($1)[$2][$3]", 1, false, false)]
-#[case::later_slice_base("SELECT ($1)[$2:][$3], $1::integer[]", 0, true, false)]
+#[case::operator("SELECT ($1)[$2][$3] + 1", 0, false, false, false)]
+#[case::cast("SELECT (($1)[$2][$3])::integer", 0, false, true, false)]
+#[case::slice_cast("SELECT (($1)[$2][$3:])::integer[]", 0, true, false, false)]
+#[case::later_base("SELECT ($1)[$2][$3], $1::integer[]", 0, false, false, false)]
+#[case::earlier_base("SELECT $1::integer[], ($1)[$2][$3]", 1, false, false, true)]
+#[case::later_slice_base("SELECT ($1)[$2:][$3], $1::integer[]", 0, true, false, false)]
 fn consecutive_subscripts_share_deferred_constraints(
     #[case] sql: &str,
     #[case] result: usize,
     #[case] array_result: bool,
     #[case] text_element_cast: bool,
+    #[case] conflict: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     let analyzed = SemAst::from_ast(
@@ -612,11 +636,18 @@ fn consecutive_subscripts_share_deferred_constraints(
         test_helpers::context(),
         &mut cache_context,
     )?;
-    assert!(
-        analyzed.context().problems().is_empty(),
+    assert_eq!(
+        analyzed.context().problems().len(),
+        usize::from(conflict),
         "{:?}",
         analyzed.context().problems()
     );
+    if conflict {
+        assert_eq!(
+            analyzed.context().problems()[0].code(),
+            "parameter_constraint"
+        );
+    }
     let constraints = analyzed.context().parameter_constraints();
     let expected = SemTypeReference::concrete_type_ref(
         PgBuiltInType::int4()

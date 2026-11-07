@@ -49,7 +49,7 @@ pub use self::{
     name_resolution::{DomainBaseTypeNameNotFound, FunctionNotFound, NameResolution},
     overload_resolution::OverloadResolution,
     ownership::OwnershipProblem,
-    parameter_constraint::ParameterConstraintProblem,
+    parameter_constraint::{ParameterBindingAmbiguity, ParameterConstraintProblem},
     query::QueryProblem,
     rule::{RuleDefinitionProblem, RuleProblem},
     serial::SerialProblem,
@@ -96,7 +96,7 @@ pub enum AnalysisProblem {
     IncompatibleEngineVersion(EngineVersionProblem),
 
     /// SQL analysis could not establish a finalized parameter type.
-    ParameterTypeUnresolved(u32),
+    ParameterTypeUnresolved(ParameterBindingAmbiguity),
     /// Inference would need an unsupported catalog-wide candidate search.
     /// This reports an analysis limitation, not invalid SQL.
     InferenceCandidateSpaceUnsupported {
@@ -615,11 +615,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::InferenceCandidateSpaceUnsupported { operation } => format!(
                 "type inference for {operation} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint"
             ),
-            Self::ParameterTypeUnresolved(index) => {
-                format!(
-                    "application input binding for parameter ${index} is unresolved; supply a supported explicit input type hint; an SQL result cast may be insufficient"
-                )
-            }
+            Self::ParameterTypeUnresolved(problem) => problem.message(),
             Self::OperatorNameSyntax(parts) => Self::operator_name_syntax_message(parts),
             Self::CrossDatabaseOperatorReference(parts) => format!(
                 "cross-database operator references are not supported: {}",
@@ -1181,8 +1177,26 @@ impl AnalysisProblem {
     }
     /// Report an application input binding whose inference did not establish one type.
     #[must_use]
-    pub const fn parameter_type_unresolved(index: u32) -> Self {
-        Self::ParameterTypeUnresolved(index)
+    pub fn parameter_type_unresolved(index: u32) -> Self {
+        Self::ParameterTypeUnresolved(ParameterBindingAmbiguity::new(index, &[]))
+    }
+
+    /// Report a use that rejects an already selected application input type.
+    #[must_use]
+    pub fn parameter_binding_conflict(
+        index: u32,
+        selected: &TypeReference,
+        required: &[TypeReference],
+    ) -> Self {
+        Self::ParameterConstraint(ParameterConstraintProblem::binding_conflict(
+            index, selected, required,
+        ))
+    }
+
+    /// Report the retained local application binding candidates.
+    #[must_use]
+    pub fn parameter_binding_ambiguous(index: u32, candidates: &[TypeReference]) -> Self {
+        Self::ParameterTypeUnresolved(ParameterBindingAmbiguity::new(index, candidates))
     }
 }
 

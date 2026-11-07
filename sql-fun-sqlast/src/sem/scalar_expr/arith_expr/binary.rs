@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-pub(super) struct ResolvedBinaryOperator {
+pub(crate) struct ResolvedBinaryOperator {
     operator_def: Option<BinaryOperatorDefinition>,
     lexpr: SemScalarExpr,
     rexpr: SemScalarExpr,
@@ -37,7 +37,7 @@ impl ResolvedBinaryOperator {
         }
     }
 
-    pub(super) fn into_call_site_expr<'context, TParseContext>(
+    pub(crate) fn into_call_site_expr<'context, TParseContext>(
         self,
         context: &'context mut TParseContext,
         name: &OperatorName,
@@ -61,7 +61,7 @@ impl ResolvedBinaryOperator {
 }
 
 impl ArithExpr {
-    pub(super) fn resolve_overload_binary<TParseContext>(
+    pub(crate) fn resolve_overload_binary<TParseContext>(
         context: &mut TParseContext,
         name: &OperatorName,
         operator_def: OperatorDefinition,

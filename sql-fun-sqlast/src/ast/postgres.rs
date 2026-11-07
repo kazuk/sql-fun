@@ -1533,10 +1533,11 @@ impl TryFromWithTokens<&syn::ParamRef> for Parameter {
 
     fn try_from_with_tokens(
         value: &syn::ParamRef,
-        _tokens: &IVec<ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             position: value.get_number() as u32,
+            location: call_argument_token_span(value.get_location(), tokens),
             name: None,
             type_name: None,
         })

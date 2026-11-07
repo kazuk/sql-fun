@@ -381,9 +381,7 @@
     "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::parameter",
     "sql": "SELECT a,b FROM record_fun($1::text) AS r(a int,b text)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "a",

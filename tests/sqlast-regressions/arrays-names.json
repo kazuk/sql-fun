@@ -75,9 +75,7 @@
     "name": "projection_names::parameter_cast",
     "sql": "SELECT ARRAY[$1]::int[]",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "array",

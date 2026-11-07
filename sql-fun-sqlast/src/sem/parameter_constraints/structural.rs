@@ -64,9 +64,13 @@ impl TypeProjection {
         }
     }
 
-    fn prepare(&mut self, context: &impl ParseContext, source: &TypeReference) {
+    pub(crate) fn prepare(
+        &mut self,
+        context: &impl ParseContext,
+        source: &TypeReference,
+    ) -> Option<TypeReference> {
         if !matches!(self, Self::Member { .. }) || source.is_array() != Some(false) {
-            return;
+            return self.project(source);
         }
         if let Some(columns) = source.row_columns(context) {
             // Resolve domain/table row fields while the catalog is available,
@@ -80,6 +84,7 @@ impl TypeProjection {
                 }
             }
         }
+        self.project(source)
     }
 
     pub(super) fn project(&self, source: &TypeReference) -> Option<TypeReference> {
@@ -140,8 +145,7 @@ impl StructuralConstraint {
         context: &impl ParseContext,
         source: &TypeReference,
     ) -> Option<TypeReference> {
-        self.projection.prepare(context, source);
-        self.projection.project(source)
+        self.projection.prepare(context, source)
     }
 
     pub(super) fn retain_owned(&mut self, source: &TypeReference) {

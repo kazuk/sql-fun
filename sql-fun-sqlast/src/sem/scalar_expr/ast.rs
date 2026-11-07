@@ -147,7 +147,9 @@ impl SemScalarExpr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         match ast {
-            Expr::Parameter(parameter) => Ok(context.parameter(parameter.position())),
+            Expr::Parameter(parameter) => Ok(context
+                .parameter(parameter.position())
+                .with_parameter_location(*parameter.location())),
             Expr::Literal(value) => Ok(Self::from_ast_literal(value)),
             Expr::Column(name) => Self::from_ast_column(name, context, scope),
             Expr::Star(name) if context.dialect() == Dialect::postgres() && !name.is_empty() => {

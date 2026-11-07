@@ -3,9 +3,7 @@
     "name": "parameter_binding::native_plain",
     "sql": "SELECT $1::text AS value",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "value",
@@ -23,9 +21,7 @@
     "name": "parameter_binding::named_plain",
     "sql": "SELECT ${src}::text AS value",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "value",
@@ -61,9 +57,7 @@
     "name": "parameter_binding::native_record",
     "sql": "SELECT a,b FROM record_fun($1::text) AS r(a int,b text)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "a",
@@ -90,9 +84,7 @@
     "name": "parameter_binding::named_record",
     "sql": "SELECT a,b FROM record_fun(${src}::text) AS r(a int,b text)",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "a",
@@ -186,9 +178,7 @@
     "name": "parameter_binding::array_index",
     "sql": "SELECT (ARRAY[1,2])[$1] AS n",
     "expected": {
-      "diagnostics": [
-        "parameter_type_unresolved"
-      ],
+      "diagnostics": [],
       "columns": [
         {
           "name": "n",
@@ -277,6 +267,155 @@
             "local_name": "int4",
             "is_array": false
           }
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_binding::first_ambiguous",
+    "sql": "SELECT ${src} IS NULL AS missing, ${src}::text AS value",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "missing",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "value",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_binding::later_operator_conflict",
+    "sql": "SELECT ${src}::text AS value, ${src} + 1 AS invalid",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "parameter_constraint",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        },
+        {
+          "name": "invalid",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_binding::later_hint_authoritative",
+    "sql": "SELECT ${src}::text AS value, ${src:int4} + 1 AS n",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        },
+        {
+          "name": "n",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_binding::projection_before_from",
+    "sql": "SELECT ${src}::text AS value FROM (SELECT ${src}::int4) s",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_binding::native_first_ambiguous",
+    "sql": "SELECT $1 IS NULL AS missing, $1::text AS value",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "missing",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "value",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_binding::indirect_predicate_conflict",
+    "sql": "SELECT ${src}::int4 AS value WHERE binding_predicate(${src})",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
         }
       ]
     }

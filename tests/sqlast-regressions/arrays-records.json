@@ -45,7 +45,9 @@
     "name": "parameter_with_anonymous_records_uses_the_record_family",
     "sql": "SELECT ARRAY[$1,pg_control_system(),pg_control_checkpoint()]",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "array",

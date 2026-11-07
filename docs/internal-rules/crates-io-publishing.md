@@ -70,6 +70,18 @@ there is no propagation retry loop. Cargo packages and verifies source during
 `cargo publish`; normal-CI `.crate` files are not inputs. No release binary,
 Debian package, or manual is rebuilt by this workflow.
 
+Before registry lookups or the first upload, publication validates internal
+prerelease dependency requirements across the whole workspace, including crates
+later in publication order. Each must name the referenced crate's exact version,
+for example `=0.2.0-rc1`; a loose requirement can select another prerelease even
+when local workspace builds succeed. The rule applies equally to development
+manifests and materialized releases, without interpreting prerelease names.
+Stable dependency requirements are not forced to use `=`. An error identifies
+the owning manifest/table, dependency, expected requirement and actual value.
+The publisher never repairs manifests. Correct mutable source before preparation;
+already recorded/tagged or partially published releases need an explicit
+forward-only release decision, preserving existing history and published bytes.
+
 The workflow supplies the explicit product `--release-tag` to `publish-crates`.
 Before any crate upload, the publisher checks registry existence for all selected
 versions and validates binstall metadata for each **new** CLI/server version

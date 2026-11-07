@@ -69,6 +69,7 @@ for package in "${packages[@]}"; do
 done
 
 updated_metadata="$(cargo metadata --no-deps --format-version=1)"
+"$repo_root/.local/sbin/release-dependencies" pin <<<"$updated_metadata"
 for package in "${packages[@]}"; do
   actual_version="$(jq -er --arg package "$package" '.packages[] | select(.name == $package) | .version' <<<"$updated_metadata")"
   [[ "$actual_version" == "${next_versions[$package]}" ]] \

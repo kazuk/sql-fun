@@ -8,7 +8,6 @@ use std::{
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 
 use crate::{Args, ServerError};
-use ::sql_fun_core::RegistrationLock;
 
 #[derive(serde::Deserialize, serde::Serialize, derive_getters::Getters)]
 #[allow(clippy::struct_field_names)]
@@ -26,11 +25,8 @@ pub struct PidFile {
 impl Drop for PidFile {
     fn drop(&mut self) {
         if let (Some(path), Some(file)) = (&self.pid_file_path, &self.pid_file) {
-            // Retain the registration's shared lock while serializing removal.
-            if let Ok(lock) = RegistrationLock::open(path)
-                && let Ok(_guard) = lock.lock()
-                && matches!(same_file_at_path(file, path), Ok(true))
-            {
+            // The shared lock stays held while the owned name is removed.
+            if matches!(same_file_at_path(file, path), Ok(true)) {
                 let _ = std::fs::remove_file(path);
             }
         }
@@ -189,8 +185,6 @@ impl PidFile {
             .filter(|p| !p.as_os_str().is_empty())
             .unwrap_or(Path::new("."));
         std::fs::create_dir_all(parent)?;
-        let lock = RegistrationLock::open(path)?;
-        let _guard = lock.lock()?;
         let content = serde_json::to_vec(self)?;
         let (mut name, mut file) = TemporaryName::create(parent)?;
 
@@ -515,8 +509,6 @@ impl PidFile {
     fn remove_if_stale(path: &Path, observed: &mut File) -> Result<bool, ServerError> {
         // Competing removers serialize on the old inode, then recheck its name.
         observed.lock()?;
-        let lock = RegistrationLock::open(path)?;
-        let _guard = lock.lock()?;
         if !same_file_at_path(observed, path)? {
             return Ok(false);
         }

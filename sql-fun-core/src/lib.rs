@@ -50,7 +50,6 @@ mod lookup_result;
 mod metadata;
 mod placehlodered_sql;
 mod postgres_version;
-mod registration_lock;
 mod rewrite_options;
 mod schema_level;
 mod sql_tokens;
@@ -101,7 +100,6 @@ pub use self::{
         SqlFunMetadata, SqlFunMetadataCollection,
     },
     postgres_version::{PostgresVersion, PostgresVersionInventory},
-    registration_lock::{RegistrationGuard, RegistrationLock},
     rewrite_options::RewriteOptions,
 };
 

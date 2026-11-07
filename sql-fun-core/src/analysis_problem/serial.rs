@@ -1,6 +1,6 @@
 use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata};
 
-/// An invalid PostgreSQL serial-family column declaration.
+/// An invalid `PostgreSQL` serial-family column declaration.
 #[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum SerialProblem {

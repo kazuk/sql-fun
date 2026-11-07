@@ -42,11 +42,7 @@ impl PidFileFixture {
             return Ok(Vec::new());
         }
         std::fs::read_dir(parent)?
-            .filter_map(|entry| match entry {
-                Ok(entry) if entry.file_name() == "server.pid.lock" => None,
-                Ok(entry) => Some(Ok(entry.path())),
-                Err(error) => Some(Err(error)),
-            })
+            .map(|entry| entry.map(|entry| entry.path()))
             .collect()
     }
 

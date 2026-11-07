@@ -62,7 +62,7 @@ of their contents, so a wide table may wrap at the terminal edge.
 SQL diagnostics and their source highlighting are included in the stdout report.
 Use `--diagnostics-to-stderr` to additionally copy SQL diagnostics to stderr;
 status headers, SQL, and tables are not copied. See the
-[diagnostic reference](../diagnostics/README.md) for code meanings and suggested
+[diagnostic reference](../diagnostics/) for code meanings and suggested
 corrections. Error diagnostics do not stop later inputs. Each input uses the same
 selected schema base, without inheriting changes from preceding inputs.
 

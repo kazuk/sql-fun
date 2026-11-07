@@ -12,7 +12,7 @@ runs="$(gh api --method GET --paginate --slurp \
 selected="$(jq -ce --arg revision "$revision" '
   [.[].workflow_runs[] |
     select(.head_sha == $revision and .status == "completed" and .conclusion == "success") |
-    select(.event == "pull_request" or .event == "merge_group")] |
+    select(.event == "pull_request" or .event == "merge_group" or .event == "push")] |
   sort_by(.created_at, .run_number, .id) | last // empty |
   {id, html_url, head_sha}
 ' <<<"$runs")" || {

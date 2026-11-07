@@ -48,10 +48,12 @@ There is no preparation-time main write or patch back-commit.
 ## Required normal CI and adopted inputs
 
 The exact original source `S` must already have a successful required normal-CI
-run of `build-test.yml`. Preparation neither dispatches nor waits for CI. It
-selects the newest successful eligible run, ordered by creation time and then
-run number/ID; rerunning an old run does not make it newly created. A different
-SHA's result is never substituted, even if its source appears equivalent.
+run of `build-test.yml` triggered by `push`, `pull_request`, or `merge_group`.
+This includes normal CI for the exact merged `main` revision. Preparation neither
+dispatches nor waits for CI. It selects the newest successful eligible run,
+ordered by creation time and then run number/ID; rerunning an old run does not
+make it newly created. A different SHA's result is never substituted, even if
+its source appears equivalent.
 
 Both reusable inputs come from that single selected run:
 
@@ -188,6 +190,15 @@ producer draft repair. A rerun may still fail earlier if its retained inputs
 are unavailable.
 
 ## Safe reruns and failed attempts
+
+An Actions rerun checks out the original event's SHA, so it cannot pick up a
+preparation code fix merged later. Before any release-state commit `R` or
+immutable tag exists, explicitly select a new source revision containing the
+fix and require successful normal CI and available required inputs for that
+exact revision. If it descends from the existing release branch tip, fast-forward
+that branch to the selected source to start a new preparation run with the same
+release identity, preserving the failed history. Do not substitute the new
+revision's CI evidence for the original SHA.
 
 A successful release-state push records `R` permanently. Rerunning the original
 `S` run, or explicitly executing preparation on that recorded `R`, reuses the

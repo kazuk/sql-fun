@@ -40,7 +40,7 @@ quoted procedural bodies stay text literals.
 
 ## SQLite frontend contract
 
-The locked `turso_parser` 0.8.1 AST normalizes type names and drops comments and
+The locked `turso_parser` 0.8.3 AST normalizes type names and drops comments and
 bracket delimiters. Stock SQLite includes these spellings in declared types and
 uses them when determining affinity. Recovering them from the normalized native
 name cannot preserve behavior, and adding consumer-specific fields to the native
@@ -51,9 +51,17 @@ upstream parser and lexer. Immutable sources and their verified MIT provenance
 are recorded under `src/sqlite_parser/upstream` and in `THIRD_PARTY_NOTICES.md`.
 The build script applies checked single-match adaptations into Cargo's output
 directory; the generated modules reuse the dependency's existing AST, token and
-error types. Both parser and macro dependencies are pinned to 0.8.1. This private
+error types. Both parser and macro dependencies are pinned to 0.8.3. This private
 component is packaged in sqlast, so published builds do not rely on a workspace
 Cargo patch. The existing semantic parser remains unchanged.
+
+The copied sources retain their original Turso 0.8.1 revision and license
+provenance. Direct comparison of the published `turso_parser` 0.8.1 and 0.8.3
+archives confirmed that every file under `src/` is byte-identical, including
+the AST, token, and error definitions. The checked-in parser and lexer match
+both archives, so their bytes and build-time adaptations are retained unchanged.
+[Issue #1048](https://github.com/kazuk/sql-fun/issues/1048#issuecomment-6715090685)
+records the archive URLs, source revisions, and SHA-256 hashes.
 
 The temporary adaptation and source-span retention are gated by both `sqlite`
 and the default-enabled `workaround_turso_9791` feature. The workaround

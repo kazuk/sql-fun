@@ -6,8 +6,9 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AnalysisError, AnalysisProblem, CheckColumnConstraint, CheckConstraint, ColumnConstraint,
-        ColumnDefinition, ConstraintNames, CreateTable, ScalarAnalysisContext, TypeReference,
-        WithTypmod, create_table::serial::SerialSequences,
+        ColumnDefinition, CommonType, ConstraintNames, CreateTable, ScalarAnalysisContext,
+        SemScalarExpr, TypeReference, WithTypmod, create_table::serial::SerialSequences,
+        problem::AlterColumnProblem, traversal::SemanticVisitor,
     },
 };
 
@@ -426,6 +427,66 @@ impl ColumnDefinition {
             if !matches!(definition.constraint(), AstColumnConstraint::Enforcement(_)) {
                 index += 1;
             }
+        }
+        Ok(())
+    }
+}
+
+impl ColumnDefinition {
+    pub(crate) fn validate_added_default(
+        &mut self,
+        context: &mut impl ParseContext,
+        table: &TableName,
+    ) -> Result<(), AnalysisError> {
+        let Some(expression) = self.default_expression() else {
+            return Ok(());
+        };
+        let mut validation = AddedDefault {
+            context: &*context,
+            valid: true,
+        };
+        expression.visit(&mut validation)?;
+        let assignable = if context.dialect() == AstDialect::postgres() {
+            match (
+                SemScalarExpr::common_type_input(expression),
+                self.get_type(),
+            ) {
+                (Some(source), Some(target)) => {
+                    source == CommonType::unknown()
+                        || source.assignment_match_context(target, context).is_some()
+                }
+                _ => false,
+            }
+        } else {
+            true
+        };
+        if !validation.valid || !assignable {
+            self.reject_declaration();
+            context.report_problem(AnalysisProblem::alter_column(
+                table,
+                self.name().as_ref().expect("declared column"),
+                &AlterColumnProblem::add_default(),
+            ))?;
+        }
+        Ok(())
+    }
+}
+
+struct AddedDefault<'a, C> {
+    context: &'a C,
+    valid: bool,
+}
+impl<C: ParseContext> SemanticVisitor for AddedDefault<'_, C> {
+    fn walk_source_column_values(&self) -> bool {
+        false
+    }
+    fn enter_query(&mut self) {
+        self.valid = false;
+    }
+    fn expression(&mut self, expression: &SemScalarExpr) -> Result<(), AnalysisError> {
+        self.valid &= expression.permits_schema_default(self.context);
+        if let Some(collate) = expression.as_collate() {
+            self.valid &= collate.can_apply(self.context);
         }
         Ok(())
     }

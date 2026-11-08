@@ -502,6 +502,12 @@ impl SemScalarExpr {
         }
     }
 
+    pub(crate) fn permits_schema_default(&self, context: &impl BaseParseContext) -> bool {
+        self.check_references_resolved()
+            && self.preserves_view_rows(context)
+            && !matches!(self, Self::Param(_))
+    }
+
     pub(crate) fn check_references_resolved(&self) -> bool {
         self.grouping_references_resolved()
             && match self {

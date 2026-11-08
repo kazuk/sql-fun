@@ -6,6 +6,80 @@ Supported schema changes update the analysis catalog for later statements in
 explicitly selected schema files; they do not execute database migrations. See
 the [shared schema-definition policy](../statements.md).
 
+### Adding columns
+
+Ordinary `ADD [COLUMN]` appends columns to an existing table in the analysis
+catalog. Subsequent queries see their declared types, order, defaults,
+nullability and supported inline constraints. PostgreSQL serial declarations
+also create the modeled sequence and dependency; explicitly named keys create
+modeled indexes. Database-generated index names are not inferred.
+
+```sql
+CREATE TABLE measurements(low integer);
+ALTER TABLE measurements
+    ADD COLUMN high integer CHECK(low < high),
+    ADD COLUMN label text;
+SELECT low, high, label FROM measurements;
+```
+
+Inline CHECK can reference existing columns and other columns added by the
+same statement, including later additions. CHECK stays associated with its
+declaring column and retains its options and resolved references. It does not
+imply NOT NULL. The [shared CHECK rules](create-table.md#check-constraints) apply.
+Additions can be combined with supported column-attribute operations and
+ADD CHECK/key/reference constraints. PostgreSQL operation phases determine
+visibility: SET NOT NULL can target a newly added column, whereas DROP NOT NULL
+runs before additions and requires a column that already exists.
+
+PostgreSQL `IF EXISTS` skips an absent table. `ADD COLUMN IF NOT EXISTS` skips an
+occupied name before resolving the requested definition, even if that definition
+names an absent type. An occupied name without that clause is rejected. SQLite
+uses case-insensitive column-name comparisons and does not accept those
+PostgreSQL existence clauses. SQLite ADD COLUMN rejects PRIMARY KEY and UNIQUE.
+
+A rejected supported operation leaves the entire statement unapplied, including
+columns, constraints, implicit objects and applied source history. Later
+statements can still be analyzed. Successful alterations retain their source
+association. Previously analyzed PostgreSQL views keep their original output
+columns after a base table gains columns.
+
+This is static schema analysis: it does not inspect row contents, prove a new
+NOT NULL/CHECK holds for stored rows, or evaluate arbitrary constant inputs.
+SQLite restrictions whose outcome depends on table emptiness, existing rows or
+foreign-key PRAGMA state cannot be decided from a schema declaration alone.
+Analysis does not assume any of those runtime facts.
+
+#### Deferred column additions
+
+This increment does not implement all ADD COLUMN definitions:
+
+- GENERATED expressions remain explicitly unimplemented and can terminate
+  analysis ([#1060](https://github.com/kazuk/sql-fun/issues/1060)). Their row
+  references need the appropriate prospective table state.
+- IDENTITY declarations remain explicitly unimplemented and can terminate
+  analysis ([#1061](https://github.com/kazuk/sql-fun/issues/1061)); their sequence
+  options and dependent objects are not supplied by ordinary-column analysis.
+- DEFERRABLE unique/primary keys and other incomplete constraint modifiers remain
+  [#563](https://github.com/kazuk/sql-fun/issues/563). The existing CREATE
+  [declaration limitations](create-table.md#remaining-declaration-limitations)
+  also apply to the corresponding added-column definitions.
+- Combinations with other unimplemented ALTER operations, such as
+  `ADD COLUMN b integer, DROP COLUMN a`, remain explicitly unimplemented
+  ([#1063](https://github.com/kazuk/sql-fun/issues/1063)). General expression
+  analysis across ALTER row states is tracked separately by
+  [#1062](https://github.com/kazuk/sql-fun/issues/1062).
+- Incompatible PostgreSQL foreign-key column types, for example adding
+  `parent_id text REFERENCES parent(id)` when `parent.id` is integer, reach an
+  unfinished diagnostic and can terminate analysis
+  ([#1067](https://github.com/kazuk/sql-fun/issues/1067), shared reporting #523).
+- SQLite declared type names currently require a matching analysis-catalog type.
+  Legal arbitrary type strings, for example `ADD COLUMN b arbitrary_type_name`,
+  can receive `column_type_not_found`; declaration affinity support remains
+  [#1069](https://github.com/kazuk/sql-fun/issues/1069).
+- SQLite CHECK expressions using the unimplemented comparison/arithmetic
+  operator path remain [#504](https://github.com/kazuk/sql-fun/issues/504).
+  Supported truth/null tests and logical expressions use SQLite truth semantics.
+
 ### Adding table CHECK constraints
 
 `ADD [CONSTRAINT name] CHECK (condition)` retains the analyzed expression and
@@ -167,14 +241,16 @@ does not establish foreign-table alterations. ALTER TYPE's composite-type
 analysis has its own [unsupported
 analysis](create-type.md#dialect-and-engine-specific-behavior).
 
-ALTER ADD COLUMN remains unimplemented for PostgreSQL and SQLite: even an
-ordinary column addition reaches an unimplemented catalog-application path.
-This includes columns with inline CHECK
-([#528](https://github.com/kazuk/sql-fun/issues/528)). Supported CREATE inline
-CHECK analysis does not establish ALTER ADD COLUMN support.
-
 ## Diagnostics
 
+- [add_column_nullability](../../diagnostics/add_column_nullability.md): an added
+  column has conflicting NULL/NOT NULL declarations.
+- [add_column_default](../../diagnostics/add_column_default.md): an added default
+  is not a resolved scalar assignment to the declared column type.
+- [add_column_primary_key](../../diagnostics/add_column_primary_key.md): an
+  addition would introduce a second primary key.
+- [add_column_sqlite_key](../../diagnostics/add_column_sqlite_key.md): SQLite
+  ADD COLUMN requests PRIMARY KEY or UNIQUE.
 - [check_boolean_type](../../diagnostics/check_boolean_type.md): a CHECK boolean
   operand has an incompatible PostgreSQL type.
 - [check_boolean_literal](../../diagnostics/check_boolean_literal.md): a CHECK

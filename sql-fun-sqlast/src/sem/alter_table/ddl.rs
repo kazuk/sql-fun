@@ -13,9 +13,9 @@ use crate::{
     names::{ColumnName, FullName, LocalName, TableName, ViewName},
     sem::{
         AlterColumnAttributes, AlterObjSubCommand, AlterTable, AlterView, AnalysisError,
-        AnalysisProblem, ColumnAttributeAction, ColumnAttributeBinding, ColumnDefinition,
-        ColumnRename, Constraint, CreateTable, FromClause, OwnerSpecification, ResolutionFailure,
-        ScalarAnalysisContext, SemScalarExpr, WithClause,
+        AnalysisProblem, ColumnAddition, ColumnAttributeAction, ColumnAttributeBinding,
+        ColumnDefinition, ColumnRename, Constraint, CreateTable, FromClause, OwnerSpecification,
+        ResolutionFailure, ScalarAnalysisContext, SemScalarExpr, WithClause,
         problem::{AlterColumnProblem, ViewProblem},
         search_path::expand_relation_search_path,
     },
@@ -107,22 +107,6 @@ mod test_analyze_sqlite_alter_table_reports_drop_missing_column {
             RelationAlteration::from_ast_and_apply_at(&alter_table, context, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
-    }
-}
-
-impl AlterObjSubCommand {
-    pub(crate) fn check_ast_existing_column(
-        context: &mut impl ParseContext,
-        table: &TableName,
-        column: &ColumnName,
-    ) -> Result<(), AnalysisError> {
-        if let Some(definition) = context.get_table(table)
-            && definition.has_column(column)
-        {
-            context
-                .report_analysis_problem(AnalysisProblem::column_already_exists(table, column))?;
-        }
-        Ok(())
     }
 }
 
@@ -298,11 +282,9 @@ impl AlterObjSubCommand {
         table: &TableName,
         column: &AstColumn,
     ) -> Result<Self, AnalysisError> {
-        let column = ColumnDefinition::from_ast_standalone(column, context, table)?;
-        if let Some(name) = column.name() {
-            Self::check_ast_existing_column(context, table, name)?;
-        }
-        Ok(Self::add_column(&column))
+        Ok(Self::add_column(&ColumnAddition::analyze_single(
+            context, table, column,
+        )?))
     }
 
     pub(crate) fn from_ast_alter_column(

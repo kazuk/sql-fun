@@ -6,8 +6,8 @@ use crate::{
     },
     names::{FullName, TableName},
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, CreateIndex, CreateTable, DropTable, Kind,
-        problem::CreationProblem, search_path::expand_relation_search_path,
+        AlterTable, AnalysisError, AnalysisProblem, CreateIndex, CreateTable, DropTable,
+        ImplicitChange, Kind, problem::CreationProblem, search_path::expand_relation_search_path,
     },
 };
 
@@ -68,6 +68,40 @@ impl SchemaFileContext {
     }
 }
 
+impl SchemaFileContext {
+    fn alter_indexes(
+        &mut self,
+        statement: &AlterTable,
+        table: &FullName,
+        changes: Vec<ImplicitChange>,
+    ) -> Result<Option<Vec<CreateIndex>>, AnalysisError> {
+        if let Some(indexes) = statement.addition_indexes() {
+            // Addition analysis retains completed object-identity decisions.
+            return Ok(Some(indexes.to_vec()));
+        }
+        let mut indexes = Vec::new();
+        for change in changes {
+            let index = change.into_index().with_table_identity(table);
+            if !self.permits_relation_creation(index.name(), Kind::index(), false, false)? {
+                return Ok(None);
+            }
+            if CreateIndex::contains_name(&indexes, index.name()) {
+                self.report_analysis_problem(AnalysisProblem::creation(
+                    CreationProblem::relation(
+                        index.name(),
+                        Kind::index(),
+                        Kind::index(),
+                        &self.creation_span(),
+                    ),
+                ))?;
+                return Ok(None);
+            }
+            indexes.push(index);
+        }
+        Ok(Some(indexes))
+    }
+}
+
 impl TableInfoWrite for SchemaFileContext {
     #[tracing::instrument(skip(self))]
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
@@ -92,7 +126,9 @@ impl TableInfoWrite for SchemaFileContext {
             return Ok(self);
         };
 
-        if let Some(name) = alter_table.conflicting_constraint(&table) {
+        if alter_table.addition_indexes().is_none()
+            && let Some(name) = alter_table.conflicting_constraint(&table)
+        {
             self.report_analysis_problem(AnalysisProblem::creation(CreationProblem::constraint(
                 &key,
                 &FullName::from_local_name(&name),
@@ -101,31 +137,19 @@ impl TableInfoWrite for SchemaFileContext {
             return Ok(self);
         }
         let implicit_changes = table.apply_alter(alter_table)?;
-        let mut indexes = Vec::new();
-        for change in implicit_changes {
-            let index = change.into_index().with_table_identity(&key);
-            if !self.permits_relation_creation(index.name(), Kind::index(), false, false)? {
-                return Ok(self);
-            }
-            if CreateIndex::contains_name(&indexes, index.name()) {
-                self.report_analysis_problem(AnalysisProblem::creation(
-                    CreationProblem::relation(
-                        index.name(),
-                        Kind::index(),
-                        Kind::index(),
-                        &self.creation_span(),
-                    ),
-                ))?;
-                return Ok(self);
-            }
-            indexes.push(index);
-        }
+        let Some(indexes) = self.alter_indexes(alter_table, &key, implicit_changes)? else {
+            return Ok(self);
+        };
+        table.record_added_sequences(alter_table.addition_sequences());
         self.catalog.store_table(&key, &table);
         if let Some(owner) = alter_table.applied_owner() {
             self.change_dependent_sequence_owners(&TableName::from(key), owner);
         }
         for index in indexes {
             self.catalog.store_index(&index);
+        }
+        for sequence in alter_table.addition_sequences() {
+            self.catalog.store_sequence(sequence.name(), sequence);
         }
         Ok(self)
     }

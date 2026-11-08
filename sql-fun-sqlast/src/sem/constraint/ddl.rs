@@ -2,8 +2,9 @@
 
 use crate::{
     ast::{
-        ColumnConstraint as AstColumnConstraint, ForeignReference as AstForeignReference,
-        TableConstraint as AstTableConstraint,
+        AlterCommand as AstAlterCommand, ColumnConstraint as AstColumnConstraint,
+        ForeignReference as AstForeignReference, TableConstraint as AstTableConstraint,
+        ddl::AlterDefinition as AstAlterDefinition,
     },
     context::ParseContext,
     names::{ColumnName, FullName, TableName},
@@ -15,6 +16,61 @@ use crate::{
 };
 
 impl Constraint {
+    pub(crate) fn added_ast_constraint(ast: &AstAlterCommand) -> Option<&AstTableConstraint> {
+        let definition = match ast {
+            AstAlterCommand::Constraint(definition) => definition,
+            AstAlterCommand::Postgres(command) => {
+                if let AstAlterDefinition::Constraint(definition) = command.definition() {
+                    definition
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        };
+        Some(definition)
+    }
+
+    pub(crate) fn from_ast_added_constraint(
+        ast: &AstTableConstraint,
+        context: &mut impl ParseContext,
+        target: &TableName,
+        pending: Option<&CreateTable>,
+    ) -> Result<(Self, bool), AnalysisError> {
+        if ast.is_check() {
+            let check =
+                CheckConstraint::from_ast_table_constraint(ast, context, target, pending, true)?;
+            return Ok((Self::check(&check), check.can_apply()));
+        }
+        if let Some(pending) = pending {
+            if ast.constraint().is_unique_key() {
+                if ast.extras().deferrable() {
+                    todo!("deferrable unique-key catalog representation (#563)");
+                }
+                let keys = Self::columns_from_ast(ast);
+                let valid = pending.check_reference_columns(context, target, &keys)?;
+                let result = Self::from_ast_column_table(
+                    ast.constraint(),
+                    context,
+                    target,
+                    ast.name().as_deref().unwrap_or_default(),
+                    &keys,
+                )?;
+                return Ok((result, valid));
+            }
+            if let Some(mut constraint) =
+                Self::from_ast_declared_foreign_key(ast, context, pending)?
+            {
+                constraint.validate_added_column_types(context, pending)?;
+                let valid = constraint.references_can_apply();
+                return Ok((constraint, valid));
+            }
+        }
+        let result = Self::from_ast_table(ast, context, target)?;
+        let valid = result.references_can_apply();
+        Ok((result, valid))
+    }
+
     pub(crate) fn from_ast_declared_key(
         ast: &AstTableConstraint,
         context: &mut impl ParseContext,

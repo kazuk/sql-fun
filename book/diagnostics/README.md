@@ -48,6 +48,10 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 
 ## Codes
 
+- [add_column_default](add_column_default.md)
+- [add_column_nullability](add_column_nullability.md)
+- [add_column_primary_key](add_column_primary_key.md)
+- [add_column_sqlite_key](add_column_sqlite_key.md)
 - [alter_column_definition_syntax](alter_column_definition_syntax.md)
 - [alter_column_duplicate_type](alter_column_duplicate_type.md)
 - [alter_column_type_conversion](alter_column_type_conversion.md)

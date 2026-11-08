@@ -77,10 +77,10 @@ reach the shared unimplemented
 operator path ([#504](https://github.com/kazuk/sql-fun/issues/504)); supported
 truth/null tests and logical expressions can bind multiple row columns.
 Analysis does not execute
-checks against database rows or infer an implicit index. ALTER ADD COLUMN,
-including columns with inline CHECK, remains unimplemented
-([#528](https://github.com/kazuk/sql-fun/issues/528)); CREATE support does not
-establish ALTER support.
+checks against database rows or infer an implicit index. Ordinary ALTER ADD
+COLUMN and supported inline CHECK use the
+[documented addition scope](alter-table.md#adding-columns); GENERATED, IDENTITY
+and other deferred declarations remain distinct from CREATE support.
 
 ### CREATE TABLE AS
 
@@ -112,6 +112,19 @@ enforcement/inheritance forms have retained syntax and explicit unsupported
 paths; grammar acceptance is not full constraint validation.
 
 ### Remaining declaration limitations
+
+SQLite declarations currently require named types to be present in the selected
+analysis catalog. Legal arbitrary type strings such as `arbitrary_type_name`
+can therefore receive `column_type_not_found`; SQLite affinity-based declaration
+resolution remains [#1069](https://github.com/kazuk/sql-fun/issues/1069).
+
+PostgreSQL CREATE TABLE analysis does not reliably reject contradictory
+NULL/NOT NULL declarations, including NULL combined with PRIMARY KEY; later
+nullability normalization can conceal the contradiction. SQLite permits NULL
+alongside NOT NULL, which must remain NOT NULL, but CREATE analysis can retain
+the last declaration instead. These CREATE limitations remain
+[#1066](https://github.com/kazuk/sql-fun/issues/1066); ADD COLUMN handles each
+dialect's nullability rules independently.
 
 PostgreSQL EXCLUDE constraint analysis remains unimplemented
 ([#526](https://github.com/kazuk/sql-fun/issues/526)) and can terminate analysis.

@@ -92,6 +92,10 @@ impl DiagnosticMessage for IndexProblem {
 impl DiagnosticMessage for AlterColumnProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::AddNullability => "added column has conflicting NULL/NOT NULL declarations".to_owned(),
+            Self::AddSqliteKey => "SQLite ADD COLUMN cannot declare PRIMARY KEY or UNIQUE".to_owned(),
+            Self::AddPrimaryKey => "a table cannot have more than one primary key".to_owned(),
+            Self::AddDefault => "added column default requires a resolved scalar expression assignable to the declared type".to_owned(),
             Self::DefinitionSyntax => "SQLite does not support ALTER COLUMN ... TO column-definition".to_owned(),
             Self::DuplicateType => "cannot alter the type of one column twice".to_owned(),
             Self::TypeConversion => "column value cannot be assigned to the requested type".to_owned(),

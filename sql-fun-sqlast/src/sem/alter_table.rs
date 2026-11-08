@@ -1,12 +1,15 @@
 mod ddl;
 
 use crate::{
+    AstAndContextPair,
+    ast::{Statement, StatementNode},
     context::GetSourcePathWithSpan,
     names::{ColumnName, TableName, ViewName},
     sem::{
-        AlterColumnAttributes, AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename,
-        Constraint, ConstraintNames, CreateTable, CreateView, OwnerSpecification, ParseContext,
-        SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
+        AlterColumnAttributes, AlterColumnDefinition, AlterColumnType, AnalysisError,
+        AnalysisProblem, ColumnDefinition, ColumnRename, Constraint, ConstraintNames, CreateTable,
+        CreateView, OwnerSpecification, ParseContext, RelationAlteration, SemScalarExpr,
+        SourcePathWithSpan, problem::ViewProblem,
     },
 };
 
@@ -29,6 +32,90 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    /// Analyze an ALTER TABLE without applying it to the schema catalog.
+    ///
+    /// The context supplies the selected engine, catalog, diagnostics and source
+    /// association. The returned statement retains semantic applicability;
+    /// applicability does not imply that catalog application is implemented.
+    /// Other statement kinds are rejected as an invalid API input.
+    pub fn analyze<TContext: ParseContext>(
+        statement: &Statement,
+        mut context: TContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        let StatementNode::AlterRelation(relation) = statement.node() else {
+            return AnalysisError::raise_unexpected_input("expected ALTER TABLE");
+        };
+        if !relation.kind().supports_table_column_attributes() {
+            return AnalysisError::raise_unexpected_input("expected ALTER TABLE relation kind");
+        }
+        if statement.dialect() != context.dialect() {
+            return AnalysisError::raise_unexpected_input("statement and context dialects differ");
+        }
+        let source = context.get_source_path_with_span().cloned();
+        context.begin_parameter_type_analysis();
+        let result = RelationAlteration::from_ast_inner(relation, &mut context, source.as_ref());
+        let analyzed = context.finish_analysis(result)?;
+        Ok(AstAndContextPair::new(analyzed, context))
+    }
+}
+
+#[cfg(test)]
+mod analysis_only_tests {
+    use crate::{
+        ast::Dialect,
+        context::BaseParseContext,
+        sem::AlterTable,
+        test_helpers::{column_attributes, public_analysis},
+    };
+
+    #[rstest::rstest]
+    #[case::applicable("ALTER TABLE t ALTER COLUMN a SET NOT NULL", true)]
+    #[case::rejected("ALTER TABLE t ALTER COLUMN missing SET NOT NULL", false)]
+    fn analysis_retains_outcomes_without_catalog_application(
+        #[case] sql: &str,
+        #[case] applicable: bool,
+    ) -> testresult::TestResult {
+        let context = column_attributes::seed("CREATE TABLE t(a integer)", "17")?;
+        let statement = public_analysis::statement(sql, Dialect::postgres());
+        let result = AlterTable::analyze(&statement, context)?;
+        assert_eq!(
+            result.ast().alter_table_statement().unwrap().can_apply(),
+            applicable
+        );
+        let table = result
+            .context()
+            .get_table(&column_attributes::table_name())
+            .unwrap();
+        assert_eq!(
+            column_attributes::column(result.context(), "a").is_not_null(),
+            Some(false)
+        );
+        assert!(table.alter_statements().is_empty());
+        Ok(())
+    }
+}
+
+impl AlterTable {
+    pub(crate) fn analyzed_column_types(
+        table: &TableName,
+        target: Option<&TableName>,
+        commands: &[AlterObjSubCommand],
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut result = Self::new(table, commands, source);
+        result.resolved_target = target.cloned();
+        result.applicable = target.is_some()
+            && commands.iter().all(|command| {
+                if let Some(change) = command.column_type_change() {
+                    change.is_valid()
+                } else if let Some(change) = command.column_definition_change() {
+                    change.is_valid()
+                } else {
+                    command.can_apply_column_attributes()
+                }
+            });
+        result
+    }
     pub(crate) fn column_rename(
         table: &TableName,
         target: Option<&TableName>,
@@ -52,9 +139,18 @@ impl AlterTable {
         command.column_rename_change()
     }
 
-    /// Whether completed semantic analysis permits catalog application.
+    /// Whether completed analysis found no rejection that prevents application.
+    ///
+    /// Column type changes still require dependency validation by the future
+    /// application implementation; true is not a guarantee of successful application.
     pub const fn can_apply(&self) -> bool {
         self.applicable
+    }
+    /// Whether final dependency validation remains with schema application.
+    pub fn requires_application_validation(&self) -> bool {
+        self.commands
+            .iter()
+            .any(|command| command.column_type_change().is_some())
     }
     /// Canonical target binding retained by semantic analysis.
     pub const fn resolved_target(&self) -> Option<&TableName> {
@@ -176,6 +272,10 @@ impl AlterView {
 pub enum AlterObjSubCommand {
     /// An analyzed PostgreSQL column-attribute operation.
     ColumnAttributes(Box<AlterColumnAttributes>),
+    /// Analyzed column type conversion, without catalog application.
+    ColumnType(Box<AlterColumnType>),
+    /// Parser-retained SQLite column definition replacement and its engine rejection.
+    ColumnDefinition(Box<AlterColumnDefinition>),
     ChangeOwner(OwnerSpecification),
     SetColumnDefault(ColumnName, Box<SemScalarExpr>),
     /// Remove a column default.
@@ -193,6 +293,8 @@ pub enum AlterObjSubCommand {
 impl AlterObjSubCommand {
     fn declaration_can_apply(&self) -> bool {
         match self {
+            Self::ColumnType(change) => change.is_valid(),
+            Self::ColumnDefinition(change) => change.is_valid(),
             Self::AddConstraint(constraint) => {
                 constraint.as_check().is_none_or(|check| check.can_apply())
             }
@@ -212,6 +314,28 @@ impl AlterObjSubCommand {
         }
     }
 
+    pub(crate) fn column_definition(value: &AlterColumnDefinition) -> Self {
+        Self::ColumnDefinition(Box::new(value.clone()))
+    }
+    /// Completed parser-retained SQLite replacement analysis, including rejection.
+    pub fn column_definition_change(&self) -> Option<&AlterColumnDefinition> {
+        if let Self::ColumnDefinition(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn column_type(value: &AlterColumnType) -> Self {
+        Self::ColumnType(Box::new(value.clone()))
+    }
+    /// Completed column type analysis, including invalid operations.
+    pub fn column_type_change(&self) -> Option<&AlterColumnType> {
+        if let Self::ColumnType(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
     pub(crate) fn column_attributes(value: &AlterColumnAttributes) -> Self {
         Self::ColumnAttributes(Box::new(value.clone()))
     }

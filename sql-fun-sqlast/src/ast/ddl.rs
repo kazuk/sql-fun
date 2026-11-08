@@ -213,7 +213,7 @@ impl AlterDefinition {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct AlterColumnType {
     type_name: TypeName,
     collation: Option<Name>,

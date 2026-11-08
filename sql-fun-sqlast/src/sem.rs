@@ -1,6 +1,8 @@
 #![doc = include_str!("sem.md")]
 
 mod alter_column;
+mod alter_column_definition;
+mod alter_column_type;
 mod alter_index;
 mod alter_owner;
 mod alter_seq;
@@ -72,6 +74,29 @@ mod wildcard_expansion;
 mod with_typmod;
 #[cfg(test)]
 pub(crate) use self::conflict_info::infer_from_catalog;
+pub use self::{
+    alter_column_definition::AlterColumnDefinition,
+    alter_column_type::{AlterColumnType, ColumnTypeConversion},
+    column_rename::ColumnRename,
+    create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
+    create_trigger::{
+        CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
+        TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity,
+        TriggerReferences, TriggerTiming, TriggerTransition,
+    },
+    cursor_info::CursorInfo,
+    declaration_collation::DeclarationCollation,
+    drop_trigger::DropTrigger,
+    merge_statement::{
+        MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
+        ViewMergeSupport, ViewMergeTriggers,
+    },
+    query_access::{AccessObjectKind, AccessRecord, QueryAccess},
+    query_metadata::QueryMetadata,
+    view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption},
+    view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport},
+    with_typmod::WithTypmod,
+};
 pub(crate) use self::{
     alter_table::AlterObjSubCommand,
     common_type::CommonType,
@@ -100,27 +125,6 @@ pub(crate) use self::{
         WildcardQualifier, WildcardQualifiers, WildcardRowsFunction, WildcardRowsProjection,
         WildcardRowsSource, WildcardRowsSources, WildcardSourceProjection, WildcardTypedRecord,
     },
-};
-pub use self::{
-    column_rename::ColumnRename,
-    create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
-    create_trigger::{
-        CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
-        TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity,
-        TriggerReferences, TriggerTiming, TriggerTransition,
-    },
-    cursor_info::CursorInfo,
-    declaration_collation::DeclarationCollation,
-    drop_trigger::DropTrigger,
-    merge_statement::{
-        MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
-        ViewMergeSupport, ViewMergeTriggers,
-    },
-    query_access::{AccessObjectKind, AccessRecord, QueryAccess},
-    query_metadata::QueryMetadata,
-    view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption},
-    view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport},
-    with_typmod::WithTypmod,
 };
 pub use crate::AstAndContextPair;
 pub(crate) use crate::stack::with_stack;

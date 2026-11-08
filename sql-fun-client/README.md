@@ -73,12 +73,29 @@ bounded retries with registration rereads. A replacement registration can be
 followed within the same deadline. Errors report the observable stage without
 printing tokens; initialization EOF cannot establish that the token was rejected.
 
-Automatic recovery is unsupported in this MVP. An unusable existing registration
-is preserved: the client never signals the registered process, deletes its file,
-or launches a replacement over it. Crash leftovers, zombies and inconsistent
-tokens can therefore require operator-assisted recovery. Verify the intended
-server and registration before cleanup and stop other startups during that work.
-Do not act on an unverified PID. Safe automatic recovery is tracked in [issue #415](https://github.com/kazuk/sql-fun/issues/415).
+After bounded unsuccessful retries, the client removes registrations for exited
+or zombie servers and retries startup. For a live, unresponsive server, it
+checks the process against the selected executable, sends SIGTERM, and escalates
+to SIGKILL if needed. It verifies exit before removing the observed
+registration. If the PID belongs to another executable, only its stale
+registration is removed; the unrelated process is never signaled. Recovery and
+restart use the same connection deadline, so a short timeout can prevent
+recovery. A changed registration is followed rather than removed.
+
+Recovery requires Linux 5.3 or newer with pidfd support. Recovering a live
+server also requires accessible `/proc` and permission to inspect and signal the
+server. These recovery prerequisites do not apply to normal startup or healthy
+reuse. Existing registration directories and their permissions are preserved. If
+identity or coordination cannot be verified, the client preserves the
+registration and reports the failed stage. Cancellation does not initiate
+termination; a signal already sent cannot be undone.
+
+Each observed registration gets at most one third of the total connection budget
+for readiness retries, with each attempt capped at two seconds. Recovery
+reserves half of its remaining budget for restart; TERM grace uses one quarter,
+and exit verification after KILL uses the next quarter. If too little time
+remains, recovery fails without starting termination. Coordination and cleanup
+also reserve time for restart. All phases remain within the original deadline.
 
 The async low-level `try_from` wraps a socket without authentication; use `connect`
 for the authenticated lifecycle. `invoke_method` accepts protocol-compatible JSON

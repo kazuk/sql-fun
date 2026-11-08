@@ -5,6 +5,7 @@
 mod async_tokio;
 mod completion;
 mod connection;
+mod recovery;
 
 #[cfg(test)]
 mod test_helpers;

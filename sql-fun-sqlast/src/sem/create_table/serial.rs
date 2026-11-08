@@ -15,7 +15,7 @@ use ::sql_fun_core::analysis_problem::SerialProblem;
 pub(crate) struct SerialSequences(Vec<CreateSequence>);
 
 impl SerialSequences {
-    pub(super) fn into_sequences(self) -> Vec<CreateSequence> {
+    pub(crate) fn into_sequences(self) -> Vec<CreateSequence> {
         self.0
     }
 

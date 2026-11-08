@@ -7,9 +7,9 @@ use crate::{
     names::{ColumnName, TableName, ViewName},
     sem::{
         AlterColumnAttributes, AlterColumnDefinition, AlterColumnType, AnalysisError,
-        AnalysisProblem, ColumnDefinition, ColumnRename, Constraint, ConstraintNames, CreateTable,
-        CreateView, OwnerSpecification, ParseContext, RelationAlteration, SemScalarExpr,
-        SourcePathWithSpan, problem::ViewProblem,
+        AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnRename, Constraint,
+        ConstraintNames, CreateIndex, CreateSequence, CreateTable, CreateView, OwnerSpecification,
+        ParseContext, RelationAlteration, SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
     },
 };
 
@@ -23,6 +23,10 @@ pub struct AlterTable {
     applicable: bool,
     #[getter(skip)]
     resolved_target: Option<TableName>,
+    #[getter(skip)]
+    addition_indexes: Option<Vec<CreateIndex>>,
+    #[getter(skip)]
+    addition_sequences: Vec<CreateSequence>,
 }
 
 impl GetSourcePathWithSpan for AlterTable {
@@ -32,6 +36,31 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    #[expect(clippy::too_many_arguments)]
+    pub(crate) fn column_additions(
+        requested: &TableName,
+        target: Option<&TableName>,
+        commands: &[AlterObjSubCommand],
+        source: &SourcePathWithSpan,
+        applicable: bool,
+        indexes: &[CreateIndex],
+        sequences: &[CreateSequence],
+    ) -> Self {
+        let mut statement = Self::new(requested, commands, source);
+        statement.resolved_target = target.cloned();
+        statement.applicable &= target.is_some() && applicable;
+        statement.addition_indexes = Some(indexes.to_vec());
+        statement.addition_sequences = sequences.to_vec();
+        statement
+    }
+
+    pub(crate) fn addition_indexes(&self) -> Option<&[CreateIndex]> {
+        self.addition_indexes.as_deref()
+    }
+    pub(crate) fn addition_sequences(&self) -> &[CreateSequence] {
+        &self.addition_sequences
+    }
+
     /// Analyze an ALTER TABLE without applying it to the schema catalog.
     ///
     /// The context supplies the selected engine, catalog, diagnostics and source
@@ -248,6 +277,8 @@ impl AlterTable {
                 .iter()
                 .all(AlterObjSubCommand::declaration_can_apply),
             resolved_target: None,
+            addition_indexes: None,
+            addition_sequences: Vec::new(),
         }
     }
 }
@@ -284,7 +315,7 @@ pub enum AlterObjSubCommand {
     ClusterOn(String),
 
     RenameTo(TableName),
-    AddColumn(ColumnDefinition),
+    AddColumn(Box<ColumnAddition>),
     AlterColumn(ColumnName, ColumnDefinition),
     RenameColumn(Box<ColumnRename>),
     DropColumn(ColumnName),
@@ -293,15 +324,15 @@ pub enum AlterObjSubCommand {
 impl AlterObjSubCommand {
     fn declaration_can_apply(&self) -> bool {
         match self {
+            Self::ColumnAttributes(change) => change.can_apply(),
             Self::ColumnType(change) => change.is_valid(),
             Self::ColumnDefinition(change) => change.is_valid(),
             Self::AddConstraint(constraint) => {
                 constraint.as_check().is_none_or(|check| check.can_apply())
             }
             Self::RenameColumn(rename) => rename.can_apply(),
-            Self::AddColumn(column) | Self::AlterColumn(_, column) => {
-                column.declaration_can_apply()
-            }
+            Self::AddColumn(addition) => addition.can_apply(),
+            Self::AlterColumn(_, column) => column.declaration_can_apply(),
             _ => true,
         }
     }
@@ -356,6 +387,16 @@ impl AlterObjSubCommand {
             value.apply(table);
         }
     }
+    pub(crate) fn addition_indexes(
+        &self,
+        table: &TableName,
+    ) -> Result<Vec<CreateIndex>, AnalysisError> {
+        if let Some(constraint) = self.added_constraint() {
+            constraint.addition_indexes(table)
+        } else {
+            Ok(Vec::new())
+        }
+    }
     const fn added_constraint(&self) -> Option<&Constraint> {
         if let Self::AddConstraint(constraint) = self {
             Some(constraint)
@@ -392,8 +433,16 @@ impl AlterObjSubCommand {
     pub(crate) fn rename_to(table: &TableName) -> Self {
         Self::RenameTo(table.clone())
     }
-    pub(crate) fn add_column(column: &ColumnDefinition) -> Self {
-        Self::AddColumn(column.clone())
+    pub(crate) fn add_column(addition: &ColumnAddition) -> Self {
+        Self::AddColumn(Box::new(addition.clone()))
+    }
+    /// Completed ADD COLUMN declaration, including skipped and rejected requests.
+    pub fn column_addition(&self) -> Option<&ColumnAddition> {
+        if let Self::AddColumn(addition) = self {
+            Some(addition)
+        } else {
+            None
+        }
     }
     pub(crate) fn alter_column(name: &ColumnName, column: &ColumnDefinition) -> Self {
         Self::AlterColumn(name.clone(), column.clone())

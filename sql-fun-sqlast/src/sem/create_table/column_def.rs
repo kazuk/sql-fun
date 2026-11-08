@@ -3,8 +3,8 @@ use crate::{
     names::{ColumnName, FullName as NamesFullName, TableName},
     sem::{
         AnalysisError, CatalogNameLookup, ColumnConstraint, ColumnNullabilityConstraint,
-        ColumnRename, DeclarationCollation, DefaultColumnConstraint, GeneratedColumnConstraint,
-        ParseContext, SemScalarExpr, TypeReference, WithTypmod,
+        ColumnRename, ConstraintNames, DeclarationCollation, DefaultColumnConstraint,
+        GeneratedColumnConstraint, ParseContext, SemScalarExpr, TypeReference, WithTypmod,
         traversal::{ColumnRenamer, SemanticVisitorMut},
     },
 };
@@ -48,6 +48,14 @@ impl ColumnAttributes {
 }
 
 impl ColumnDefinition {
+    pub(crate) fn reserve_check_names(&self, names: &mut ConstraintNames) {
+        for constraint in &self.constraints {
+            if let Some(check) = constraint.as_check() {
+                names.reserve(check.name().unwrap_or_default());
+            }
+        }
+    }
+
     #[expect(deprecated)]
     pub(crate) fn default_expression(&self) -> Option<&SemScalarExpr> {
         self.constraints
@@ -343,7 +351,7 @@ impl ColumnDefinition {
         self.is_not_null = not_null;
     }
 
-    pub(super) fn apply_primary_key_nullability(&mut self) {
+    pub(crate) fn apply_primary_key_nullability(&mut self) {
         if self
             .constraints
             .iter()

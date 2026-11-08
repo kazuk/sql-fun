@@ -11,6 +11,7 @@ mod analysis_state;
 mod ast;
 mod cast;
 mod client_type;
+mod column_addition;
 mod column_constraints;
 mod column_rename;
 mod common_type;
@@ -156,6 +157,7 @@ pub use {
         analysis_state::AnalysisState,
         cast::{CastContext, CastDefinition},
         client_type::parse_client_type,
+        column_addition::ColumnAddition,
         column_constraints::{
             AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
             AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,

@@ -1,7 +1,10 @@
 use crate::{
     ast::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
+    context::ParseContext,
     names::{ColumnName, TableName},
-    sem::{AnalysisError, ColumnRename, ForeignKeyTarget, ImplicitChange},
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnRename, CreateTable, ForeignKeyTarget, ImplicitChange,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -21,6 +24,62 @@ pub struct ForeignKeyConstraint {
 }
 
 impl ForeignKeyConstraint {
+    pub(crate) fn validate_added_column_types(
+        &mut self,
+        context: &mut impl ParseContext,
+        pending: &CreateTable,
+    ) -> Result<(), AnalysisError> {
+        let Some(target) = self.target_table.relation() else {
+            return Ok(());
+        };
+        let Some(columns) = &self.target_columns else {
+            return Ok(());
+        };
+        let referenced = if target == pending.name() {
+            Some(pending)
+        } else {
+            context.get_table_impl(target.full_name())
+        };
+        let mut mismatches = Vec::new();
+        for (source_name, target_name) in self.source_columns.iter().zip(columns) {
+            let source = if let Some(column) = pending.find_column(source_name, false) {
+                column.get_type()
+            } else {
+                None
+            };
+            let target_type = if let Some(table) = referenced
+                && let Some(column) = table.find_column(target_name, false)
+            {
+                column.get_type()
+            } else {
+                None
+            };
+            if let (Some(source), Some(target_type)) = (source, target_type)
+                && source
+                    .implicit_match_context(target_type, context)
+                    .is_none()
+                && target_type
+                    .implicit_match_context(source, context)
+                    .is_none()
+            {
+                // The shared mismatch diagnostic is unimplemented (#1067; parent #523).
+                mismatches.push(AnalysisProblem::foreign_key_column_type_mismatch(
+                    pending.name(),
+                    source_name,
+                    source,
+                    target,
+                    target_name,
+                    target_type,
+                ));
+            }
+        }
+        self.references_valid &= mismatches.is_empty();
+        for problem in mismatches {
+            context.report_problem(problem)?;
+        }
+        Ok(())
+    }
+
     /// Referencing columns in declaration order.
     pub fn source_columns(&self) -> &[ColumnName] {
         &self.source_columns

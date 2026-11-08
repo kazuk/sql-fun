@@ -31,7 +31,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 164 groups are split 10/77/77.
+in the committed file. The current 166 groups are split 10/78/78.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -271,8 +271,10 @@ groups. Valid schema DDL supplies subsequent query metadata. Focused Rust tests
 retain applicability,
 undefined-capability and ambiguity outcomes, requested types/modifiers, rejected
 DDL atomicity, public composite-analysis entry-point coverage and recovery.
-PostgreSQL ADD COLUMN application and ALTER COLUMN TYPE remain tracked by #528
-and #529 respectively; declaration validation does not implement those operations.
+Ordinary ADD COLUMN now applies the completed declarations; its GENERATED and
+IDENTITY follow-ups are #1060 and #1061. ALTER COLUMN TYPE application remains
+tracked by #1057. Declaration validation alone does not implement those deferred
+operations.
 
 The query-analysis API analyzes each input statement in an independent context,
 and `sql-fun test` expects one result per case. Catalog transitions and
@@ -449,5 +451,23 @@ boolean/domain/NULL inputs, prohibited expressions, names and CHECK options.
 Rust schema-chain tests retain inline ownership, completed binding failures,
 applicability, rejection-safe catalog updates, rename propagation, frozen layers
 and additive serialization. SQLite feature tests verify distinct truth rules.
-ALTER ADD COLUMN application remains tracked by #528, as explicitly separated
-from #991 by the maintainer.
+Ordinary ALTER ADD COLUMN application is covered by #528 below, following its
+original separation from #991 by the maintainer.
+
+## Ordinary ADD COLUMN (#528)
+
+`table-additions` uses explicit project schemas and real PostgreSQL 17/18 builtin
+catalogs to verify query columns after additions, fixed existing-view shapes,
+serial metadata, supported constraints, skip/duplicate decisions, default
+assignment diagnostics and mixed column-attribute phases. Its manifest entries
+participate in both source-tree and installed-distribution checks.
+
+Rust schema-chain tests retain declaration applicability, canonical bindings,
+source history, implicit objects, freeze/base-layer preservation and rejected
+group atomicity, including suppressed diagnostic delivery. SQLite feature tests
+cover its case-insensitive names and supported CHECK scopes with explicit
+minimal metadata. SQLite rejects prohibited ADD key declarations during
+parsing. The tests do not depend on live servers.
+GENERATED (#1060), IDENTITY (#1061), general ALTER row-state expression analysis
+(#1062), unsupported mixed operation families (#1063) and DEFERRABLE semantics
+(#563) are outside this increment.

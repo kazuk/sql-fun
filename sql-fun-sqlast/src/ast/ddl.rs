@@ -33,6 +33,16 @@ impl From<&FullName> for Name {
 }
 
 impl super::AlterRelation {
+    pub(crate) fn single_column_addition(table: &FullName, column: &AstColumn) -> Self {
+        Self {
+            name: Name::from(table),
+            kind: AlterRelationKind::table(),
+            commands: vec![AlterCommand::AddColumn(column.clone())],
+            if_exists: false,
+            only: false,
+        }
+    }
+
     pub(crate) const fn with_view_kind(mut self, materialized: bool) -> Self {
         self.kind = AlterRelationKind::view(materialized);
         self
@@ -152,6 +162,14 @@ pub(crate) enum AlterDefinition {
 }
 
 impl AlterDefinition {
+    pub(crate) const fn as_column(&self) -> Option<&AstColumn> {
+        if let Self::Column(column) = self {
+            Some(column)
+        } else {
+            None
+        }
+    }
+
     pub(crate) const fn none() -> Self {
         Self::None
     }
@@ -780,5 +798,16 @@ impl Call {
             over: None,
             location: None,
         }
+    }
+}
+
+impl AstColumn {
+    /// Analyze REFERENCES after all effective columns and keys are staged.
+    pub(crate) fn without_foreign_keys(&self) -> Self {
+        let mut column = self.clone();
+        column.constraints.retain(|constraint| {
+            !matches!(constraint.constraint(), ColumnConstraint::ForeignKey(_))
+        });
+        column
     }
 }

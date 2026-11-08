@@ -8,7 +8,8 @@ use crate::{
     ast::{Column as AstColumn, ColumnConstraint as AstColumnConstraint},
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnRename, ImplicitChange, ParseContext, traversal::SemanticVisitorMut,
+        AnalysisError, ColumnRename, CreateIndex, CreateTable, ImplicitChange, ParseContext,
+        traversal::SemanticVisitorMut,
     },
 };
 use std::collections::HashMap;
@@ -32,6 +33,40 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    pub(crate) fn check(value: &CheckConstraint) -> Self {
+        Self::Check(value.clone())
+    }
+
+    pub(crate) fn validate_added_column_types(
+        &mut self,
+        context: &mut impl ParseContext,
+        pending: &CreateTable,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Foreign(key) = self {
+            key.validate_added_column_types(context, pending)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn first_key(&self) -> Option<&ColumnName> {
+        if let Self::PrimaryKey(key) = self {
+            key.keys().first()
+        } else {
+            None
+        }
+    }
+    pub(crate) fn addition_indexes(
+        &self,
+        target: &TableName,
+    ) -> Result<Vec<CreateIndex>, AnalysisError> {
+        if self.name().is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(self
+            .implicit_changes()?
+            .into_iter()
+            .map(|change| change.into_index().with_table_identity(target.full_name()))
+            .collect())
+    }
     /// Inspect a table CHECK, including a rejected definition's retained expression.
     pub const fn as_check(&self) -> Option<&CheckConstraint> {
         if let Self::Check(value) = self {

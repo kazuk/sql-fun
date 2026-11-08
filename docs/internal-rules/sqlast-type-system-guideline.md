@@ -400,9 +400,9 @@ composite and domain declarations publish no definitions; invalid add-column
 groups leave the table unchanged. Query declarations preserve known result
 columns even when collation validation fails.
 
-Successful PostgreSQL ADD COLUMN application remains tracked by
-[#528](https://github.com/kazuk/sql-fun/issues/528); sharing declaration validation
-does not implement that operation. ALTER COLUMN TYPE COLLATE retains syntax but
+Ordinary ADD COLUMN applies completed declaration outcomes through the staged
+addition path. See the [supported/deferred boundary](../../book/sql-analysis/statements/alter-table.md#adding-columns).
+ALTER COLUMN TYPE COLLATE retains syntax but
 its semantic operation remains owned by
 [#529](https://github.com/kazuk/sql-fun/issues/529). Expression COLLATE has its own
 validation lifecycle; this declaration policy does not change it or SQLite.

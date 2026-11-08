@@ -1944,6 +1944,26 @@
                   "const": "DefinitionSyntax"
                 },
                 {
+                  "description": "SQLite forbids PRIMARY KEY and UNIQUE in ADD COLUMN.",
+                  "type": "string",
+                  "const": "AddSqliteKey"
+                },
+                {
+                  "description": "A PostgreSQL table cannot acquire a second primary key.",
+                  "type": "string",
+                  "const": "AddPrimaryKey"
+                },
+                {
+                  "description": "An added default is not a valid scalar assignment to the column.",
+                  "type": "string",
+                  "const": "AddDefault"
+                },
+                {
+                  "description": "Added column has contradictory NULL and NOT NULL declarations.",
+                  "type": "string",
+                  "const": "AddNullability"
+                },
+                {
                   "description": "The requested type change occurs twice for one column.",
                   "type": "string",
                   "const": "DuplicateType"
@@ -6411,6 +6431,26 @@
                   "description": "The parser-retained column replacement is not SQLite engine syntax.",
                   "type": "string",
                   "const": "DefinitionSyntax"
+                },
+                {
+                  "description": "SQLite forbids PRIMARY KEY and UNIQUE in ADD COLUMN.",
+                  "type": "string",
+                  "const": "AddSqliteKey"
+                },
+                {
+                  "description": "A PostgreSQL table cannot acquire a second primary key.",
+                  "type": "string",
+                  "const": "AddPrimaryKey"
+                },
+                {
+                  "description": "An added default is not a valid scalar assignment to the column.",
+                  "type": "string",
+                  "const": "AddDefault"
+                },
+                {
+                  "description": "Added column has contradictory NULL and NOT NULL declarations.",
+                  "type": "string",
+                  "const": "AddNullability"
                 },
                 {
                   "description": "The requested type change occurs twice for one column.",

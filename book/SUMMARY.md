@@ -84,6 +84,10 @@
 ## SQL diagnostic reference
 
 - [Diagnostic reference](diagnostics/README.md)
+  - [add_column_default](diagnostics/add_column_default.md)
+  - [add_column_nullability](diagnostics/add_column_nullability.md)
+  - [add_column_primary_key](diagnostics/add_column_primary_key.md)
+  - [add_column_sqlite_key](diagnostics/add_column_sqlite_key.md)
   - [alter_column_definition_syntax](diagnostics/alter_column_definition_syntax.md)
   - [alter_column_duplicate_type](diagnostics/alter_column_duplicate_type.md)
   - [alter_column_type_conversion](diagnostics/alter_column_type_conversion.md)

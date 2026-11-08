@@ -6,6 +6,14 @@ use crate::analysis_problem::{ColumnName, DiagnosticMetadata, DiagnosticSeverity
 pub enum AlterColumnProblem {
     /// The parser-retained column replacement is not SQLite engine syntax.
     DefinitionSyntax,
+    /// SQLite forbids PRIMARY KEY and UNIQUE in ADD COLUMN.
+    AddSqliteKey,
+    /// A PostgreSQL table cannot acquire a second primary key.
+    AddPrimaryKey,
+    /// An added default is not a valid scalar assignment to the column.
+    AddDefault,
+    /// Added column has contradictory NULL and NOT NULL declarations.
+    AddNullability,
     /// The requested type change occurs twice for one column.
     DuplicateType,
     /// The existing column cannot be assigned to the requested type.
@@ -45,6 +53,26 @@ pub enum AlterColumnProblem {
 }
 
 impl AlterColumnProblem {
+    /// Contradictory added-column nullability declarations.
+    #[must_use]
+    pub const fn add_nullability() -> Self {
+        Self::AddNullability
+    }
+    /// A key declaration forbidden by SQLite ADD COLUMN.
+    #[must_use]
+    pub const fn add_sqlite_key() -> Self {
+        Self::AddSqliteKey
+    }
+    /// A second primary key on an existing PostgreSQL table.
+    #[must_use]
+    pub const fn add_primary_key() -> Self {
+        Self::AddPrimaryKey
+    }
+    /// An invalid added-column default expression or assignment.
+    #[must_use]
+    pub const fn add_default() -> Self {
+        Self::AddDefault
+    }
     /// Parser extension rejected by the SQLite engine.
     #[must_use]
     pub const fn definition_syntax() -> Self {
@@ -159,6 +187,10 @@ impl AlterColumnProblem {
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::AddSqliteKey => "add_column_sqlite_key",
+            Self::AddPrimaryKey => "add_column_primary_key",
+            Self::AddDefault => "add_column_default",
+            Self::AddNullability => "add_column_nullability",
             Self::DefinitionSyntax => "alter_column_definition_syntax",
             Self::DuplicateType => "alter_column_duplicate_type",
             Self::TypeConversion => "alter_column_type_conversion",
@@ -188,6 +220,10 @@ impl AlterColumnProblem {
         column: &ColumnName,
     ) -> DiagnosticMetadata {
         let message = match self {
+            Self::AddNullability => "added column has conflicting NULL/NOT NULL declarations".to_owned(),
+            Self::AddSqliteKey => "SQLite ADD COLUMN cannot declare PRIMARY KEY or UNIQUE".to_owned(),
+            Self::AddPrimaryKey => "a table cannot have more than one primary key".to_owned(),
+            Self::AddDefault => "added column default requires a resolved scalar expression assignable to the declared type".to_owned(),
             Self::DefinitionSyntax => "SQLite does not support ALTER COLUMN ... TO column-definition".to_owned(),
             Self::DuplicateType => "cannot alter the type of one column twice".to_owned(),
             Self::TypeConversion => "column value cannot be assigned to the requested type".to_owned(),

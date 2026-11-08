@@ -1,15 +1,17 @@
 mod ddl;
 mod serial;
 pub use self::column_def::ColumnDefinition;
+pub(crate) use self::serial::SerialSequences;
 use crate::{
     ast::{CreateTableMode, Dialect},
     context::{GetSourcePathWithSpan, ParseContext},
     names::{ColumnName, FullName, TableName},
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, CheckConstraint, ColumnAttributeAction,
-        ColumnRename, Constraint, CreateIndex, CreateSequence, ForeignKeyConstraint,
-        ImplicitChange, IndirectionExpr, InsertArbiter, Kind, OwnerSpecification, RuleIdentity,
-        RuleReferences, SemScalarExpr, SourcePathWithSpan, TriggerReferences, TypeReference,
+        ColumnRename, Constraint, ConstraintNames, CreateIndex, CreateSequence,
+        ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
+        OwnerSpecification, RuleIdentity, RuleReferences, SemScalarExpr, SourcePathWithSpan,
+        TriggerReferences, TypeReference,
         alter_table::AlterObjSubCommand,
         problem::CreationProblem,
         traversal::{RelationRenamer, SemanticVisitorMut},
@@ -400,6 +402,41 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    pub(crate) fn for_alter_analysis(&self, target: &TableName) -> Self {
+        let mut table = self.clone();
+        table.name = target.clone();
+        table
+    }
+
+    pub(crate) fn record_added_sequences(&mut self, sequences: &[CreateSequence]) {
+        self.serial_sequences.extend_from_slice(sequences);
+    }
+
+    pub(crate) fn apply_added_column(
+        &mut self,
+        column: &ColumnDefinition,
+        constraints: &[Constraint],
+    ) -> Result<(), AnalysisError> {
+        self.append_declared_column(column);
+        for constraint in constraints {
+            self.record_declared_constraint(constraint)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn reserve_constraint_names(&self, names: &mut ConstraintNames) {
+        for constraint in self.constraints.values() {
+            names.reserve(constraint.name());
+        }
+        for column in &self.columns.0 {
+            column.reserve_check_names(names);
+        }
+    }
+
+    pub(crate) fn append_declared_column(&mut self, column: &ColumnDefinition) {
+        self.columns.0.push(column.clone());
+    }
+
     pub(crate) const fn declared_columns(&self) -> &ColumnCollection {
         &self.columns
     }
@@ -690,14 +727,18 @@ impl CreateTable {
                 }
                 AlterObjSubCommand::DropColumnDefault(_) => todo!(),
                 AlterObjSubCommand::AddConstraint(constraint) => {
-                    implicit_changes.extend(self.apply_added_constraint(constraint)?);
+                    if alter_table.addition_indexes().is_some() {
+                        self.record_declared_constraint(constraint)?;
+                    } else {
+                        implicit_changes.extend(self.apply_added_constraint(constraint)?);
+                    }
                 }
                 AlterObjSubCommand::ClusterOn(index_name) => {
                     self.cluster_on = Some(index_name.clone())
                 }
                 AlterObjSubCommand::RenameTo(name) => self.rename_identity(name),
-                AlterObjSubCommand::AddColumn(_) => {
-                    todo!()
+                AlterObjSubCommand::AddColumn(addition) => {
+                    addition.apply_to(self)?;
                 }
                 AlterObjSubCommand::AlterColumn(_, _) => {
                     todo!()
@@ -713,6 +754,9 @@ impl CreateTable {
             }
         }
 
+        if alter_table.addition_indexes().is_some() {
+            self.apply_primary_key_nullability();
+        }
         Ok(implicit_changes)
     }
 

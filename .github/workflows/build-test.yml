@@ -695,7 +695,7 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --step=server-api-spec
+          .local/bin/check-test-flow --step=verify-server-api-spec
           sccache --show-stats
 
   deny:

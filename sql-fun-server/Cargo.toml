@@ -1,6 +1,6 @@
 [package]
 name = "sql-fun-server"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "schema data service for sql-fun"
@@ -49,3 +49,8 @@ tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-gnu]
+pkg-url = "https://github.com/kazuk/sql-fun/releases/download/v0.1.0/sql-fun-v0.1.0-x86_64-unknown-linux-gnu.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }"

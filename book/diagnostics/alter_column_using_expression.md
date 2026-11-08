@@ -7,7 +7,7 @@ Code: `alter_column_using_expression`. Severity: Error.
 ## When it is reported
 
 USING contains an unresolved reference, a parameter, a subquery, an aggregate, a
-window function or a set-returning expression.
+window function, a set-returning expression or an invalid COLLATE annotation.
 
 ## What analysis knows and does not know
 
@@ -21,6 +21,7 @@ column type changes remains
 ## How to address it
 
 Use a scalar expression referring to existing columns of the original row.
+For COLLATE, select an existing collation and a collatable operand type.
 
 ## Example
 

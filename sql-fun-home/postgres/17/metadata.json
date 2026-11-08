@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "server_version_num": 170006,
-  "extractor_version": "0.1.0",
+  "extractor_version": "0.2.0",
   "provenance": {
     "source": "docker",
     "image_id": "sha256:ca95f67ffb26270b70c5bc95dfaecc1a58bd08cab56ba6aeb051acb2163d2aab"

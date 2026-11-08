@@ -92,6 +92,37 @@ impl ColumnTypeConversion {
     }
 }
 
+#[cfg(test)]
+mod default_conversion_tests {
+    use crate::{
+        ast::Dialect,
+        sem::AlterTable,
+        test_helpers::{alter_column_type, public_analysis},
+    };
+
+    #[rstest::rstest]
+    #[case::null("NULL", true)]
+    #[case::collated_string("'true' COLLATE \"C\"", false)]
+    #[case::collated_null("NULL COLLATE \"C\"", false)]
+    fn default_context_preserves_existing_coercions(
+        #[case] default: &str,
+        #[case] valid: bool,
+    ) -> testresult::TestResult {
+        let context = alter_column_type::declared_default(default)?;
+        let statement = public_analysis::statement(
+            "ALTER TABLE defaults ALTER COLUMN a TYPE boolean USING true",
+            Dialect::postgres(),
+        );
+        let result = AlterTable::analyze(&statement, context)?;
+        let change = result.ast().alter_table_statement().unwrap().commands()[0]
+            .column_type_change()
+            .unwrap();
+        assert_eq!(change.default().unwrap().can_assign(), valid);
+        assert_eq!(change.is_valid(), valid);
+        Ok(())
+    }
+}
+
 /// Completed analysis of one ALTER COLUMN TYPE, retaining rejected requests too.
 #[derive(Clone, Debug)]
 pub struct AlterColumnType {
@@ -454,28 +485,6 @@ mod analysis_tests {
         );
         Ok(())
     }
-
-    #[rstest::rstest]
-    #[case::null("NULL", true)]
-    #[case::collated_string("'true' COLLATE \"C\"", false)]
-    #[case::collated_null("NULL COLLATE \"C\"", false)]
-    fn default_context_preserves_existing_coercions(
-        #[case] default: &str,
-        #[case] valid: bool,
-    ) -> testresult::TestResult {
-        let context = alter_column_type::declared_default(default)?;
-        let statement = public_analysis::statement(
-            "ALTER TABLE defaults ALTER COLUMN a TYPE boolean USING true",
-            Dialect::postgres(),
-        );
-        let result = AlterTable::analyze(&statement, context)?;
-        let change = result.ast().alter_table_statement().unwrap().commands()[0]
-            .column_type_change()
-            .unwrap();
-        assert_eq!(change.default().unwrap().can_assign(), valid);
-        assert_eq!(change.is_valid(), valid);
-        Ok(())
-    }
 }
 
 struct UsingExpression<'a, C> {
@@ -493,6 +502,46 @@ impl<C: ParseContext> SemanticVisitor for UsingExpression<'_, C> {
         self.valid &= expression.check_references_resolved()
             && expression.preserves_view_rows(self.context)
             && !matches!(expression, SemScalarExpr::Param(_));
+        if let Some(collate) = expression.as_collate() {
+            self.valid &= collate.can_apply(self.context);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod using_expression_tests {
+    use crate::{
+        ast::Dialect,
+        sem::AlterTable,
+        test_helpers::{alter_column_type, public_analysis},
+    };
+
+    #[rstest::rstest]
+    #[case::noncollatable("a COLLATE \"C\"", false)]
+    #[case::missing("'1' COLLATE absent", false)]
+    #[case::nested("(a COLLATE \"C\")::bigint", false)]
+    #[case::unknown_literal("'1' COLLATE \"C\"", true)]
+    fn collate_outcomes_determine_using_validity(
+        #[case] operand: &str,
+        #[case] valid: bool,
+    ) -> testresult::TestResult {
+        let statement = public_analysis::statement(
+            &format!("ALTER TABLE t ALTER COLUMN a TYPE bigint USING {operand}"),
+            Dialect::postgres(),
+        );
+        let result = AlterTable::analyze(&statement, alter_column_type::context())?;
+        let alter = result.ast().alter_table_statement().unwrap();
+        let change = alter.commands()[0].column_type_change().unwrap();
+        assert!(change.value().can_assign());
+        assert_eq!(change.is_valid(), valid);
+        assert_eq!(alter.can_apply(), valid);
+        assert_eq!(
+            result
+                .context()
+                .has_reported_problem("alter_column_using_expression"),
+            !valid
+        );
         Ok(())
     }
 }

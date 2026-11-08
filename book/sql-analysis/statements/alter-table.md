@@ -65,7 +65,9 @@ and value/default conversion outcomes. Without USING, the old value must permit
 assignment conversion. USING refers to the original row, including when several
 columns change in one statement. Existing defaults are checked independently;
 USING does not convert a default. Repeated type changes for one column are
-rejected. Already supported column-attribute operations can accompany a type
+rejected. Invalid or unresolved COLLATE annotations inside USING also make the
+operation locally invalid, even when its result type is known.
+Already supported column-attribute operations can accompany a type
 change.
 
 This analysis does not apply the change to the schema catalog. Schema-file

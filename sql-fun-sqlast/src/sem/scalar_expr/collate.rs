@@ -250,6 +250,52 @@ mod test_collate_resolution {
 }
 
 impl CollateExpr {
+    /// Consume the completed lookup and operand capability without resolving names again.
+    pub(crate) fn can_apply(&self, context: &impl ParseContext) -> bool {
+        if self.collation.resolved_name().is_none() {
+            return false;
+        }
+        if context.dialect() != Dialect::postgres() {
+            return true;
+        }
+        let Some(ty) = SemScalarExpr::common_type_input(&self.argument) else {
+            return true;
+        };
+        // Unknown literals are assigned a type by the enclosing expression.
+        // Missing catalog capability does not establish a forbidden annotation.
+        ty == CommonType::unknown() || ty.collation_capability(context) != Some(false)
+    }
+}
+
+#[cfg(test)]
+mod applicability_tests {
+    use crate::{
+        ast::Dialect,
+        test_helpers::collate::{context, expression, query},
+    };
+
+    #[rstest::rstest]
+    #[case::noncollatable("SELECT 1 COLLATE \"C\"", false)]
+    #[case::missing("SELECT 'x' COLLATE absent", false)]
+    #[case::unknown_literal("SELECT 'x' COLLATE \"C\"", true)]
+    fn consumes_lookup_and_operand_outcomes(
+        #[case] sql: &str,
+        #[case] valid: bool,
+    ) -> testresult::TestResult {
+        let mut context = context(Dialect::postgres());
+        let result = query(sql, &mut context)?;
+        assert_eq!(
+            expression(&result)
+                .as_collate()
+                .unwrap()
+                .can_apply(&context),
+            valid
+        );
+        Ok(())
+    }
+}
+
+impl CollateExpr {
     /// Analyzed operand, including nested explicit annotations and failed bindings.
     pub const fn argument(&self) -> &SemScalarExpr {
         &self.argument

@@ -52,6 +52,7 @@ use tokio::{
 
 /// service for user
 #[derive(clap::Parser, Clone)]
+#[command(version)]
 pub struct Args {
     #[arg(short, long, env = "USER")]
     user: String,

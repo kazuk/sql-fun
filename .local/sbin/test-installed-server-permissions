@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Focused installed-package regression for #1049, owned by install-validation.
+# This controlled fixture reproduces #1031; it is not a fresh-install test.
+set -euo pipefail
+
+if (( $# != 2 )) || [[ "$1" != /* || "$2" != /* ]]; then
+  echo 'usage: test-installed-server-permissions <absolute-cli> <absolute-server>' >&2
+  exit 2
+fi
+cli=$1
+server=$2
+test -x "$cli" && test -x "$server"
+(( EUID != 0 )) || { echo 'Run as an ordinary user' >&2; exit 1; }
+
+runtime=$(mktemp -d /tmp/sql-fun-permissions.XXXXXXXX)
+server_pid=''
+cleanup() {
+  local status=$? running_pid
+  trap - EXIT
+  if (( status != 0 )); then
+    for log in "$runtime/server.log" "$runtime/cli.stderr" "$runtime/response.jsonl"; do
+      if [[ -f "$log" ]]; then cat "$log" >&2; fi
+    done
+  fi
+  for running_pid in $(jobs -pr); do
+    if [[ "$running_pid" == "$server_pid" ]]; then
+      kill -KILL "$running_pid" 2>/dev/null || true
+    fi
+  done
+  if [[ -n "$server_pid" ]]; then wait "$server_pid" 2>/dev/null || true; fi
+  rm -rf -- "$runtime"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# 0755 would pass #1031's mode & 0022 check; group-write must be exercised.
+chmod 0775 "$runtime"
+test "$(stat -c '%u' "$runtime")" = "$EUID"
+test "$(stat -c '%a' "$runtime")" = 775
+printf 'Permission fixture: uid=%s mode=%s\n' "$EUID" "$(stat -c '%a' "$runtime")"
+export USER="${runtime##*/}"
+export SQL_FUN_SERVER="$server"
+unset SQL_FUN_SERVER_COMMAND SQL_FUN_MAX_RESPONSE_BYTES RUST_LOG BASH_ENV \
+  SQL_FUN_LOG_FILE SQL_FUN_LOG_LEVEL REQUEST_LENGTH_LIMIT IDLE_TIMEOUT AUTH_TIMEOUT
+
+"$server" --user "$USER" --server-idle-timeout 0 </dev/null >"$runtime/server.log" 2>&1 &
+server_pid=$!
+for ((attempt = 0; attempt < 200; attempt++)); do
+  if [[ -s "$runtime/sql-fun-server.pid" ]]; then break; fi
+  if ! kill -0 "$server_pid" 2>/dev/null; then
+    echo 'Permission fixture: server exited before registration' >&2
+    exit 1
+  fi
+  sleep 0.05
+done
+test -s "$runtime/sql-fun-server.pid" || {
+  echo 'Permission fixture: server readiness timed out' >&2
+  exit 1
+}
+jq -e --argjson pid "$server_pid" '.pid == $pid' "$runtime/sql-fun-server.pid" >/dev/null
+
+# Forbid another launch: the response must come from our registered child.
+printf '%s\n' '{"method":"echo","params":{"permissions":"0775"}}' |
+  timeout 15s "$cli" api --user "$USER" --server-command 'exit 99' \
+    >"$runtime/response.jsonl" 2>"$runtime/cli.stderr"
+jq -e -s '. == [{"id":1,"jsonrpc":"2.0","result":{"permissions":"0775"}}]' \
+  "$runtime/response.jsonl" >/dev/null
+test "$(stat -c '%a' "$runtime")" = 775
+cat "$runtime/response.jsonl"

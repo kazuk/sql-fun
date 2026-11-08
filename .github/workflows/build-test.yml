@@ -854,6 +854,10 @@ jobs:
           rustup default stable
           tests/postgres-e2e/run.sh --installed /usr/bin/sql-fun /usr/bin/sql-fun-server
 
+      - name: Validate installed server with group-writable registration directory
+        run: |
+          .local/sbin/test-installed-server-permissions /usr/bin/sql-fun /usr/bin/sql-fun-server
+
       - name: Clean PostgreSQL E2E build artifacts
         if: ${{ always() }}
         run: cargo clean

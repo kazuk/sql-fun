@@ -1,4 +1,4 @@
-use crate::{TcpJsonRpcClientAsync, async_tokio::DEFAULT_MAX_RESPONSE_BYTES};
+use crate::{TcpJsonRpcClientAsync, async_tokio::DEFAULT_MAX_RESPONSE_BYTES, recovery::recover};
 
 use std::{
     os::unix::process::CommandExt,
@@ -225,16 +225,16 @@ impl ConnectionError {
         Self::failure("invalid input", message)
     }
 
-    fn failure(stage: &str, message: &str) -> Self {
+    pub(crate) fn failure(stage: &str, message: &str) -> Self {
         Self {
             message: format!("{stage}: {message}"),
             timed_out: false,
         }
     }
 
-    fn timeout(path: &Path, pid: Option<u32>, last: &str) -> Self {
+    pub(crate) fn timeout(path: &Path, pid: Option<u32>, last: &str) -> Self {
         let action = if pid.is_some() {
-            "Automatic recovery is unsupported; verify the intended server and registration before operator-assisted cleanup, with other startups stopped"
+            "Check the registered server and retry with a sufficient timeout"
         } else {
             "Check the selected executable and startup command; no usable registration was discovered"
         };
@@ -255,16 +255,18 @@ impl ConnectionError {
 }
 
 #[derive(serde::Deserialize)]
-struct Registration {
+pub(crate) struct Registration {
     pid: u32,
     port: u16,
     token: String,
+    #[serde(skip)]
+    file: Option<std::fs::File>,
 }
 
 impl Registration {
     async fn read(path: &Path) -> Result<Option<Self>, ConnectionError> {
         use ::tokio::io::AsyncReadExt;
-        let file = match ::tokio::fs::File::open(path).await {
+        let mut file = match ::tokio::fs::File::open(path).await {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => {
@@ -275,12 +277,13 @@ impl Registration {
             }
         };
         let mut bytes = Vec::new();
-        file.take(u64::from(REGISTRATION_LIMIT) + 1)
+        (&mut file)
+            .take(u64::from(REGISTRATION_LIMIT) + 1)
             .read_to_end(&mut bytes)
             .await
             .map_err(|error| ConnectionError::failure("registration", &error.to_string()))?;
         // Never include JSON errors or raw records: they can contain the token.
-        let record: Self = ::serde_json::from_slice(&bytes).map_err(|_| {
+        let mut record: Self = ::serde_json::from_slice(&bytes).map_err(|_| {
             ConnectionError::failure(
                 "registration",
                 &format!(
@@ -302,7 +305,57 @@ impl Registration {
                 ),
             ));
         }
+        record.file = Some(file.into_std().await);
         Ok(Some(record))
+    }
+
+    pub(crate) const fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    pub(crate) fn still_at(&self, path: &Path) -> std::io::Result<bool> {
+        use std::{io::Read, os::unix::fs::MetadataExt};
+        let old = self
+            .file
+            .as_ref()
+            .expect("observed registration")
+            .metadata()?;
+        let current = match std::fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        if !current.is_file() || old.dev() != current.dev() || old.ino() != current.ino() {
+            return Ok(false);
+        }
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)?
+            .take(u64::from(REGISTRATION_LIMIT) + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > usize::from(REGISTRATION_LIMIT) {
+            return Ok(false);
+        }
+        let Ok(record) = ::serde_json::from_slice::<Self>(&bytes) else {
+            return Ok(false);
+        };
+        Ok(self.pid == record.pid && self.port == record.port && self.token == record.token)
+    }
+
+    fn same_record(&self, other: &Self) -> bool {
+        self.pid == other.pid
+            && self.port == other.port
+            && self.token == other.token
+            && self
+                .file
+                .as_ref()
+                .zip(other.file.as_ref())
+                .is_some_and(|(a, b)| {
+                    use std::os::unix::fs::MetadataExt;
+                    a.metadata()
+                        .ok()
+                        .zip(b.metadata().ok())
+                        .is_some_and(|(a, b)| a.dev() == b.dev() && a.ino() == b.ino())
+                })
     }
 
     async fn authenticate(
@@ -338,65 +391,156 @@ impl Registration {
     }
 }
 
+struct ConnectionAttempt {
+    child: Option<Child>,
+    launched: bool,
+    observed: Option<(Registration, Instant)>,
+    last: String,
+    readiness_budget: Duration,
+}
+
+impl ConnectionAttempt {
+    fn new(deadline: Instant) -> Self {
+        Self {
+            child: None,
+            launched: false,
+            observed: None,
+            last: String::from("registration not published"),
+            readiness_budget: deadline.saturating_duration_since(Instant::now()) / 3,
+        }
+    }
+
+    fn pid(&self) -> Option<u32> {
+        self.observed.as_ref().map(|(record, _)| record.pid)
+    }
+
+    async fn try_registration(
+        &mut self,
+        record: Registration,
+        options: &ConnectionOptions,
+        path: &Path,
+        deadline: Instant,
+    ) -> Result<Option<TcpJsonRpcClientAsync>, ConnectionError> {
+        let since = match self.observed.take() {
+            Some((previous, since)) if previous.same_record(&record) => since,
+            _ => Instant::now(),
+        };
+        let readiness_deadline = since
+            .checked_add(self.readiness_budget)
+            .unwrap_or(deadline)
+            .min(deadline);
+        let attempt_deadline = readiness_deadline.min(Instant::now() + ATTEMPT_TIMEOUT);
+        if Instant::now() < attempt_deadline {
+            match record
+                .authenticate(attempt_deadline, options.max_response_bytes)
+                .await
+            {
+                Ok(client) if Instant::now() < deadline => return Ok(Some(client)),
+                Ok(_) => self.last = String::from("initialize completed after connection deadline"),
+                Err(error) => self.last = error,
+            }
+        }
+        if Instant::now() >= readiness_deadline {
+            recover(
+                path,
+                &record,
+                &options.server_executable,
+                deadline,
+                &self.last,
+            )
+            .await?;
+            // Discovery decides whether to follow a replacement or launch.
+            self.launched = false;
+        } else {
+            self.observed = Some((record, since));
+        }
+        Ok(None)
+    }
+
+    fn launch_if_absent(&mut self, options: &ConnectionOptions) -> Result<(), ConnectionError> {
+        if self.observed.take().is_some() {
+            self.launched = false;
+        }
+        if !self.launched {
+            self.child = Some(options.launch()?);
+            self.launched = true;
+        }
+        Ok(())
+    }
+
+    fn observe_launch(&mut self) -> Result<(), ConnectionError> {
+        if let Some(process) = &mut self.child
+            && let Some(status) = process
+                .try_wait()
+                .map_err(|error| ConnectionError::failure("launch", &error.to_string()))?
+        {
+            if self.observed.is_none() {
+                self.last = format!(
+                    "launch exited with {status}; no authenticated primary discovered; previous failure: {}",
+                    self.last
+                );
+            }
+            self.child = None;
+        }
+        Ok(())
+    }
+
+    async fn step(
+        &mut self,
+        options: &ConnectionOptions,
+        path: &Path,
+        deadline: Instant,
+    ) -> Result<Option<TcpJsonRpcClientAsync>, ConnectionError> {
+        if Instant::now() >= deadline {
+            return Err(ConnectionError::timeout(path, self.pid(), &self.last));
+        }
+        let record = timeout_at(deadline, Registration::read(path))
+            .await
+            .map_err(|_| {
+                ConnectionError::timeout(path, self.pid(), "registration read stalled")
+            })??;
+        if Instant::now() >= deadline {
+            return Err(ConnectionError::timeout(path, self.pid(), &self.last));
+        }
+        if let Some(record) = record {
+            if let Some(client) = self
+                .try_registration(record, options, path, deadline)
+                .await?
+            {
+                return Ok(Some(client));
+            }
+        } else {
+            self.launch_if_absent(options)?;
+        }
+        self.observe_launch()?;
+        Ok(None)
+    }
+}
+
 /// Discover, launch if absent, and authenticate a per-user server on localhost.
 ///
-/// This Linux operation never deletes registrations or signals registered servers.
-/// An unusable registration requires operator-assisted recovery. Drop/cancellation
-/// closes client sockets; detached servers persist. All retries share one deadline.
+/// Unusable registrations are recovered only when process identity can be
+/// verified safely. Drop or cancellation closes client sockets, without initiating
+/// termination. All retries and recovery share a single deadline.
+///
+/// Recovery requires Linux 5.3+ with pidfd support. Live-process recovery also
+/// needs access to `/proc` and permission to inspect and signal the selected
+/// server. Healthy reuse and normal startup do not require these recovery checks.
+/// An unrelated live process is never signaled; uncertain identity preserves the
+/// registration. Existing directory permissions are neither checked nor changed.
 ///
 /// # Errors
-/// Rejects invalid options before filesystem access. Reports malformed registration,
-/// spawn failure, or deadline expiration with the last readiness failure. An existing
-/// registration is preserved even when its server is dead or authentication fails.
+/// Reports invalid options, malformed registration, unsafe process identity,
+/// launch failures, and deadline expiration with the last readiness failure.
 pub async fn connect(
     options: &ConnectionOptions,
 ) -> Result<TcpJsonRpcClientAsync, ConnectionError> {
     let deadline = options.deadline()?;
     let path = options.registration_path();
-    let mut child: Option<Child> = None;
-    let mut launched = false;
-    let mut observed_registration = false;
-    let mut pid = None;
-    let mut last = String::from("registration not published");
+    let mut attempt = ConnectionAttempt::new(deadline);
     loop {
-        if Instant::now() >= deadline {
-            return Err(ConnectionError::timeout(&path, pid, &last));
-        }
-        let record = timeout_at(deadline, Registration::read(&path))
-            .await
-            .map_err(|_| ConnectionError::timeout(&path, pid, "registration read stalled"))??;
-        if Instant::now() >= deadline {
-            return Err(ConnectionError::timeout(&path, pid, &last));
-        }
-        if let Some(record) = record {
-            observed_registration = true;
-            pid = Some(record.pid);
-            let attempt_deadline = deadline.min(Instant::now() + ATTEMPT_TIMEOUT);
-            match record
-                .authenticate(attempt_deadline, options.max_response_bytes)
-                .await
-            {
-                Ok(client) if Instant::now() < deadline => return Ok(client),
-                Ok(_) => last = String::from("initialize completed after connection deadline"),
-                Err(error) => last = error,
-            }
-        } else if !launched && !observed_registration {
-            // Publication arbitrates the race with another fresh-start client.
-            // Never launch again after observing any existing registration.
-            child = Some(options.launch()?);
-            launched = true;
-        }
-        if let Some(process) = &mut child
-            && let Some(status) = process
-                .try_wait()
-                .map_err(|error| ConnectionError::failure("launch", &error.to_string()))?
-        {
-            // A loser may exit with either status while the winner publishes.
-            // Continue discovery until the same deadline, retaining evidence.
-            if !observed_registration {
-                last = format!("launch exited with {status}; no authenticated primary discovered");
-            }
-            child = None;
+        if let Some(client) = attempt.step(options, &path, deadline).await? {
+            return Ok(client);
         }
         sleep_until(deadline.min(Instant::now() + RETRY_INTERVAL)).await;
     }

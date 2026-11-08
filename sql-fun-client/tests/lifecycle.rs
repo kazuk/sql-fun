@@ -65,15 +65,16 @@ async fn cargo_command_launch_uses_prebuilt_actual_server() -> ::testresult::Tes
 }
 
 #[tokio::test]
-async fn unusable_registration_times_out_without_mutation_or_launch() -> ::testresult::TestResult {
+async fn unverifiable_registration_is_preserved_without_launch() -> ::testresult::TestResult {
     let fixture = RegistrationFixture::new()?;
     let record = fixture.preserve_unusable_record()?;
     let start = Instant::now();
     let error = connect(&fixture.options(Duration::from_millis(150)))
         .await
         .unwrap_err();
-    assert!(error.is_timeout());
+    assert!(!error.is_timeout());
     assert!(start.elapsed() < Duration::from_secs(2));
+    assert!(error.to_string().contains("cannot verify"));
     assert!(error.to_string().contains("TCP connect"));
     assert!(!error.to_string().contains("fixture-secret"));
     assert_eq!(record, std::fs::read(fixture.path())?);
@@ -132,44 +133,6 @@ async fn broken_shell_command_retains_launch_failure_at_deadline() -> ::testresu
     assert!(error.is_timeout());
     assert!(error.to_string().contains("launch exited"));
     assert!(!fixture.path().exists());
-    Ok(())
-}
-
-#[tokio::test]
-#[ignore = "High CI disk usage from server builds"]
-async fn rejected_token_preserves_actual_server_and_registration() -> ::testresult::TestResult {
-    let fixture = heavy::ServerFixture::new()?;
-    drop(connect(&fixture.options()).await?);
-    let record = fixture.change_token()?;
-    let error = connect(&fixture.with_command(Some("exit 97"), Duration::from_millis(150)))
-        .await
-        .unwrap_err();
-    assert!(error.is_timeout());
-    assert!(error.to_string().contains("initialize"));
-    assert!(!error.to_string().contains("mismatched-fixture-secret"));
-    assert_eq!(record, fixture.registration()?);
-    Ok(())
-}
-
-#[tokio::test]
-#[ignore = "High CI disk usage from server builds"]
-async fn stalled_actual_server_is_preserved_with_bounded_deadline() -> ::testresult::TestResult {
-    let fixture = heavy::ServerFixture::new()?;
-    drop(connect(&fixture.options()).await?);
-    let record = fixture.registration()?;
-    fixture.pause()?;
-    let start = Instant::now();
-    let error = connect(&fixture.with_command(None, Duration::from_millis(150)))
-        .await
-        .unwrap_err();
-    assert!(error.is_timeout());
-    assert!(start.elapsed() < Duration::from_secs(2));
-    assert!(
-        error
-            .to_string()
-            .contains("initialize write/read timed out")
-    );
-    assert_eq!(record, fixture.registration()?);
     Ok(())
 }
 

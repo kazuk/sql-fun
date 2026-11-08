@@ -2,7 +2,7 @@
   "openrpc": "1.2.6",
   "info": {
     "title": "sql-fun-server JSON-RPC api",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "# `sql-fun` server api\n\n`sql-fun` server provides database schema cache for `sql-fun` and schema aware\nSQL semantics analysis.\n"
   },
   "methods": [

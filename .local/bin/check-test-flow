@@ -43,13 +43,13 @@ USAGE
 }
 
 DEFAULT_STEPS=(
+  server-api-spec
   affected
   workspace
   proc-macro-tests
   fmt
   lint
   package-metadata
-  server-api-spec
   deny
   dependency-updates
   markdown-lint
@@ -59,7 +59,7 @@ DEFAULT_STEPS=(
   skill-lint
 )
 
-ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract cli-e2e semver)
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract cli-e2e semver verify-server-api-spec)
 
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"
@@ -67,7 +67,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e|semver)
+    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|verify-server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e|semver)
       printf '%s\n' "$1"
       ;;
     format)
@@ -297,9 +297,9 @@ function run_lint() {
   RUST_LOG=error taplo lint
 }
 
-function run_server_api_spec() (
+function verify_server_api_spec() (
   require_command jq
-  echo "== Generate server API spec document"
+  echo "== Verify server API spec document"
   local temporary
   temporary=$(mktemp -d)
   trap 'rm -rf "$temporary"' EXIT
@@ -315,6 +315,20 @@ function run_server_api_spec() (
     diff -u "${GIT_ROOT}/server_api_spec.json" "${temporary}/server_api_spec.json" || true
     return 1
   fi
+)
+
+function generate_server_api_spec() (
+  require_command jq
+  echo "== Generate server API spec document"
+  local temporary
+  temporary=$(mktemp -d)
+  trap 'rm -rf "$temporary"' EXIT
+  cargo run -p sql-fun-server-api --features openrpc-schema,bin-deps \
+    --bin openrpc-spec -- \
+    --output-path "${GIT_ROOT}/server_api_spec.json" \
+    --force
+  "${GIT_ROOT}/.local/sbin/check-access-kind-docs" \
+    "${GIT_ROOT}/server_api_spec.json" "${GIT_ROOT}/book/access-kinds.md"
 )
 
 function run_deny() {
@@ -432,7 +446,8 @@ for step in "${ALL_STEPS[@]}"; do
       fmt) run_fmt ;;
       lint) run_lint ;;
       package-metadata) run_package_metadata ;;
-      server-api-spec) run_server_api_spec ;;
+      verify-server-api-spec) verify_server_api_spec ;;
+      server-api-spec) generate_server_api_spec ;;
       deny) run_deny ;;
       dependency-updates) run_dependency_updates ;;
       doc) run_doc ;;

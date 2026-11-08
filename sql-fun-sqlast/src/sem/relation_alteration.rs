@@ -9,10 +9,10 @@ use crate::{
     context::ParseContext,
     names::{FullName, TableName, ViewName},
     sem::{
-        AlterIndex, AlterObjSubCommand, AlterSequence, AlterTable, AlterView, AnalysisError,
-        AnalysisProblem, ColumnAttributeAction, ColumnRename, EngineFeatureValidation,
-        IndexAlteration, Kind, ResolutionFailure, SemAst, SourcePathWithSpan, problem::ViewProblem,
-        search_path::expand_relation_search_path,
+        AlterColumnDefinition, AlterColumnType, AlterIndex, AlterObjSubCommand, AlterSequence,
+        AlterTable, AlterView, AnalysisError, AnalysisProblem, ColumnAttributeAction, ColumnRename,
+        EngineFeatureValidation, IndexAlteration, Kind, ResolutionFailure, SemAst,
+        SourcePathWithSpan, problem::ViewProblem, search_path::expand_relation_search_path,
     },
 };
 
@@ -103,6 +103,14 @@ impl RelationAlteration {
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
+        if ast.kind().supports_table_column_attributes()
+            && AlterColumnDefinition::is_ast_relation(ast)
+        {
+            return AlterColumnDefinition::analyze_relation(ast, context, source);
+        }
+        if ast.kind().supports_table_column_attributes() && AlterColumnType::is_ast_relation(ast) {
+            return AlterColumnType::analyze_relation(ast, context, source);
+        }
         if ast.kind().supports_table_column_attributes() && Self::has_ast_column_rename(ast) {
             return Self::from_ast_column_rename(ast, context, source);
         }

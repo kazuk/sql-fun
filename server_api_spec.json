@@ -1939,6 +1939,44 @@
               "description": "A completed ALTER COLUMN binding or validation outcome.",
               "oneOf": [
                 {
+                  "description": "The parser-retained column replacement is not SQLite engine syntax.",
+                  "type": "string",
+                  "const": "DefinitionSyntax"
+                },
+                {
+                  "description": "The requested type change occurs twice for one column.",
+                  "type": "string",
+                  "const": "DuplicateType"
+                },
+                {
+                  "description": "The existing column cannot be assigned to the requested type.",
+                  "type": "string",
+                  "const": "TypeConversion"
+                },
+                {
+                  "description": "The existing default cannot be assigned to the requested type.",
+                  "type": "string",
+                  "const": "DefaultConversion"
+                },
+                {
+                  "description": "USING contains a prohibited expression or unresolved binding.",
+                  "type": "string",
+                  "const": "UsingExpression"
+                },
+                {
+                  "description": "The requested type modifier is invalid.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTypmod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidTypmod"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "The target relation does not exist or has the wrong kind.",
                   "type": "string",
                   "const": "MissingRelation"
@@ -6369,6 +6407,44 @@
             "AlterColumnProblem": {
               "description": "A completed ALTER COLUMN binding or validation outcome.",
               "oneOf": [
+                {
+                  "description": "The parser-retained column replacement is not SQLite engine syntax.",
+                  "type": "string",
+                  "const": "DefinitionSyntax"
+                },
+                {
+                  "description": "The requested type change occurs twice for one column.",
+                  "type": "string",
+                  "const": "DuplicateType"
+                },
+                {
+                  "description": "The existing column cannot be assigned to the requested type.",
+                  "type": "string",
+                  "const": "TypeConversion"
+                },
+                {
+                  "description": "The existing default cannot be assigned to the requested type.",
+                  "type": "string",
+                  "const": "DefaultConversion"
+                },
+                {
+                  "description": "USING contains a prohibited expression or unresolved binding.",
+                  "type": "string",
+                  "const": "UsingExpression"
+                },
+                {
+                  "description": "The requested type modifier is invalid.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTypmod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidTypmod"
+                  ],
+                  "additionalProperties": false
+                },
                 {
                   "description": "The target relation does not exist or has the wrong kind.",
                   "type": "string",

@@ -84,6 +84,12 @@
 ## SQL diagnostic reference
 
 - [Diagnostic reference](diagnostics/README.md)
+  - [alter_column_definition_syntax](diagnostics/alter_column_definition_syntax.md)
+  - [alter_column_duplicate_type](diagnostics/alter_column_duplicate_type.md)
+  - [alter_column_type_conversion](diagnostics/alter_column_type_conversion.md)
+  - [alter_column_default_conversion](diagnostics/alter_column_default_conversion.md)
+  - [alter_column_using_expression](diagnostics/alter_column_using_expression.md)
+  - [alter_column_invalid_typmod](diagnostics/alter_column_invalid_typmod.md)
   - [alter_column_duplicate_option](diagnostics/alter_column_duplicate_option.md)
   - [alter_column_identity](diagnostics/alter_column_identity.md)
   - [alter_column_invalid_option](diagnostics/alter_column_invalid_option.md)

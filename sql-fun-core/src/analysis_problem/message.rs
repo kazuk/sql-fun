@@ -92,6 +92,12 @@ impl DiagnosticMessage for IndexProblem {
 impl DiagnosticMessage for AlterColumnProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::DefinitionSyntax => "SQLite does not support ALTER COLUMN ... TO column-definition".to_owned(),
+            Self::DuplicateType => "cannot alter the type of one column twice".to_owned(),
+            Self::TypeConversion => "column value cannot be assigned to the requested type".to_owned(),
+            Self::DefaultConversion => "default cannot be assigned to the requested type independently of USING".to_owned(),
+            Self::UsingExpression => "USING requires a resolved scalar expression without subqueries, parameters, aggregates or window/set-returning functions".to_owned(),
+            Self::InvalidTypmod(message) => format!("invalid requested type modifier: {message}"),
             Self::MissingRelation => "ALTER COLUMN target is absent or is not a table".to_owned(),
             Self::MissingColumn => "ALTER COLUMN target column does not exist".to_owned(),
             Self::PrimaryKey => "a primary-key column must remain NOT NULL".to_owned(),

@@ -1,6 +1,7 @@
 //! test helper types
 #![cfg(test)]
 
+pub(crate) mod alter_column_type;
 pub(crate) mod alter_index;
 pub(crate) mod alter_syntax;
 #[cfg(feature = "sqlite")]

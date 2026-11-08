@@ -48,6 +48,12 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 
 ## Codes
 
+- [alter_column_definition_syntax](alter_column_definition_syntax.md)
+- [alter_column_duplicate_type](alter_column_duplicate_type.md)
+- [alter_column_type_conversion](alter_column_type_conversion.md)
+- [alter_column_default_conversion](alter_column_default_conversion.md)
+- [alter_column_using_expression](alter_column_using_expression.md)
+- [alter_column_invalid_typmod](alter_column_invalid_typmod.md)
 - [alter_column_duplicate_option](alter_column_duplicate_option.md)
 - [alter_column_identity](alter_column_identity.md)
 - [alter_column_invalid_option](alter_column_invalid_option.md)

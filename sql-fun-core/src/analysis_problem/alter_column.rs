@@ -4,6 +4,18 @@ use crate::analysis_problem::{ColumnName, DiagnosticMetadata, DiagnosticSeverity
 #[derive(Clone, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AlterColumnProblem {
+    /// The parser-retained column replacement is not SQLite engine syntax.
+    DefinitionSyntax,
+    /// The requested type change occurs twice for one column.
+    DuplicateType,
+    /// The existing column cannot be assigned to the requested type.
+    TypeConversion,
+    /// The existing default cannot be assigned to the requested type.
+    DefaultConversion,
+    /// USING contains a prohibited expression or unresolved binding.
+    UsingExpression,
+    /// The requested type modifier is invalid.
+    InvalidTypmod(String),
     /// The target relation does not exist or has the wrong kind.
     MissingRelation,
     /// The named column is absent from the resolved relation.
@@ -33,6 +45,36 @@ pub enum AlterColumnProblem {
 }
 
 impl AlterColumnProblem {
+    /// Parser extension rejected by the SQLite engine.
+    #[must_use]
+    pub const fn definition_syntax() -> Self {
+        Self::DefinitionSyntax
+    }
+    /// Repeated type change for one column.
+    #[must_use]
+    pub const fn duplicate_type() -> Self {
+        Self::DuplicateType
+    }
+    /// Incompatible column assignment conversion.
+    #[must_use]
+    pub const fn type_conversion() -> Self {
+        Self::TypeConversion
+    }
+    /// Incompatible default assignment conversion.
+    #[must_use]
+    pub const fn default_conversion() -> Self {
+        Self::DefaultConversion
+    }
+    /// Prohibited or unresolved USING expression.
+    #[must_use]
+    pub const fn using_expression() -> Self {
+        Self::UsingExpression
+    }
+    /// Invalid requested modifier.
+    #[must_use]
+    pub fn invalid_typmod(message: &str) -> Self {
+        Self::InvalidTypmod(message.to_owned())
+    }
     /// Diagnostic missing relation.
     #[must_use]
     pub const fn missing_relation() -> Self {
@@ -117,6 +159,12 @@ impl AlterColumnProblem {
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::DefinitionSyntax => "alter_column_definition_syntax",
+            Self::DuplicateType => "alter_column_duplicate_type",
+            Self::TypeConversion => "alter_column_type_conversion",
+            Self::DefaultConversion => "alter_column_default_conversion",
+            Self::UsingExpression => "alter_column_using_expression",
+            Self::InvalidTypmod(_) => "alter_column_invalid_typmod",
             Self::MissingRelation => "alter_column_missing_relation",
             Self::MissingColumn => "alter_column_missing_column",
             Self::PrimaryKey => "alter_column_primary_key",
@@ -140,6 +188,12 @@ impl AlterColumnProblem {
         column: &ColumnName,
     ) -> DiagnosticMetadata {
         let message = match self {
+            Self::DefinitionSyntax => "SQLite does not support ALTER COLUMN ... TO column-definition".to_owned(),
+            Self::DuplicateType => "cannot alter the type of one column twice".to_owned(),
+            Self::TypeConversion => "column value cannot be assigned to the requested type".to_owned(),
+            Self::DefaultConversion => "default cannot be assigned to the requested type independently of USING".to_owned(),
+            Self::UsingExpression => "USING requires a resolved scalar expression without subqueries, parameters, aggregates or window/set-returning functions".to_owned(),
+            Self::InvalidTypmod(message) => format!("invalid requested type modifier: {message}"),
             Self::MissingRelation => "ALTER COLUMN target is absent or is not a table".to_owned(),
             Self::MissingColumn => "ALTER COLUMN target column does not exist".to_owned(),
             Self::PrimaryKey => "a primary-key column must remain NOT NULL".to_owned(),

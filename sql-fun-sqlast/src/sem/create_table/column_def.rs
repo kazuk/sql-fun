@@ -48,6 +48,14 @@ impl ColumnAttributes {
 }
 
 impl ColumnDefinition {
+    #[expect(deprecated)]
+    pub(crate) fn default_expression(&self) -> Option<&SemScalarExpr> {
+        self.constraints
+            .iter()
+            .find_map(|constraint| constraint.as_default().map(DefaultColumnConstraint::expr))
+            .or(self.default.as_deref())
+    }
+
     pub(crate) fn set_projection_name(&mut self, name: &ColumnName) {
         self.name = Some(name.clone());
     }

@@ -674,6 +674,9 @@ impl CreateTable {
         let mut implicit_changes = Vec::new();
         for cmd in alter_table.commands() {
             match cmd {
+                AlterObjSubCommand::ColumnDefinition(_) | AlterObjSubCommand::ColumnType(_) => {
+                    todo!("ALTER COLUMN TYPE catalog application (#1057)")
+                }
                 AlterObjSubCommand::ColumnAttributes(_) => cmd.apply_column_attributes(self),
                 AlterObjSubCommand::ChangeOwner(new_owner) => {
                     if new_owner.can_apply() {

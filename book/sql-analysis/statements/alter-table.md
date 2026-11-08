@@ -46,13 +46,40 @@ operation leaves the catalog unchanged for the whole statement, and later
 statements can still be analyzed. Analysis updates schema metadata; it does not
 scan database rows to establish that existing values satisfy a new constraint.
 
-Combining these operations with other ALTER commands, changing a generation
+Applying combinations with column type changes remains
+[#1057](https://github.com/kazuk/sql-fun/issues/1057). Combining these operations with
+other ALTER commands, changing a generation
 expression with `SET EXPRESSION`, changing storage/compression, generic foreign
 column options, and applying column attributes through ALTER INDEX or ALTER
 FOREIGN TABLE or materialized views remain unimplemented. Version-dependent
 validation for custom PostgreSQL version identifiers remains unimplemented.
 Inheritance and partition propagation are also outside the currently modeled
 schema behavior.
+
+### Column type analysis
+
+Standalone semantic analysis of PostgreSQL `ALTER [COLUMN] name [SET DATA]
+TYPE type [COLLATE collation] [USING expression]` retains the resolved table
+and column, original definition, requested type and modifiers, collation lookup,
+and value/default conversion outcomes. Without USING, the old value must permit
+assignment conversion. USING refers to the original row, including when several
+columns change in one statement. Existing defaults are checked independently;
+USING does not convert a default. Repeated type changes for one column are
+rejected. Already supported column-attribute operations can accompany a type
+change.
+
+This analysis does not apply the change to the schema catalog. Schema-file
+application, checking and rebuilding dependent CHECK constraints, foreign keys,
+generated columns, views and other dependent definitions remain unimplemented
+([#1057](https://github.com/kazuk/sql-fun/issues/1057)). Successful local analysis
+does not guarantee successful application: a dependency can cause a later
+rejection. Index compatibility and rebuild analysis are tracked separately in
+[#1058](https://github.com/kazuk/sql-fun/issues/1058).
+
+With the SQLite feature, the parser-retained `ALTER COLUMN old TO new
+column-definition` extension retains its source binding and requested definition
+but is rejected as unsupported SQLite engine syntax. Analysis does not synthesize
+a table-rebuild migration.
 
 ### Rename table
 
@@ -109,8 +136,8 @@ column renames also have SQLite paths behind the `sqlite` feature, with the
 dialect-specific behavior and unsupported propagation cases described above.
 Other ALTER TABLE grammar may be retained without completed semantic or catalog
 application. In particular, successful ADD COLUMN application remains tracked in
-[#528](https://github.com/kazuk/sql-fun/issues/528); ALTER COLUMN TYPE COLLATE
-remains separate work in [#529](https://github.com/kazuk/sql-fun/issues/529).
+[#528](https://github.com/kazuk/sql-fun/issues/528). Column type changes have the
+analysis-only support and application limitations described above.
 PostgreSQL 18 constraint enforcement/inheritance transitions remain
 unimplemented ([#887](https://github.com/kazuk/sql-fun/issues/887)).
 
@@ -167,6 +194,18 @@ CHECK analysis does not establish ALTER ADD COLUMN support.
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): a table
   rename destination, retained constraint or implicit index conflicts with an
   existing identity.
+- [alter_column_definition_syntax](../../diagnostics/alter_column_definition_syntax.md):
+  SQLite does not execute the retained column replacement extension.
+- [alter_column_duplicate_type](../../diagnostics/alter_column_duplicate_type.md):
+  a column has repeated type changes in one statement.
+- [alter_column_type_conversion](../../diagnostics/alter_column_type_conversion.md):
+  a row value cannot be assigned to the destination type.
+- [alter_column_default_conversion](../../diagnostics/alter_column_default_conversion.md):
+  the existing default cannot be assigned to the destination type.
+- [alter_column_using_expression](../../diagnostics/alter_column_using_expression.md):
+  USING contains a prohibited expression or unresolved reference.
+- [alter_column_invalid_typmod](../../diagnostics/alter_column_invalid_typmod.md):
+  the requested type modifier is invalid.
 - [alter_column_missing_relation](../../diagnostics/alter_column_missing_relation.md):
   a column-attribute target relation is absent.
 - [alter_column_missing_column](../../diagnostics/alter_column_missing_column.md):

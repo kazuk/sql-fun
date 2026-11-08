@@ -47,6 +47,9 @@ use proc_macro2_diagnostic::DiagnosticResult;
 use quote::{ToTokens, quote};
 use syn::{Expr, Ident, ItemFn, Type};
 
+/// `sql-fun-codegen` crate version
+pub const SQL_FUN_CODEGEN_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// diagnostics
 #[derive(Debug)]
 pub enum SqlFunDiagnostic {

@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 use ::serde_json::Value;
 use ::sql_fun_client::TcpJsonRpcClientAsync;
-use ::sql_fun_codegen::{QueryRequirement, QueryRequirements};
+use ::sql_fun_codegen::{QueryRequirement, QueryRequirements, SQL_FUN_CODEGEN_VERSION};
 use ::sql_fun_core::{
     CteName, CteParameterCollection, PlaceholderedSql, ResolvedCteCatalog, SqlFunArgs,
 };
@@ -118,7 +118,7 @@ pub(super) fn requirements(
             source,
             r#"
 fn query_{index}() {{
-    const __SQL_FUN_CODEGEN_VERSION: &str = {version:?};
+    const __SQL_FUN_CODEGEN_VERSION: &str = {SQL_FUN_CODEGEN_VERSION:?};
     const __SQL_FUN_SOURCE_FILE: &str = "src/queries.rs";
     const __SQL_FUN_SOURCE_LINE: u32 = 42;
     const __SQL_FUN_DATASOURCE: &str = {datasource:?};
@@ -126,7 +126,6 @@ fn query_{index}() {{
     const __SQL_FUN_USING_CTE: &str = {encoded:?};
 }}
 "#,
-            version = env!("CARGO_PKG_VERSION")
         )
         .unwrap();
     }

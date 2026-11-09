@@ -229,6 +229,34 @@ for operational details.
   implementation plan. Clearly document required runtime tools as prerequisites
   for the affected CLI feature.
 
+## Build, CI, and Release Automation Principles
+
+- **Prioritize the KISS principle** when designing, implementing, or reviewing
+  build scripts, CI pipelines, release workflows, and their supporting utilities.
+  Simplicity and ease of understanding are the highest priorities, even over
+  additional validation, defensive mechanisms, or architectural sophistication.
+- Treat existing scripts and workflows with a proven history of successful
+  operation as valuable, trusted assets. Preserving their established behavior
+  and reliability is more important than introducing theoretically stronger
+  guarantees.
+- Prefer the smallest possible change to existing, working implementations.
+  Extend the existing control flow rather than redesigning, replacing, or
+  restructuring it to accommodate a local requirement.
+- During planning, explicitly evaluate requirements and proposed solutions
+  against the KISS principle. If a requirement would force unnecessary
+  complexity or undermine the simplicity of an existing workflow, identify the
+  conflict and raise it for a maintainer decision before implementation.
+- Do not introduce additional guarantees, validation layers, abstractions, or
+  failure-handling mechanisms beyond the stated requirements without explicit
+  authorization. More comprehensive validation is not inherently better.
+- Do not rewrite working scripts in another language, introduce new orchestration
+  layers, or change workflow boundaries merely to make implementation or
+  validation easier. Such changes require a separately agreed scope.
+- During implementation and review, evaluate the risk and maintenance cost of
+  the changes themselves, not only whether the resulting behavior satisfies the
+  requirements. A functionally correct solution that unnecessarily increases
+  complexity or modifies trusted behavior is not an acceptable implementation.
+
 ## CI and Workflow Design
 
 - Before planning, implementing, or reviewing CI workflows, release automation,

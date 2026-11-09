@@ -27,3 +27,24 @@ where
 }
 
 pub(crate) mod theme;
+
+/// Encode catalog values using psql's NUL record separator.
+pub(crate) fn catalog_results(values: &[serde_json::Value]) -> String {
+    let mut output = String::new();
+    for value in values {
+        output.push_str(&value.to_string());
+        output.push('\0');
+    }
+    output
+}
+
+/// Frame the version, scope check, and catalog payloads as a psql response.
+pub(crate) fn extraction_results(
+    version: u32,
+    schemas_exist: bool,
+    catalogs: &[serde_json::Value],
+) -> String {
+    let mut values = vec![serde_json::json!(version), serde_json::json!(schemas_exist)];
+    values.extend_from_slice(catalogs);
+    catalog_results(&values)
+}

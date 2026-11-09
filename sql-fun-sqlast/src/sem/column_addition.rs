@@ -117,7 +117,39 @@ impl ColumnAddition {
             .append_declared_column(result.definition.as_ref().expect("declared column"));
         Ok(result)
     }
+}
 
+#[cfg(test)]
+mod declaration_tests {
+    use crate::{ast::Dialect, test_helpers::checks};
+
+    #[test]
+    fn an_existing_column_skip_does_not_resolve_the_requested_type() -> testresult::TestResult {
+        let context = checks::apply(
+            checks::context(Dialect::postgres()),
+            "CREATE TABLE t(a integer)",
+        )?
+        .into_context();
+        let pair = checks::apply(
+            context,
+            "ALTER TABLE t ADD COLUMN IF NOT EXISTS a no_such_type, ADD COLUMN b integer",
+        )?;
+        let statement = pair.ast().alter_table_statement().unwrap();
+        assert!(statement.can_apply());
+        let addition = statement.commands()[0].column_addition().unwrap();
+        assert!(addition.is_skipped());
+        assert!(addition.existing().is_some());
+        assert!(addition.definition().is_none());
+        assert!(
+            pair.context().problems().is_empty(),
+            "{:?}",
+            pair.context().problems()
+        );
+        Ok(())
+    }
+}
+
+impl ColumnAddition {
     fn check_ast_support(syntax: &AstColumn) {
         for definition in syntax.constraints() {
             match definition.constraint() {
@@ -129,7 +161,28 @@ impl ColumnAddition {
             }
         }
     }
+}
 
+#[cfg(test)]
+mod ast_support_tests {
+    use crate::{ast::Dialect, test_helpers::checks};
+
+    #[rstest::rstest]
+    #[case::generated("ALTER TABLE t ADD COLUMN b integer GENERATED ALWAYS AS(a + 1) STORED")]
+    #[case::identity("ALTER TABLE t ADD COLUMN b bigint GENERATED ALWAYS AS IDENTITY")]
+    #[should_panic(expected = "ADD COLUMN")]
+    fn deferred_declarations_cannot_be_published_as_ordinary_columns(#[case] sql: &str) {
+        let context = checks::apply(
+            checks::context(Dialect::postgres()),
+            "CREATE TABLE t(a integer)",
+        )
+        .unwrap()
+        .into_context();
+        checks::apply(context, sql).unwrap();
+    }
+}
+
+impl ColumnAddition {
     fn validate_keys(
         &mut self,
         context: &mut impl ParseContext,
@@ -460,8 +513,9 @@ impl AdditionAnalysis {
         let table = self.table().clone();
         for addition in &mut self.additions {
             if let Some(column) = &mut addition.definition {
+                let declaration = addition.requested.without_foreign_keys();
                 ColumnDefinition::resolve_ast_inline_checks(
-                    &addition.requested,
+                    &declaration,
                     context,
                     &table,
                     self.staged.as_ref(),
@@ -691,30 +745,6 @@ mod schema_chain_tests {
         Ok(())
     }
 
-    #[test]
-    fn an_existing_column_skip_does_not_resolve_the_requested_type() -> testresult::TestResult {
-        let context = checks::apply(
-            checks::context(Dialect::postgres()),
-            "CREATE TABLE t(a integer)",
-        )?
-        .into_context();
-        let pair = checks::apply(
-            context,
-            "ALTER TABLE t ADD COLUMN IF NOT EXISTS a no_such_type, ADD COLUMN b integer",
-        )?;
-        let statement = pair.ast().alter_table_statement().unwrap();
-        assert!(statement.can_apply());
-        let addition = statement.commands()[0].column_addition().unwrap();
-        assert!(addition.is_skipped());
-        assert!(addition.existing().is_some());
-        assert!(addition.definition().is_none());
-        assert!(
-            pair.context().problems().is_empty(),
-            "{:?}",
-            pair.context().problems()
-        );
-        Ok(())
-    }
     #[rstest::rstest]
     #[case::missing_type("ALTER TABLE t ADD COLUMN b no_such_type", false)]
     #[case::invalid_default("ALTER TABLE t ADD COLUMN b boolean DEFAULT 1", false)]
@@ -895,19 +925,5 @@ mod schema_chain_tests {
             );
         }
         Ok(())
-    }
-
-    #[rstest::rstest]
-    #[case::generated("ALTER TABLE t ADD COLUMN b integer GENERATED ALWAYS AS(a + 1) STORED")]
-    #[case::identity("ALTER TABLE t ADD COLUMN b bigint GENERATED ALWAYS AS IDENTITY")]
-    #[should_panic(expected = "ADD COLUMN")]
-    fn deferred_declarations_cannot_be_published_as_ordinary_columns(#[case] sql: &str) {
-        let context = checks::apply(
-            checks::context(Dialect::postgres()),
-            "CREATE TABLE t(a integer)",
-        )
-        .unwrap()
-        .into_context();
-        checks::apply(context, sql).unwrap();
     }
 }

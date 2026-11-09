@@ -239,5 +239,48 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "reference-before-check",
+    "sql": "ALTER TABLE addition_items ADD COLUMN e integer REFERENCES addition_parent(id) CHECK(e > 0)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "check-before-reference",
+    "sql": "ALTER TABLE addition_items ADD COLUMN e integer CHECK(e > 0) REFERENCES addition_parent(id)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "added-reference-check-columns",
+    "sql": "SELECT b, c FROM addition_checked",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "c",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
   }
 ]

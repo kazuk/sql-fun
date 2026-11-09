@@ -244,6 +244,12 @@ fn attribute_combinations_analyze_without_publication(
 #[cfg(feature = "sqlite")]
 #[rstest::rstest]
 #[case::case_insensitive(&["CREATE TABLE t(a,b)"], "ALTER TABLE t DROP COLUMN A")]
+#[case::using_key(&["CREATE TABLE t(a,b)", "CREATE TABLE u(a,c)", "CREATE VIEW v AS SELECT t.b FROM t JOIN u USING(a)"], "ALTER TABLE t DROP a")]
+#[case::using_right_key(&["CREATE TABLE t(a,b)", "CREATE TABLE u(a,c)", "CREATE VIEW v AS SELECT t.b FROM u JOIN t USING(a)"], "ALTER TABLE t DROP a")]
+#[case::using_case(&["CREATE TABLE t(a,b)", "CREATE TABLE u(a,c)", "CREATE VIEW v AS SELECT t.b FROM t JOIN u USING(A)"], "ALTER TABLE t DROP a")]
+#[case::unrelated_join_key(&["CREATE TABLE t(a,b)", "CREATE TABLE u(a,c)", "CREATE TABLE w(a,d)", "CREATE VIEW v AS SELECT t.b FROM t CROSS JOIN (u JOIN w USING(a))"], "ALTER TABLE t DROP a")]
+#[case::cte_key_lineage(&["CREATE TABLE t(a,b)", "CREATE TABLE u(a,c)", "CREATE VIEW v AS WITH d AS (SELECT b AS a FROM t) SELECT 1 FROM d JOIN u USING(a)"], "ALTER TABLE t DROP a")]
+#[case::nested_using_key(&["CREATE TABLE t(a,b)", "CREATE TABLE u(a,c)", "CREATE VIEW v AS SELECT t.b FROM t JOIN (SELECT c AS a FROM u) d USING(a)"], "ALTER TABLE t DROP a")]
 #[case::last_column(&["CREATE TABLE t(a)"], "ALTER TABLE t DROP COLUMN a")]
 #[case::last_non_generated(&["CREATE TABLE t(a,b GENERATED ALWAYS AS(1))"], "ALTER TABLE t DROP COLUMN a")]
 #[case::key(&["CREATE TABLE t(a PRIMARY KEY,b)"], "ALTER TABLE t DROP COLUMN a")]
@@ -458,5 +464,48 @@ fn whole_rows_and_fields_have_distinct_dependencies(
         .unwrap();
     assert_eq!(change.is_locally_applicable(), applicable);
     assert_eq!(change.dependencies().is_empty(), applicable);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::restrict("RESTRICT", false)]
+#[case::cascade("CASCADE", true)]
+fn using_key_dependencies_preserve_bound_column_identity(
+    #[case] policy: &str,
+    #[case] applicable: bool,
+) -> testresult::TestResult {
+    let context = column_rename::schema(&[
+        "CREATE TABLE t(a integer,b integer)",
+        "CREATE TABLE u(x integer,c integer)",
+        "CREATE VIEW v AS SELECT r.b FROM t AS r(x,b) JOIN u USING(x)",
+    ])?;
+    let statement = public_analysis::statement(
+        &format!("ALTER TABLE t DROP a {policy}"),
+        Dialect::postgres(),
+    );
+    let result = AlterTable::analyze(&statement, context)?;
+    let change = result.ast().alter_table_statement().unwrap().commands()[0]
+        .column_drop()
+        .unwrap();
+    assert_eq!(change.is_locally_applicable(), applicable);
+    assert_eq!(change.dependencies().len(), 1);
+    assert_eq!(change.dependencies()[0].kind(), DropDependencyKind::View);
+    assert_eq!(
+        change.dependencies()[0].relation(),
+        &column_rename::name("v")
+    );
+    assert!(
+        result
+            .context()
+            .get_view_impl(&column_rename::name("v"))
+            .is_some()
+    );
+    assert!(
+        result
+            .context()
+            .get_table(change.table())
+            .unwrap()
+            .has_column(&ColumnName::from("a"))
+    );
     Ok(())
 }

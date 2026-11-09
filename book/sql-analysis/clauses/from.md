@@ -24,6 +24,12 @@ parameter analysis, but parameter-free PostgreSQL ON operands share the
 NATURAL joins merge matching columns for an unqualified star; qualified stars
 retain each source's columns and its outer-join nullability.
 
+SQLite access-purpose reports can omit USING key columns when the USING name
+uses different ASCII case from the source declaration, such as `USING(A)` for
+column `a` ([#1080](https://github.com/kazuk/sql-fun/issues/1080)). The SQL is
+legal; this limitation concerns access facts, separately from result columns
+and DROP COLUMN dependency analysis.
+
 For PostgreSQL FULL JOIN USING and NATURAL FULL JOIN, merged keys appear first,
 followed by remaining left and right columns. Each merged key uses the common
 type and retains the value present on an unmatched row. SQLite keeps merged keys

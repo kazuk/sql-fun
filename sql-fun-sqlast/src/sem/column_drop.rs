@@ -145,7 +145,6 @@ pub struct ColumnDrop {
     original: Option<ColumnDefinition>,
     if_exists: bool,
     cascade: bool,
-    sqlite: bool,
     only: bool,
     relation_if_exists: bool,
     outcome: ColumnDropOutcome,
@@ -224,7 +223,6 @@ impl ColumnDrop {
             original,
             if_exists,
             cascade,
-            sqlite,
             only: false,
             relation_if_exists: false,
             outcome: ColumnDropOutcome::applicable(),
@@ -242,7 +240,7 @@ impl ColumnDrop {
         } else if change.original.is_none() {
             change.reject(AlterColumnProblem::missing_column());
         } else if let Some(definition) = definition {
-            if sqlite && !definition.has_non_generated_column_after_drop(&change) {
+            if sqlite && !definition.has_non_generated_column_after_drop(context, &change) {
                 change.reject(AlterColumnProblem::drop_last_column());
             }
             change.analyze_dependencies(context, definition)?;

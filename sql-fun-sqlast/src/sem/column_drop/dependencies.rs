@@ -6,8 +6,8 @@ use crate::{
     names::{ColumnName, FullName},
     sem::{
         AnalysisError, ColumnDrop, CreateTable, DropDependency, DropDependencyDecision,
-        DropDependencyKind, DropKnowledgeGap, RuleReferences, SemScalarExpr, TriggerReferences,
-        traversal::SemanticVisitorMut,
+        DropDependencyKind, DropKnowledgeGap, QueryAccess, RuleReferences, SemScalarExpr,
+        TriggerReferences, traversal::SemanticVisitorMut,
     },
 };
 
@@ -18,9 +18,9 @@ impl ColumnDrop {
         table: &CreateTable,
     ) -> Result<(), AnalysisError> {
         let sqlite = context.dialect() == Dialect::sqlite();
-        table.collect_drop_dependencies(self, &self.table.full_name().clone(), sqlite)?;
+        table.collect_drop_dependencies(context, self, &self.table.full_name().clone())?;
         for index in context.indexes_for_table(&self.table) {
-            if index.depends_on_column(self)? {
+            if index.depends_on_column(context, self)? {
                 self.named_dependency(
                     self.table.full_name().clone(),
                     index.name(),
@@ -30,7 +30,7 @@ impl ColumnDrop {
             }
         }
         for name in context.relation_names() {
-            self.analyze_relation_dependencies(context, &name, sqlite)?;
+            self.analyze_relation_dependencies(context, &name)?;
         }
         Ok(())
     }
@@ -38,24 +38,25 @@ impl ColumnDrop {
         &mut self,
         context: &impl ParseContext,
         name: &FullName,
-        sqlite: bool,
     ) -> Result<(), AnalysisError> {
         if let Some(table) = context.get_table_impl(name) {
             if name != self.table.full_name() {
-                table.collect_drop_dependencies(self, name, sqlite)?;
+                table.collect_drop_dependencies(context, self, name)?;
             }
-            self.analyze_links(
-                context,
-                name,
-                Some(table.triggers()),
-                Some(table.rules()),
-                sqlite,
-            )?;
+            self.analyze_links(context, name, Some(table.triggers()), Some(table.rules()))?;
         }
         if let Some(view) = context.get_view_impl(name) {
-            let mut probe = self.probe();
+            let mut probe = self.probe(context);
             view.clone().walk_column_dependencies(&mut probe)?;
-            if probe.found {
+            let join_keys = QueryAccess::from_explicit_join_keys(context, view.query())?;
+            let join_dependency = join_keys.records().iter().any(|access| {
+                access.relation() == self.table.full_name()
+                    && access
+                        .column_name()
+                        .as_ref()
+                        .is_some_and(|column| self.matches_name(context, column))
+            });
+            if probe.found || join_dependency {
                 self.named_dependency(name.clone(), name, DropDependencyKind::view(), false);
             } else if probe.expanded_found {
                 self.dependencies.push(DropDependency {
@@ -67,7 +68,7 @@ impl ColumnDrop {
                 });
             }
             self.retain_probe(&probe);
-            self.analyze_links(context, name, view.triggers(), view.rules(), sqlite)?;
+            self.analyze_links(context, name, view.triggers(), view.rules())?;
         }
         Ok(())
     }
@@ -77,14 +78,16 @@ impl ColumnDrop {
         name: &FullName,
         triggers: Option<&TriggerReferences>,
         rules: Option<&RuleReferences>,
-        sqlite: bool,
     ) -> Result<(), AnalysisError> {
         if let Some(triggers) = triggers {
             for trigger in triggers.resolve(context, name) {
-                let mut probe = self.probe();
+                let mut probe = self.probe(context);
                 trigger.clone().walk_column_dependencies(&mut probe)?;
                 // SQLite retains UPDATE OF names even when the column is absent.
-                if probe.found || (!sqlite && trigger.drop_event_depends_on(self)) {
+                if probe.found
+                    || (context.dialect() != Dialect::sqlite()
+                        && trigger.drop_event_depends_on(context, self))
+                {
                     self.named_dependency(
                         name.clone(),
                         trigger.identity().name(),
@@ -97,7 +100,7 @@ impl ColumnDrop {
         }
         if let Some(rules) = rules {
             for rule in rules.resolve(context) {
-                let mut probe = self.probe();
+                let mut probe = self.probe(context);
                 rule.clone().walk(&mut probe)?;
                 if probe.found {
                     self.named_dependency(
@@ -112,14 +115,14 @@ impl ColumnDrop {
         }
         Ok(())
     }
-    pub(crate) fn matches_name(&self, column: &ColumnName) -> bool {
+    pub(crate) fn matches_name(&self, context: &impl ParseContext, column: &ColumnName) -> bool {
         let Some(original) = &self.original else {
             return false;
         };
         let Some(bound) = original.name() else {
             return false;
         };
-        if self.sqlite {
+        if context.dialect() == Dialect::sqlite() {
             bound.as_str().eq_ignore_ascii_case(column.as_str())
         } else {
             bound == column
@@ -162,14 +165,18 @@ impl ColumnDrop {
     }
     pub(crate) fn expression_dependency(
         &mut self,
+        context: &impl ParseContext,
         expression: &SemScalarExpr,
     ) -> Result<bool, AnalysisError> {
-        let mut probe = self.probe();
+        let mut probe = self.probe(context);
         expression.clone().walk(&mut probe)?;
         self.retain_probe(&probe);
         Ok(probe.found)
     }
-    pub(crate) fn probe(&self) -> ColumnDependencyProbe {
+    pub(crate) fn probe<'a, C: ParseContext>(
+        &self,
+        context: &'a C,
+    ) -> ColumnDependencyProbe<'a, C> {
         ColumnDependencyProbe {
             relation: self.table.full_name().clone(),
             column: if let Some(original) = &self.original {
@@ -179,13 +186,13 @@ impl ColumnDrop {
             },
             found: false,
             unbound: false,
-            sqlite: self.sqlite,
+            context,
             expanded: false,
             expanded_found: false,
             nominal_rows: 0,
         }
     }
-    pub(crate) fn retain_probe(&mut self, probe: &ColumnDependencyProbe) {
+    pub(crate) fn retain_probe(&mut self, probe: &ColumnDependencyProbe<'_, impl ParseContext>) {
         if probe.unbound
             && !self
                 .knowledge_gaps
@@ -198,17 +205,17 @@ impl ColumnDrop {
 }
 
 /// Observes bound expressions on private clones without altering the input catalog.
-pub(crate) struct ColumnDependencyProbe {
+pub(crate) struct ColumnDependencyProbe<'a, C> {
     relation: FullName,
     column: Option<ColumnName>,
     found: bool,
     unbound: bool,
-    sqlite: bool,
+    context: &'a C,
     expanded: bool,
     expanded_found: bool,
     nominal_rows: usize,
 }
-impl SemanticVisitorMut for ColumnDependencyProbe {
+impl<C: ParseContext> SemanticVisitorMut for ColumnDependencyProbe<'_, C> {
     fn walk_source_column_values(&self) -> bool {
         false
     }
@@ -219,7 +226,7 @@ impl SemanticVisitorMut for ColumnDependencyProbe {
         expanded: bool,
         _value: &mut SemScalarExpr,
     ) -> Result<(), AnalysisError> {
-        self.expanded = self.sqlite && expanded;
+        self.expanded = self.context.dialect() == Dialect::sqlite() && expanded;
         Ok(())
     }
     fn enter_expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {

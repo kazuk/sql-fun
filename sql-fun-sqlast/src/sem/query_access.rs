@@ -3,7 +3,7 @@
 use crate::{
     names::{ColumnName, FullName, TableName, ViewName},
     sem::{
-        AccessKind, AliasSpec, AnalysisError, ParseContext, SemAst, SemScalarExpr,
+        AccessKind, AliasSpec, AnalysisError, ParseContext, SelectStatement, SemAst, SemScalarExpr,
         data_source::JoinExprDataSource, traversal::SemanticVisitor,
     },
 };
@@ -176,6 +176,29 @@ impl QueryAccess {
             statement.visit_nested_command(&mut collector)?;
         }
         Ok(collector.finish())
+    }
+    /// Collect retained explicit USING keys, including nested query/CTE lineage.
+    pub(crate) fn from_explicit_join_keys(
+        context: &impl ParseContext,
+        query: &SelectStatement,
+    ) -> Result<Self, AnalysisError> {
+        let mut collector = AccessCollector::new(context);
+        collector.explicit_join_keys = Some(Vec::new());
+        query.visit(&mut collector)?;
+        let inputs = collector
+            .explicit_join_keys
+            .take()
+            .expect("join key collection enabled");
+        let mut records = Self::default();
+        for column in collector.graph.columns(&inputs) {
+            records.record(
+                AccessKind::select_join(),
+                column.kind,
+                &column.relation,
+                Some(&column.column),
+            );
+        }
+        Ok(records)
     }
     /// Resolved relation and column records; relation-only actions have no column.
     pub fn records(&self) -> &[AccessRecord] {
@@ -808,6 +831,7 @@ struct AccessCollector<'a, C> {
     last_expression: Vec<AccessInput>,
     joins: Vec<(usize, usize)>,
     join_purposes: Vec<AccessKind>,
+    explicit_join_keys: Option<Vec<AccessInput>>,
     set_operands: Vec<Vec<Outputs>>,
     rows_functions: Vec<(Outputs, usize)>,
 }
@@ -825,6 +849,7 @@ impl<'a, C: ParseContext> AccessCollector<'a, C> {
             last_expression: Vec::new(),
             joins: Vec::new(),
             join_purposes: Vec::new(),
+            explicit_join_keys: None,
             set_operands: Vec::new(),
             rows_functions: Vec::new(),
         }
@@ -1055,6 +1080,11 @@ impl<C: ParseContext> SemanticVisitor for AccessCollector<'_, C> {
                 .collect::<Vec<_>>(),
         );
         for (name, columns) in left.iter().chain(&right) {
+            if join.has_explicit_using_key(self.context, name)
+                && let Some(keys) = &mut self.explicit_join_keys
+            {
+                keys.extend(columns.iter().cloned());
+            }
             if layout.keys().contains(name) {
                 self.record_columns(columns);
             }

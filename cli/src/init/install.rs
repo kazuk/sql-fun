@@ -83,6 +83,46 @@ pub(crate) fn validate(path: &Path, version: &PostgresVersion) -> Result<(), any
     Ok(())
 }
 
+#[cfg(test)]
+mod test_validate {
+    use crate::init::install::validate;
+    use crate::test_helpers::installation::InstallationFixture;
+
+    #[rstest::rstest]
+    #[case::absent(None)]
+    #[case::older(Some("0.1.0"))]
+    #[case::newer(Some("99.0.0"))]
+    #[case::opaque(Some("legacy-extractor"))]
+    fn extractor_version_does_not_control_compatibility(#[case] extractor: Option<&str>) {
+        let fixture = InstallationFixture::new();
+        let stage = fixture.prepare("compatible");
+        let mut metadata = serde_json::json!({"format_version": 1, "server_version_num": 170_000});
+        if let Some(version) = extractor {
+            metadata["extractor_version"] = version.into();
+        }
+        InstallationFixture::write_metadata(&stage, &metadata);
+        validate(&stage.candidate(), &"17".parse().unwrap()).unwrap();
+    }
+
+    #[rstest::rstest]
+    #[case::format("format_version", serde_json::json!(2))]
+    #[case::major("server_version_num", serde_json::json!(180_000))]
+    #[case::identity("version_identity", serde_json::json!("18"))]
+    fn extractor_version_does_not_bypass_compatibility(
+        #[case] key: &str,
+        #[case] value: serde_json::Value,
+    ) {
+        let fixture = InstallationFixture::new();
+        let stage = fixture.prepare("incompatible");
+        let mut metadata = serde_json::json!({
+            "format_version": 1, "server_version_num": 170_000, "extractor_version": "0.1.0"
+        });
+        metadata[key] = value;
+        InstallationFixture::write_metadata(&stage, &metadata);
+        assert!(validate(&stage.candidate(), &"17".parse().unwrap()).is_err());
+    }
+}
+
 fn installed(destination: &Path, version: &PostgresVersion) -> Result<bool, anyhow::Error> {
     match fs::symlink_metadata(destination) {
         Ok(_) => {

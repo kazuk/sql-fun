@@ -46,6 +46,13 @@ impl InstallationFixture {
         .unwrap();
         stage
     }
+    pub(crate) fn write_metadata(stage: &InstallationStage, value: &serde_json::Value) {
+        fs::write(
+            stage.candidate().join("metadata.json"),
+            serde_json::to_vec(value).unwrap(),
+        )
+        .unwrap();
+    }
     pub(crate) fn assert_revision(&self, revision: &str) {
         validate(&self.destination(), &self.version).unwrap();
         assert_eq!(

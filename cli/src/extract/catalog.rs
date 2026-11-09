@@ -161,7 +161,7 @@ pub(super) async fn extract(
     anyhow::ensure!(lines.next().is_none(), "unexpected psql catalog result");
     let mut metadata = serde_json::json!({
         "format_version": 1, "server_version_num": version,
-        "extractor_version": env!("CARGO_PKG_VERSION"), "provenance": provenance,
+        "provenance": provenance,
         "scope": "bootstrap-pg_catalog-and-information_schema"
     });
     schemas.record_scope(&mut metadata);

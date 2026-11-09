@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Inspect the unstaged bump diff before committing or publishing release state.
+# Every changed line must have a matching line with only a version substituted.
+git diff --no-ext-diff --no-textconv --unified=0 -- "$@" | awk '
+  function check() {
+    if (removed != added) invalid = 1
+    for (i = 1; i <= removed; i++)
+      if (before[i] != after[i]) invalid = 1
+    removed = added = 0
+  }
+  function normalize(line, tag) {
+    if (spec) {
+      if (line !~ /^[[:space:]]*"version": "[^"]+",?$/) invalid = 1
+      sub(/"version": "[^"]+"/, "\"version\": \"VERSION\"", line)
+    } else if (line ~ /^pkg-url = "/) {
+      if (!match(line, /\/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?\//)) invalid = 1
+      tag = substr(line, RSTART + 1, RLENGTH - 2)
+      gsub(/\./, "[.]", tag)
+      gsub(tag, "VERSION", line)
+    } else {
+      if (line !~ /(^|[ {,])version = "[^"]+"/ &&
+          line !~ /^sql-fun[-A-Za-z0-9]* = "[=^~]?[0-9]/) invalid = 1
+      gsub(/"[=^~]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?"/, "\"VERSION\"", line)
+    }
+    return line
+  }
+  /^diff --git / { check(); spec = ($0 ~ / b\/server_api_spec.json$/); next }
+  /^index / || /^--- / || /^\+\+\+ / { next }
+  /^@@ / { check(); next }
+  /^-/ { before[++removed] = normalize(substr($0, 2)); if (spec) spec_removed++; next }
+  /^\+/ { after[++added] = normalize(substr($0, 2)); if (spec) spec_added++; next }
+  { invalid = 1 }
+  END {
+    check()
+    if (spec_removed > 1 || spec_added > 1) invalid = 1
+    if (invalid) {
+      print "Unexpected release diff: only paired version/URL changes are allowed" > "/dev/stderr"
+      exit 1
+    }
+  }
+'

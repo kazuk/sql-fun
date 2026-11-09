@@ -50,7 +50,7 @@ mapfile -t manifests < <(jq -r '
   | .packages[] | select(.id as $id | $members | index($id))
   | .manifest_path
 ' <<<"$metadata")
-declare -A owned_paths=([Cargo.toml]=1 [Cargo.lock]=1)
+declare -A owned_paths=([Cargo.toml]=1 [Cargo.lock]=1 [server_api_spec.json]=1)
 for manifest in "${manifests[@]}"; do
   owned_paths["${manifest#"$repo_root"/}"]=1
 done
@@ -59,11 +59,16 @@ mkdir -p "$state"
 "$repo_root/.local/bin/materialize-release-versions" "$mode" --output="$state/crates.tsv"
 "$helpers/release-binstall" materialize "$tag" cli/Cargo.toml sql-fun-server/Cargo.toml
 "$helpers/release-binstall" check "$tag" cli/Cargo.toml sql-fun-server/Cargo.toml
+cargo sort --workspace
+"$helpers/../bin/check-test-flow" --step=server-api-spec
+"$helpers/check-release-diff" server_api_spec.json
+"$helpers/check-release-diff" Cargo.toml "${manifests[@]}"
 metadata="$(cargo metadata --locked --no-deps --format-version=1)"
 "$helpers/release-dependencies" check <<<"$metadata"
 # cargo-edit may update dependency requirements in non-publishable members as
-# well as versions in publishable members. Only workspace manifests and the
-# workspace lockfile belong to this step. Nothing is staged or committed here.
+# well as versions in publishable members. Only workspace manifests, the
+# workspace lockfile and regenerated API spec belong to this step.
+# Nothing is staged or committed here.
 while IFS= read -r -d '' path; do
   [[ -n "${owned_paths[$path]:-}" ]] || {
     echo "Unexpected materialization change: $path" >&2

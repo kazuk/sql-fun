@@ -94,7 +94,7 @@ def validate_record(revision, release):
     require(git('show', '-s', '--format=%s', revision) ==
             f'chore(release): materialize {release["tag"]}', 'Unexpected release commit subject')
     data = metadata()
-    allowed = workspace_paths(data)
+    allowed = workspace_paths(data) | {'server_api_spec.json'}
     if release['classification'] == 'stable':
         allowed.add('.local/semver_baseline.tar.gz')
     require(changed_paths(fields['Release-Source'], revision) <= allowed,
@@ -173,7 +173,7 @@ def commit(args):
     require(not changed_paths('--cached'), 'Release finalization requires an empty index')
     require(remote_tip(args.ref) == args.source, 'Release branch changed before finalization')
     data = metadata()
-    manifests = workspace_paths(data)
+    manifests = workspace_paths(data) | {'server_api_spec.json'}
     paths = read_paths(args.manifests)
     baseline = read_paths(args.baseline)
     require(paths <= manifests, 'Materializer paths contain unowned files')

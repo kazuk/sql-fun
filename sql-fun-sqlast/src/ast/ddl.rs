@@ -77,7 +77,7 @@ pub(crate) struct PostgresAlterCommand {
     definition: AlterDefinition,
     #[getter(copy)]
     missing_ok: bool,
-    #[getter(skip)]
+    #[getter(copy)]
     cascade: bool,
     legacy: Option<Box<AlterCommand>>,
 }

@@ -25,6 +25,11 @@ outside a projection target, or on a scalar value, produces a diagnostic. When a
 composite input's type is still unknown, analysis cannot report its expanded
 columns until the type and its fields are determined.
 
+A bare PostgreSQL relation or alias used as a row value, such as
+`SELECT t FROM t`, still reports a missing-column diagnostic
+([#614](https://github.com/kazuk/sql-fun/issues/614)). This is legal PostgreSQL SQL;
+qualified whole-row values such as `(t.*)::t` use a separate supported path.
+
 ### Composite fields
 
 PostgreSQL member access follows domains over composite types and table row

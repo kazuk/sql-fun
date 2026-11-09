@@ -1939,6 +1939,24 @@
               "description": "A completed ALTER COLUMN binding or validation outcome.",
               "oneOf": [
                 {
+                  "description": "SQLite cannot drop the final non-generated column of a table.",
+                  "type": "string",
+                  "const": "DropLastColumn"
+                },
+                {
+                  "description": "A retained dependency prevents this column removal.",
+                  "type": "object",
+                  "properties": {
+                    "DropDependency": {
+                      "$ref": "#/$defs/ColumnDropDependency"
+                    }
+                  },
+                  "required": [
+                    "DropDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "The parser-retained column replacement is not SQLite engine syntax.",
                   "type": "string",
                   "const": "DefinitionSyntax"
@@ -2111,6 +2129,22 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "ColumnDropDependency": {
+              "description": "The retained identity of an object preventing a column removal.",
+              "type": "object",
+              "properties": {
+                "relation": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "member": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "relation",
+                "member"
               ]
             },
             "MinMaxProblem": {
@@ -6428,6 +6462,24 @@
               "description": "A completed ALTER COLUMN binding or validation outcome.",
               "oneOf": [
                 {
+                  "description": "SQLite cannot drop the final non-generated column of a table.",
+                  "type": "string",
+                  "const": "DropLastColumn"
+                },
+                {
+                  "description": "A retained dependency prevents this column removal.",
+                  "type": "object",
+                  "properties": {
+                    "DropDependency": {
+                      "$ref": "#/$defs/ColumnDropDependency"
+                    }
+                  },
+                  "required": [
+                    "DropDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "The parser-retained column replacement is not SQLite engine syntax.",
                   "type": "string",
                   "const": "DefinitionSyntax"
@@ -6600,6 +6652,22 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "ColumnDropDependency": {
+              "description": "The retained identity of an object preventing a column removal.",
+              "type": "object",
+              "properties": {
+                "relation": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "member": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "relation",
+                "member"
               ]
             },
             "MinMaxProblem": {

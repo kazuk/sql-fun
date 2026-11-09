@@ -92,6 +92,8 @@ impl DiagnosticMessage for IndexProblem {
 impl DiagnosticMessage for AlterColumnProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::DropLastColumn => "SQLite requires at least one non-generated column".to_owned(),
+            Self::DropDependency(identity) => format!("column removal is prevented by {}.{}", identity.relation(), identity.member()),
             Self::AddNullability => "added column has conflicting NULL/NOT NULL declarations".to_owned(),
             Self::AddSqliteKey => "SQLite ADD COLUMN cannot declare PRIMARY KEY or UNIQUE".to_owned(),
             Self::AddPrimaryKey => "a table cannot have more than one primary key".to_owned(),

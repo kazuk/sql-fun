@@ -32,6 +32,10 @@ struct RowSource {
 }
 
 impl WholeRowExpr {
+    /// Bound value of a selected exposed field, preserving source aliases.
+    pub(crate) fn field_value(&self, name: &str) -> Option<&SemScalarExpr> {
+        self.fields.value(name)
+    }
     pub(super) fn has_renamed_field(&self, rename: &ColumnRename) -> bool {
         self.fields
             .0
@@ -302,6 +306,12 @@ impl WholeRowField {
     }
 }
 impl WholeRowFields {
+    fn value(&self, name: &str) -> Option<&SemScalarExpr> {
+        self.0
+            .iter()
+            .find(|field| field.name.as_str() == name)
+            .map(|field| &field.value)
+    }
     pub(crate) fn scalar_not_null(&self) -> Option<bool> {
         match self.0.as_slice() {
             [field] => field.value.is_not_null(),

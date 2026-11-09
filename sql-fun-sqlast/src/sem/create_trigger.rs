@@ -5,8 +5,8 @@ use crate::{
     context::BaseParseContext,
     names::{ColumnName, FullName, LocalName, SchemaName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename, ParseContext, SemAst,
-        SemScalarExpr, SourcePathWithSpan, TypeReference,
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnDrop, ColumnRename, ParseContext,
+        SemAst, SemScalarExpr, SourcePathWithSpan, TypeReference,
         problem::TriggerProblem,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
     },
@@ -398,6 +398,21 @@ pub struct CreateTrigger {
     source: Option<SourcePathWithSpan>,
 }
 impl CreateTrigger {
+    pub(crate) fn drop_event_depends_on(&self, change: &ColumnDrop) -> bool {
+        self.target() == change.table().full_name()
+            && self
+                .events
+                .iter()
+                .any(|event| event.drop_depends_on(change))
+    }
+    pub(crate) fn walk_column_dependencies(
+        &mut self,
+        visitor: &mut impl SemanticVisitorMut,
+    ) -> Result<(), AnalysisError> {
+        optional(&mut self.predicate, visitor)?;
+        self.body.rename_relation(visitor)
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         self.rename_column_with(rename, &mut ColumnRenamer::new(rename))
     }
@@ -411,8 +426,7 @@ impl CreateTrigger {
                 event.rename_column(rename);
             }
         }
-        optional(&mut self.predicate, visitor)?;
-        self.body.rename_relation(visitor)
+        self.walk_column_dependencies(visitor)
     }
 
     pub(crate) fn rename_relation(
@@ -959,5 +973,17 @@ impl TriggerBody {
             }
         }
         Ok(())
+    }
+}
+
+impl TriggerEvent {
+    fn drop_depends_on(&self, change: &ColumnDrop) -> bool {
+        if let Self::Update(columns) = self {
+            columns
+                .iter()
+                .any(|column| change.matches_name(column.name()))
+        } else {
+            false
+        }
     }
 }

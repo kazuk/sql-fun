@@ -17,6 +17,11 @@ pub struct GeneratedColumnConstraint {
 }
 
 impl GeneratedColumnConstraint {
+    /// Analyzed generation expression, including any unresolved references.
+    pub(crate) const fn expression(&self) -> &SemScalarExpr {
+        &self.expr
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);

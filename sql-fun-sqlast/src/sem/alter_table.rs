@@ -7,7 +7,7 @@ use crate::{
     names::{ColumnName, TableName, ViewName},
     sem::{
         AlterColumnAttributes, AlterColumnDefinition, AlterColumnType, AnalysisError,
-        AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnRename, Constraint,
+        AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnDrop, ColumnRename, Constraint,
         ConstraintNames, CreateIndex, CreateSequence, CreateTable, CreateView, OwnerSpecification,
         ParseContext, RelationAlteration, SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
     },
@@ -125,6 +125,16 @@ mod analysis_only_tests {
 }
 
 impl AlterTable {
+    pub(crate) fn analyzed_drops(
+        table: &TableName,
+        target: Option<&TableName>,
+        commands: &[AlterObjSubCommand],
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut result = Self::new(table, commands, source);
+        result.resolved_target = target.cloned();
+        result
+    }
     pub(crate) fn analyzed_column_types(
         table: &TableName,
         target: Option<&TableName>,
@@ -170,16 +180,16 @@ impl AlterTable {
 
     /// Whether completed analysis found no rejection that prevents application.
     ///
-    /// Column type changes still require dependency validation by the future
-    /// application implementation; true is not a guarantee of successful application.
+    /// Column type changes and removals still require final dependency validation
+    /// by schema application; true is not a guarantee of successful application.
     pub const fn can_apply(&self) -> bool {
         self.applicable
     }
     /// Whether final dependency validation remains with schema application.
     pub fn requires_application_validation(&self) -> bool {
-        self.commands
-            .iter()
-            .any(|command| command.column_type_change().is_some())
+        self.commands.iter().any(|command| {
+            command.column_type_change().is_some() || command.column_drop().is_some()
+        })
     }
     /// Canonical target binding retained by semantic analysis.
     pub const fn resolved_target(&self) -> Option<&TableName> {
@@ -318,7 +328,8 @@ pub enum AlterObjSubCommand {
     AddColumn(Box<ColumnAddition>),
     AlterColumn(ColumnName, ColumnDefinition),
     RenameColumn(Box<ColumnRename>),
-    DropColumn(ColumnName),
+    /// Analyzed removal, without schema-catalog application.
+    DropColumn(Box<ColumnDrop>),
 }
 
 impl AlterObjSubCommand {
@@ -326,6 +337,7 @@ impl AlterObjSubCommand {
         match self {
             Self::ColumnAttributes(change) => change.can_apply(),
             Self::ColumnType(change) => change.is_valid(),
+            Self::DropColumn(change) => change.is_locally_applicable(),
             Self::ColumnDefinition(change) => change.is_valid(),
             Self::AddConstraint(constraint) => {
                 constraint.as_check().is_none_or(|check| check.can_apply())
@@ -458,8 +470,16 @@ impl AlterObjSubCommand {
             None
         }
     }
-    pub(crate) fn drop_column(column: &ColumnName) -> Self {
-        Self::DropColumn(column.clone())
+    pub(crate) fn drop_column(change: &ColumnDrop) -> Self {
+        Self::DropColumn(Box::new(change.clone()))
+    }
+    /// Completed DROP COLUMN analysis, including skipped and rejected requests.
+    pub fn column_drop(&self) -> Option<&ColumnDrop> {
+        if let Self::DropColumn(change) = self {
+            Some(change)
+        } else {
+            None
+        }
     }
 }
 

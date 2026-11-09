@@ -74,6 +74,12 @@ impl CreateView {
         self.check_option = check;
         self
     }
+    pub(crate) fn walk_column_dependencies(
+        &mut self,
+        visitor: &mut impl SemanticVisitorMut,
+    ) -> Result<(), AnalysisError> {
+        self.query.walk(visitor)
+    }
     /// The resolved defining query.
     pub const fn query(&self) -> &SelectStatement {
         &self.query

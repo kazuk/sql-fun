@@ -18,6 +18,16 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    pub(crate) fn walk_column_dependencies(
+        &mut self,
+        visitor: &mut impl SemanticVisitorMut,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::View(view) => view.walk_column_dependencies(visitor),
+            Self::MaterializedView(view) => view.walk_column_dependencies(visitor),
+        }
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         match self {
             Self::View(value) => value.rename_column(rename),

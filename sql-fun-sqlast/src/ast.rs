@@ -230,7 +230,7 @@ pub(crate) struct AlterRelation {
     commands: Vec<AlterCommand>,
     #[getter(copy)]
     if_exists: bool,
-    #[getter(skip)]
+    #[getter(copy)]
     only: bool,
 }
 

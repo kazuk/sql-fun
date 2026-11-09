@@ -8,7 +8,7 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, CheckConstraint, ColumnAttributeAction,
-        ColumnRename, Constraint, ConstraintNames, CreateIndex, CreateSequence,
+        ColumnDrop, ColumnRename, Constraint, ConstraintNames, CreateIndex, CreateSequence,
         ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
         OwnerSpecification, RuleIdentity, RuleReferences, SemScalarExpr, SourcePathWithSpan,
         TriggerReferences, TypeReference,
@@ -437,6 +437,20 @@ impl CreateTable {
         self.columns.0.push(column.clone());
     }
 
+    pub(crate) fn has_non_generated_column_after_drop(&self, change: &ColumnDrop) -> bool {
+        self.columns.0.iter().any(|column| {
+            !column.has_generation()
+                && column
+                    .name()
+                    .as_ref()
+                    .is_some_and(|name| !change.matches_name(name))
+        })
+    }
+    pub(crate) fn stage_column_removal(&mut self, column: &ColumnName) {
+        self.columns
+            .0
+            .retain(|definition| definition.name().as_ref() != Some(column));
+    }
     pub(crate) const fn declared_columns(&self) -> &ColumnCollection {
         &self.columns
     }
@@ -749,7 +763,7 @@ impl CreateTable {
                     }
                 }
                 AlterObjSubCommand::DropColumn(_) => {
-                    todo!()
+                    todo!("DROP COLUMN catalog application (#1076)")
                 }
             }
         }
@@ -1099,6 +1113,24 @@ mod test_foreign_key_reference_columns {
         let oracle = ::rusqlite::Connection::open_in_memory()?;
         oracle.execute_batch("CREATE TABLE parent(id PRIMARY KEY)")?;
         oracle.execute_batch(sql)?;
+        Ok(())
+    }
+}
+
+impl CreateTable {
+    pub(crate) fn collect_drop_dependencies(
+        &self,
+        change: &mut ColumnDrop,
+        owner: &FullName,
+        sqlite: bool,
+    ) -> Result<(), AnalysisError> {
+        let owned = owner == change.table().full_name();
+        for (identity, constraint) in &self.constraints {
+            constraint.collect_drop_dependencies(change, owner, identity, owned, sqlite)?;
+        }
+        for column in &self.columns.0 {
+            column.collect_drop_dependencies(change, owner, owned, sqlite)?;
+        }
         Ok(())
     }
 }

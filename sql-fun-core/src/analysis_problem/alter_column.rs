@@ -1,9 +1,15 @@
-use crate::analysis_problem::{ColumnName, DiagnosticMetadata, DiagnosticSeverity, TableName};
+use crate::analysis_problem::{
+    ColumnName, DiagnosticMetadata, DiagnosticSeverity, FullName, TableName,
+};
 
 /// A completed ALTER COLUMN binding or validation outcome.
 #[derive(Clone, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AlterColumnProblem {
+    /// SQLite cannot drop the final non-generated column of a table.
+    DropLastColumn,
+    /// A retained dependency prevents this column removal.
+    DropDependency(ColumnDropDependency),
     /// The parser-retained column replacement is not SQLite engine syntax.
     DefinitionSyntax,
     /// SQLite forbids PRIMARY KEY and UNIQUE in ADD COLUMN.
@@ -53,6 +59,17 @@ pub enum AlterColumnProblem {
 }
 
 impl AlterColumnProblem {
+    /// SQLite final non-generated column removal.
+    #[must_use]
+    pub const fn drop_last_column() -> Self {
+        Self::DropLastColumn
+    }
+    /// A known dependent object prevents removal.
+    #[must_use]
+    pub fn drop_dependency(relation: impl Into<FullName>, member: &str) -> Self {
+        Self::DropDependency(ColumnDropDependency::new(relation, member))
+    }
+
     /// Contradictory added-column nullability declarations.
     #[must_use]
     pub const fn add_nullability() -> Self {
@@ -187,6 +204,8 @@ impl AlterColumnProblem {
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::DropLastColumn => "drop_column_last_column",
+            Self::DropDependency(_) => "drop_column_dependency",
             Self::AddSqliteKey => "add_column_sqlite_key",
             Self::AddPrimaryKey => "add_column_primary_key",
             Self::AddDefault => "add_column_default",
@@ -220,6 +239,8 @@ impl AlterColumnProblem {
         column: &ColumnName,
     ) -> DiagnosticMetadata {
         let message = match self {
+            Self::DropLastColumn => "SQLite requires at least one non-generated column".to_owned(),
+            Self::DropDependency(identity) => format!("column removal is prevented by {}.{}", identity.relation(), identity.member()),
             Self::AddNullability => "added column has conflicting NULL/NOT NULL declarations".to_owned(),
             Self::AddSqliteKey => "SQLite ADD COLUMN cannot declare PRIMARY KEY or UNIQUE".to_owned(),
             Self::AddPrimaryKey => "a table cannot have more than one primary key".to_owned(),
@@ -307,5 +328,33 @@ impl ColumnAttributeProblem {
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         self.reason.render_metadata(&self.table, &self.column)
+    }
+}
+
+/// The retained identity of an object preventing a column removal.
+#[derive(Clone, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct ColumnDropDependency {
+    relation: FullName,
+    member: String,
+}
+impl ColumnDropDependency {
+    /// Construct a dependency diagnostic from its owning relation and local identity.
+    #[must_use]
+    pub fn new(relation: impl Into<FullName>, member: &str) -> Self {
+        Self {
+            relation: relation.into(),
+            member: member.to_owned(),
+        }
+    }
+    /// Canonical relation owning the dependency.
+    #[must_use]
+    pub const fn relation(&self) -> &FullName {
+        &self.relation
+    }
+    /// Local dependency identity, empty for a relation itself.
+    #[must_use]
+    pub fn member(&self) -> &str {
+        &self.member
     }
 }

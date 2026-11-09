@@ -217,15 +217,44 @@ analysis-only support and application limitations described above.
 PostgreSQL 18 constraint enforcement/inheritance transitions remain
 unimplemented ([#887](https://github.com/kazuk/sql-fun/issues/887)).
 
+### Column removal analysis
+
+Standalone analysis of PostgreSQL and SQLite `ALTER TABLE ... DROP COLUMN`
+resolves the table and column and distinguishes locally applicable, skipped
+and rejected operations. PostgreSQL supports table/column IF EXISTS,
+RESTRICT/CASCADE, repeated removals and combinations with supported column
+attributes. SQLite uses case-insensitive column lookup and rejects removal of
+its final non-generated column or a column required by a retained key, index,
+CHECK, view or trigger. An inline CHECK on the removed SQLite column is
+removed with that column; a view's `SELECT *` requires later output
+reconstruction rather than rejection merely because its expansion contains the
+removed column.
+
+Known dependency decisions distinguish PostgreSQL automatic removal, explicit
+CASCADE and rejection. A PostgreSQL view's whole-row reference does not by
+itself depend on every current column; selecting a field from that row depends
+on the selected column. This analysis is limited by retained catalog information;
+column-specific sequence ownership remains [#545](https://github.com/kazuk/sql-fun/issues/545)
+and unbound generation-expression analysis remains
+[#1062](https://github.com/kazuk/sql-fun/issues/1062). Unknown dependencies are not
+proof that a removal is safe. Other mixed ALTER command groups remain
+unimplemented ([#1077](https://github.com/kazuk/sql-fun/issues/1077)).
+
+Analysis does not change the schema catalog or source history. Catalog
+application, complete dependency closure and subsequent-query effects remain
+unimplemented ([#1076](https://github.com/kazuk/sql-fun/issues/1076)); loading a
+schema that attempts an applicable removal can still reach an unimplemented
+application path. Local semantic acceptance does not guarantee final application
+acceptance. This capability does not execute database migrations.
+
 ### Other unimplemented alterations
 
-The following retained PostgreSQL operations do not yet have completed
-semantic resolution and catalog application; they can reach unimplemented
-paths. The supported column attributes and renames above are separate cases.
+The following retained PostgreSQL operations still have unimplemented paths.
+The analysis-only capabilities above do not imply catalog application support.
 
 | Operation | Missing behavior | Tracking issue |
 | --- | --- | --- |
-| DROP COLUMN | Column removal and dependent catalog changes; SQLite application is also unimplemented | [#531](https://github.com/kazuk/sql-fun/issues/531) |
+| DROP COLUMN | Catalog application and complete dependent catalog changes; standalone analysis is described above | [#1076](https://github.com/kazuk/sql-fun/issues/1076) |
 | ALTER / VALIDATE / DROP CONSTRAINT | Constraint state, deferrability and removal changes | [#533](https://github.com/kazuk/sql-fun/issues/533) |
 | Relation physical/storage settings | DROP CLUSTER, SET LOGGED/UNLOGGED, version-applicable DROP OIDS, access method, tablespace and relation options | [#534](https://github.com/kazuk/sql-fun/issues/534) |
 | ENABLE / DISABLE TRIGGER or RULE | ALWAYS/REPLICA and ALL/USER state changes where applicable | [#535](https://github.com/kazuk/sql-fun/issues/535) |

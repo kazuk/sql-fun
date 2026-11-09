@@ -24,7 +24,8 @@ validated. Its retained keys can inform supported INSERT conflict inference; the
 
 ## Dialect and engine-specific behavior
 
-SQLite CREATE INDEX semantic analysis remains unimplemented; receiving or
+SQLite CREATE INDEX semantic analysis remains unimplemented
+([#552](https://github.com/kazuk/sql-fun/issues/552)); receiving or
 parsing such a statement is not equivalent support. PostgreSQL's supported
 storage initialization is B-tree-specific. Sort USING expressions and other
 missing index-analysis paths can fail before a retained index is produced.

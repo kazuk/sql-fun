@@ -48,6 +48,8 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 
 ## Codes
 
+- [drop_column_dependency](drop_column_dependency.md)
+- [drop_column_last_column](drop_column_last_column.md)
 - [add_column_default](add_column_default.md)
 - [add_column_nullability](add_column_nullability.md)
 - [add_column_primary_key](add_column_primary_key.md)

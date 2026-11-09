@@ -14,8 +14,8 @@ use crate::{
     sem::{
         AlterColumnAttributes, AlterObjSubCommand, AlterTable, AlterView, AnalysisError,
         AnalysisProblem, ColumnAddition, ColumnAttributeAction, ColumnAttributeBinding,
-        ColumnDefinition, ColumnRename, Constraint, CreateTable, FromClause, OwnerSpecification,
-        ResolutionFailure, ScalarAnalysisContext, SemScalarExpr, WithClause,
+        ColumnDefinition, ColumnDrop, ColumnRename, Constraint, CreateTable, FromClause,
+        OwnerSpecification, ResolutionFailure, ScalarAnalysisContext, SemScalarExpr, WithClause,
         problem::{AlterColumnProblem, ViewProblem},
         search_path::expand_relation_search_path,
     },
@@ -323,8 +323,24 @@ impl AlterObjSubCommand {
         name: &str,
     ) -> Result<Self, AnalysisError> {
         let name = ColumnName::from(name);
-        Self::check_ast_missing_column(context, table, &name)?;
-        Ok(Self::drop_column(&name))
+        let target = context.resolve_table_name(table);
+        let table = target.as_ref().unwrap_or(table);
+        let definition = if let Some(name) = &target {
+            context.get_table_impl(name.full_name()).cloned()
+        } else {
+            None
+        };
+        let mut change = ColumnDrop::resolve(
+            context,
+            table,
+            definition.as_ref(),
+            &name,
+            false,
+            false,
+            false,
+        )?;
+        change.finish(context, &[])?;
+        Ok(Self::drop_column(&change))
     }
 
     pub(crate) fn from_ast_postgres_owner(

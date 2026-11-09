@@ -2,9 +2,10 @@ mod ddl;
 use crate::{
     names::{ColumnName, FullName as NamesFullName, TableName},
     sem::{
-        AnalysisError, CatalogNameLookup, ColumnConstraint, ColumnNullabilityConstraint,
-        ColumnRename, ConstraintNames, DeclarationCollation, DefaultColumnConstraint,
-        GeneratedColumnConstraint, ParseContext, SemScalarExpr, TypeReference, WithTypmod,
+        AnalysisError, CatalogNameLookup, ColumnConstraint, ColumnDrop,
+        ColumnNullabilityConstraint, ColumnRename, ConstraintNames, DeclarationCollation,
+        DefaultColumnConstraint, DropDependencyKind, GeneratedColumnConstraint, ParseContext,
+        SemScalarExpr, TypeReference, WithTypmod,
         traversal::{ColumnRenamer, SemanticVisitorMut},
     },
 };
@@ -224,6 +225,11 @@ impl ColumnDefinition {
             .iter()
             .any(|constraint| constraint.as_primary_key().is_some())
     }
+    pub(crate) fn has_generation(&self) -> bool {
+        self.constraints
+            .iter()
+            .any(|constraint| constraint.as_generated().is_some())
+    }
     pub(crate) fn has_stored_generation(&self) -> bool {
         self.constraints.iter().any(|constraint| {
             constraint
@@ -380,5 +386,73 @@ impl ColumnDefinition {
 
     pub(crate) fn insert_inline_check(&mut self, index: usize, check: &ColumnConstraint) {
         self.constraints.insert(index, check.clone());
+    }
+}
+
+impl ColumnDefinition {
+    pub(crate) fn collect_drop_dependencies(
+        &self,
+        change: &mut ColumnDrop,
+        owner: &NamesFullName,
+        owned: bool,
+        sqlite: bool,
+    ) -> Result<(), AnalysisError> {
+        let removed = owned
+            && self
+                .name()
+                .as_ref()
+                .is_some_and(|name| change.matches_name(name));
+        for (index, constraint) in self.constraints.iter().enumerate() {
+            let anonymous = format!(
+                "{}#{index}",
+                self.name().as_ref().map_or("", ColumnName::as_str)
+            );
+            if removed {
+                if constraint.as_primary_key().is_some() || constraint.as_unique().is_some() {
+                    change.dependency(
+                        owner.clone(),
+                        &anonymous,
+                        DropDependencyKind::constraint(),
+                        !sqlite,
+                    );
+                }
+                continue;
+            }
+            if let Some(check) = constraint.as_check()
+                && owned
+                && change.expression_dependency(check.expr())?
+            {
+                change.dependency(
+                    owner.clone(),
+                    check.name().unwrap_or(&anonymous),
+                    DropDependencyKind::constraint(),
+                    !sqlite,
+                );
+            }
+            if let Some(generated) = constraint.as_generated()
+                && owned
+                && change.expression_dependency(generated.expression())?
+            {
+                change.dependency(
+                    owner.clone(),
+                    self.name().as_ref().map_or("", ColumnName::as_str),
+                    DropDependencyKind::generated_column(),
+                    false,
+                );
+            }
+            if let Some(key) = constraint.as_foreign_key()
+                && !sqlite
+                && key.primary_key_table() == Some(change.table())
+                && change.matches_name(key.primary_key_column())
+            {
+                change.dependency(
+                    owner.clone(),
+                    &anonymous,
+                    DropDependencyKind::constraint(),
+                    owned,
+                );
+            }
+        }
+        Ok(())
     }
 }

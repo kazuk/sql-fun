@@ -114,6 +114,10 @@ impl TableColumnRef {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }
+    /// Bound source column identity, before aliases or result naming.
+    pub(crate) fn bound_column(&self) -> Option<&ColumnName> {
+        self.column_def.as_ref()?.name().as_ref()
+    }
     /// Exact relation identity for this resolved column.
     pub const fn relation(&self) -> &FullName {
         self.table_name.full_name()

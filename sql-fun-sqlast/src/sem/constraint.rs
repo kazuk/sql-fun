@@ -6,10 +6,10 @@ pub use self::{
 };
 use crate::{
     ast::{Column as AstColumn, ColumnConstraint as AstColumnConstraint},
-    names::{ColumnName, TableName},
+    names::{ColumnName, FullName, TableName},
     sem::{
-        AnalysisError, ColumnRename, CreateIndex, CreateTable, ImplicitChange, ParseContext,
-        traversal::SemanticVisitorMut,
+        AnalysisError, ColumnDrop, ColumnRename, CreateIndex, CreateTable, DropDependencyKind,
+        ImplicitChange, ParseContext, traversal::SemanticVisitorMut,
     },
 };
 use std::collections::HashMap;
@@ -285,5 +285,51 @@ impl ConstraintNames {
                 names.reserve(definition.name().as_deref().unwrap_or_default());
             }
         }
+    }
+}
+
+impl Constraint {
+    pub(crate) fn collect_drop_dependencies(
+        &self,
+        change: &mut ColumnDrop,
+        owner: &FullName,
+        identity: &str,
+        owned: bool,
+        sqlite: bool,
+    ) -> Result<(), AnalysisError> {
+        let affected = match self {
+            Self::Check(check) => owned && change.expression_dependency(check.expression())?,
+            Self::PrimaryKey(key) => {
+                owned && key.keys().iter().any(|name| change.matches_name(name))
+            }
+            Self::Unique(key) => {
+                owned
+                    && key
+                        .key_columns()
+                        .iter()
+                        .any(|name| change.matches_name(name))
+            }
+            Self::Foreign(key) => {
+                (owned
+                    && key
+                        .source_columns()
+                        .iter()
+                        .any(|name| change.matches_name(name)))
+                    || (!sqlite
+                        && key.target_table() == Some(change.table())
+                        && key.target_columns().is_some_and(|columns| {
+                            columns.iter().any(|name| change.matches_name(name))
+                        }))
+            }
+        };
+        if affected {
+            change.dependency(
+                owner.clone(),
+                identity,
+                DropDependencyKind::constraint(),
+                owned && !sqlite,
+            );
+        }
+        Ok(())
     }
 }

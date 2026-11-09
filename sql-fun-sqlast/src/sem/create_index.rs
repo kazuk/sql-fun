@@ -7,7 +7,7 @@ pub use self::settings::IndexStorageValue;
 use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
-        AnalysisError, ColumnRename, SemScalarExpr,
+        AnalysisError, ColumnDrop, ColumnRename, SemScalarExpr,
         problem::IndexProblemKind,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
     },
@@ -404,5 +404,34 @@ impl CreateIndex {
     #[must_use]
     pub const fn name(&self) -> &FullName {
         &self.name
+    }
+}
+
+impl CreateIndex {
+    pub(crate) fn depends_on_column(&self, change: &mut ColumnDrop) -> Result<bool, AnalysisError> {
+        if self.table.full_name() != change.table().full_name() {
+            return Ok(false);
+        }
+        let mut affected = false;
+        for element in self
+            .key_columns
+            .0
+            .iter()
+            .chain(self.include_columns.0.iter())
+        {
+            affected |= element.element.depends_on_column(change)?;
+        }
+        if let Some(predicate) = &self.predicate {
+            affected |= change.expression_dependency(predicate)?;
+        }
+        Ok(affected)
+    }
+}
+impl IndexElement {
+    fn depends_on_column(&self, change: &mut ColumnDrop) -> Result<bool, AnalysisError> {
+        match self {
+            Self::ColumnName(name) => Ok(change.matches_name(name)),
+            Self::Expr(expression) => change.expression_dependency(expression),
+        }
     }
 }

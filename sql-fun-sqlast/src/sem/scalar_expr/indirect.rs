@@ -317,3 +317,20 @@ impl IndirectionExpr {
         )
     }
 }
+
+impl IndirectionExpr {
+    fn selected_row_field(&self) -> Option<&SemScalarExpr> {
+        let Self::MemberRef(member) = self else {
+            return None;
+        };
+        let row = member.base().as_whole_row()?;
+        row.relation()?;
+        row.field_value(member.member())
+    }
+}
+impl SemScalarExpr {
+    /// Bound exposed field selected from a nominal whole-row source.
+    pub(crate) fn selected_row_field(&self) -> Option<&Self> {
+        self.as_indirection()?.selected_row_field()
+    }
+}

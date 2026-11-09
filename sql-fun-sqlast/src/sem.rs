@@ -13,6 +13,7 @@ mod cast;
 mod client_type;
 mod column_addition;
 mod column_constraints;
+mod column_drop;
 mod column_rename;
 mod common_type;
 pub(crate) mod conflict_info;
@@ -78,6 +79,10 @@ pub(crate) use self::conflict_info::infer_from_catalog;
 pub use self::{
     alter_column_definition::AlterColumnDefinition,
     alter_column_type::{AlterColumnType, ColumnTypeConversion},
+    column_drop::{
+        ColumnDrop, ColumnDropOutcome, DropDependency, DropDependencyDecision, DropDependencyKind,
+        DropKnowledgeGap,
+    },
     column_rename::ColumnRename,
     create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
     create_trigger::{

@@ -471,3 +471,12 @@ parsing. The tests do not depend on live servers.
 GENERATED (#1060), IDENTITY (#1061), general ALTER row-state expression analysis
 (#1062), unsupported mixed operation families (#1063) and DEFERRABLE semantics
 (#563) are outside this increment.
+
+Issue #531 DROP COLUMN contracts run through the Rust `AlterTable::analyze`
+entry point in the maintained workspace default and SQLite feature tests.
+They inspect completed bindings, local outcomes, known dependencies, explicit
+knowledge gaps and input-catalog/history/frozen-layer immutability. The CLI
+query-analysis route calls `SemAst::from_ast`, which also attempts catalog
+application; successful DROP application remains #1076. Post-drop project-schema
+and result-column fixtures therefore belong to that follow-up, rather than
+sending applicable DROP statements to the shared regression server now.

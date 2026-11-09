@@ -1,11 +1,15 @@
 pub(crate) use crate::test_helpers::ownership::apply_ownership_sql as apply;
 use crate::{
+    ast::{CreateTableMode, GeneratedColumnMode},
     context::{
         BaseParseContext as _, FrozenBaseContext, MutSourcePathWithSpan as _, ParseContext as _,
-        SchemaFileContext,
+        SchemaFileContext, TableInfoWrite,
     },
-    names::{ColumnName, FullName, SchemaName, TableName},
-    sem::{AnalysisError, ColumnDefinition, PgBuiltInType as SemPgBuiltInType},
+    names::{AliasName, ColumnName, FullName, SchemaName, TableName},
+    sem::{
+        AnalysisError, ColumnConstraint, ColumnDefinition, ColumnReferenceExpr, CreateTable,
+        GeneratedColumnConstraint, PgBuiltInType as SemPgBuiltInType, SemScalarExpr,
+    },
     test_helpers::{TestParseContext, source_span},
 };
 
@@ -91,4 +95,56 @@ pub(crate) fn assert_select_nullability(
         expected
     );
     Ok(())
+}
+
+/// Explicit completed/failed bindings avoid relying on the current generation parser gap.
+pub(crate) fn generation_dependency_context(
+    known: bool,
+) -> Result<SchemaFileContext, AnalysisError> {
+    let mut context = context("17");
+    let name = table_name();
+    let a = ColumnName::from("a");
+    let g = ColumnName::from("g");
+    let original =
+        ColumnDefinition::new(&Some(a.clone()), Some(&SemPgBuiltInType::int4()), None, &[]);
+    let expression = if known {
+        SemScalarExpr::column_reference(ColumnReferenceExpr::table_column(
+            &AliasName::from("t"),
+            &a,
+            &name,
+            Some(&original),
+            false,
+        ))
+    } else {
+        ColumnReferenceExpr::undefined_column_with_report(&mut context, &a)?
+    };
+    let generated = ColumnConstraint::generated(GeneratedColumnConstraint::new(
+        &name,
+        &g,
+        expression,
+        Some(GeneratedColumnMode::stored()),
+    ));
+    let table = CreateTable::new(
+        &name,
+        vec![
+            original,
+            ColumnDefinition::new(
+                &Some(g),
+                Some(&SemPgBuiltInType::int4()),
+                None,
+                &[generated],
+            ),
+            ColumnDefinition::new(
+                &Some(ColumnName::from("b")),
+                Some(&SemPgBuiltInType::int4()),
+                None,
+                &[],
+            ),
+        ],
+        CreateTableMode::from_if_not_exists(false),
+        false,
+        &source_span(),
+    );
+    context.insert_create_table(name.full_name(), &table);
+    Ok(context)
 }

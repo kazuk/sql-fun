@@ -29,7 +29,7 @@ mod update;
 mod values;
 mod view;
 pub use self::{
-    alter_column::{AlterColumnProblem, ColumnAttributeProblem},
+    alter_column::{AlterColumnProblem, ColumnAttributeProblem, ColumnDropDependency},
     array::ArrayProblem,
     call_argument::CallArgumentProblem,
     check::CheckProblem,

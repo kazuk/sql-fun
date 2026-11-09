@@ -7,7 +7,7 @@ pub use self::settings::IndexStorageValue;
 use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
-        AnalysisError, ColumnDrop, ColumnRename, SemScalarExpr,
+        AnalysisError, ColumnDrop, ColumnRename, ParseContext, SemScalarExpr,
         problem::IndexProblemKind,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
     },
@@ -408,7 +408,11 @@ impl CreateIndex {
 }
 
 impl CreateIndex {
-    pub(crate) fn depends_on_column(&self, change: &mut ColumnDrop) -> Result<bool, AnalysisError> {
+    pub(crate) fn depends_on_column(
+        &self,
+        context: &impl ParseContext,
+        change: &mut ColumnDrop,
+    ) -> Result<bool, AnalysisError> {
         if self.table.full_name() != change.table().full_name() {
             return Ok(false);
         }
@@ -419,19 +423,23 @@ impl CreateIndex {
             .iter()
             .chain(self.include_columns.0.iter())
         {
-            affected |= element.element.depends_on_column(change)?;
+            affected |= element.element.depends_on_column(context, change)?;
         }
         if let Some(predicate) = &self.predicate {
-            affected |= change.expression_dependency(predicate)?;
+            affected |= change.expression_dependency(context, predicate)?;
         }
         Ok(affected)
     }
 }
 impl IndexElement {
-    fn depends_on_column(&self, change: &mut ColumnDrop) -> Result<bool, AnalysisError> {
+    fn depends_on_column(
+        &self,
+        context: &impl ParseContext,
+        change: &mut ColumnDrop,
+    ) -> Result<bool, AnalysisError> {
         match self {
-            Self::ColumnName(name) => Ok(change.matches_name(name)),
-            Self::Expr(expression) => change.expression_dependency(expression),
+            Self::ColumnName(name) => Ok(change.matches_name(context, name)),
+            Self::Expr(expression) => change.expression_dependency(context, expression),
         }
     }
 }

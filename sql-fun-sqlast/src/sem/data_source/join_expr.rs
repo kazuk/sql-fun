@@ -426,6 +426,22 @@ impl JoinExprDataSource {
         }))
     }
 
+    pub(crate) fn has_explicit_using_key(
+        &self,
+        context: &impl ParseContext,
+        column: &ColumnName,
+    ) -> bool {
+        !self.natural
+            && self.using_clause.as_ref().is_some_and(|using| {
+                using.using_columns.iter().any(|key| {
+                    if context.dialect() == Dialect::sqlite() {
+                        key.as_str().eq_ignore_ascii_case(column.as_str())
+                    } else {
+                        key == column
+                    }
+                })
+            })
+    }
     pub(crate) const fn alias(&self) -> Option<&AliasSpec> {
         self.alias.as_ref()
     }

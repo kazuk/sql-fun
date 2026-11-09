@@ -54,6 +54,11 @@ impl CreateTableAs {
             .walk_nested_command(&mut RelationRenamer::new(old, new))
     }
 
+    pub(crate) fn query(&self) -> &SelectStatement {
+        self.query
+            .select_statement()
+            .expect("CREATE AS query is a SELECT")
+    }
     pub(crate) fn result_columns(&self) -> &ResultColumnCollection {
         self.query
             .select_statement()

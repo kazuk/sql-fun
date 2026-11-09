@@ -230,6 +230,9 @@ removed with that column; a view's `SELECT *` requires later output
 reconstruction rather than rejection merely because its expansion contains the
 removed column.
 
+Retained `JOIN ... USING` keys are column dependencies even when the query
+projects only other columns.
+
 Known dependency decisions distinguish PostgreSQL automatic removal, explicit
 CASCADE and rejection. A PostgreSQL view's whole-row reference does not by
 itself depend on every current column; selecting a field from that row depends

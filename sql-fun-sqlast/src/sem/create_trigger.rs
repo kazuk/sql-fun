@@ -398,12 +398,16 @@ pub struct CreateTrigger {
     source: Option<SourcePathWithSpan>,
 }
 impl CreateTrigger {
-    pub(crate) fn drop_event_depends_on(&self, change: &ColumnDrop) -> bool {
+    pub(crate) fn drop_event_depends_on(
+        &self,
+        context: &impl ParseContext,
+        change: &ColumnDrop,
+    ) -> bool {
         self.target() == change.table().full_name()
             && self
                 .events
                 .iter()
-                .any(|event| event.drop_depends_on(change))
+                .any(|event| event.drop_depends_on(context, change))
     }
     pub(crate) fn walk_column_dependencies(
         &mut self,
@@ -977,11 +981,11 @@ impl TriggerBody {
 }
 
 impl TriggerEvent {
-    fn drop_depends_on(&self, change: &ColumnDrop) -> bool {
+    fn drop_depends_on(&self, context: &impl ParseContext, change: &ColumnDrop) -> bool {
         if let Self::Update(columns) = self {
             columns
                 .iter()
-                .any(|column| change.matches_name(column.name()))
+                .any(|column| change.matches_name(context, column.name()))
         } else {
             false
         }

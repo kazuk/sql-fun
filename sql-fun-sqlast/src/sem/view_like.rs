@@ -18,6 +18,13 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    pub(crate) fn query(&self) -> &SelectStatement {
+        match self {
+            Self::View(view) => view.query(),
+            Self::MaterializedView(view) => view.query(),
+        }
+    }
+
     pub(crate) fn walk_column_dependencies(
         &mut self,
         visitor: &mut impl SemanticVisitorMut,

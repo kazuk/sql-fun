@@ -437,13 +437,17 @@ impl CreateTable {
         self.columns.0.push(column.clone());
     }
 
-    pub(crate) fn has_non_generated_column_after_drop(&self, change: &ColumnDrop) -> bool {
+    pub(crate) fn has_non_generated_column_after_drop(
+        &self,
+        context: &impl ParseContext,
+        change: &ColumnDrop,
+    ) -> bool {
         self.columns.0.iter().any(|column| {
             !column.has_generation()
                 && column
                     .name()
                     .as_ref()
-                    .is_some_and(|name| !change.matches_name(name))
+                    .is_some_and(|name| !change.matches_name(context, name))
         })
     }
     pub(crate) fn stage_column_removal(&mut self, column: &ColumnName) {
@@ -1120,16 +1124,16 @@ mod test_foreign_key_reference_columns {
 impl CreateTable {
     pub(crate) fn collect_drop_dependencies(
         &self,
+        context: &impl ParseContext,
         change: &mut ColumnDrop,
         owner: &FullName,
-        sqlite: bool,
     ) -> Result<(), AnalysisError> {
         let owned = owner == change.table().full_name();
         for (identity, constraint) in &self.constraints {
-            constraint.collect_drop_dependencies(change, owner, identity, owned, sqlite)?;
+            constraint.collect_drop_dependencies(context, change, owner, identity, owned)?;
         }
         for column in &self.columns.0 {
-            column.collect_drop_dependencies(change, owner, owned, sqlite)?;
+            column.collect_drop_dependencies(context, change, owner, owned)?;
         }
         Ok(())
     }

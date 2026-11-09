@@ -1,5 +1,6 @@
 mod ddl;
 use crate::{
+    ast::Dialect,
     names::{ColumnName, FullName as NamesFullName, TableName},
     sem::{
         AnalysisError, CatalogNameLookup, ColumnConstraint, ColumnDrop,
@@ -392,16 +393,17 @@ impl ColumnDefinition {
 impl ColumnDefinition {
     pub(crate) fn collect_drop_dependencies(
         &self,
+        context: &impl ParseContext,
         change: &mut ColumnDrop,
         owner: &NamesFullName,
         owned: bool,
-        sqlite: bool,
     ) -> Result<(), AnalysisError> {
+        let sqlite = context.dialect() == Dialect::sqlite();
         let removed = owned
             && self
                 .name()
                 .as_ref()
-                .is_some_and(|name| change.matches_name(name));
+                .is_some_and(|name| change.matches_name(context, name));
         for (index, constraint) in self.constraints.iter().enumerate() {
             let anonymous = format!(
                 "{}#{index}",
@@ -420,7 +422,7 @@ impl ColumnDefinition {
             }
             if let Some(check) = constraint.as_check()
                 && owned
-                && change.expression_dependency(check.expr())?
+                && change.expression_dependency(context, check.expr())?
             {
                 change.dependency(
                     owner.clone(),
@@ -431,7 +433,7 @@ impl ColumnDefinition {
             }
             if let Some(generated) = constraint.as_generated()
                 && owned
-                && change.expression_dependency(generated.expression())?
+                && change.expression_dependency(context, generated.expression())?
             {
                 change.dependency(
                     owner.clone(),
@@ -443,7 +445,7 @@ impl ColumnDefinition {
             if let Some(key) = constraint.as_foreign_key()
                 && !sqlite
                 && key.primary_key_table() == Some(change.table())
-                && change.matches_name(key.primary_key_column())
+                && change.matches_name(context, key.primary_key_column())
             {
                 change.dependency(
                     owner.clone(),

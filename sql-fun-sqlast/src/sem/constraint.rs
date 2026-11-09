@@ -5,7 +5,7 @@ pub use self::{
     unique::UniqueConstraint,
 };
 use crate::{
-    ast::{Column as AstColumn, ColumnConstraint as AstColumnConstraint},
+    ast::{Column as AstColumn, ColumnConstraint as AstColumnConstraint, Dialect},
     names::{ColumnName, FullName, TableName},
     sem::{
         AnalysisError, ColumnDrop, ColumnRename, CreateIndex, CreateTable, DropDependencyKind,
@@ -291,34 +291,43 @@ impl ConstraintNames {
 impl Constraint {
     pub(crate) fn collect_drop_dependencies(
         &self,
+        context: &impl ParseContext,
         change: &mut ColumnDrop,
         owner: &FullName,
         identity: &str,
         owned: bool,
-        sqlite: bool,
     ) -> Result<(), AnalysisError> {
+        let sqlite = context.dialect() == Dialect::sqlite();
         let affected = match self {
-            Self::Check(check) => owned && change.expression_dependency(check.expression())?,
+            Self::Check(check) => {
+                owned && change.expression_dependency(context, check.expression())?
+            }
             Self::PrimaryKey(key) => {
-                owned && key.keys().iter().any(|name| change.matches_name(name))
+                owned
+                    && key
+                        .keys()
+                        .iter()
+                        .any(|name| change.matches_name(context, name))
             }
             Self::Unique(key) => {
                 owned
                     && key
                         .key_columns()
                         .iter()
-                        .any(|name| change.matches_name(name))
+                        .any(|name| change.matches_name(context, name))
             }
             Self::Foreign(key) => {
                 (owned
                     && key
                         .source_columns()
                         .iter()
-                        .any(|name| change.matches_name(name)))
+                        .any(|name| change.matches_name(context, name)))
                     || (!sqlite
                         && key.target_table() == Some(change.table())
                         && key.target_columns().is_some_and(|columns| {
-                            columns.iter().any(|name| change.matches_name(name))
+                            columns
+                                .iter()
+                                .any(|name| change.matches_name(context, name))
                         }))
             }
         };

@@ -5,3 +5,5 @@ ALTER TABLE addition_items ADD COLUMN d bigint;
 CREATE TABLE addition_parent(id integer PRIMARY KEY);
 CREATE TABLE addition_serial(a integer);
 ALTER TABLE addition_serial ADD COLUMN id serial;
+CREATE TABLE addition_checked(a integer);
+ALTER TABLE addition_checked ADD COLUMN b integer REFERENCES addition_parent(id) CHECK(b > 0), ADD COLUMN c integer CHECK(c > 0) REFERENCES addition_parent(id);

@@ -2,7 +2,6 @@
 
 use std::{
     error::Error as StdError,
-    io::ErrorKind,
     path::{Path, PathBuf},
 };
 
@@ -20,16 +19,13 @@ struct LintItems {
 }
 
 impl LintConfigurations {
-    /// Load an explicitly selected file. A missing file is an empty configuration.
+    /// Load an explicitly selected file. An existing empty file has no definitions.
     ///
     /// # Errors
-    /// Reports unreadable files, malformed TOML, and known fields that cannot decode.
+    /// Reports missing or unreadable files, malformed TOML, and known fields that cannot decode.
     pub fn load_from(path: &Path) -> Result<Self, LintConfigurationError> {
-        let text = match std::fs::read_to_string(path) {
-            Ok(text) => text,
-            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Self::default()),
-            Err(error) => return Err(LintConfigurationError::new(path, error)),
-        };
+        let text = std::fs::read_to_string(path)
+            .map_err(|error| LintConfigurationError::new(path, error))?;
         toml::from_str(&text).map_err(|error| LintConfigurationError::new(path, error))
     }
 
@@ -46,6 +42,10 @@ mod test_lint_loading {
         LintConfigurations,
         test_helpers::{TestProjectDir, parse_lint_fixture},
     };
+    use std::{
+        error::Error as StdError,
+        io::{Error as IoError, ErrorKind},
+    };
 
     #[rstest::rstest]
     #[case::empty("")]
@@ -58,15 +58,20 @@ mod test_lint_loading {
     }
 
     #[test]
-    fn missing_file_is_empty_but_directory_is_an_error() {
+    fn missing_file_preserves_not_found_error() {
         let project = TestProjectDir::new().unwrap();
-        assert!(
-            LintConfigurations::load_from(&project.path().join("missing.toml"))
-                .unwrap()
-                .deprecated()
-                .is_empty()
-        );
+        let path = project.path().join("missing.toml");
+        let error = LintConfigurations::load_from(&path).unwrap_err();
+        let source = error.source().unwrap().downcast_ref::<IoError>().unwrap();
+        assert_eq!(source.kind(), ErrorKind::NotFound);
+        assert!(error.to_string().contains(&path.display().to_string()));
+    }
+
+    #[test]
+    fn directory_is_a_read_error() {
+        let project = TestProjectDir::new().unwrap();
         let error = LintConfigurations::load_from(project.path()).unwrap_err();
+        assert!(error.source().unwrap().downcast_ref::<IoError>().is_some());
         assert!(
             error
                 .to_string()

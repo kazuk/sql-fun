@@ -1,4 +1,4 @@
-use crate::{CodegenOptions, RewriteOptions};
+use crate::{CodegenOptions, LintConfigurationError, LintConfigurations, RewriteOptions};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -13,7 +13,10 @@ use crate::{
 
 /// Engine choices for initialization, independent of enabled analysis features.
 /// Full analysis metadata is resolved only for selected implemented setup tasks.
-pub struct InitializationDatasources(toml::Table);
+pub struct InitializationDatasources {
+    datasources: toml::Table,
+    metadata_file: PathBuf,
+}
 
 impl InitializationDatasources {
     /// Read datasource declarations without choosing or initializing an engine.
@@ -31,7 +34,10 @@ impl InitializationDatasources {
             None
         };
         let Some(database) = database else {
-            return Ok(Self(toml::Table::new()));
+            return Ok(Self {
+                datasources: toml::Table::new(),
+                metadata_file: path.to_path_buf(),
+            });
         };
         let Some(table) = database.as_table() else {
             return MetadataError::metadata_load_from_file(
@@ -39,14 +45,17 @@ impl InitializationDatasources {
                 "package.metadata.database requires a table",
             );
         };
-        Ok(Self(table.clone()))
+        Ok(Self {
+            datasources: table.clone(),
+            metadata_file: path.to_path_buf(),
+        })
     }
 
     /// Datasource names in deterministic prompt order.
     #[must_use]
     pub fn names(&self) -> Vec<String> {
         let mut names = self
-            .0
+            .datasources
             .iter()
             .filter(|(_, value)| value.is_table())
             .map(|(name, _)| name.clone())
@@ -60,7 +69,7 @@ impl InitializationDatasources {
     /// # Errors
     /// Rejects missing datasources or omitted engine choices, even for one option.
     pub fn engine(&self, name: &str) -> Result<&str, MetadataError> {
-        if let Some(datasource) = self.0.get(name)
+        if let Some(datasource) = self.datasources.get(name)
             && let Some(engine) = datasource.get("engine")
             && let Some(engine) = engine.as_str()
         {
@@ -77,10 +86,10 @@ impl InitializationDatasources {
     /// # Errors
     /// Rejects missing or invalid selected datasource metadata.
     pub fn selected_metadata(&self, name: &str) -> Result<SqlFunMetadata, MetadataError> {
-        let Some(value) = self.0.get(name) else {
+        let Some(value) = self.datasources.get(name) else {
             return MetadataError::metadata_load_from_file(name, "selected datasource not found");
         };
-        SqlFunMetadata::from_value(name, value)
+        SqlFunMetadata::from_value(name, value, &self.metadata_file)
     }
 }
 
@@ -173,7 +182,9 @@ impl SqlFunMetadataCollection {
         };
         let mut result = Self::default();
         for (key, value) in datasources {
-            if let Some(_existing) = result.insert(SqlFunMetadata::from_value(key, value)?) {
+            if let Some(_existing) =
+                result.insert(SqlFunMetadata::from_value(key, value, path_hint.as_ref())?)
+            {
                 Error::metadata_load_from_file(
                     &path_hint,
                     &format!("duplicate datasource name {key}"),
@@ -394,6 +405,9 @@ pub struct SqlFunMetadata {
     /// Schema search path
     search_path: Option<Vec<String>>,
 
+    /// Explicit lint configuration file, relative to the metadata file.
+    lint_configuration: Option<PathBuf>,
+
     /// CTE catalog directory path
     cte_catalog: Option<PathBuf>,
 
@@ -445,6 +459,134 @@ impl MetadataError {
 }
 
 impl SqlFunMetadata {
+    /// Configured lint file resolved relative to the metadata file, without checking existence.
+    #[must_use]
+    pub fn lint_configuration(&self) -> Option<&Path> {
+        self.lint_configuration.as_deref()
+    }
+
+    /// Load this datasource's lint definitions without semantic validation.
+    ///
+    /// # Errors
+    /// Reports unreadable or undecodable configuration; missing files are empty.
+    pub fn load_lint_configuration(&self) -> Result<LintConfigurations, LintConfigurationError> {
+        let Some(path) = self.lint_configuration() else {
+            return Ok(LintConfigurations::default());
+        };
+        LintConfigurations::load_from(path)
+    }
+}
+
+#[cfg(test)]
+mod test_lint_metadata {
+    use crate::{
+        InitializationDatasources, SqlFunMetadataCollection,
+        test_helpers::{TestProjectDir, write_lint_metadata},
+    };
+
+    #[rstest::rstest]
+    #[case::omitted(None)]
+    #[case::relative(Some("lint.toml"))]
+    fn resolves_selected_and_collection_paths(#[case] selection: Option<&str>) {
+        let project = TestProjectDir::new().unwrap();
+        let metadata_file = write_lint_metadata(&project, selection);
+        let collection = SqlFunMetadataCollection::load_from(&metadata_file).unwrap();
+        let selected = InitializationDatasources::load_from(&metadata_file)
+            .unwrap()
+            .selected_metadata("default")
+            .unwrap();
+        let expected = selection.map(|path| metadata_file.parent().unwrap().join(path));
+        assert_eq!(
+            collection.get("default").unwrap().lint_configuration(),
+            expected.as_deref()
+        );
+        assert_eq!(selected.lint_configuration(), expected.as_deref());
+        assert!(
+            selected
+                .load_lint_configuration()
+                .unwrap()
+                .deprecated()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn datasource_files_remain_independent() {
+        let project = TestProjectDir::new().unwrap();
+        let metadata_file = project
+            .write_file(
+                "config/Cargo.toml",
+                r#"
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+lint_configuration = "default.toml"
+[package.metadata.database.other]
+engine = "PostgreSQL"
+dialect = "postgres"
+lint_configuration = "other.toml"
+"#,
+            )
+            .unwrap();
+        project
+            .write_file("config/other.toml", "invalid TOML")
+            .unwrap();
+        let collection = SqlFunMetadataCollection::load_from(&metadata_file).unwrap();
+        assert!(
+            collection
+                .get("default")
+                .unwrap()
+                .load_lint_configuration()
+                .unwrap()
+                .deprecated()
+                .is_empty()
+        );
+        assert!(
+            collection
+                .get("other")
+                .unwrap()
+                .load_lint_configuration()
+                .is_err()
+        );
+        let selected = InitializationDatasources::load_from(&metadata_file)
+            .unwrap()
+            .selected_metadata("default")
+            .unwrap();
+        assert!(
+            selected
+                .load_lint_configuration()
+                .unwrap()
+                .deprecated()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn absolute_path_loads_only_on_request() {
+        let project = TestProjectDir::new().unwrap();
+        let lint = project.write_file("lint.toml", "not valid TOML").unwrap();
+        let metadata_file = write_lint_metadata(&project, Some(lint.to_str().unwrap()));
+        let declarations = InitializationDatasources::load_from(&metadata_file).unwrap();
+        assert_eq!(declarations.names(), ["default"]);
+        let metadata = declarations.selected_metadata("default").unwrap();
+        assert_eq!(metadata.lint_configuration(), Some(lint.as_path()));
+        assert!(metadata.load_lint_configuration().is_err());
+        project
+            .write_file(
+                "lint.toml",
+                r#"[[lint.deprecated]]
+kind = "function"
+name = ["public", "legacy"]"#,
+            )
+            .unwrap();
+        assert_eq!(
+            metadata.load_lint_configuration().unwrap().deprecated()[0].name(),
+            ["public", "legacy"]
+        );
+    }
+}
+
+impl SqlFunMetadata {
     fn deserialize_database_name<'de, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Option<String>, D::Error> {
@@ -483,9 +625,21 @@ impl SqlFunMetadata {
     /// # Errors
     ///
     /// Returns [`MetadataError`] when TOML conversion fails.
-    pub(crate) fn from_value(name: &str, database: &toml::Value) -> Result<Self, MetadataError> {
+    pub(crate) fn from_value(
+        name: &str,
+        database: &toml::Value,
+        metadata_file: &Path,
+    ) -> Result<Self, MetadataError> {
         let mut db_metadata: Self = database.clone().try_into()?;
         db_metadata.name = Some(String::from(name));
+        if let Some(path) = &mut db_metadata.lint_configuration
+            && path.is_relative()
+        {
+            *path = metadata_file
+                .parent()
+                .unwrap_or_else(|| Path::new(""))
+                .join(&*path);
+        }
         Ok(db_metadata)
     }
 

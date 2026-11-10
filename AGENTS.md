@@ -257,6 +257,15 @@ for operational details.
   requirements. A functionally correct solution that unnecessarily increases
   complexity or modifies trusted behavior is not an acceptable implementation.
 
+## Configuration File Design
+
+- Before designing, implementing, or reviewing configuration file formats or
+  their validation, read and apply
+  [docs/internal-rules/configuration-design-guideline.md](docs/internal-rules/configuration-design-guideline.md).
+- In particular, evaluate the compatibility impact of validation when users
+  upgrade or downgrade sql-fun. Validation must serve a concrete responsibility,
+  not merely enforce a checkable restriction.
+
 ## CI and Workflow Design
 
 - Before planning, implementing, or reviewing CI workflows, release automation,

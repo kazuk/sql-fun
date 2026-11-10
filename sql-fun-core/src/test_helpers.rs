@@ -1,4 +1,4 @@
-use crate::SqlFunMetadataCollection;
+use crate::{LintConfigurationError, LintConfigurations, SqlFunMetadataCollection};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -396,4 +396,30 @@ search_path = ["public"]
         )
         .unwrap();
     fixture
+}
+
+/// Write minimal datasource metadata with an optional lint file selection.
+///
+/// # Panics
+/// Panics if the temporary metadata file cannot be written.
+pub fn write_lint_metadata(project: &TestProjectDir, lint_path: Option<&str>) -> PathBuf {
+    let selection = lint_path.map_or_else(String::new, |path| {
+        format!("lint_configuration = {path:?}\n")
+    });
+    project.write_file("config/Cargo.toml", &format!(
+        "[package.metadata.database.default]\nengine = 'PostgreSQL'\ndialect = 'postgres'\n{selection}"
+    )).unwrap()
+}
+
+/// Load a lint fixture through the public file loader.
+///
+/// # Errors
+/// Returns the lint loader error for invalid configuration.
+///
+/// # Panics
+/// Panics if the temporary project or fixture cannot be created.
+pub fn parse_lint_fixture(text: &str) -> Result<LintConfigurations, LintConfigurationError> {
+    let project = TestProjectDir::new().unwrap();
+    let path = project.write_file("lint.toml", text).unwrap();
+    LintConfigurations::load_from(&path)
 }

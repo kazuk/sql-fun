@@ -46,6 +46,7 @@ mod cte_catalog;
 mod diagnostic_presentation;
 mod extensions;
 mod highlighter;
+mod lint_configuration;
 mod lookup_result;
 mod metadata;
 mod placehlodered_sql;
@@ -69,6 +70,7 @@ pub use self::{
         ParameterRenameCollection, ResolvedCteCatalog,
     },
     diagnostic_presentation::DiagnosticPresentation,
+    lint_configuration::{DeprecatedLintItem, LintConfigurationError, LintConfigurations},
     placehlodered_sql::{
         FragmentName, ParameterName, PlaceholderTypeHint, PlaceholderedSql, PlaceholderedSqlError,
         PlaceholderedSqlToken,

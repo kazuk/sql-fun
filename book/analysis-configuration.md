@@ -16,8 +16,9 @@ lint_configuration = "lint.toml"
 ```
 
 Relative lint paths are resolved from the directory containing the metadata
-file; absolute paths are used as supplied. An omitted path, a missing file,
-or an empty file means no lint definitions. Whitespace and comments alone
+file; absolute paths are used as supplied. An omitted path or an existing empty
+file means no lint definitions. An explicitly configured path that does not exist
+returns a filesystem I/O error (`NotFound`). Whitespace and comments alone
 also mean no definitions. No lint file is discovered automatically.
 
 The lint file uses `[[lint.deprecated]]` entries:
@@ -57,7 +58,7 @@ Configuration loading preserves repeated entries and supported optional fields
 without checking target existence or semantic field combinations. Unknown
 fields are ignored so fields added or removed across versions do not themselves
 prevent SQL analysis. Malformed TOML, known field values that cannot be decoded,
-and file read errors other than a missing file are reported with the lint path.
+and all file read errors, including missing files, are reported with the lint path.
 
 This step provides configuration loading only. Deprecated-reference diagnostics,
 semantic validation, and end-of-analysis reporting for `expect = true` are tracked

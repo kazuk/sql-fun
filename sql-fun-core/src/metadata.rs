@@ -468,7 +468,7 @@ impl SqlFunMetadata {
     /// Load this datasource's lint definitions without semantic validation.
     ///
     /// # Errors
-    /// Reports unreadable or undecodable configuration; missing files are empty.
+    /// Reports missing, unreadable, or undecodable configured files.
     pub fn load_lint_configuration(&self) -> Result<LintConfigurations, LintConfigurationError> {
         let Some(path) = self.lint_configuration() else {
             return Ok(LintConfigurations::default());
@@ -490,6 +490,9 @@ mod test_lint_metadata {
     fn resolves_selected_and_collection_paths(#[case] selection: Option<&str>) {
         let project = TestProjectDir::new().unwrap();
         let metadata_file = write_lint_metadata(&project, selection);
+        if selection.is_some() {
+            project.write_file("config/lint.toml", "").unwrap();
+        }
         let collection = SqlFunMetadataCollection::load_from(&metadata_file).unwrap();
         let selected = InitializationDatasources::load_from(&metadata_file)
             .unwrap()
@@ -528,6 +531,7 @@ lint_configuration = "other.toml"
 "#,
             )
             .unwrap();
+        project.write_file("config/default.toml", "").unwrap();
         project
             .write_file("config/other.toml", "invalid TOML")
             .unwrap();
@@ -559,6 +563,25 @@ lint_configuration = "other.toml"
                 .deprecated()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn configured_missing_file_is_an_error_through_both_metadata_paths() {
+        let project = TestProjectDir::new().unwrap();
+        let metadata_file = write_lint_metadata(&project, Some("missing.toml"));
+        let collection = SqlFunMetadataCollection::load_from(&metadata_file).unwrap();
+        assert!(
+            collection
+                .get("default")
+                .unwrap()
+                .load_lint_configuration()
+                .is_err()
+        );
+        let selected = InitializationDatasources::load_from(&metadata_file)
+            .unwrap()
+            .selected_metadata("default")
+            .unwrap();
+        assert!(selected.load_lint_configuration().is_err());
     }
 
     #[test]

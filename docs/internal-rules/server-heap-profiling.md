@@ -12,9 +12,9 @@ executed against a live database.
 Use the contributor environment described in [CONTRIBUTING.md](../../CONTRIBUTING.md).
 The initial supported platform is Ubuntu 24.04 amd64 with its existing Cargo, uv,
 Bash, jq, C compiler with static libc support, gzip, APT, dpkg and Ubuntu archive
-signing key. Network access to the Ubuntu archives is required. Reserve at least
-40 GiB free on the
-build, report and scratch filesystems; actual trace sizes depend on the workload.
+signing key. Network access to the Ubuntu archives is required. Build, report
+and scratch space usage depends on the workload; filesystem errors are reported
+when an operation fails.
 
 You do **not** need to install heaptrack manually. Every invocation downloads
 and extracts heaptrack, heaptrack_print, binutils (for readable Rust symbols)

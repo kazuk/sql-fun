@@ -17,6 +17,7 @@ medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	case-common-types-17
 medium	case-common-types-18
+medium	case_semantic-17
 medium	coalesce_semantic-18
 medium	collate-17
 medium	collate-18
@@ -37,6 +38,7 @@ medium	named-variadic-calls-17
 medium	named-variadic-calls-18
 medium	operator-names-17
 medium	operator-names-18
+medium	output-names-18
 medium	patterns-17
 medium	patterns-18
 medium	postgres18-syntax-17-17
@@ -45,7 +47,6 @@ medium	project-roles-18
 medium	project-roles-empty-17
 medium	project-roles-empty-18
 medium	rows-17
-medium	rows-18
 medium	rows-from-17
 medium	rows-from-18
 medium	schema-composites-17
@@ -79,7 +80,6 @@ medium	schema-update-18
 medium	schema-views-diagnostics-17
 medium	schema-views-diagnostics-18
 medium	schema-views-precedence-17
-medium	schema-views-precedence-18
 medium	set-operations-17
 medium	set-operations-18
 medium	table-additions-17
@@ -99,7 +99,6 @@ light	arrays-operators-18
 light	arrays-records-17
 light	arrays-records-18
 light	bootstrap-array-expressions-18
-light	case_semantic-17
 light	case_semantic-18
 light	casts-17
 light	casts-18
@@ -116,12 +115,12 @@ light	minmax-metadata-18
 light	output-function-params-17
 light	output-function-params-18
 light	output-names-17
-light	output-names-18
 light	pilot-17
 light	pilot-18
 light	postgres18-syntax-18-18
 light	project-roles-omitted-17
 light	project-roles-omitted-18
+light	rows-18
 light	schema-delete-17
 light	schema-delete-18
 light	schema-domains-builtin-17
@@ -156,6 +155,7 @@ light	schema-views-automatic-17
 light	schema-views-automatic-18
 light	schema-views-mechanisms-17
 light	schema-views-mechanisms-18
+light	schema-views-precedence-18
 light	schema-views-special-17
 light	schema-views-special-18
 light	serial-family-17

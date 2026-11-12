@@ -24,21 +24,33 @@ metadata and package hashes, runs a small symbolization/capture check, and
 records the selected package versions. It does not install host packages, run
 package installation scripts, require sudo, or change the CI image.
 
-Explicitly select the feature variant, builtin catalog installation, persistent
-report parent and temporary scratch parent:
+Start a measurement with no arguments:
 
 ```sh
-.local/bin/profile-server-heap --features default \
-  --sql-fun-home "$GIT_ROOT/sql-fun-home" \
-  --output "$GIT_ROOT/target/heap-reports" \
-  --raw-dir "$GIT_ROOT/target/heap-scratch"
+profile-server-heap
 ```
 
-Use absolute paths without quotes, backslashes, percent signs or newlines in
-their names (heaptrack interprets percent placeholders in output paths).
+This profiles default features using the repository's `sql-fun-home` catalog
+installation, writes reports under `target/heap-reports`, and uses
+`target/heap-scratch` for temporary data. These paths are relative to the actual
+repository root, regardless of the caller's working directory. Raw data is
+removed after successful extraction unless `--keep-raw` is supplied.
+
+Override any selection when needed, for example:
+
+```sh
+profile-server-heap --features all \
+  --sql-fun-home "/absolute/path/to/sql-fun-home" \
+  --output "/absolute/path/to/reports" \
+  --raw-dir "/absolute/path/to/scratch"
+```
+
+For path overrides, use absolute paths without quotes, backslashes, percent
+signs or newlines in their names (heaptrack interprets percent placeholders in
+output paths).
 The command uses the current checkout's committed fixture manifest and priority
 file. It validates PostgreSQL 17/18 catalog metadata in the installation you
-selected. It never attaches to a developer's existing server.
+use. It never attaches to a developer's existing server.
 
 Run again with `--features all` to measure the all-features CI variant. Each
 invocation creates fresh `run-*` reports and `heap-profile-*` scratch directories.

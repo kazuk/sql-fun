@@ -157,8 +157,9 @@ reported by the build errors for your environment.
 Useful local scripts live under [`.local/bin/`](.local/bin/). The repository
 environment adds this directory to `PATH`.
 
-For optional local server allocation measurements, see the
-[heap profiling guide](docs/internal-rules/server-heap-profiling.md). The command
+Run `profile-server-heap` with no arguments for optional local server allocation
+measurements using the default feature set and repository paths. See the
+[heap profiling guide](docs/internal-rules/server-heap-profiling.md) for overrides. The command
 provisions its own heaptrack tools and runs the complete SQL regression workload;
 it is separate from normal verification and CI.
 

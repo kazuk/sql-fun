@@ -63,6 +63,7 @@ pub(crate) mod merge_statements;
 pub(crate) mod merge_views;
 mod name_builders;
 pub(crate) mod name_identity;
+pub(crate) mod notify;
 pub(crate) mod operator_layers;
 pub(crate) mod operator_names;
 pub(crate) mod ownership;

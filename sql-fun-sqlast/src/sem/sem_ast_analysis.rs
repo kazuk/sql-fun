@@ -24,6 +24,9 @@ impl SemAst {
             return Ok(Self::unresolved_statement());
         }
         match ast {
+            AstStatementNode::Notify(_) => {
+                todo!("standalone NOTIFY semantic analysis (#1098)")
+            }
             AstStatementNode::DefaultPrivileges(_) => {
                 todo!("ALTER DEFAULT PRIVILEGES interpretation (#955)")
             }

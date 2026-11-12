@@ -5,9 +5,9 @@ use crate::{
         CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment, CompositeType, CreateRule,
         CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropRule,
         DropTable, DropTrigger, EnumType, Expr, Extension, ForeignTable, Indirection, Insert,
-        Literal, Merge, Name, NamedArgument, NullTest, ObjectArgument, ObjectKind, ObjectTarget,
-        OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice, SqlValue,
-        StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
+        Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument, ObjectKind,
+        ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice,
+        SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
         TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
@@ -737,6 +737,10 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             let value = ForeignTable::try_from_with_tokens(&value, tokens)?;
             return Ok(Self::foreign_table(value));
         }
+        if let Some(notify) = value.as_notify_stmt().as_inner() {
+            let notify = Notify::try_from(&notify)?;
+            return Ok(Self::notify(notify));
+        }
         if let Some(query) = value.as_select_stmt().as_inner() {
             return Ok(Self::query(Query::try_from_with_tokens(&query, tokens)?));
         }
@@ -881,6 +885,30 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+#[cfg(test)]
+mod test_notify_dispatch {
+    use crate::{
+        ast::{Dialect, StatementKind, StatementNode},
+        parse_statements,
+    };
+
+    // Verifies frontend dispatch through the public statement classification.
+    #[test]
+    fn classifies_and_retains_standalone_notify() {
+        let statement = parse_statements(r#"NOTIFY "Mixed.Channel", ''"#, Dialect::postgres())
+            .next()
+            .expect("statement")
+            .expect("common conversion");
+        assert_eq!(statement.kind(), StatementKind::notify());
+        assert_eq!(statement.kind().to_string(), "NOTIFY");
+        let StatementNode::Notify(notify) = statement.into_test_node() else {
+            panic!("NOTIFY payload");
+        };
+        assert_eq!(notify.channel(), "Mixed.Channel");
+        assert_eq!(notify.payload().as_deref(), Some(""));
     }
 }
 

@@ -129,10 +129,6 @@ impl CreateRule {
     ) -> Result<Vec<StatementNode>, AnalysisError> {
         let mut actions = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
-            if node.as_notify_stmt().as_inner().is_some() {
-                // NOTIFY has no owned common statement yet; never discard an action.
-                todo!("CREATE RULE NOTIFY action syntax conversion: #608");
-            }
             actions.push(StatementNode::try_from_with_tokens(&node, tokens)?);
         }
         Ok(actions)
@@ -140,15 +136,63 @@ impl CreateRule {
 }
 
 #[cfg(test)]
-mod test_action_boundary {
+mod test_notify_actions {
+    use crate::{
+        ast::{StatementKind, StatementNode},
+        test_helpers::rule::rule,
+    };
 
-    use crate::test_helpers::rule::rule;
+    #[rstest::rstest]
+    #[case::single("NOTIFY channel, 'payload'")]
+    #[case::parenthesized("(NOTIFY channel, 'payload')")]
+    fn retains_single_notify(#[case] action: &str) {
+        let rule = rule(&format!("CREATE RULE r AS ON INSERT TO absent DO {action}"));
+        let [StatementNode::Notify(notify)] = rule.actions().as_slice() else {
+            panic!("one common NOTIFY action");
+        };
+        assert_eq!(notify.channel(), "channel");
+        assert_eq!(notify.payload().as_deref(), Some("payload"));
+    }
 
     #[test]
-    #[should_panic(expected = "CREATE RULE NOTIFY action syntax conversion: #608")]
-    fn notify_is_an_explicit_tracked_nested_boundary() {
-        let _ = rule(
-            "CREATE RULE r AS ON INSERT TO absent DO (SELECT NEW.id; NOTIFY channel, 'payload')",
+    fn retains_notify_and_query_dml_actions_in_order() {
+        let rule = rule(
+            r#"CREATE RULE r AS ON INSERT TO absent DO (
+                SELECT NEW.id;
+                NOTIFY "First.Channel";
+                INSERT INTO log VALUES (NEW.id);
+                UPDATE log SET id = NEW.id;
+                NOTIFY second, '';
+                DELETE FROM log;
+                NOTIFY last_channel, 'it''s retained'
+            )"#,
+        );
+        let kinds: Vec<_> = rule.actions().iter().map(StatementNode::kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                StatementKind::query(),
+                StatementKind::notify(),
+                StatementKind::insert(),
+                StatementKind::update(),
+                StatementKind::notify(),
+                StatementKind::delete(),
+                StatementKind::notify(),
+            ]
+        );
+        let mut notifications = Vec::new();
+        for action in rule.actions() {
+            if let StatementNode::Notify(notify) = action {
+                notifications.push((notify.channel().as_str(), notify.payload().as_deref()));
+            }
+        }
+        assert_eq!(
+            notifications,
+            [
+                ("First.Channel", None),
+                ("second", Some("")),
+                ("last_channel", Some("it's retained")),
+            ]
         );
     }
 }

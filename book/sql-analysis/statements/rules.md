@@ -30,8 +30,11 @@ subqueries use the shared query-expression support rules. Exact result
 compatibility for known built-in modifier-capable types (such as varchar,
 numeric and timestamp, including arrays) is rejected because complete
 type-modifier checking is not implemented (#619), even when their base types
-match. NOTIFY actions remain unsupported (#608). No rewrite expansion, action
-execution or SQL rendering is performed.
+match. NOTIFY actions are retained in written order with their channel and
+optional payload when parsing SQL. Their semantic analysis remains unsupported
+([#1097](https://github.com/kazuk/sql-fun/issues/1097)); a rule containing NOTIFY
+is diagnosed as an unsupported action and is not registered. No rewrite
+expansion, action execution or SQL rendering is performed.
 
 PostgreSQL `DROP RULE` resolves its ON relation first and retains the exact rule
 name within that relation. After a successful DROP, the rule is no longer

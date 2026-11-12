@@ -106,6 +106,8 @@ impl Statement {
 /// `ViewWrite` category has been removed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StatementKind {
+    /// Unresolved PostgreSQL NOTIFY syntax; semantic analysis is separate.
+    Notify,
     /// An unresolved PostgreSQL DROP RULE statement. Analysis awaits #605.
     DropRule,
     /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
@@ -169,6 +171,7 @@ pub enum StatementKind {
 impl std::fmt::Display for StatementKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
+            Self::Notify => "NOTIFY",
             Self::DropRule => "DROP RULE",
             Self::CreateTrigger => "CREATE TRIGGER",
             Self::CreateRule => "CREATE RULE",
@@ -203,6 +206,11 @@ impl std::fmt::Display for StatementKind {
 }
 
 impl StatementKind {
+    /// The PostgreSQL NOTIFY category.
+    pub const fn notify() -> Self {
+        Self::Notify
+    }
+
     /// The ALTER DEFAULT PRIVILEGES category.
     pub const fn default_privileges() -> Self {
         Self::DefaultPrivileges
@@ -350,6 +358,7 @@ impl StatementKind {
 impl StatementNode {
     pub(super) const fn kind(&self) -> StatementKind {
         match self {
+            Self::Notify(_) => StatementKind::notify(),
             Self::Query(_) => StatementKind::query(),
             Self::Insert(_) => StatementKind::insert(),
             Self::Update(_) => StatementKind::update(),

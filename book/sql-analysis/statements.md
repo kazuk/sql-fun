@@ -97,3 +97,9 @@ columns, or publish a foreign-table definition for later analysis
 ([#956](https://github.com/kazuk/sql-fun/issues/956)). For engine-compatible
 forms, analysis can still terminate without a structured semantic diagnostic.
 These limitations do not make the corresponding SQL invalid in PostgreSQL.
+
+Standalone PostgreSQL `NOTIFY` retains its channel and optional payload during
+syntax conversion, but semantic analysis is unimplemented and can terminate
+analysis ([#1098](https://github.com/kazuk/sql-fun/issues/1098)). Notification
+delivery and SQL rendering are not supported. For NOTIFY within a rule, see
+[CREATE RULE](statements/rules.md).

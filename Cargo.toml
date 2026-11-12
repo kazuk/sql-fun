@@ -44,7 +44,7 @@ baseline = "v0.1.0-baseline"
 [workspace.metadata.next-release]
 sql-fun = "patch"
 sql-fun-cli = "patch"
-sql-fun-server = "patch"
+sql-fun-server = "minor"
 sql-fun-server-api = "patch"
 sql-fun-core = "major"
 sql-fun-client = "patch"

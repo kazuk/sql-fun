@@ -16,6 +16,7 @@ pub(crate) mod document;
 mod drop_behavior;
 mod foreign_table;
 mod mutation;
+mod notify;
 mod options;
 pub(crate) mod postgres;
 pub(crate) mod projection;
@@ -42,6 +43,7 @@ pub(crate) use self::{
         MergeMatchKind, MergeWhen, MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp,
         XmlOptionType, XmlSerialize, XmlTable,
     },
+    notify::Notify,
 };
 pub use self::{
     default_privileges::{
@@ -271,6 +273,7 @@ pub(crate) enum StatementNode {
     Insert(Insert),
     Update(Update),
     Delete(Delete),
+    Notify(Notify),
     Merge(Merge),
     View(View),
     DropRule(DropRule),
@@ -298,6 +301,10 @@ pub(crate) enum StatementNode {
 }
 
 impl StatementNode {
+    const fn notify(value: Notify) -> Self {
+        Self::Notify(value)
+    }
+
     const fn default_privileges(value: DefaultPrivileges) -> Self {
         Self::DefaultPrivileges(value)
     }

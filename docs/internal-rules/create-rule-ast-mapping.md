@@ -4,7 +4,7 @@ This checklist is for maintainers auditing the context-free conversion in
 `sql-fun-sqlast/src/ast/rule.rs` (#600), not semantic support or rendering.
 The public classification boundary is documented in `StatementKind` rustdoc.
 
-The audited lockfile versions are `pg_query 6.2.1` and `turso_parser 0.8.1`.
+The audited lockfile versions are `pg_query 18.1.0` and `turso_parser 0.8.3`.
 The PostgreSQL contracts are `RuleStmt`, `RangeVar` and the statement types in
 `pg_query/src/protobuf.rs`, the corresponding `parsenodes.h` definitions, and
 `RuleStmt`, `RuleActionList`, `RuleActionMulti`, `RuleActionStmt`, `event` and
@@ -13,27 +13,53 @@ from PostgreSQL's `gram.y`). There is no SQLite RULE grammar or conversion.
 
 ## Statement fields and alternatives
 
-| Source | Owned common destination | Coverage in `ast/rule/tests.rs` |
+| Source | Owned common destination | Coverage in `ast/rule.rs` and `ast/rule/tests.rs` |
 | --- | --- | --- |
 | `relation` | Required `Relation`, without catalog lookup or target-kind validation | Identity, field comparison and missing-target tests |
 | `rulename` | `name: Name`, with parser-normalized identifier spelling | Identity, all-event and field comparison tests |
 | `where_clause` | `predicate: Option<Expr>`, retaining the complete condition | Identity, nested query, field comparison and diagnostic-location tests |
 | `event` | Syntax-only `RuleEvent`: SELECT, INSERT, UPDATE, DELETE | `preserves_every_event_without_catalog`, invalid-event tests |
 | `instead` | `instead: bool`; ALSO and omission both parse as false | `preserves_action_mode`, field comparison tests |
-| `actions` | Ordered `Vec<StatementNode>`, never `syn::Node` or semantic `WriteAction` | Ordered DML/query, action-mode, no-action and NOTIFY boundary tests |
+| `actions` | Ordered `Vec<StatementNode>`, never `syn::Node` or semantic `WriteAction` | Ordered DML/query, action-mode, no-action and NOTIFY retention tests |
 | `replace` | `replace: bool` independently of event/body | Identity, all-event and field comparison tests |
 
 `frontend_fields_agree_with_common_ast` compares every statement field against
 raw frontend facts, including nested target fields and action cardinality.
 The other tests inspect action/condition content, not merely parse success.
 
-`RuleActionStmt` admits SELECT, INSERT, UPDATE, DELETE and NOTIFY. The first four
-reuse their existing common statement payloads. NOTIFY is an explicit unsupported
-nested conversion boundary owned by [#608](https://github.com/kazuk/sql-fun/issues/608).
-`notify_is_an_explicit_tracked_nested_boundary` asserts the documented `todo!()`;
-no preceding or following actions are returned as a partial successful rule.
-Replace this boundary and test when the owned NOTIFY conversion lands. This
-independent nested work is not a prerequisite for #600's statement-level migration.
+`RuleActionStmt` admits SELECT, INSERT, UPDATE, DELETE and NOTIFY. All five
+reuse their common statement payloads through ordinary statement dispatch.
+`retains_single_notify` and `retains_notify_and_query_dml_actions_in_order`
+assert NOTIFY payload retention and order, replacing #600's unsupported nested
+conversion boundary under [#608](https://github.com/kazuk/sql-fun/issues/608).
+
+### NOTIFY field mapping and normalization
+
+`ast/notify.rs` owns context-free conversion; `StatementNode::Notify` is a leaf.
+No relation lookup, semantic action, SQL rendering or runtime notification is
+implied by successful conversion. Standalone syntax has the same conversion and
+`StatementKind::Notify` classification. Standalone interpretation remains an
+explicit unsupported boundary tracked by
+[#1098](https://github.com/kazuk/sql-fun/issues/1098).
+
+| Frontend field | Common destination / use |
+| --- | --- |
+| `conditionname` | One channel identifier string; unquoted spelling is folded, quoted spelling and embedded dots remain one identifier |
+| `payload` | Optional decoded string; quote/backslash escapes and dollar quoting are normalized by the frontend |
+| `payload_location` | Used only to distinguish omission from an explicit literal, then discarded; no diagnostic anchor or retained offset |
+
+The pg_query 18.1.0 bundled grammar leaves `payload_location` zero when payload
+is omitted and assigns a positive offset for an explicit literal. Protobuf
+strings collapse both a null payload and an empty literal to an empty string;
+the location fact distinguishes common `None` from `Some("")`. Tests audit this
+presence contract directly against the frontend and assert decoded values.
+Inconsistent presence facts and an empty channel violate the frontend contract.
+Original quoting, escape spelling and formatting are not retained. PostgreSQL
+runtime notifications use an empty payload for either omitted or empty syntax;
+the distinction here supports syntax inspection only.
+
+Per the maintainer's #608 scope adjustment, this conversion does not scan tokens
+or add NOTIFY-specific diagnostic source-location support or location tests.
 
 The parser normalizes single actions and parenthesized multi-action lists into
 the same ordered list. Empty entries in parenthesized lists are removed; DO
@@ -87,8 +113,8 @@ GROUPING, and SQL JSON/XML payloads. Their source-specific options remain in
 common payloads; no semantic resolution is performed. Existing unsupported
 nested conversions keep their explicit failure boundaries; discovering another
 missing parser-produced form requires an owning issue and checklist update,
-not silent omission. The NOTIFY alternative above is the missing statement
-conversion identified by this audit.
+not silent omission. The NOTIFY alternative now uses the owned
+conversion described above.
 
 ## Integration and staged semantics
 
@@ -109,7 +135,9 @@ production PostgreSQL builtin/bootstrap and CLI initialization checks. The
 DROP RULE SQL semantics (#605); service tests cover tombstones, explicit unlink,
 replacement, re-creation and frozen parent/sibling isolation meanwhile.
 
-NOTIFY conversion remains owned by #608. Rule analysis explicitly rejects
+NOTIFY syntax conversion is implemented under #608; semantic action analysis
+remains unsupported and is tracked by
+[#1097](https://github.com/kazuk/sql-fun/issues/1097). Rule analysis explicitly rejects
 unimplemented subquery semantics tracked by #570–#573, rather than accepting
 scalar placeholders. ON CONFLICT DO UPDATE retains its existing #474 boundary.
 Exact result compatibility for modifier-capable types is rejected pending

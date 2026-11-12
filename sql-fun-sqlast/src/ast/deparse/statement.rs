@@ -10,6 +10,7 @@ use crate::{
 impl SqlEmit for StatementNode {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         with_stack(|| match self {
+            Self::Notify(_) => writer.unsupported("NOTIFY"),
             Self::Query(v) => v.emit(writer),
             Self::Insert(v) => v.emit(writer),
             Self::Update(v) => v.emit(writer),

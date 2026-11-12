@@ -59,12 +59,6 @@ def arguments(argv):
             parser.error(f"Catalog version mismatch: {catalog}")
     target = Path(json.loads(subprocess.check_output(
         ["cargo", "metadata", "--locked", "--no-deps", "--format-version=1"], cwd=ROOT))["target_directory"])
-    for path in (target, args.raw_dir, args.output):
-        ancestor = path
-        while not ancestor.exists():
-            ancestor = ancestor.parent
-        if shutil.disk_usage(ancestor).free < 40 * 1024**3:
-            parser.error(f"At least 40 GiB free required on {ancestor} before profiling")
     return args, groups, priorities, target
 
 

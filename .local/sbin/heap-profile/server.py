@@ -54,7 +54,7 @@ class ProfiledServer:
                 self.registration = registration
                 self.verify()
                 return
-            except (FileNotFoundError, json.JSONDecodeError):
+            except (FileNotFoundError, ValueError):
                 time.sleep(0.05)
         raise RuntimeError("Profiled server readiness timed out")
 

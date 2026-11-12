@@ -59,9 +59,10 @@ release optimization, full debug information and no stripping. Cargo's target
 directory setting is respected. Build settings apply only to that invocation.
 
 The profiler captures server startup, the full workload, and natural shutdown.
-After the workload finishes, allow approximately three minutes for the server's
-ordinary client-free idle shutdown, followed by profile finalization and
-extraction. The finalization wait is bounded at four minutes. Forced termination
+The profiling-only server shuts down after 10 seconds without clients, followed
+by profile finalization and extraction. Active client operations prevent idle
+shutdown. The finalization wait is bounded at 70 seconds. Production defaults
+and the normal regression runner are unchanged. Forced termination
 is recorded as an incomplete capture, retains available raw data and returns
 failure. A failed suite still attempts extraction but returns failure even when
 its profile is readable. Instrumentation changes runtime and memory use; these
@@ -69,8 +70,28 @@ measurements are not normal server latency or RSS benchmarks.
 
 ## Read the results
 
-The command prints the report directory. Open `report.txt` in a text editor;
-long optimized Rust frames are easier to inspect without line wrapping. Inspect:
+The command prints `SUCCESS` only after the SQL workload, capture, extraction
+and requested raw cleanup all succeed. Failures print `FAILURE` and return a
+nonzero exit status. With `--keep-raw`, success instead confirms raw retention.
+The per-run `run.json` includes the overall `ok` result and detailed outcomes.
+
+After success, `<output>/report.txt` and `<output>/run.json` provide predictable
+paths to the latest successful report and metadata. With default options:
+
+```sh
+less target/heap-reports/report.txt
+cat target/heap-reports/run.json
+```
+
+Each `run-*` directory remains available for history and failure evidence.
+Failed or incomplete runs do not replace the stable successful result. Both
+stable paths follow the `latest` directory link, which switches only after a
+successful run is finalized. A script needing both files from the same run
+while another measurement finishes can resolve `latest` once and use that
+run directory.
+
+Open `report.txt` in a text editor; long optimized Rust frames are easier to
+inspect without line wrapping. Inspect:
 
 - `report.txt`: native heaptrack text, with allocation counts, temporary
   allocations, peak consumers, unfreed allocations and top call stacks (20 per
@@ -94,7 +115,8 @@ when available, but optimized/inlined Rust frames may be combined or absent.
 
 Reports are published only after successful extraction and checks for supported
 sections. A successful normal capture/extraction deletes that run's bulky raw
-profile, private tools and package cache. Existing reports are never overwritten.
+profile, private tools and package cache. Per-run reports are never overwritten;
+the stable paths advance on success.
 
 ## Inspect raw data or recover a failed extraction
 

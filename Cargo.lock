@@ -595,6 +595,7 @@ dependencies = [
  "castaway",
  "cfg-if",
  "itoa",
+ "serde",
  "static_assertions",
  "zmij",
 ]
@@ -3274,6 +3275,7 @@ dependencies = [
  "assert_matches",
  "clap",
  "combine",
+ "compact_str",
  "ctor",
  "derive-getters",
  "derive_builder",

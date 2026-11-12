@@ -28,6 +28,7 @@ turso_parser = ["dep:turso_parser", "dep:turso_macros", "dep:memchr"]
 
 [dependencies]
 combine = { workspace = true }
+compact_str = { workspace = true, features = ["serde"] }
 derive-getters = { workspace = true }
 derive_builder = { workspace = true }
 itertools = { workspace = true }

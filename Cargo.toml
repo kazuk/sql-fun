@@ -48,7 +48,7 @@ sql-fun-server = "minor"
 sql-fun-server-api = "patch"
 sql-fun-core = "major"
 sql-fun-client = "patch"
-sql-fun-sqlast = "minor"
+sql-fun-sqlast = "major"
 sql-fun-codegen = "minor"
 sql-fun-collector = "patch"
 

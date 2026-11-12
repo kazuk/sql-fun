@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Optional profiling command; never called by normal verification or CI.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+exec uv run --no-project --no-config --python 3.12 python -B \
+  "$root/.local/sbin/heap-profile/main.py" "$@"

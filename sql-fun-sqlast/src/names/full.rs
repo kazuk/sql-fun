@@ -295,6 +295,11 @@ mod deserialize_tests {
     #[case::local(FullName::from_local_name("a.b"))]
     #[case::schema(FullName::with_schema("", "Mixed"))]
     #[case::catalog(FullName::with_catalog("my.db", "a.b", "c.d"))]
+    #[case::long_components(FullName::with_catalog(
+        &"catalog".repeat(16),
+        &"x".repeat(63),
+        &"界".repeat(21),
+    ))]
     fn preserves_serialized_shape_and_valid_identity(
         #[case] name: FullName,
     ) -> testresult::TestResult {

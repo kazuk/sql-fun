@@ -33,11 +33,16 @@ def write_json(path, value):
 
 
 def arguments(argv):
-    parser = argparse.ArgumentParser(prog="profile-server-heap", description=__doc__)
-    parser.add_argument("--features", required=True, choices=("default", "all"))
-    parser.add_argument("--sql-fun-home", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--raw-dir", type=Path, required=True)
+    parser = argparse.ArgumentParser(prog="profile-server-heap", description=__doc__,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--features", default="default", choices=("default", "all"),
+                        help="Feature variant to profile")
+    parser.add_argument("--sql-fun-home", type=Path, default=ROOT / "sql-fun-home",
+                        help="Builtin catalog installation")
+    parser.add_argument("--output", type=Path, default=ROOT / "target/heap-reports",
+                        help="Persistent report parent directory")
+    parser.add_argument("--raw-dir", type=Path, default=ROOT / "target/heap-scratch",
+                        help="Temporary profiling data parent directory")
     parser.add_argument("--keep-raw", action="store_true")
     args = parser.parse_args(argv)
     for key in ("sql_fun_home", "output", "raw_dir"):

@@ -9,6 +9,10 @@ import time
 from tools import run
 
 
+IDLE_TIMEOUT = 10
+FINALIZATION_TIMEOUT = 70
+
+
 class ProfiledServer:
     def __init__(self, tools, binary, runtime, raw, reports, env):
         self.tools, self.binary, self.runtime = tools, binary, runtime
@@ -39,7 +43,7 @@ class ProfiledServer:
         self.process = subprocess.Popen([
             str(self.tools.heaptrack), "--record-only", "--output", str(self.raw / "server-profile"),
             str(launcher), str(self.raw / "server.pid"), str(self.binary),
-            "--server-idle-timeout", "180"],
+            "--server-idle-timeout", str(IDLE_TIMEOUT)],
             env=dict(self.env, LD_LIBRARY_PATH=self.tools.env["LD_LIBRARY_PATH"]), stdin=subprocess.DEVNULL,
             stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
         deadline = time.monotonic() + 60
@@ -77,8 +81,8 @@ class ProfiledServer:
             raise RuntimeError("Owned profiled server registration changed")
 
     def finish(self):
-        print("Waiting for the server's 180-second idle shutdown and profile finalization…", flush=True)
-        status = self.process.wait(timeout=240)
+        print(f"Waiting for the server's {IDLE_TIMEOUT}-second idle shutdown and profile finalization…", flush=True)
+        status = self.process.wait(timeout=FINALIZATION_TIMEOUT)
         if status != 0:
             raise RuntimeError(f"Profiler/server failed with status {status}")
         self.log.close()

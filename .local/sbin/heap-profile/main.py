@@ -20,7 +20,7 @@ sys.path.insert(0, str(SUITE))
 import parallel_runner as regression
 import scheduling
 
-from server import ProfiledServer
+from server import IDLE_TIMEOUT, ProfiledServer
 from tools import digest, provision, run
 
 
@@ -146,7 +146,7 @@ def capture(args, tools, cli, binary, groups, priorities, raw, reports, metadata
         env.update(USER=runtime.name, SQL_FUN_HOME=str(args.sql_fun_home),
                    SQL_FUN_BIN=str(cli), SQL_FUN_TEST_SERVER_BIN=str(binary),
                    SQL_FUN_SERVER=str(binary), SQL_FUN_SERVER_COMMAND="exit 97", LC_ALL="C",
-                   SQL_FUN_SERVER_IDLE_TIMEOUT="180")
+                   SQL_FUN_SERVER_IDLE_TIMEOUT=str(IDLE_TIMEOUT))
         # Only the profiler and its children receive private runtime libraries.
         server = ProfiledServer(tools, binary, runtime, raw, reports, env)
         began = time.monotonic()
@@ -184,6 +184,60 @@ def recovery(raw, tools, profile, reports):
         shlex.join(["bash", "-o", "pipefail", "-c", pipeline]) +
         "\nAfter inspection, manually remove only this run's directory:\n" +
         shlex.join(["rm", "-r", "--", str(raw)]) + "\n")
+
+
+def publish_latest(output, reports):
+    # Both stable files follow one atomically replaced directory link.
+    for name in ("report.txt", "run.json"):
+        path = output / name
+        target = Path("latest") / name
+        if path.is_symlink():
+            if path.readlink() != target:
+                raise RuntimeError(f"Unexpected stable output link: {path}")
+        elif path.exists():
+            raise RuntimeError(f"Stable output path already exists: {path}")
+    for name in ("report.txt", "run.json"):
+        path = output / name
+        if not path.is_symlink():
+            path.symlink_to(Path("latest") / name)
+    pending = reports / ".latest"
+    pending.symlink_to(reports.name, target_is_directory=True)
+    pending.replace(output / "latest")
+
+
+def validate_outcome(args, raw, metadata):
+    if not metadata.get("suite", {}).get("ok"):
+        raise RuntimeError("SQL regression workload failed; inspect suite/summary.json")
+    if not metadata.get("capture_complete") or not metadata.get("extraction_complete"):
+        raise RuntimeError("Profile capture or report extraction is incomplete")
+    if not args.keep_raw and (metadata["raw_retained"] or raw.exists()):
+        raise RuntimeError("Raw profiling data cleanup is incomplete")
+
+
+def finish_run(args, raw, reports, metadata, status):
+    metadata["finished"] = datetime.now(timezone.utc).isoformat()
+    metadata["persistent_bytes"] = size(reports)
+    metadata["ok"] = status == 0
+    write_json(reports / "run.json", metadata)
+    if status == 0:
+        try:
+            publish_latest(args.output, reports)
+        except Exception as error:
+            status = 1
+            metadata.update(ok=False, error=str(error))
+            write_json(reports / "run.json", metadata)
+    if status == 0:
+        raw_status = "retained (--keep-raw)" if args.keep_raw else "removed"
+        print(f"SUCCESS: SQL workload passed; capture and extraction complete; raw data {raw_status}.", flush=True)
+        print(f"Latest report: {args.output / 'report.txt'}\nLatest metadata: {args.output / 'run.json'}", flush=True)
+    else:
+        print(f"FAILURE: {metadata.get('error', 'Profiling did not complete')}", file=sys.stderr, flush=True)
+    print(f"Reports: {reports}", flush=True)
+    if metadata["raw_retained"]:
+        print(f"Raw/tools retained: {raw}; see recovery.txt if extraction was reached.", flush=True)
+        if (reports / "recovery.txt").exists():
+            print((reports / "recovery.txt").read_text(), flush=True)
+    return status
 
 
 def main(argv=None):
@@ -231,21 +285,15 @@ def main(argv=None):
             shutil.rmtree(raw)
             metadata["raw_retained"] = False
             (reports / "recovery.txt").unlink()
-        status = 0 if metadata["suite"]["ok"] else 1
+        validate_outcome(args, raw, metadata)
+        status = 0
     except (Exception, KeyboardInterrupt) as error:
         metadata["error"] = str(error) or "Interrupted"
         print(f"Profiling failed: {metadata['error']}", file=sys.stderr, flush=True)
         if isinstance(error, KeyboardInterrupt):
             status = 130
     finally:
-        metadata["finished"] = datetime.now(timezone.utc).isoformat()
-        metadata["persistent_bytes"] = size(reports)
-        write_json(reports / "run.json", metadata)
-        print(f"Reports: {reports}", flush=True)
-        if metadata["raw_retained"]:
-            print(f"Raw/tools retained: {raw}; see recovery.txt if extraction was reached.", flush=True)
-            if (reports / "recovery.txt").exists():
-                print((reports / "recovery.txt").read_text(), flush=True)
+        status = finish_run(args, raw, reports, metadata, status)
     return status
 
 

@@ -1,3 +1,4 @@
+use crate::sem::{AnalysisError, traversal::SemanticVisitor};
 mod ddl;
 use crate::{
     ast::ObjectKind,
@@ -21,6 +22,19 @@ pub struct CreateFunction {
 }
 
 impl CreateFunction {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for overload in &self.overloads {
+            overload.visit_references(visitor)?;
+        }
+        if let Some(columns) = &self.returning_columdef {
+            columns.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) -> bool {
         let previous = self.clone();
         self.overloads.rename_relation(old, new);

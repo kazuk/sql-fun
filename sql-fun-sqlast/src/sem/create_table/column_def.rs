@@ -7,7 +7,7 @@ use crate::{
         ColumnNullabilityConstraint, ColumnRename, ConstraintNames, DeclarationCollation,
         DefaultColumnConstraint, DropDependencyKind, GeneratedColumnConstraint, ParseContext,
         SemScalarExpr, TypeReference, WithTypmod,
-        traversal::{ColumnRenamer, SemanticVisitorMut},
+        traversal::{ColumnRenamer, SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -50,6 +50,19 @@ impl ColumnAttributes {
 }
 
 impl ColumnDefinition {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(reference) = &self.type_ref {
+            visitor.schema_type(reference)?;
+        }
+        for constraint in &self.constraints {
+            constraint.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn reserve_check_names(&self, names: &mut ConstraintNames) {
         for constraint in &self.constraints {
             if let Some(check) = constraint.as_check() {

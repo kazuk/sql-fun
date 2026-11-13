@@ -9,7 +9,9 @@ use crate::{
     sem::{
         AnalysisError, ColumnDrop, ColumnRename, ParseContext, SemScalarExpr,
         problem::IndexProblemKind,
-        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
+        traversal::{
+            ColumnRenamer, RelationRenamer, SemanticVisitor, SemanticVisitorMut, optional,
+        },
     },
 };
 
@@ -34,6 +36,17 @@ pub enum IndexElement {
 }
 
 impl IndexElement {
+    fn visit_references<V: SemanticVisitor>(
+        &self,
+        table: &TableName,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::ColumnName(column) => visitor.schema_column(table.full_name(), false, column),
+            Self::Expr(expression) => expression.visit(visitor),
+        }
+    }
+
     fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         match self {
             Self::ColumnName(name) => rename.rename_name(name),
@@ -94,6 +107,17 @@ impl IndexElementWithOrder {
 pub struct IndexElementCollection(Vec<IndexElementWithOrder>);
 
 impl IndexElementCollection {
+    fn visit_references<V: SemanticVisitor>(
+        &self,
+        table: &TableName,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for entry in &self.0 {
+            entry.element.visit_references(table, visitor)?;
+        }
+        Ok(())
+    }
+
     fn rename_relation(
         &mut self,
         visitor: &mut impl SemanticVisitorMut,
@@ -185,6 +209,20 @@ pub struct CreateIndex {
 }
 
 impl CreateIndex {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.schema_relation(self.table.full_name(), false)?;
+        self.key_columns.visit_references(&self.table, visitor)?;
+        self.include_columns
+            .visit_references(&self.table, visitor)?;
+        if let Some(predicate) = &self.predicate {
+            predicate.visit(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         if rename.matches_table(&self.table) {
             for column in self

@@ -85,4 +85,4 @@ serial-family	project	serial-family.sql	20	17,18
 named-variadic-calls	project	named-variadic-calls.sql	72	17,18
 table-checks	project	table-checks.sql	66	17,18
 table-additions	project	table-additions.sql	22	17,18
-row-security	project	row-security.sql	9	17,18
+row-security	project	row-security.sql	12	17,18

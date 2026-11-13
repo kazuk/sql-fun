@@ -75,6 +75,8 @@ pub enum RowSecurityOutcome {
     MissingTarget,
     /// A relation exists, but its kind cannot have table row-security flags.
     InvalidTarget(Kind),
+    /// The target is a table, but the ALTER statement requested another kind.
+    InvalidStatementKind,
 }
 
 impl RowSecurityOutcome {
@@ -93,6 +95,11 @@ impl RowSecurityOutcome {
     /// The resolved relation has an incompatible kind.
     pub const fn invalid_target(kind: Kind) -> Self {
         Self::InvalidTarget(kind)
+    }
+
+    /// A non-table ALTER statement cannot apply row-security actions to a table.
+    pub const fn invalid_statement_kind() -> Self {
+        Self::InvalidStatementKind
     }
 
     const fn can_apply(self) -> bool {
@@ -152,7 +159,7 @@ impl RowSecurityChange {
         let binding = expand_relation_search_path(context, &requested, |key| {
             context.object_kind(key).map(|kind| (key.clone(), kind))
         });
-        let (table, target, outcome) = match binding {
+        let (table, target, mut outcome) = match binding {
             Some((name, kind)) if kind == Kind::table() => {
                 let table = TableName::from(name);
                 (table.clone(), Some(table), RowSecurityOutcome::applicable())
@@ -173,7 +180,10 @@ impl RowSecurityChange {
                 RowSecurityOutcome::missing_target(),
             ),
         };
-        if outcome.requires_diagnostic() {
+        if target.is_some() && !ast.kind().supports_row_security() {
+            outcome = RowSecurityOutcome::invalid_statement_kind();
+            context.report_analysis_problem(AnalysisProblem::row_security_requires_table())?;
+        } else if outcome.requires_diagnostic() {
             context.report_analysis_problem(AnalysisProblem::table_not_found(&table))?;
         }
         let mut commands = Vec::new();

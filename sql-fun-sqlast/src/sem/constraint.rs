@@ -9,7 +9,7 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AnalysisError, ColumnDrop, ColumnRename, CreateIndex, CreateTable, DropDependencyKind,
-        ImplicitChange, ParseContext, traversal::SemanticVisitorMut,
+        ImplicitChange, ParseContext, traversal::SemanticVisitor, traversal::SemanticVisitorMut,
     },
 };
 use std::collections::HashMap;
@@ -33,6 +33,17 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Check(value) => value.expression().visit(visitor),
+            Self::Foreign(value) => value.visit_references(visitor),
+            _ => Ok(()),
+        }
+    }
+
     pub(crate) fn check(value: &CheckConstraint) -> Self {
         Self::Check(value.clone())
     }

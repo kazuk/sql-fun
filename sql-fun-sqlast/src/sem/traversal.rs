@@ -13,6 +13,29 @@ use crate::{
 /// Observe completed semantic bindings through shared references only.
 /// Visitor state can change; semantic nodes and their retained metadata cannot.
 pub(crate) trait SemanticVisitor {
+    /// Canonical relation binding in the shared table/view namespace.
+    fn schema_relation_identity(&mut self, _name: &FullName) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+
+    fn schema_relation(&mut self, _name: &FullName, _view: bool) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+    fn schema_column(
+        &mut self,
+        _name: &FullName,
+        _view: bool,
+        _column: &ColumnName,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+    fn schema_function(&mut self, _name: &FullName) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+    fn schema_type(&mut self, _reference: &TypeReference) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+
     fn enter_rows_functions(&mut self) {}
     fn leave_rows_functions(&mut self, _alias: &AliasSpec, _ordinality: bool) {}
     fn access_purpose(&mut self, _kind: AccessKind) {}

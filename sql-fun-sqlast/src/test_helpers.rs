@@ -35,6 +35,7 @@ pub(crate) mod deparse;
 pub(crate) mod deparse_constraints;
 pub(crate) mod deparse_lexical;
 pub(crate) mod deparse_statements;
+pub(crate) mod deprecated_lint;
 pub(crate) mod distinct;
 pub(crate) mod document_merge;
 pub(crate) mod domain_casts;

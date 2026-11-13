@@ -1,7 +1,11 @@
 mod ddl;
 use crate::{
+    ast::ObjectKind,
     names::FullName as NamesFullName,
-    sem::{OwnerSpecification, OwnershipIdentity},
+    sem::{
+        AnalysisError, OwnerSpecification, OwnershipIdentity, TypeReference,
+        traversal::SemanticVisitor,
+    },
 };
 
 /// Completed target lookup for an ALTER OWNER statement.
@@ -146,6 +150,32 @@ pub struct AlterOwner {
     owner: OwnerSpecification,
 }
 impl AlterOwner {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        let Some(identity) = self.target.identity() else {
+            return Ok(());
+        };
+        match identity.kind() {
+            ObjectKind::TABLE => visitor.schema_relation(identity.name(), false)?,
+            ObjectKind::VIEW | ObjectKind::MATERIALIZED_VIEW => {
+                visitor.schema_relation(identity.name(), true)?
+            }
+            ObjectKind::FUNCTION => visitor.schema_function(identity.name())?,
+            ObjectKind::TYPE | ObjectKind::DOMAIN => {
+                visitor.schema_type(&TypeReference::from_full_name(identity.name().clone()))?
+            }
+            _ => {}
+        }
+        if let Some(arguments) = identity.arguments() {
+            for reference in arguments.iter().flatten() {
+                visitor.schema_type(reference)?;
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn new(target: &OwnershipLookup, owner: &OwnerSpecification) -> Self {
         Self {
             target: target.clone(),

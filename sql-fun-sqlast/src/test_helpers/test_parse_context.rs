@@ -34,6 +34,7 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Clone, Debug, Default)]
 pub struct TestParseContext {
+    lint_configuration: ::sql_fun_core::LintConfigurations,
     rules: HashMap<RuleIdentity, Option<CreateRule>>,
     ownership: OwnershipCatalog,
     triggers: HashMap<TriggerIdentity, Option<CreateTrigger>>,
@@ -649,6 +650,9 @@ impl crate::context::ParameterTypeHintWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn lint_configuration(&self) -> &::sql_fun_core::LintConfigurations {
+        &self.lint_configuration
+    }
     fn lookup_sampling_method(&self, name: &FullName) -> SamplingMethodLookup {
         let Some(methods) = &self.sampling_methods else {
             return SamplingMethodLookup::unavailable();

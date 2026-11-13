@@ -113,6 +113,9 @@ mod implementation {
             &self,
             visitor: &mut V,
         ) -> Result<(), AnalysisError> {
+            if let Some(name) = self.resolution.function_identity() {
+                visitor.schema_function(name)?;
+            }
             self.modifiers.visit(visitor)
         }
     }
@@ -373,6 +376,9 @@ mod implementation {
             &self,
             visitor: &mut V,
         ) -> Result<(), AnalysisError> {
+            if let Some(name) = self.name_resolution.function_identity() {
+                visitor.schema_function(name)?;
+            }
             for arg in self.args.iter() {
                 arg.arg_expr.visit(visitor)?;
             }

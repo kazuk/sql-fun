@@ -32,6 +32,12 @@ not establish ALTER TYPE catalog transitions. SQLite/Turso CREATE/DROP TYPE
 operations are separately listed in the [statement support
 inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
 
+Enum casts currently resolve the enum type without validating literal label
+text: for example, `'unknown'::public.item_state` does not receive a diagnostic
+for an absent label. Individual enum-label references are not yet available
+for deprecated-label linting
+([#1084](https://github.com/kazuk/sql-fun/issues/1084)).
+
 ## Diagnostics
 
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): the

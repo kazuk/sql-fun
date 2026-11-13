@@ -2,8 +2,8 @@ use crate::{
     ast::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
     names::{ColumnName, TableName},
     sem::{
-        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ForeignKeyTarget, TypeReference,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
+        ForeignKeyTarget, TypeReference, traversal::SemanticVisitor,
     },
 };
 
@@ -23,6 +23,19 @@ pub struct ForeignKeyColumnConstraint {
 }
 
 impl ForeignKeyColumnConstraint {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(table) = self.primary_key_table.relation() {
+            visitor.schema_relation(table.full_name(), false)?;
+            if self.primary_key_column_type.is_some() {
+                visitor.schema_column(table.full_name(), false, &self.primary_key_column)?;
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);

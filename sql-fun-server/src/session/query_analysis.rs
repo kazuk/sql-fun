@@ -23,7 +23,7 @@ use ::sql_fun_sqlast::{
     context::{BaseParseContext, ParameterTypeHintWrite, ParseContext, SchemaFileContext},
     parse_statements,
     sem::{
-        AnalysisProblem, QueryMetadata, SemAst, TypeReference as SqlType,
+        AnalysisProblem, DeprecatedObservations, QueryMetadata, SemAst, TypeReference as SqlType,
         WildcardExpansionCollection,
     },
 };
@@ -270,6 +270,8 @@ struct QueryResult {
     parameters: Vec<ParameterDescribe>,
     columns: Vec<ResultSetColumn>,
     accesses: Vec<ColumnAccess>,
+    // #1087 consumes these effective expectations and emitted-diagnostic observations.
+    lint_observations: DeprecatedObservations,
 }
 
 impl QueryResult {
@@ -294,6 +296,7 @@ impl QueryResult {
             parameters: Vec::new(),
             columns: Vec::new(),
             accesses: Vec::new(),
+            lint_observations: DeprecatedObservations::default(),
         }
     }
     fn parse_failure(
@@ -390,6 +393,15 @@ impl<'a> StatementAnalysis<'a> {
         let mut result = QueryResult::for_statement(self.statement, self.mapping);
         let mut context =
             SchemaFileContext::new(&self.source.path, base, base.get_args(), base.metadata());
+        if self.schema.has_project_schema() {
+            match base.metadata().load_lint_configuration() {
+                Ok(configuration) => context.set_lint_configuration(&configuration),
+                Err(error) => {
+                    result.report(self, QueryAnalysisStage::analysis(), &error.to_string());
+                    return result;
+                }
+            }
+        }
         context.set_diagnostic_source(self.statement_text());
         context.set_statement_span(*self.statement.span());
         let hints = self.bindings.type_hints();
@@ -444,10 +456,18 @@ impl<'a> StatementAnalysis<'a> {
     fn complete(
         &self,
         result: &mut QueryResult,
-        pair: ::sql_fun_sqlast::AstAndContextPair<SchemaFileContext>,
+        mut pair: ::sql_fun_sqlast::AstAndContextPair<SchemaFileContext>,
         output: Option<&mut Statement>,
         analyze_access: bool,
     ) {
+        if self.schema.has_project_schema() {
+            match pair.lint_deprecated() {
+                Ok(observations) => result.lint_observations = observations,
+                Err(error) => {
+                    result.report(self, QueryAnalysisStage::analysis(), &error.to_string());
+                }
+            }
+        }
         if let Some(accesses) = collect_requested_accesses(analyze_access, || {
             ::sql_fun_sqlast::sem::QueryAccess::from_statement(pair.context(), pair.ast())
         }) {
@@ -913,5 +933,65 @@ mod test_access_invocation {
             assert_eq!(result.is_some(), option == Some(true));
             assert_eq!(calls.get(), usize::from(option == Some(true)));
         }
+    }
+}
+
+#[cfg(test)]
+mod test_project_lints {
+    use crate::{
+        schema_cache::test_helpers::SchemaProject,
+        session::query_analysis::{
+            Bindings, QueryResult, QuerySource, SourceMap, StatementAnalysis,
+        },
+        test_helpers::create_cache_context,
+    };
+    use ::sql_fun_sqlast::{ast::Dialect, parse_statements, sem::SemAst};
+
+    #[tokio::test]
+    async fn explicit_project_lint_delivers_warning_and_keeps_query_complete() {
+        let project = SchemaProject::new();
+        let service = project.service();
+        let schema = project.initialized_schema(&service).await;
+        let sql = "SELECT value FROM retained";
+        let source = QuerySource {
+            text: sql.to_owned(),
+            path: "query.sql".into(),
+        };
+        let mut mapping = SourceMap::default();
+        mapping.push(sql, sql, None);
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let bindings = Bindings {
+            names: Vec::new(),
+            hints: Vec::new(),
+        };
+        let analysis = StatementAnalysis::new(&statement, &bindings, &source, &schema, &mapping);
+        let mut context = project.analysis_context_over(schema.base_context(), "products");
+        let file = ::tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            file.path(),
+            r#"[[lint.deprecated]]
+kind = "table"
+name = ["retained"]
+column = "value"
+expect = true
+"#,
+        )
+        .unwrap();
+        context.set_lint_configuration(
+            &::sql_fun_core::LintConfigurations::load_from(file.path()).unwrap(),
+        );
+        let pair = SemAst::from_ast(&statement, context, &mut create_cache_context()).unwrap();
+        let mut result = QueryResult::for_statement(&statement, &mapping);
+        result.sql = Some(sql.to_owned());
+        analysis.complete(&mut result, pair, None, false);
+        assert!(result.complete);
+        assert_eq!(result.columns.len(), 1);
+        assert_eq!(result.problems.len(), 1);
+        assert_eq!(result.problems[0].code(), "deprecated");
+        assert!(result.lint_observations.entries()[0].occurred());
+        assert!(result.lint_observations.entries()[0].expected());
     }
 }

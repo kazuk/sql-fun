@@ -129,6 +129,9 @@ impl ConstrainedExpr {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        if let Some(binding) = &self.cast_binding {
+            binding.visit_type(visitor)?;
+        }
         if let Some(indirection) = &self.indirection {
             indirection.visit(visitor)?;
         }

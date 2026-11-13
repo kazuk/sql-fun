@@ -98,6 +98,9 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Immutable project lint declarations supplied for this analysis.
+    fn lint_configuration(&self) -> &::sql_fun_core::LintConfigurations;
+
     /// Apply nested schema declarations as one publication group.
     /// Implementations retain diagnostics while discarding catalog writes when a
     /// nested declaration is rejected. The closure keeps using this ParseContext.

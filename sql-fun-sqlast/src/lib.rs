@@ -50,7 +50,7 @@ use crate::{
     ast::{Dialect, Statement, StatementNode, TryFromWithTokens},
     context::{FrozenBaseContext, GetSourcePathWithSpanOpt, ParseContext, SchemaFileContext},
     parse_statements::split_postgres_statements,
-    sem::{AnalysisError, SemAst},
+    sem::{AnalysisError, DeprecatedObservations, SemAst},
     syn::{ListOpt, ParseResult, ScanToken},
 };
 
@@ -67,6 +67,13 @@ impl<TParseContext> AstAndContextPair<TParseContext>
 where
     TParseContext: ParseContext,
 {
+    /// Explicit project lint pass over this tree using its original context.
+    /// # Errors
+    /// Returns traversal or diagnostic-delivery failures.
+    pub fn lint_deprecated(&mut self) -> Result<DeprecatedObservations, AnalysisError> {
+        self.0.lint_deprecated(&mut self.1)
+    }
+
     /// create instance
     pub const fn new(ast: SemAst, context: TParseContext) -> Self {
         Self(ast, context)

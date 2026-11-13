@@ -16,7 +16,7 @@ pub(crate) fn configuration(text: &str) -> LintConfigurations {
 }
 pub(crate) fn schema() -> SchemaFileContext {
     indirection::schema(
-        r#"CREATE TABLE public.items (id integer, legacy text);
+        r#"CREATE TABLE public.items (id integer PRIMARY KEY, legacy text);
 CREATE VIEW public.old_view AS SELECT id, legacy FROM public.items;
 CREATE DOMAIN public.legacy_domain AS integer;
 CREATE TYPE public.mood AS ENUM ('happy', 'sad');

@@ -250,6 +250,27 @@ schema that attempts an applicable removal can still reach an unimplemented
 application path. Local semantic acceptance does not guarantee final application
 acceptance. This capability does not execute database migrations.
 
+### PostgreSQL row-level security
+
+`ALTER TABLE` supports `ENABLE`, `DISABLE`, `FORCE` and `NO FORCE ROW LEVEL
+SECURITY`. Analysis resolves the target table and retains the operation and its
+applicability. Schema loading applies the changes before subsequent analysis.
+New tables start with row security disabled and not forced.
+
+ENABLE/DISABLE and FORCE/NO FORCE change independent flags. FORCE can be set
+while row security is disabled; DISABLE does not clear FORCE. Multiple
+row-security actions in one statement are applied in order. Changing a parent
+table does not propagate these flags to inherited tables or partitions.
+
+A missing table produces `table_not_found`, unless `IF EXISTS` skips it. An
+existing relation of another kind, such as a view, also produces
+`table_not_found`, including with `IF EXISTS`. Rejected or skipped alterations
+do not change the catalog. Row-security actions combined with other ALTER
+operation families remain unimplemented ([#1104](https://github.com/kazuk/sql-fun/issues/1104)).
+
+These flags are schema metadata. Analysis does not evaluate policies or runtime
+permissions, filter result rows, or change result-column types and nullability.
+
 ### Other unimplemented alterations
 
 The following retained PostgreSQL operations still have unimplemented paths.
@@ -263,7 +284,6 @@ The analysis-only capabilities above do not imply catalog application support.
 | ENABLE / DISABLE TRIGGER or RULE | ALWAYS/REPLICA and ALL/USER state changes where applicable | [#535](https://github.com/kazuk/sql-fun/issues/535) |
 | INHERIT / NO INHERIT and OF / NOT OF | Inheritance and typed-table associations | [#536](https://github.com/kazuk/sql-fun/issues/536) |
 | REPLICA IDENTITY | Mode and optional index binding/application | [#537](https://github.com/kazuk/sql-fun/issues/537) |
-| ENABLE / DISABLE / FORCE / NO FORCE ROW LEVEL SECURITY | Relation row-security state | [#538](https://github.com/kazuk/sql-fun/issues/538) |
 | ATTACH / DETACH PARTITION and DETACH PARTITION FINALIZE | Bounds, concurrency and parent/child relationships | [#539](https://github.com/kazuk/sql-fun/issues/539) |
 | ADD / SET / DROP IDENTITY | Identity-column transitions and sequence options | [#540](https://github.com/kazuk/sql-fun/issues/540) |
 

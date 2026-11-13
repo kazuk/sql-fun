@@ -58,6 +58,7 @@ mod query_access;
 mod query_metadata;
 mod relation_alteration;
 mod resolution;
+mod row_security;
 mod sampling_method;
 mod scalar_expr;
 pub(crate) mod search_path;
@@ -99,6 +100,7 @@ pub use self::{
     },
     query_access::{AccessObjectKind, AccessRecord, QueryAccess},
     query_metadata::QueryMetadata,
+    row_security::{RowSecurityAction, RowSecurityChange, RowSecurityOutcome},
     view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption},
     view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport},
     with_typmod::WithTypmod,

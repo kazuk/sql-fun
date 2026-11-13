@@ -130,3 +130,34 @@ fn row_security_target_outcomes(
     assert!(!table.row_security_forced());
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::view("VIEW")]
+#[case::sequence("SEQUENCE")]
+#[case::index("INDEX")]
+fn non_table_alter_cannot_change_a_table(#[case] kind: &str) -> testresult::TestResult {
+    let context = catalog::seed("CREATE TABLE t(a integer)", "17")?;
+    let result = catalog::apply(
+        context,
+        &format!("ALTER {kind} t ENABLE ROW LEVEL SECURITY"),
+    )?;
+    let statement = result.ast().alter_table_statement().unwrap();
+    assert_eq!(statement.resolved_target(), Some(&catalog::table_name()));
+    assert!(!statement.can_apply());
+    assert_eq!(
+        statement.commands()[0]
+            .row_security_change()
+            .unwrap()
+            .outcome(),
+        RowSecurityOutcome::invalid_statement_kind(),
+    );
+    assert_eq!(result.context().problems().len(), 1);
+    assert_eq!(
+        result.context().problems()[0].code(),
+        "row_security_requires_table"
+    );
+    let table = result.context().get_table(&catalog::table_name()).unwrap();
+    assert!(!table.row_security_enabled());
+    assert!(!table.row_security_forced());
+    Ok(())
+}

@@ -255,7 +255,9 @@ acceptance. This capability does not execute database migrations.
 `ALTER TABLE` supports `ENABLE`, `DISABLE`, `FORCE` and `NO FORCE ROW LEVEL
 SECURITY`. Analysis resolves the target table and retains the operation and its
 applicability. Schema loading applies the changes before subsequent analysis.
-New tables start with row security disabled and not forced.
+New tables start with row security disabled and not forced. The statement must
+specify `ALTER TABLE`: using `ALTER VIEW`, `ALTER SEQUENCE` or `ALTER INDEX`
+against a table produces `row_security_requires_table` and leaves it unchanged.
 
 ENABLE/DISABLE and FORCE/NO FORCE change independent flags. FORCE can be set
 while row security is disabled; DISABLE does not clear FORCE. Multiple

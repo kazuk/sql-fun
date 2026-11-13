@@ -470,6 +470,11 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Row-security actions were requested through a non-table ALTER statement.",
+                  "type": "string",
+                  "const": "RowSecurityRequiresTable"
+                },
+                {
                   "description": "An invalid CHECK constraint definition.",
                   "type": "object",
                   "properties": {
@@ -4992,6 +4997,11 @@
             "AnalysisProblem": {
               "description": "Semantic analysis problems",
               "oneOf": [
+                {
+                  "description": "Row-security actions were requested through a non-table ALTER statement.",
+                  "type": "string",
+                  "const": "RowSecurityRequiresTable"
+                },
                 {
                   "description": "An invalid CHECK constraint definition.",
                   "type": "object",

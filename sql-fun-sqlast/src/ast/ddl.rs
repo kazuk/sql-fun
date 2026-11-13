@@ -733,6 +733,10 @@ impl ColumnConstraint {
 }
 
 impl AlterRelationKind {
+    pub(crate) const fn supports_row_security(self) -> bool {
+        matches!(self, Self::Table)
+    }
+
     pub(crate) const fn supports_table_column_attributes(self) -> bool {
         matches!(self, Self::Table)
     }

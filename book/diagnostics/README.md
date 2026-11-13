@@ -172,6 +172,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [relation_already_exists](relation_already_exists.md)
 - [relation_not_found](relation_not_found.md)
 - [require_array](require_array.md)
+- [row_security_requires_table](row_security_requires_table.md)
 - [rule_invalid_definition](rule_invalid_definition.md)
 - [sequence_not_found](sequence_not_found.md)
 - [serial_array](serial_array.md)

@@ -84,5 +84,35 @@
         }
       ]
     }
+  },
+  {
+    "name": "wrong-statement-view",
+    "sql": "ALTER VIEW rls_items ENABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [
+        "row_security_requires_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-statement-sequence",
+    "sql": "ALTER SEQUENCE rls_items ENABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [
+        "row_security_requires_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-statement-index",
+    "sql": "ALTER INDEX rls_items ENABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [
+        "row_security_requires_table"
+      ],
+      "columns": []
+    }
   }
 ]

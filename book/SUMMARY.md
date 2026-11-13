@@ -208,6 +208,7 @@
   - [relation_already_exists](diagnostics/relation_already_exists.md)
   - [relation_not_found](diagnostics/relation_not_found.md)
   - [require_array](diagnostics/require_array.md)
+  - [row_security_requires_table](diagnostics/row_security_requires_table.md)
   - [rule_invalid_definition](diagnostics/rule_invalid_definition.md)
   - [sequence_not_found](diagnostics/sequence_not_found.md)
   - [serial_array](diagnostics/serial_array.md)

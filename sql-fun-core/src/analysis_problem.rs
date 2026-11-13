@@ -88,6 +88,8 @@ fn fragments_text(fragments: &[DiagnosticMessageFragment<'_>]) -> String {
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// Row-security actions were requested through a non-table ALTER statement.
+    RowSecurityRequiresTable,
     /// An invalid CHECK constraint definition.
     Check(CheckProblem),
     /// An invalid serial column declaration.
@@ -220,6 +222,12 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Report a row-security action outside ALTER TABLE.
+    #[must_use]
+    pub const fn row_security_requires_table() -> Self {
+        Self::RowSecurityRequiresTable
+    }
+
     /// Report an invalid `PostgreSQL` serial-family declaration.
     #[must_use]
     pub const fn serial(problem: SerialProblem) -> Self {
@@ -491,6 +499,7 @@ impl AnalysisProblem {
     #[must_use]
     pub fn code(&self) -> &str {
         match self {
+            Self::RowSecurityRequiresTable => "row_security_requires_table",
             Self::IncompatibleEngineVersion(_) => "incompatible_engine_version",
             Self::ParameterTypeUnresolved(_) => "parameter_type_unresolved",
             Self::InferenceCandidateSpaceUnsupported { .. } => {
@@ -566,7 +575,8 @@ impl AnalysisProblem {
     #[must_use]
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
-            Self::IncompatibleEngineVersion(_)
+            Self::RowSecurityRequiresTable
+            | Self::IncompatibleEngineVersion(_)
             | Self::ForeignKeyReferencedPrimaryKeyMissing(_)
             | Self::ParameterTypeUnresolved(_)
             | Self::InferenceCandidateSpaceUnsupported { .. }
@@ -611,6 +621,7 @@ impl AnalysisProblem {
 impl DiagnosticMessage for AnalysisProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::RowSecurityRequiresTable => "row-security actions require ALTER TABLE".to_owned(),
             Self::IncompatibleEngineVersion(problem) => problem.diagnostic_message(),
             Self::InferenceCandidateSpaceUnsupported { operation } => format!(
                 "type inference for {operation} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint"

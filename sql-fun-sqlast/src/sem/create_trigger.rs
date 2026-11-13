@@ -8,7 +8,9 @@ use crate::{
         AnalysisError, AnalysisProblem, ColumnDefinition, ColumnDrop, ColumnRename, ParseContext,
         SemAst, SemScalarExpr, SourcePathWithSpan, TypeReference,
         problem::TriggerProblem,
-        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
+        traversal::{
+            ColumnRenamer, RelationRenamer, SemanticVisitor, SemanticVisitorMut, optional,
+        },
     },
 };
 
@@ -398,6 +400,35 @@ pub struct CreateTrigger {
     source: Option<SourcePathWithSpan>,
 }
 impl CreateTrigger {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.schema_relation_identity(&self.target)?;
+        if let Some(constraint) = &self.constraint
+            && let Some(relation) = &constraint.relation
+        {
+            visitor.schema_relation_identity(relation)?;
+        }
+        for event in &self.events {
+            for column in event.columns() {
+                if column.found() {
+                    visitor.schema_column(&self.target, false, column.name())?;
+                }
+            }
+        }
+        if let Some(predicate) = &self.predicate {
+            predicate.visit(visitor)?;
+        }
+        if let Some(function) = self.body.function_reference() {
+            visitor.schema_function(function.name())?;
+        }
+        for statement in self.body.statements() {
+            statement.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn drop_event_depends_on(
         &self,
         context: &impl ParseContext,

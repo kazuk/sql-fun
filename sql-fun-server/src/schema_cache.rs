@@ -254,6 +254,12 @@ pub struct InitializedSchema {
 }
 
 impl InitializedSchema {
+    /// Whether initialization explicitly loaded the selected application schema dump.
+    #[must_use]
+    pub(crate) const fn has_project_schema(&self) -> bool {
+        self.actual_hash.is_some()
+    }
+
     /// Cache identity, not a session handle.
     #[must_use]
     pub const fn key(&self) -> &SchemaContextKey {

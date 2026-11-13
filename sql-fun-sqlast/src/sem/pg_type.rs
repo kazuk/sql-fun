@@ -130,6 +130,14 @@ where
 }
 
 impl TypeDefinition {
+    pub(crate) fn has_enum_label(&self, label: &str) -> bool {
+        if let Self::Enum(definition) = self {
+            definition.has_label(label)
+        } else {
+            false
+        }
+    }
+
     /// PostgreSQL classification from catalog metadata or verified DDL semantics.
     ///
     /// Missing metadata, unresolved domains, and non-PostgreSQL contexts

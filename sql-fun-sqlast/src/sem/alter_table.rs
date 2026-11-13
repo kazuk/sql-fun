@@ -10,7 +10,7 @@ use crate::{
         AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnDrop, ColumnRename, Constraint,
         ConstraintNames, CreateIndex, CreateSequence, CreateTable, CreateView, OwnerSpecification,
         ParseContext, RelationAlteration, RowSecurityChange, SemScalarExpr, SourcePathWithSpan,
-        problem::ViewProblem,
+        problem::ViewProblem, traversal::SemanticVisitor,
     },
 };
 
@@ -37,6 +37,19 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(target) = &self.resolved_target {
+            visitor.schema_relation_identity(target.full_name())?;
+        }
+        for command in &self.commands {
+            command.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     #[expect(clippy::too_many_arguments)]
     pub(crate) fn column_additions(
         requested: &TableName,
@@ -287,6 +300,18 @@ impl AlterTable {
             .find_map(AlterObjSubCommand::applied_owner)
     }
 
+    pub(crate) fn resolved_commands(
+        requested: &TableName,
+        target: Option<&TableName>,
+        commands: &[AlterObjSubCommand],
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut statement = Self::new(requested, commands, source);
+        statement.resolved_target = target.cloned();
+        statement.applicable &= target.is_some();
+        statement
+    }
+
     pub(crate) fn new(
         table: &TableName,
         commands: &[AlterObjSubCommand],
@@ -314,6 +339,17 @@ pub struct AlterView {
 }
 
 impl AlterView {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.schema_relation(self.view.full_name(), true)?;
+        for command in &self.commands {
+            command.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn new(view: &ViewName, commands: &[AlterObjSubCommand]) -> Self {
         Self {
             view: view.clone(),
@@ -358,6 +394,51 @@ impl AlterObjSubCommand {
             Some(change)
         } else {
             None
+        }
+    }
+
+    fn visit_references<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        match self {
+            Self::SetColumnDefault(_, expression) => expression.visit(visitor),
+            Self::AddConstraint(constraint) => constraint.visit_references(visitor),
+            Self::AddColumn(addition) => {
+                if let Some(definition) = addition.definition() {
+                    definition.visit_references(visitor)?;
+                }
+                for constraint in addition.constraints() {
+                    constraint.visit_references(visitor)?;
+                }
+                Ok(())
+            }
+            Self::AlterColumn(_, definition) => definition.visit_references(visitor),
+            Self::ColumnType(change) => {
+                if change.original().is_some() {
+                    visitor.schema_column(change.table().full_name(), false, change.column())?;
+                }
+                if let Some(target) = change.value().target() {
+                    visitor.schema_type(target)?;
+                }
+                if let Some(expression) = change.value().expression() {
+                    expression.visit(visitor)?;
+                }
+                Ok(())
+            }
+            Self::ColumnDefinition(change) => change.requested().visit_references(visitor),
+            Self::RenameColumn(change) => {
+                if let Some(source) = change.source()
+                    && let Some(column) = source.name()
+                {
+                    visitor.schema_column(change.table().full_name(), false, column)?;
+                }
+                Ok(())
+            }
+            Self::DropColumn(change) => {
+                if change.original().is_some() {
+                    visitor.schema_column(change.table().full_name(), false, change.requested())?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
         }
     }
 

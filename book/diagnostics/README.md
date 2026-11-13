@@ -48,6 +48,9 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 
 ## Codes
 
+- [deprecated](deprecated.md)
+- [duplicate_lint_target](duplicate_lint_target.md)
+- [lint_configuration](lint_configuration.md)
 - [drop_column_dependency](drop_column_dependency.md)
 - [drop_column_last_column](drop_column_last_column.md)
 - [add_column_default](add_column_default.md)

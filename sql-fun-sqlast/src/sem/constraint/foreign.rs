@@ -31,10 +31,59 @@ impl ForeignKeyConstraint {
     ) -> Result<(), AnalysisError> {
         if let Some(table) = self.target_table.relation() {
             visitor.schema_relation(table.full_name(), false)?;
+            if let Some(columns) = &self.target_columns {
+                for column in columns {
+                    visitor.schema_column(table.full_name(), false, column)?;
+                }
+            }
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_foreign_key_reference_traversal {
+    use crate::test_helpers::deprecated_lint;
+
+    #[rstest::rstest]
+    #[case::create_explicit(
+        "CREATE TABLE fresh (x integer, FOREIGN KEY (x) REFERENCES items(id))",
+        true
+    )]
+    #[case::create_primary_key(
+        "CREATE TABLE fresh (x integer, FOREIGN KEY (x) REFERENCES items)",
+        true
+    )]
+    #[case::alter_explicit(
+        "ALTER TABLE items ADD CONSTRAINT fresh FOREIGN KEY (id) REFERENCES items(id)",
+        true
+    )]
+    #[case::alter_primary_key(
+        "ALTER TABLE items ADD CONSTRAINT fresh FOREIGN KEY (id) REFERENCES items",
+        true
+    )]
+    #[case::other_column(
+        "CREATE TABLE fresh (x text, FOREIGN KEY (x) REFERENCES items(legacy))",
+        false
+    )]
+    fn observes_referenced_columns(
+        #[case] sql: &str,
+        #[case] occurred: bool,
+    ) -> testresult::TestResult {
+        let config = deprecated_lint::target("table", "items", Some("id"));
+        let mut pair = deprecated_lint::analyze(sql, &config)?;
+        let observations = pair.lint_deprecated()?;
+        assert_eq!(
+            observations.entries()[0].occurred(),
+            occurred,
+            "{:?}",
+            pair.context().problems()
+        );
+        Ok(())
+    }
+}
+
+impl ForeignKeyConstraint {
     pub(crate) fn validate_added_column_types(
         &mut self,
         context: &mut impl ParseContext,

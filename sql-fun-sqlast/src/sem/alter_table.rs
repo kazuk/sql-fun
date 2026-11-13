@@ -4,7 +4,7 @@ use crate::{
     AstAndContextPair,
     ast::{Statement, StatementNode},
     context::GetSourcePathWithSpan,
-    names::{ColumnName, TableName, ViewName},
+    names::{ColumnName, FullName, TableName, ViewName},
     sem::{
         AlterColumnAttributes, AlterColumnDefinition, AlterColumnType, AnalysisError,
         AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnDrop, ColumnRename, Constraint,
@@ -45,7 +45,12 @@ impl AlterTable {
             visitor.schema_relation_identity(target.full_name())?;
         }
         for command in &self.commands {
-            command.visit_references(visitor)?;
+            command.visit_references(
+                visitor,
+                self.resolved_target
+                    .as_ref()
+                    .map(|target| (target.full_name(), false)),
+            )?;
         }
         Ok(())
     }
@@ -333,7 +338,7 @@ impl AlterView {
     ) -> Result<(), AnalysisError> {
         visitor.schema_relation(self.view.full_name(), true)?;
         for command in &self.commands {
-            command.visit_references(visitor)?;
+            command.visit_references(visitor, Some((self.view.full_name(), true)))?;
         }
         Ok(())
     }
@@ -370,9 +375,33 @@ pub enum AlterObjSubCommand {
 }
 
 impl AlterObjSubCommand {
-    fn visit_references<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+    fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        relation: Option<(&FullName, bool)>,
+    ) -> Result<(), AnalysisError> {
         match self {
-            Self::SetColumnDefault(_, expression) => expression.visit(visitor),
+            Self::ColumnAttributes(change) => {
+                if let Some(definition) = change.binding().definition()
+                    && let Some(column) = definition.name()
+                    && let Some((name, view)) = relation
+                {
+                    visitor.schema_column(name, view, column)?;
+                }
+                Ok(())
+            }
+            Self::SetColumnDefault(column, expression) => {
+                if let Some((name, view)) = relation {
+                    visitor.schema_column(name, view, column)?;
+                }
+                expression.visit(visitor)
+            }
+            Self::DropColumnDefault(column) => {
+                if let Some((name, view)) = relation {
+                    visitor.schema_column(name, view, column)?;
+                }
+                Ok(())
+            }
             Self::AddConstraint(constraint) => constraint.visit_references(visitor),
             Self::AddColumn(addition) => {
                 if let Some(definition) = addition.definition() {
@@ -414,7 +443,69 @@ impl AlterObjSubCommand {
             _ => Ok(()),
         }
     }
+}
 
+#[cfg(test)]
+mod test_alter_column_reference_traversal {
+    use crate::test_helpers::deprecated_lint;
+
+    #[rstest::rstest]
+    #[case::not_null(
+        "ALTER TABLE items ALTER COLUMN legacy SET NOT NULL",
+        "table",
+        "items",
+        true
+    )]
+    #[case::drop_not_null(
+        "ALTER TABLE items ALTER COLUMN legacy DROP NOT NULL",
+        "table",
+        "items",
+        true
+    )]
+    #[case::set_default(
+        "ALTER TABLE items ALTER COLUMN legacy SET DEFAULT 'x'",
+        "table",
+        "items",
+        true
+    )]
+    #[case::view_set_default(
+        "ALTER VIEW old_view ALTER COLUMN legacy SET DEFAULT 'x'",
+        "view",
+        "old_view",
+        true
+    )]
+    #[case::view_drop_default(
+        "ALTER VIEW old_view ALTER COLUMN legacy DROP DEFAULT",
+        "view",
+        "old_view",
+        true
+    )]
+    #[case::missing_column(
+        "ALTER TABLE items ALTER COLUMN absent SET NOT NULL",
+        "table",
+        "items",
+        false
+    )]
+    fn observes_destination_column(
+        #[case] sql: &str,
+        #[case] kind: &str,
+        #[case] name: &str,
+        #[case] occurred: bool,
+    ) -> testresult::TestResult {
+        let config = deprecated_lint::target(kind, name, Some("legacy"));
+        let mut pair = deprecated_lint::analyze(sql, &config)?;
+        let observations = pair.lint_deprecated()?;
+        assert_eq!(
+            observations.entries()[0].occurred(),
+            occurred,
+            "{:?}",
+            pair.context().problems()
+        );
+        Ok(())
+    }
+}
+
+impl AlterObjSubCommand {
     fn declaration_can_apply(&self) -> bool {
         match self {
             Self::ColumnAttributes(change) => change.can_apply(),

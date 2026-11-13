@@ -12,8 +12,8 @@ use crate::{
         AlterColumnDefinition, AlterColumnType, AlterIndex, AlterObjSubCommand, AlterSequence,
         AlterTable, AlterView, AnalysisError, AnalysisProblem, ColumnAddition,
         ColumnAttributeAction, ColumnDrop, ColumnRename, EngineFeatureValidation, IndexAlteration,
-        Kind, ResolutionFailure, SemAst, SourcePathWithSpan, problem::ViewProblem,
-        search_path::expand_relation_search_path,
+        Kind, ResolutionFailure, RowSecurityChange, SemAst, SourcePathWithSpan,
+        problem::ViewProblem, search_path::expand_relation_search_path,
     },
 };
 
@@ -104,6 +104,9 @@ impl RelationAlteration {
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
+        if RowSecurityChange::is_ast_relation(ast) {
+            return RowSecurityChange::analyze_relation(ast, context, source);
+        }
         if ast.kind().supports_table_column_attributes() && ColumnDrop::is_ast_relation(ast) {
             return ColumnDrop::analyze_relation(ast, context, source);
         }

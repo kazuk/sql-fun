@@ -359,6 +359,8 @@ pub struct CreateTable {
     drop_statements: Vec<DropTable>,
     owner: Option<OwnerSpecification>,
     cluster_on: Option<String>,
+    row_security_enabled: bool,
+    row_security_forced: bool,
     constraints: HashMap<String, Constraint>,
     mode: CreateTableMode,
     temporary: bool,
@@ -616,6 +618,8 @@ impl CreateTable {
             drop_statements: Default::default(),
             owner: Default::default(),
             cluster_on: Default::default(),
+            row_security_enabled: false,
+            row_security_forced: false,
             constraints: Default::default(),
             mode,
             temporary,
@@ -717,6 +721,17 @@ impl CreateTable {
         }
     }
 
+    /// Whether `PostgreSQL` row-level security is enabled on this table.
+    pub const fn row_security_enabled(&self) -> bool {
+        self.row_security_enabled
+    }
+
+    /// Whether the table owner is subject to row-level security when enabled.
+    /// This flag remains independent of whether row-level security is enabled.
+    pub const fn row_security_forced(&self) -> bool {
+        self.row_security_forced
+    }
+
     /// apply `alter table` statement
     pub fn apply_alter(
         &mut self,
@@ -729,6 +744,10 @@ impl CreateTable {
         let mut implicit_changes = Vec::new();
         for cmd in alter_table.commands() {
             match cmd {
+                AlterObjSubCommand::RowSecurity(change) => change.action().apply(
+                    &mut self.row_security_enabled,
+                    &mut self.row_security_forced,
+                ),
                 AlterObjSubCommand::ColumnDefinition(_) | AlterObjSubCommand::ColumnType(_) => {
                     todo!("ALTER COLUMN TYPE catalog application (#1057)")
                 }

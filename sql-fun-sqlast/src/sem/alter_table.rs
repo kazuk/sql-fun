@@ -9,7 +9,8 @@ use crate::{
         AlterColumnAttributes, AlterColumnDefinition, AlterColumnType, AnalysisError,
         AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnDrop, ColumnRename, Constraint,
         ConstraintNames, CreateIndex, CreateSequence, CreateTable, CreateView, OwnerSpecification,
-        ParseContext, RelationAlteration, SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
+        ParseContext, RelationAlteration, RowSecurityChange, SemScalarExpr, SourcePathWithSpan,
+        problem::ViewProblem,
     },
 };
 
@@ -125,6 +126,18 @@ mod analysis_only_tests {
 }
 
 impl AlterTable {
+    pub(crate) fn row_security(
+        table: &TableName,
+        target: Option<&TableName>,
+        commands: &[AlterObjSubCommand],
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut statement = Self::new(table, commands, source);
+        statement.resolved_target = target.cloned();
+        statement.applicable &= target.is_some();
+        statement
+    }
+
     pub(crate) fn analyzed_drops(
         table: &TableName,
         target: Option<&TableName>,
@@ -311,6 +324,8 @@ impl AlterView {
 
 #[derive(Debug, Clone)]
 pub enum AlterObjSubCommand {
+    /// Completed row-security action and target outcome.
+    RowSecurity(RowSecurityChange),
     /// An analyzed PostgreSQL column-attribute operation.
     ColumnAttributes(Box<AlterColumnAttributes>),
     /// Analyzed column type conversion, without catalog application.
@@ -333,8 +348,22 @@ pub enum AlterObjSubCommand {
 }
 
 impl AlterObjSubCommand {
+    pub(crate) fn row_security(change: &RowSecurityChange) -> Self {
+        Self::RowSecurity(change.clone())
+    }
+
+    /// Analyzed row-security operation, including skipped and rejected targets.
+    pub const fn row_security_change(&self) -> Option<&RowSecurityChange> {
+        if let Self::RowSecurity(change) = self {
+            Some(change)
+        } else {
+            None
+        }
+    }
+
     fn declaration_can_apply(&self) -> bool {
         match self {
+            Self::RowSecurity(change) => change.can_apply(),
             Self::ColumnAttributes(change) => change.can_apply(),
             Self::ColumnType(change) => change.is_valid(),
             Self::DropColumn(change) => change.is_locally_applicable(),

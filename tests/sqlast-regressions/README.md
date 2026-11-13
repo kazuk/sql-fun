@@ -480,3 +480,11 @@ query-analysis route calls `SemAst::from_ast`, which also attempts catalog
 application; successful DROP application remains #1076. Post-drop project-schema
 and result-column fixtures therefore belong to that follow-up, rather than
 sending applicable DROP statements to the shared regression server now.
+
+Issue #538 adds `row-security` on PostgreSQL 17/18 through both source and
+installed checks. The project schema applies all four row-security operations;
+CLI cases verify legal actions, missing/invalid-target diagnostics and subsequent
+SELECT result shape. Rust schema-chain tests retain the semantic actions,
+completed target outcomes and independently observable enabled/forced catalog
+flags, including operation sequences. These checks do not evaluate row policies
+or runtime permissions.

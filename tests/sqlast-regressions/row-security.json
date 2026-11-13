@@ -1,0 +1,88 @@
+[
+  {
+    "name": "enable",
+    "sql": "ALTER TABLE rls_items ENABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "disable",
+    "sql": "ALTER TABLE rls_items DISABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "force",
+    "sql": "ALTER TABLE rls_items FORCE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "no-force",
+    "sql": "ALTER TABLE rls_items NO FORCE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "combined",
+    "sql": "ALTER TABLE rls_items ENABLE ROW LEVEL SECURITY, FORCE ROW LEVEL SECURITY, DISABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing",
+    "sql": "ALTER TABLE missing_rls ENABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [
+        "table_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-if-exists",
+    "sql": "ALTER TABLE IF EXISTS missing_rls ENABLE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-view",
+    "sql": "ALTER TABLE IF EXISTS rls_view FORCE ROW LEVEL SECURITY",
+    "expected": {
+      "diagnostics": [
+        "table_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "subsequent-select-shape",
+    "sql": "SELECT a FROM rls_items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

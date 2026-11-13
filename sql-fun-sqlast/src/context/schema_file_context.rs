@@ -14,6 +14,8 @@ mod func_info;
 mod name_identity_tests;
 mod object_info;
 mod ownership;
+#[cfg(test)]
+mod row_security_tests;
 mod sequence_info;
 mod table_info;
 mod table_rename;

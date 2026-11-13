@@ -31,7 +31,7 @@ use crate::{
         AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename, DeleteRowColumn,
         DeleteRowVersion, SemScalarExpr, TypeReference, WildcardQualifiers, WildcardRewriteError,
         data_source::MergeRecordRole, query_access::AccessColumn as QueryAccessAccessColumn,
-        scalar_expr::SemScalarExprNode,
+        scalar_expr::SemScalarExprNode, traversal::SemanticVisitor,
     },
 };
 
@@ -555,5 +555,34 @@ impl ColumnReferenceExpr {
             vec![alias.to_owned(), column.to_string()]
         };
         Ok(Expr::projection_column(&Name::from_parts(&parts)))
+    }
+}
+
+impl ColumnReferenceExpr {
+    pub(crate) fn visit_reference<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::TableColumn(value) => {
+                if let Some(column) = value.bound_column() {
+                    visitor.schema_column(value.relation(), false, column)?;
+                }
+            }
+            Self::ViewColumn(value) => {
+                if let Some(definition) = value.get_column_def()
+                    && let Some(column) = definition.name()
+                {
+                    visitor.schema_column(value.access_relation(), true, column)?;
+                }
+            }
+            Self::SystemColumn(value) => {
+                visitor.schema_column(value.relation(), false, value.attribute())?
+            }
+            Self::DeleteRow(value) => value.source().visit_reference(visitor)?,
+            Self::MergeRecord(value) => value.source().visit_reference(visitor)?,
+            _ => {}
+        }
+        Ok(())
     }
 }

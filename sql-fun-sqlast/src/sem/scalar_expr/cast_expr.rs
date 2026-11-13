@@ -140,6 +140,7 @@ impl TypeCastExpr {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        self.resolution.visit_type(visitor)?;
         self.arg.visit(visitor)?;
         Ok(())
     }
@@ -154,6 +155,7 @@ impl ImplicitCastExpr {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.schema_type(&self.cast_target)?;
         self.value.visit(visitor)?;
         Ok(())
     }

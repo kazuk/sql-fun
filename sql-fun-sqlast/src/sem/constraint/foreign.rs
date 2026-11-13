@@ -3,7 +3,8 @@ use crate::{
     context::ParseContext,
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnRename, CreateTable, ForeignKeyTarget, ImplicitChange,
+        AnalysisError, AnalysisProblem, ColumnRename, CreateTable, ForeignKeyTarget,
+        ImplicitChange, traversal::SemanticVisitor,
     },
 };
 
@@ -24,6 +25,16 @@ pub struct ForeignKeyConstraint {
 }
 
 impl ForeignKeyConstraint {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(table) = self.target_table.relation() {
+            visitor.schema_relation(table.full_name(), false)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_added_column_types(
         &mut self,
         context: &mut impl ParseContext,

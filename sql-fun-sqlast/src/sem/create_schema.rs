@@ -1,7 +1,10 @@
 use crate::{
     CacheContext,
     ast::Schema,
-    sem::{AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst},
+    sem::{
+        AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst,
+        traversal::SemanticVisitor,
+    },
 };
 
 /// Analyzed CREATE SCHEMA statement.
@@ -11,11 +14,20 @@ pub struct CreateSchema {
 
     owner: Option<OwnerSpecification>,
     name: String,
-    #[expect(dead_code)]
     elements: Vec<SemAst>,
 }
 
 impl CreateSchema {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for statement in &self.elements {
+            statement.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) const fn if_not_exists(&self) -> bool {
         self.if_not_exists
     }

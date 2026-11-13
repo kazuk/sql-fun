@@ -148,6 +148,7 @@ impl TableDataSource {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.schema_relation(self.name.full_name(), false)?;
         visitor.table_binding(&self.name);
         visitor.source_binding(self.name.full_name(), &self.alias);
         visitor.relation_identity(self.name.full_name());

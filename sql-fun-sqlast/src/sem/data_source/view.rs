@@ -126,6 +126,7 @@ impl ViewDataSource {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.schema_relation(self.view.full_name(), true)?;
         visitor.source_binding(self.view.full_name(), &self.alias);
         visitor.relation_identity(self.view.full_name());
         visitor.relation(None, self.alias.name().as_str(), &[]);

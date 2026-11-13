@@ -7,7 +7,7 @@ use crate::{
         AnalysisError, AnalysisProblem, ColumnRename, ParseContext, SelectStatement, SemAst,
         SemScalarExpr, SourcePathWithSpan, ViewColumnLineage,
         problem::RuleProblem,
-        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
+        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitor, SemanticVisitorMut},
         view_write::WriteEvent,
     },
 };
@@ -159,6 +159,20 @@ pub struct CreateRule {
     select_lineage: Option<ViewColumnLineage>,
 }
 impl CreateRule {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.schema_relation_identity(self.target())?;
+        if let Some(predicate) = &self.predicate {
+            predicate.visit(visitor)?;
+        }
+        for statement in &self.actions {
+            statement.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         if let Some(lineage) = &mut self.select_lineage
             && let Some(action) = self.actions.first()

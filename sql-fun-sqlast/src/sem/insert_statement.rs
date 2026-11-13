@@ -143,6 +143,7 @@ impl InsertStatement {
         result
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.schema_relation(self.target().full_name(), self.view_support.is_some())?;
         visitor.relation_identity(self.target().full_name());
         visitor.enter_query();
         let result = self.visit_body(visitor);

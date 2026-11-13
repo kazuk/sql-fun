@@ -5,7 +5,7 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AnalysisError, CatalogNameLookup, ColumnCollection, ColumnDefinition, DeclarationCollation,
-        Nullable, OwnerSpecification, TypeReference, WithTypmod,
+        Nullable, OwnerSpecification, TypeReference, WithTypmod, traversal::SemanticVisitor,
     },
 };
 use std::convert::Infallible;
@@ -65,6 +65,15 @@ pub struct CreateCompositeType {
 }
 
 impl CreateCompositeType {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.fields
+            .get_column_collection()
+            .visit_references(visitor)
+    }
+
     pub(crate) fn declarations_can_apply(&self) -> bool {
         self.fields.declarations_can_apply()
     }

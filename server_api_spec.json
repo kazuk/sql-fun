@@ -470,6 +470,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Project lint finding or configuration warning.",
+                  "type": "object",
+                  "properties": {
+                    "Lint": {
+                      "$ref": "#/$defs/LintProblem"
+                    }
+                  },
+                  "required": [
+                    "Lint"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An invalid CHECK constraint definition.",
                   "type": "object",
                   "properties": {
@@ -1242,6 +1255,95 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "LintProblem": {
+              "description": "Structured warning produced by project semantic linting.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/LintProblemKind"
+                },
+                "target": {
+                  "$ref": "#/$defs/LintTarget"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "span": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StringSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "target",
+                "reason"
+              ]
+            },
+            "LintProblemKind": {
+              "type": "string",
+              "enum": [
+                "Deprecated",
+                "Configuration",
+                "Duplicate"
+              ]
+            },
+            "LintTarget": {
+              "description": "Structured target facts for a project lint diagnostic.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "column": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "name"
+              ]
+            },
+            "StringSpan": {
+              "description": "Statement-relative byte range retained by analysis.",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "len": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "len"
               ]
             },
             "CheckProblem": {
@@ -2326,26 +2428,6 @@
                   ],
                   "additionalProperties": false
                 }
-              ]
-            },
-            "StringSpan": {
-              "description": "Statement-relative byte range retained by analysis.",
-              "type": "object",
-              "properties": {
-                "offset": {
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                },
-                "len": {
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                }
-              },
-              "required": [
-                "offset",
-                "len"
               ]
             },
             "CreationProblem": {
@@ -4993,6 +5075,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Project lint finding or configuration warning.",
+                  "type": "object",
+                  "properties": {
+                    "Lint": {
+                      "$ref": "#/$defs/LintProblem"
+                    }
+                  },
+                  "required": [
+                    "Lint"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An invalid CHECK constraint definition.",
                   "type": "object",
                   "properties": {
@@ -5765,6 +5860,95 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "LintProblem": {
+              "description": "Structured warning produced by project semantic linting.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/LintProblemKind"
+                },
+                "target": {
+                  "$ref": "#/$defs/LintTarget"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "span": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StringSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "target",
+                "reason"
+              ]
+            },
+            "LintProblemKind": {
+              "type": "string",
+              "enum": [
+                "Deprecated",
+                "Configuration",
+                "Duplicate"
+              ]
+            },
+            "LintTarget": {
+              "description": "Structured target facts for a project lint diagnostic.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "column": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "name"
+              ]
+            },
+            "StringSpan": {
+              "description": "Statement-relative byte range retained by analysis.",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "len": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "len"
               ]
             },
             "CheckProblem": {
@@ -6849,26 +7033,6 @@
                   ],
                   "additionalProperties": false
                 }
-              ]
-            },
-            "StringSpan": {
-              "description": "Statement-relative byte range retained by analysis.",
-              "type": "object",
-              "properties": {
-                "offset": {
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                },
-                "len": {
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                }
-              },
-              "required": [
-                "offset",
-                "len"
               ]
             },
             "CreationProblem": {

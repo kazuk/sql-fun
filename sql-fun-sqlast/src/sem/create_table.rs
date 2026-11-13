@@ -14,7 +14,7 @@ use crate::{
         TriggerReferences, TypeReference,
         alter_table::AlterObjSubCommand,
         problem::CreationProblem,
-        traversal::{RelationRenamer, SemanticVisitorMut},
+        traversal::{RelationRenamer, SemanticVisitor, SemanticVisitorMut},
     },
 };
 use std::collections::HashMap;
@@ -26,6 +26,16 @@ mod column_def;
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for column in &self.0 {
+            column.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn check_scope_columns(&self) -> Self {
         // Bind CHECK to row fields, not recursively retained column CHECK bodies.
         Self(
@@ -402,6 +412,17 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.columns.visit_references(visitor)?;
+        for constraint in self.constraints.values() {
+            constraint.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn for_alter_analysis(&self, target: &TableName) -> Self {
         let mut table = self.clone();
         table.name = target.clone();

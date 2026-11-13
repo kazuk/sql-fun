@@ -189,14 +189,16 @@ impl RelationAlteration {
             return AnalysisError::raise_unexpected_none("source span");
         };
         let table = TableName::from(name.clone());
-        if context.get_table(&table).is_none() {
+        let target = context.resolve_table_name(&table);
+        if target.is_none() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(&table))?;
         }
         let mut commands = Vec::new();
         for command in syntax_commands {
             commands.push(AlterObjSubCommand::from_ast(command, context, &table)?);
         }
-        let mut statement = AlterTable::new(&table, &commands, source);
+        let mut statement =
+            AlterTable::resolved_commands(&table, target.as_ref(), &commands, source);
         statement.validate_check_names(context)?;
         Ok(SemAst::alter_table(&statement))
     }
@@ -207,16 +209,25 @@ impl RelationAlteration {
         syntax_commands: &[AstAlterCommand],
         materialized: bool,
     ) -> Result<SemAst, AnalysisError> {
-        let view = ViewName::from_full_name(name);
-        let valid = context
-            .get_view(&view)
-            .is_some_and(|definition| definition.is_materialized() == materialized);
-        if !valid {
-            context.report_analysis_problem(AnalysisProblem::view(
-                &ViewProblem::invalid_target(name),
-            ))?;
-            return Ok(SemAst::unresolved_statement());
-        }
+        let resolved = expand_relation_search_path(context, name, |key| {
+            context.get_view_impl(key)?;
+            Some(key.clone())
+        });
+        let view = match resolved {
+            Some(name)
+                if context
+                    .get_view_impl(&name)
+                    .is_some_and(|definition| definition.is_materialized() == materialized) =>
+            {
+                ViewName::from_full_name(&name)
+            }
+            _ => {
+                context.report_analysis_problem(AnalysisProblem::view(
+                    &ViewProblem::invalid_target(name),
+                ))?;
+                return Ok(SemAst::unresolved_statement());
+            }
+        };
         let commands = syntax_commands
             .iter()
             .map(|command| AlterObjSubCommand::from_ast_owner(command, context))

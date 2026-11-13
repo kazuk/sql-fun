@@ -37,6 +37,16 @@ pub enum QueryNameResolution {
     Ambiguous,
 }
 impl QueryNameResolution {
+    pub(crate) fn visit_type<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Type(reference) = self {
+            visitor.schema_type(reference)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Self::Type(reference) = self {
             reference.rename_relation(old, new);

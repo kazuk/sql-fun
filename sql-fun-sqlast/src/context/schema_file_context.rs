@@ -65,6 +65,7 @@ use std::path::{Path, PathBuf};
 /// rendering state. Schema-file loaders retain problems on their parsed result.
 #[derive(Debug)]
 pub struct SchemaFileContext {
+    lint_configuration: ::sql_fun_core::LintConfigurations,
     catalog: SchemaCatalog,
     statement_span: StringSpan,
     source_access_service: Option<Box<dyn SourceAccessService>>,
@@ -114,6 +115,11 @@ pub(super) struct SchemaCatalog {
 }
 
 impl SchemaFileContext {
+    /// Supply immutable declarations for explicit project lint traversal.
+    pub fn set_lint_configuration(&mut self, configuration: &::sql_fun_core::LintConfigurations) {
+        self.lint_configuration = configuration.clone();
+    }
+
     /// Create a context with explicit current-analysis configuration.
     ///
     /// The frozen base supplies catalog data only. Its retained configuration is
@@ -173,6 +179,7 @@ impl SchemaFileContext {
                 objects: TrieMap::default(),
                 source: None,
             },
+            lint_configuration: Default::default(),
             statement_span: StringSpan::default(),
             source_access_service: None,
             diagnostic_source: None,
@@ -864,6 +871,9 @@ mod test_parameter_type_hint_write {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn lint_configuration(&self) -> &::sql_fun_core::LintConfigurations {
+        &self.lint_configuration
+    }
     fn apply_creation_group<F>(
         mut self,
         operation: F,

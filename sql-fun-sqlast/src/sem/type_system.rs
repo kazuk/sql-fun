@@ -14,8 +14,8 @@ pub use self::{
 use crate::{
     names::TableName,
     sem::{
-        pg_type::TypeReference as PgTypeTypeReference,
-        scalar_expr::SemScalarExpr as ScalarExprSemScalarExpr,
+        AnalysisError, pg_type::TypeReference as PgTypeTypeReference,
+        scalar_expr::SemScalarExpr as ScalarExprSemScalarExpr, traversal::SemanticVisitor,
     },
 };
 
@@ -110,6 +110,19 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(reference) = &self.ret_type {
+            visitor.schema_type(reference)?;
+        }
+        for parameter in &self.params {
+            parameter.visit_references(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Some(ty) = &mut self.ret_type {
             ty.rename_relation(old, new);

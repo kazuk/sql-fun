@@ -16,6 +16,10 @@ pub struct CreateEnum {
 }
 
 impl CreateEnum {
+    pub(crate) fn has_label(&self, label: &str) -> bool {
+        self.values.iter().any(|value| value.name == label)
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     /// Ownership is catalog state: it is omitted from the existing serialized
     /// type format and does not affect SQL type equality or hashing.

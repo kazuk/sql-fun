@@ -18,6 +18,7 @@ use crate::{
         AnalysisError, ColumnCollection, ParseContext, ScalarAnalysisContext, SemScalarExpr,
         TypeReference,
         create_comp_type::CompositeFieldDefinition,
+        traversal::SemanticVisitor,
         type_system::{
             ArgumentBindingCollection, CommonInferContext, SimpleInferContext, SimpleInferResult,
             TypeError,
@@ -104,6 +105,19 @@ mod test_function_param_display {
 }
 
 impl FunctionParam {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(reference) = self.get_type() {
+            visitor.schema_type(reference)?;
+        }
+        if let Some(expression) = self.default_expression() {
+            expression.visit(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         match self {
             Self::In(value) => value.rename_relation(old, new),

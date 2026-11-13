@@ -1441,6 +1441,9 @@ impl SemScalarExpr {
         visitor.expression(self)
     }
     fn visit_body<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        if let Self::ColumnRef(reference) = self {
+            reference.visit_reference(visitor)?;
+        }
         visitor.enter_expression(self)?;
         match self {
             Self::SourceColumn(value) => value.visit(visitor)?,
@@ -1771,6 +1774,9 @@ impl SemScalarExpr {
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        if let Self::ColumnRef(reference) = self {
+            reference.visit_reference(visitor)?;
+        }
         if let Self::Indirection(target) = self {
             target.visit_assignment_target(visitor)?;
         }

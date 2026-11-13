@@ -11,6 +11,7 @@ mod engine_version;
 mod facts;
 mod index;
 mod insert;
+mod lint;
 mod membership;
 mod message;
 mod min_max;
@@ -44,6 +45,7 @@ pub use self::{
     },
     index::{IndexProblem, IndexProblemKind},
     insert::{InsertProblem, InsertProblemKind},
+    lint::{LintProblem, LintTarget},
     membership::MembershipProblem,
     min_max::MinMaxProblem,
     name_resolution::{DomainBaseTypeNameNotFound, FunctionNotFound, NameResolution},
@@ -88,6 +90,8 @@ fn fragments_text(fragments: &[DiagnosticMessageFragment<'_>]) -> String {
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// Project lint finding or configuration warning.
+    Lint(LintProblem),
     /// An invalid CHECK constraint definition.
     Check(CheckProblem),
     /// An invalid serial column declaration.
@@ -220,6 +224,12 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Wrap a structured project lint warning.
+    #[must_use]
+    pub fn lint(problem: &LintProblem) -> Self {
+        Self::Lint(problem.clone())
+    }
+
     /// Report an invalid `PostgreSQL` serial-family declaration.
     #[must_use]
     pub const fn serial(problem: SerialProblem) -> Self {
@@ -276,7 +286,7 @@ impl AnalysisProblem {
         match self {
             Self::AlterColumn(problem) => problem.reason().severity(),
             Self::Index(problem) => problem.severity(),
-            Self::UnreachableCoalesceArgument(..) => DiagnosticSeverity::Warning,
+            Self::Lint(_) | Self::UnreachableCoalesceArgument(..) => DiagnosticSeverity::Warning,
             _ => DiagnosticSeverity::Error,
         }
     }
@@ -491,6 +501,7 @@ impl AnalysisProblem {
     #[must_use]
     pub fn code(&self) -> &str {
         match self {
+            Self::Lint(problem) => problem.code(),
             Self::IncompatibleEngineVersion(_) => "incompatible_engine_version",
             Self::ParameterTypeUnresolved(_) => "parameter_type_unresolved",
             Self::InferenceCandidateSpaceUnsupported { .. } => {
@@ -556,6 +567,7 @@ impl AnalysisProblem {
     #[must_use]
     pub fn statement_relative_span(&self) -> Option<StringSpan> {
         match self {
+            Self::Lint(problem) => problem.span(),
             Self::NameResolution(problem) => problem.statement_relative_span(),
             Self::CallArgument(problem) => problem.statement_relative_span(),
             _ => None,
@@ -566,6 +578,7 @@ impl AnalysisProblem {
     #[must_use]
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
+            Self::Lint(problem) => problem.render_metadata(),
             Self::IncompatibleEngineVersion(_)
             | Self::ForeignKeyReferencedPrimaryKeyMissing(_)
             | Self::ParameterTypeUnresolved(_)
@@ -611,6 +624,7 @@ impl AnalysisProblem {
 impl DiagnosticMessage for AnalysisProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::Lint(problem) => problem.diagnostic_message(),
             Self::IncompatibleEngineVersion(problem) => problem.diagnostic_message(),
             Self::InferenceCandidateSpaceUnsupported { operation } => format!(
                 "type inference for {operation} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint"

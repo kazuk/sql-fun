@@ -37,6 +37,7 @@ mod data_source;
 mod declaration_collation;
 mod def_elem;
 mod delete_statement;
+mod deprecated_lint;
 mod drop_rule_ast;
 mod drop_trigger;
 mod engine_features;
@@ -66,6 +67,7 @@ mod sem_ast_analysis;
 mod source_flag;
 mod top_level_statement;
 pub(crate) mod traversal;
+pub use self::deprecated_lint::{DeprecatedObservation, DeprecatedObservations};
 pub(crate) mod type_system;
 mod update_statement;
 mod variable_set;
@@ -392,6 +394,63 @@ pub enum SemAst {
 }
 
 impl SemAst {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::SelectStatement(query) => query.visit(visitor),
+            Self::InsertStatement(insert) => insert.visit(visitor),
+            Self::UpdateStatement(update) => update.visit(visitor),
+            Self::DeleteStatement(delete) => delete.visit(visitor),
+            Self::MergeStatement(merge) => merge.visit(visitor),
+            Self::CreateView(view) => view.query().visit(visitor),
+            Self::CreateTableAs(table) => table.query().visit(visitor),
+            Self::AlterTable(table) => table.visit_references(visitor),
+            Self::AlterView(view) => view.visit_references(visitor),
+            Self::AlterOwner(owner) => owner.visit_references(visitor),
+            Self::CreateSequence(sequence) => {
+                if let Some(table) = sequence.owned_by() {
+                    visitor.schema_relation(table.full_name(), false)?;
+                }
+                Ok(())
+            }
+            Self::AlterSequence(sequence) => {
+                if let Some(dependency) = sequence.owned_by()
+                    && let Some(table) = dependency.relation()
+                {
+                    visitor.schema_relation(table.full_name(), false)?;
+                }
+                Ok(())
+            }
+            Self::DropRule(rule) => {
+                if let Some(identity) = rule.identity() {
+                    visitor.schema_relation_identity(identity.target())?;
+                }
+                Ok(())
+            }
+            Self::DropTrigger(trigger) => {
+                if let Some(target) = trigger.target() {
+                    visitor.schema_relation_identity(target)?;
+                }
+                Ok(())
+            }
+            Self::CreateSchema(schema) => schema.visit_references(visitor),
+            Self::CreateRule(rule) => rule.visit_references(visitor),
+            Self::CreateTrigger(trigger) => trigger.visit_references(visitor),
+            Self::CreateTable(table) => table.visit_references(visitor),
+            Self::CreateCompType(composite) => composite.visit_references(visitor),
+            Self::CreateIndex(index) => index.visit_references(visitor),
+            Self::CreateFunction(function) => function.visit_references(visitor),
+            Self::CreateDomain(domain) => {
+                if let Some(reference) = domain.base_type() {
+                    visitor.schema_type(reference)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
     pub(crate) fn walk_nested_command<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,

@@ -30,7 +30,7 @@ pub use self::{
 };
 use crate::{
     names::{ColumnName, TableName},
-    sem::{AnalysisError, ColumnRename, traversal::SemanticVisitorMut},
+    sem::{AnalysisError, ColumnRename, traversal::SemanticVisitor, traversal::SemanticVisitorMut},
 };
 
 /// common behavior for column constraints
@@ -77,6 +77,19 @@ pub enum ColumnConstraint {
 }
 
 impl ColumnConstraint {
+    pub(crate) fn visit_references<V: SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Default(value) => value.expr().visit(visitor),
+            Self::Generated(value) => value.expression().visit(visitor),
+            Self::Check(value) => value.expr().visit(visitor),
+            Self::ForeignKey(value) => value.visit_references(visitor),
+            _ => Ok(()),
+        }
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         match self {
             Self::Nullability(value) => value.rename_column(rename, owned),

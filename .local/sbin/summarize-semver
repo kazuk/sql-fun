@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Render an existing release-intent report for the Actions job summary."""
+import argparse
+import html
+import json
+from pathlib import Path
+import re
+
+
+MAX_BYTES = 128 * 1024
+
+
+def code(value):
+    text = ' '.join(str(value).split())
+    if len(text) > 500:
+        text = text[:500] + '… [truncated]'
+    return '<code>' + html.escape(text).replace('|', '&#124;') + '</code>'
+
+
+def excerpt(text):
+    lines = text.strip().splitlines()
+    sample = '\n'.join(lines[:12])
+    truncated = len(lines) > 12 or len(sample) > 3000
+    return '<pre>' + html.escape(sample[:3000]) + ('\n[truncated]' if truncated else '') + '</pre>\n\n'
+
+
+def findings(diagnostics):
+    """Read presentation blocks only; the validator owns all impact decisions."""
+    headers = list(re.finditer(r'^--- (failure|warning) (\w+): (.*?) ---\s*$', diagnostics, re.M))
+    for index, header in enumerate(headers):
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(diagnostics)
+        body = diagnostics[header.end():end]
+        affected = re.search(r'^(?:Failed|Warned) in:\s*\n(.*?)(?:\n\s*\n|\Z)', body, re.M | re.S)
+        rows = tuple(line.strip() for line in affected[1].splitlines() if line.strip()) if affected else ()
+        yield (*header.groups(), rows), body
+
+
+def comparison_details(comparisons):
+    grouped = {}
+    other = []
+    for comparison in comparisons:
+        result = comparison['result']
+        label = f'{comparison["configuration"]} ({comparison["kind"]})'
+        diagnostics = result.get('semver', {}).get('diagnostics', '')
+        blocks = list(findings(diagnostics))
+        for key, body in blocks:
+            entry = grouped.setdefault(key, dict(configurations=[], body=body))
+            if label not in entry['configurations']:
+                entry['configurations'].append(label)
+        diff = result.get('diff', {})
+        changes = {kind: diff.get(kind, []) for kind in ('added', 'removed', 'changed')}
+        if any(changes.values()) or not blocks:
+            details = f'- {code(label)}: public API changes: ' + ', '.join(
+                f'{kind}={len(items)}' for kind, items in changes.items()) + '.\n'
+            # Only sample the inventory when no lint explains the change.
+            for kind in ('removed', 'changed', 'added'):
+                if changes[kind] and not blocks:
+                    details += f'  - {kind}, example: {code(changes[kind][0])}\n'
+            if not blocks and diagnostics and result.get('impact') != 'patch':
+                details += '\nAnalyzer excerpt (no recognized finding block):\n\n' + excerpt(diagnostics)
+            other.append(details)
+        if result.get('removed_features'):
+            other.append(f'- {code(label)}: removed features: '
+                         + ', '.join(code(f) for f in result['removed_features']) + '.\n')
+    sections = []
+    for (severity, lint, title, rows), entry in list(grouped.items())[:10]:
+        details = f'- **{code(lint)}** ({severity}): {html.escape(title)}\n'
+        description = re.search(r'^Description:\s*\n(.*?)(?:^\s*(?:ref|impl):|\n\s*\n|\Z)',
+                                entry['body'], re.M | re.S)
+        if description:
+            explanation = ' '.join(description[1].split())
+            details += '  - ' + html.escape(explanation[:700]) + ('… [truncated]' if len(explanation) > 700 else '') + '\n'
+        details += '  - Configurations: ' + ', '.join(code(c) for c in entry['configurations'][:20]) + '.\n'
+        if len(entry['configurations']) > 20:
+            details += '  - Additional configurations omitted; see the full report.\n'
+        if rows:
+            details += f'  - Affected entries: **{len(rows)}**.\n'
+            details += ''.join(f'  - {code(row)}\n' for row in rows[:3])
+            if len(rows) > 3:
+                details += f'  - {len(rows) - 3} additional entries in the full report.\n'
+        else:
+            details += '\nFinding excerpt (unrecognized affected-API layout):\n\n' + excerpt(entry['body'])
+        sections.append(details + '\n')
+    sections.extend(other[:10])
+    if len(grouped) > 10 or len(other) > 10:
+        sections.append('\nAdditional evidence omitted; see the full report.\n')
+    return ''.join(sections)
+
+
+def crate_details(crate, comparisons):
+    details = f'### {code(crate["package"])}: {code(crate["declared"])} → {code(crate["impact"])}\n\n'
+    details += comparison_details([c for c in comparisons if c['package'] == crate['package']])
+    details += '\nConfiguration and coverage evidence:\n\n'
+    for evidence in crate['evidence'][:20]:
+        details += (f'- {code(evidence.get("configuration", "package-wide"))}: '
+                    f'{code(evidence.get("kind", evidence.get("reason")))} → {code(evidence["impact"])}')
+        if evidence.get('features'):
+            details += '; features: ' + ', '.join(code(f) for f in evidence['features'])
+        details += '.\n'
+    if len(crate['evidence']) > 20:
+        details += '- Additional configuration evidence omitted; see the full report.\n'
+    return details + '\n'
+
+
+def render(report):
+    status = report['status']
+    if status == 'analysis-error':
+        return ['**Analysis error: no compatibility verdict is available.** Inspect the validator diagnostics.\n\n',
+                excerpt(report['diagnostics'])]
+    if status not in ('passed', 'exceeds-intent'):
+        raise ValueError('unrecognized report status')
+    crates = sorted(report['crates'], key=lambda c: c['outcome'] == 'pass')
+    sections = [f'Overall result: **{status}**.\n\n']
+    table = '| Crate | Declared | Detected | Outcome |\n| --- | --- | --- | --- |\n'
+    for crate in crates[:50]:
+        table += '| ' + ' | '.join(code(crate[k]) for k in ('package', 'declared', 'impact', 'outcome')) + ' |\n'
+    sections.append(table + '\n')
+    if len(crates) > 50:
+        sections.append('Additional crates omitted; see the full report.\n\n')
+    if status == 'exceeds-intent':
+        sections.append('Detected impact describes API compatibility changes. **exceeds-intent** means that impact '
+                        'is above the declared release intent. Review/revise the API change, or deliberately update '
+                        'release intent if the change is intended and repository policy permits.\n\n')
+        for crate in crates[:50]:
+            if crate['outcome'] != 'pass':
+                sections.append(crate_details(crate, report['comparisons']))
+    else:
+        sections.append('All checked crates fit their declared release intent.\n\n')
+    return sections
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--report', required=True, type=Path)
+    parser.add_argument('--artifact-url', default='')
+    args = parser.parse_args()
+    try:
+        sections = render(json.loads(args.report.read_text()))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        sections = ['**No usable SemVer report was produced.** Inspect the '
+                    '**Validate release intent and generate baseline candidate** step. '
+                    'No compatibility verdict is available from this summary.\n\n']
+    footer = ('Full JSON evidence: <a href="' + html.escape(args.artifact_url, quote=True)
+              + '">sql-fun-semver-report</a> (retained for 30 days).\n' if args.artifact_url else
+              'Diagnostic artifact unavailable; inspect the validation and report-upload steps.\n')
+    output = '## SemVer release intent\n\n'
+    for section in sections:
+        if len((output + section + footer).encode()) > MAX_BYTES - 200:
+            output += '**Summary truncated; additional evidence is in the full report.**\n\n'
+            break
+        output += section
+    print(output + footer)
+
+
+if __name__ == '__main__':
+    main()

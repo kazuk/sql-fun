@@ -201,6 +201,24 @@ Compiler identities and available disk space are recorded in the job log;
 the Actions container setup records the image digest. No runtime toolchain
 update is performed.
 
+The Actions run summary shows a concise crate table (declared/detected impact
+and outcome), with failing crates first. Failures include configuration evidence
+and grouped analyzer findings with representative affected APIs and source
+locations where available. Repeated findings show entry counts; large summaries
+are bounded and disclose omitted evidence. Analysis errors are reported without
+a compatibility verdict. A compatibility finding and an `exceeds-intent`
+decision are distinct: review the API change or deliberately revise release
+intent when appropriate, rather than assuming a version bump is the remedy.
+
+The complete unchanged JSON report is saved as `semver-report.json` in the
+`sql-fun-semver-report` diagnostic artifact, retained for 30 days on success or
+failure when the file exists. The summary links to that artifact. The normal
+job log retains the validator's stderr diagnostics without copying the full JSON
+or public API inventory. If validation fails before producing a usable report,
+the summary directs the reader to the validation step; an unavailable artifact
+is identified separately. Summary generation does not override validation
+failure or enable baseline upload after failure.
+
 Successful validation uploads `sql-fun-semver-baseline`, containing
 `semver_baseline.tar.gz`, retained for 30 days. The output is produced once by
 that validation invocation outside the checkout. Validation failure prevents

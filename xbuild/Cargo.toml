@@ -12,7 +12,7 @@ askama.workspace = true
 clap.workspace = true
 convert_case.workspace = true
 j9.workspace = true
-public-api = "=0.52.0"
+public-api = "=0.52.2"
 serde.workspace = true
 serde_json.workspace = true
 

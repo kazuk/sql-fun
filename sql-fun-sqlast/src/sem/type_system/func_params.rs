@@ -335,6 +335,10 @@ impl FunctionParam {
                     &source_type.to_string(),
                     &target_type.to_string(),
                 )?;
+                #[allow(
+                    unreachable_code,
+                    reason = "Rust 1.100 recognizes the preceding Infallible result"
+                )]
                 TypeError::never()
             }
         } else {
@@ -379,6 +383,10 @@ impl FunctionParam {
                             &format!("{st}"),
                             &format!("{target_type}"),
                         )?;
+                        #[allow(
+                            unreachable_code,
+                            reason = "Rust 1.100 recognizes the preceding Infallible result"
+                        )]
                         TypeError::never()
                     }
                 }

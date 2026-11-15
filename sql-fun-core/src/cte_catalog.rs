@@ -255,6 +255,10 @@ impl<'a> CteCatalogEntry<'a> {
                 if let Some(cte) = catalog.get_cte(rename_def.cte_name()) {
                     let Some(params) = cte.get_parameters() else {
                         CteCatalogError::unexpected_parameter_collection_not_exist()?;
+                        #[allow(
+                            unreachable_code,
+                            reason = "Rust 1.100 recognizes the preceding Infallible result"
+                        )]
                         CteCatalogError::never()
                     };
                     if !params.exists(rename_def.parameter_name()) {
@@ -270,6 +274,10 @@ impl<'a> CteCatalogEntry<'a> {
         for cte in &self.with {
             let Some(cte_def) = catalog.get_cte(cte.cte_name()) else {
                 CteCatalogError::raise_cte_not_found(cte.cte_name())?;
+                #[allow(
+                    unreachable_code,
+                    reason = "Rust 1.100 recognizes the preceding Infallible result"
+                )]
                 CteCatalogError::never()
             };
 
@@ -300,6 +308,10 @@ impl<'a> CteCatalogEntry<'a> {
     pub fn try_get_parameters(&self) -> Result<&CteParameterCollection, CteCatalogError> {
         let Some(parameters) = &self.aggregated_cte_parameter else {
             CteCatalogError::unexpected_parameter_collection_not_exist()?;
+            #[allow(
+                unreachable_code,
+                reason = "Rust 1.100 recognizes the preceding Infallible result"
+            )]
             CteCatalogError::never()
         };
         Ok(parameters)
@@ -334,6 +346,10 @@ impl<'a> CteCatalogEntry<'a> {
         for cte in &self.with {
             let Some(entry) = catalog.get_cte(cte.cte_name()) else {
                 CteCatalogError::raise_cte_not_found(cte.cte_name())?;
+                #[allow(
+                    unreachable_code,
+                    reason = "Rust 1.100 recognizes the preceding Infallible result"
+                )]
                 CteCatalogError::never()
             };
             entry.expand(catalog, cte.alias(), state)?;
@@ -1127,6 +1143,10 @@ impl CteCatalog<'_> {
             Ok(self)
         } else {
             CteCatalogError::validation_error(errors)?;
+            #[allow(
+                unreachable_code,
+                reason = "Rust 1.100 recognizes the preceding Infallible result"
+            )]
             CteCatalogError::never()
         }
     }
@@ -1236,6 +1256,10 @@ impl CteCatalog<'_> {
             let cte_name = &reference.cte_name();
             let Some(cte) = self.get_cte(cte_name) else {
                 CteCatalogError::raise_cte_not_found(cte_name)?;
+                #[allow(
+                    unreachable_code,
+                    reason = "Rust 1.100 recognizes the preceding Infallible result"
+                )]
                 CteCatalogError::never()
             };
             let params = cte.try_get_parameters()?;

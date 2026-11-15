@@ -124,6 +124,10 @@ where
 
     /// Validate creation against the exact shared relation namespace.
     /// Returns false for an accepted no-op or a diagnosed conflict.
+    #[allow(
+        clippy::needless_bool,
+        reason = "Keep namespace rejection as an explicit guard"
+    )]
     fn permits_relation_creation(
         &mut self,
         name: &FullName,
@@ -370,6 +374,10 @@ where
     ) -> Result<Self, AnalysisError> {
         let Some(name) = create_comp_type.name() else {
             create_comp_type.raise_registration_error()?;
+            #[allow(
+                unreachable_code,
+                reason = "Rust 1.100 recognizes the preceding Infallible result"
+            )]
             AnalysisError::never()
         };
         if self.dialect() == Dialect::postgres() && !create_comp_type.declarations_can_apply() {

@@ -169,18 +169,17 @@ mod sql_name_conversion_tests {
         #[case] name: FullName,
     ) -> testresult::TestResult {
         use crate::syn::ListOpt;
-        for spelling in [name.to_string(), name.to_sql(Dialect::postgres())?] {
-            let node = SynBuilder::new().parse(&format!("SELECT * FROM {spelling}"));
-            let relation = node
-                .as_select_stmt()
-                .get_from_clause()
-                .map(|node| node.as_range_var())
-                .expect("FROM");
-            assert_eq!(
-                FullName::from_ast_name(&Name::try_from(&relation[0])?)?,
-                name
-            );
-        }
+        let spelling = name.to_sql(Dialect::postgres())?;
+        let node = SynBuilder::new().parse(&format!("SELECT * FROM {spelling}"));
+        let relation = node
+            .as_select_stmt()
+            .get_from_clause()
+            .map(|node| node.as_range_var())
+            .expect("FROM");
+        assert_eq!(
+            FullName::from_ast_name(&Name::try_from(&relation[0])?)?,
+            name
+        );
         Ok(())
     }
 

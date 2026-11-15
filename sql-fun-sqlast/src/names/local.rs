@@ -1,11 +1,10 @@
+use crate::identifier::CanonicalIdentifier;
 use std::{fmt::Display, ops::Deref};
-
-use ::compact_str::CompactString;
 
 /// part of name for schema specific local name
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
-pub struct LocalName(CompactString);
+pub struct LocalName(CanonicalIdentifier);
 
 #[cfg(test)]
 mod identity_tests {
@@ -40,27 +39,31 @@ mod identity_tests {
 }
 
 impl LocalName {
+    pub(crate) const fn canonical(&self) -> &CanonicalIdentifier {
+        &self.0
+    }
+
     /// create from string
     #[must_use]
     pub fn from(value: &str) -> Self {
-        Self(CompactString::new(value))
+        Self(CanonicalIdentifier::from(value))
     }
     /// convert to string
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.0
+        self.0.as_str()
     }
 
     /// local name is record
     #[must_use]
     pub fn is_record(&self) -> bool {
-        &self.0 == "record"
+        self.as_str() == "record"
     }
 }
 
 impl Display for LocalName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        f.write_str(self.as_str())
     }
 }
 
@@ -68,6 +71,6 @@ impl Deref for LocalName {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.0.as_ref()
+        self.as_str()
     }
 }

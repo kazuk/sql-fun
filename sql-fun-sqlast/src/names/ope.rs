@@ -15,11 +15,7 @@ pub struct ValidOperatorName {
 impl Display for ValidOperatorName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(schema_name) = &self.schema_name {
-            write!(
-                f,
-                "{}.",
-                crate::identifier::CanonicalIdentifier::from(schema_name.as_str())
-            )?;
+            write!(f, "{}.", schema_name.canonical())?;
         }
         write!(f, "{}", self.op_name)?;
         Ok(())

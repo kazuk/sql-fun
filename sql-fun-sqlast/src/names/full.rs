@@ -12,9 +12,10 @@ use std::fmt::Display;
 /// A catalog requires a schema. Components contain logical identifier values,
 /// without SQL delimiters; constructors do not perform SQL case folding.
 /// `Display` is an injective canonical spelling used by name-search tries. It
-/// quotes punctuation, case-sensitive spellings and PostgreSQL keywords where
-/// necessary. It is not dialect validation: empty identifiers, for example,
-/// are representable here but are not legal PostgreSQL SQL.
+/// quotes punctuation and case-sensitive spellings using a dialect-independent
+/// lexical rule; lowercase keyword-shaped values remain unquoted. It is not
+/// dialect validation: empty identifiers, for example, are representable here
+/// but are not legal PostgreSQL SQL.
 ///
 /// `FromStr` reads this component spelling (including doubled double quotes),
 /// preserving case, without interpreting SQL type aliases or folding case.
@@ -212,26 +213,14 @@ impl FullName {
 impl Display for FullName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(catalog) = &self.catalog {
-            write!(
-                f,
-                "{}.",
-                crate::identifier::CanonicalIdentifier::from(catalog.as_str())
-            )?;
+            write!(f, "{}.", catalog.canonical())?;
         }
 
         if let Some(schema) = &self.schema {
-            write!(
-                f,
-                "{}.",
-                crate::identifier::CanonicalIdentifier::from(schema.as_str())
-            )?;
+            write!(f, "{}.", schema.canonical())?;
         }
 
-        write!(
-            f,
-            "{}",
-            crate::identifier::CanonicalIdentifier::from(self.name.as_str())
-        )
+        write!(f, "{}", self.name.canonical())
     }
 }
 
@@ -245,7 +234,9 @@ mod display_tests {
     #[case::quote("a\"b", r#""a""b""#)]
     #[case::mixed("Mixed", r#""Mixed""#)]
     #[case::space("odd name", r#""odd name""#)]
-    #[case::reserved("select", r#""select""#)]
+    #[case::reserved("select", "select")]
+    #[case::postgres_keyword("ilike", "ilike")]
+    #[case::sqlite_keyword("glob", "glob")]
     #[case::unicode("éclair", r#""éclair""#)]
     #[case::empty("", r#""""#)]
     #[case::numeric("12abc", r#""12abc""#)]
@@ -381,6 +372,9 @@ mod canonical_parse_tests {
 
     #[rstest::rstest]
     #[case::local("Mixed", FullName::from_local_name("Mixed"))]
+    #[case::keyword("select", FullName::from_local_name("select"))]
+    #[case::old_quoted_keyword(r#""select""#, FullName::from_local_name("select"))]
+    #[case::quoted_plain(r#""simple""#, FullName::from_local_name("simple"))]
     #[case::quoted_dot(r#""a.b".c"#, FullName::with_schema("a.b", "c"))]
     #[case::local_dot(r#"a."b.c""#, FullName::with_schema("a", "b.c"))]
     #[case::three(

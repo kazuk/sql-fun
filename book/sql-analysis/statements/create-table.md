@@ -88,8 +88,13 @@ The PostgreSQL table-as path analyzes its query and derives ordered columns. A
 supplied column-name list renames outputs by position; too many names or
 duplicate outputs are diagnosed. Ordinary CREATE TABLE AS publishes a table
 definition. The materialized-view variant retains the analyzed query as a
-materialized view. Neither operation executes the query or populates rows; a
-WITH NO DATA spelling does not turn static analysis into data loading.
+materialized view. After loading, its columns can be looked up by their output
+names, with their analyzed types and available inferred nullability. A renamed
+output is found under its new name; an absent column has no definition.
+Inferred nullability describes the query result, rather than a database NOT NULL
+constraint on the materialized view. Neither operation executes the query or
+populates rows; a WITH NO DATA spelling does not turn static analysis into data
+loading.
 
 ## Dialect and engine-specific behavior
 

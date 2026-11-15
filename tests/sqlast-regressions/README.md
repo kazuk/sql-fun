@@ -17,6 +17,10 @@ selects `--workspace-phase=rust-test` for archived Rust tests and
 compilation. The existing combined `--workspace-phase=test` route and normal
 local full-check behavior remain supported.
 
+Optional local [server CPU profiling](../../docs/internal-rules/server-cpu-profiling.md)
+reuses this complete workload with one `record` or `stat` measurement per
+invocation. It does not run in ordinary regression checks or CI.
+
 ## Committed CI scheduling
 
 The local workspace check runs the suite serially and records full CLI command

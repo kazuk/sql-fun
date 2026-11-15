@@ -32,6 +32,7 @@ fn parameter_cast_accepts_the_qualified_domain_reference() -> Result<(), Box<dyn
             .parameter_constraints()
             .result_column(0)
             .unwrap()
+            .resolved()
             .admissible_types(),
         Some(std::slice::from_ref(&domain))
     );
@@ -145,6 +146,7 @@ fn parameter_dependent_overloads_match_concrete_calls(
             .parameter_constraints()
             .result_column(0)
             .unwrap()
+            .resolved()
             .admissible_types(),
         Some(std::slice::from_ref(&expected))
     );

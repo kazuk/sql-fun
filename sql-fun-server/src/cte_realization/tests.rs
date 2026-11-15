@@ -496,6 +496,7 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
                 .parameter(position)
                 .unwrap()
                 .constraint()
+                .resolved()
                 .admissible_types(),
             Some([expected].as_slice())
         );

@@ -2,7 +2,8 @@ use crate::{
     ast::Dialect,
     sem::{
         AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, ParseContext,
-        PgBuiltInType, ScalarConstExpr, SelectStatement, SemScalarExpr, TypeReference,
+        PgBuiltInType, ResolvedTypes, ScalarConstExpr, SelectStatement, SemScalarExpr,
+        TypeReference,
         parameter_resolution::ParameterResolution,
         problem::ArrayProblem,
         scalar_expr::SemScalarExprNode,
@@ -15,7 +16,7 @@ use crate::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArraySubqueryExpr {
     query: Box<SelectStatement>,
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     invalid_shape: bool,
     #[serde(skip)]
     node: Option<usize>,
@@ -28,7 +29,7 @@ impl ArraySubqueryExpr {
     ) -> Result<Self, AnalysisError> {
         let mut value = Self {
             query: Box::new(query.clone()),
-            types: InputTypeConstraint::any(),
+            types: ResolvedTypes::any(),
             invalid_shape: false,
             node: None,
         };
@@ -76,14 +77,14 @@ impl ArraySubqueryExpr {
 
     /// Array-result candidates; unrestricted while unresolved, empty on failure.
     #[must_use]
-    pub const fn types(&self) -> &InputTypeConstraint {
+    pub const fn types(&self) -> &ResolvedTypes {
         &self.types
     }
 
     fn validate_shape(&mut self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
         if !self.invalid_shape && !self.query.has_pending_stars() && !self.query.has_width(1) {
             self.invalid_shape = true;
-            self.types = InputTypeConstraint::types([]);
+            self.types = ResolvedTypes::types([]);
             context.report_analysis_problem(AnalysisProblem::array(
                 ArrayProblem::subquery_columns(self.query.result_columns().len()),
             ))?;
@@ -155,8 +156,8 @@ impl ArraySubqueryExpr {
                 .query
                 .result_columns()
                 .scalar_type()
-                .map(|ty| InputTypeConstraint::exact(&ty.array_type()))
-                .unwrap_or_else(InputTypeConstraint::any);
+                .map(|ty| ResolvedTypes::exact(&ty.array_type()))
+                .unwrap_or_else(ResolvedTypes::any);
         }
     }
 }
@@ -345,9 +346,8 @@ impl ArraySubqueryExpr {
         } else {
             InputTypeConstraint::any()
         };
-        let (node, types) = parameters.array_query_result(&fallback, single_output, self.node);
+        let (node, _) = parameters.array_query_result(&fallback, single_output, self.node);
         self.node = Some(node);
-        self.types = types;
         Ok(())
     }
 }
@@ -359,7 +359,7 @@ impl ArraySubqueryExpr {
 
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
-            self.types = constraints.node_domain(node).clone();
+            self.types = constraints.node_domain(node).into();
         }
     }
 
@@ -404,5 +404,11 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for UnknownOutpu
         {
             *value = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::text(), value);
         }
+    }
+}
+
+impl ArraySubqueryExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
     }
 }

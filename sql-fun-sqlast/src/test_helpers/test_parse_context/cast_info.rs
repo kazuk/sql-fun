@@ -5,7 +5,7 @@ use crate::{
     sem::{CastDefinition, TypeReference},
 };
 
-use crate::test_helpers::test_parse_context::TestParseContext;
+use crate::test_helpers::test_parse_context::{TestContext, TestParseContext};
 
 impl TestParseContext {
     /// setup [CastInfoRead::get_implicit_cast] result
@@ -45,7 +45,7 @@ impl TestParseContext {
     }
 }
 
-impl CastInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> CastInfoRead for TestContext<Constraints> {
     fn cast_sources(&self, target: &TypeReference, _explicit: bool) -> HashSet<TypeReference> {
         assert!(
             !self.forbid_type_enumeration,

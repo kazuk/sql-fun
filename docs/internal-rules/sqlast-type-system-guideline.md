@@ -272,10 +272,19 @@ while inspection retains the original SQL requirements. An independently selecte
 binding supplies evidence for operation-specific diagnostics, including an
 inapplicable operator at a later use. Report selected types and conflicting
 requirements without erasing the binding.
-When deferred projection expansion resumes collection, parameter occurrences
-must supply their retained SQL input constraints, never their finalized
-application types. Keep that transient input state out of serialized expressions
-and grouping identity.
+When deferred projection expansion resumes collection, use the original graph
+with its previous SQL-admissible parameter results and explicit context hints,
+never finalized application types from parameter
+occurrences. `InputTypeConstraint` candidates belong to the query-local solver
+and share immutable `TypeReference` values through `Rc`. The inference pass
+also owns its compatibility memo; it does not remain in the server session cache.
+Semantic expressions retain owned `ResolvedTypes` result information, including
+unresolved, impossible and alternative results, independently of the graph.
+Materialize these results during finalization. Graph node IDs remain available
+through same-query projection-expansion revisits and are cleared from expressions
+and set outputs before the completed analysis escapes to catalog or other
+consumers. Serialization alone is insufficient: in-memory clones must also
+contain no completed inference's graph-local identities.
 
 ### Default candidates and deferred overloads
 

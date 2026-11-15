@@ -797,8 +797,8 @@ impl SemScalarExpr {
         match self {
             Self::SourceColumn(value) => value.value().constraint_node(),
             Self::NamedArg(value) => value.value().constraint_node(),
-            Self::Param(value) => Some(value.node()),
-            Self::Constrained(value) => Some(value.node()),
+            Self::Param(value) => value.node(),
+            Self::Constrained(value) => value.node(),
             Self::MinMax(value) => value.node(),
             Self::Array(value) => value.node(),
             Self::ArraySubquery(value) => value.node(),
@@ -1550,7 +1550,7 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         let replacement = match self {
-            Self::Param(value) => Some(parameters.parameter_occurrence(value)),
+            Self::Param(value) => Some(parameters.parameter_occurrence(value, context)),
             Self::ColumnRef(_) => parameters.column(self),
             Self::Arith(value) => value.collect_constraints(parameters, context)?,
             Self::FuncCall(value) => value.collect_constraints(parameters, context)?,
@@ -2038,5 +2038,23 @@ impl SemScalarExpr {
             target.is_array() == Some(true),
         );
         Ok(AstExpr::projection_cast(&expression, &target))
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn finish_inference(&mut self) {
+        match self {
+            Self::Param(value) => value.finish_inference(),
+            Self::Constrained(value) => value.finish_inference(),
+            Self::MinMax(value) => value.finish_inference(),
+            Self::Array(value) => value.finish_inference(),
+            Self::ArraySubquery(value) => value.finish_inference(),
+            Self::Case(value) => value.finish_inference(),
+            Self::TruthTest(value) => value.finish_inference(),
+            Self::Distinct(value) => value.finish_inference(),
+            Self::Membership(value) => value.finish_inference(),
+            Self::Coalesce(value) => value.finish_inference(),
+            _ => {}
+        }
     }
 }

@@ -2,8 +2,8 @@ use crate::sem::CommonType;
 use crate::{
     ast::Dialect,
     sem::{
-        AccessKind, AnalysisError, AnalysisProblem, ConstrainedExpr, InputTypeConstraint,
-        InsertTarget, ParameterConstraints, ParseContext, QueryProblem, ResultColumnCollection,
+        AccessKind, AnalysisError, AnalysisProblem, ConstrainedExpr, InsertTarget,
+        ParameterConstraints, ParseContext, QueryProblem, ResolvedTypes, ResultColumnCollection,
         SelectStatement, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -95,7 +95,7 @@ pub struct SetOperationQuery {
 /// Common-type outcome and conversions at one positional output boundary.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 struct SetColumnResult {
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     coercions: [Option<TypeReference>; 2],
     failure: Option<SetColumnFailure>,
     #[serde(skip)]
@@ -111,7 +111,7 @@ enum SetColumnFailure {
 impl SetColumnResult {
     const fn pending() -> Self {
         Self {
-            types: InputTypeConstraint::any(),
+            types: ResolvedTypes::any(),
             coercions: [None, None],
             failure: None,
             node: None,
@@ -178,7 +178,7 @@ impl SetOperationQuery {
             && self.results.iter().all(|result| result.failure.is_none())
     }
     /// Admissible common types of a positional output, including unresolved/empty domains.
-    pub fn output_types(&self, index: usize) -> Option<&InputTypeConstraint> {
+    pub fn output_types(&self, index: usize) -> Option<&ResolvedTypes> {
         self.results.get(index).map(|result| &result.types)
     }
     /// Required implicit coercions for the left and right column respectively.
@@ -234,7 +234,7 @@ impl SetOperationQuery {
         }
         for index in 0..self.results.len() {
             let Some(inputs) = self.inputs(index) else {
-                self.results[index].types = InputTypeConstraint::types([]);
+                self.results[index].types = ResolvedTypes::types([]);
                 self.results[index].failure = Some(SetColumnFailure::Incompatible);
                 self.columns
                     .set_output(index, &self.results[index].types, None, None);
@@ -258,15 +258,15 @@ impl SetOperationQuery {
             result.types = inputs[0]
                 .get_type()
                 .as_ref()
-                .map(InputTypeConstraint::exact)
-                .unwrap_or_else(InputTypeConstraint::any);
+                .map(ResolvedTypes::exact)
+                .unwrap_or_else(ResolvedTypes::any);
         } else if result.failure.is_none()
             && let [Some(left), Some(right)] =
                 inputs.each_ref().map(SemScalarExpr::common_type_input)
         {
             match CommonType::select_common_type(context, &[left, right]) {
                 Ok(target) => {
-                    result.types = InputTypeConstraint::exact(&target);
+                    result.types = ResolvedTypes::exact(&target);
                     result.coerce(inputs);
                 }
                 Err(problem) => {
@@ -275,10 +275,10 @@ impl SetOperationQuery {
                         crate::sem::problem::MinMaxProblem::Incompatible(..)
                     ) {
                         result.failure = Some(SetColumnFailure::Incompatible);
-                        result.types = InputTypeConstraint::types([]);
+                        result.types = ResolvedTypes::types([]);
                     } else {
                         result.failure = Some(SetColumnFailure::MissingFacts);
-                        result.types = InputTypeConstraint::any();
+                        result.types = ResolvedTypes::any();
                     }
                     context.report_analysis_problem(AnalysisProblem::query(
                         QueryProblem::set_type(self.kind.name(), index + 1, &problem),
@@ -326,10 +326,11 @@ impl SetOperationQuery {
         {
             parameters.unify_set_types(context, self.kind.name(), inputs)?
         } else {
-            let value = parameters.operation(self.kind.name(), &[], &result.types, None);
+            let value =
+                parameters.operation(self.kind.name(), &[], &result.types.constraint(), None);
             (
                 value.constraint_node().expect("set output node"),
-                result.types.clone(),
+                result.types.constraint(),
             )
         };
         let not_null = if let Some(inputs) = &inputs {
@@ -341,12 +342,11 @@ impl SetOperationQuery {
         // Preserve published identities across star expansion and resumed solves.
         let node = parameters.retain_output_node(result.node, node);
         result.node = Some(node);
-        result.types = types;
         let expression = SemScalarExpr::constrained(&ConstrainedExpr::new(
             node,
             self.kind.name(),
             &[],
-            &result.types,
+            &types,
             not_null,
             "",
         ));
@@ -362,7 +362,7 @@ impl SetOperationQuery {
             };
             let result = &mut self.results[index];
             if let Some(node) = result.node {
-                result.types = constraints.node_domain(node).clone();
+                result.types = constraints.node_domain(node).into();
                 if result.types.admissible_types() == Some(&[]) {
                     result.failure = Some(SetColumnFailure::Incompatible);
                 }
@@ -564,18 +564,8 @@ mod test_set_operation {
         assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int8())])));
         assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
         let output = constraints.result_column(0).unwrap();
-        assert!(
-            output
-                .admissible_types()
-                .unwrap()
-                .contains(&PgBuiltInType::int4())
-        );
-        assert!(
-            output
-                .admissible_types()
-                .unwrap()
-                .contains(&PgBuiltInType::int8())
-        );
+        assert!(output.allows(&PgBuiltInType::int4()));
+        assert!(output.allows(&PgBuiltInType::int8()));
         assert!(constraints.result_column(1).is_none());
         Ok(())
     }
@@ -674,5 +664,17 @@ mod test_set_operation {
             analyzed.context().problems()
         );
         Ok(())
+    }
+}
+
+impl SetOperationQuery {
+    pub(crate) fn finish_inference<V: SemanticVisitorMut>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for result in &mut self.results {
+            result.node = None;
+        }
+        self.columns.walk(visitor)
     }
 }

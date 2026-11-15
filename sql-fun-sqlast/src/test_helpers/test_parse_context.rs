@@ -33,7 +33,7 @@ use std::collections::{HashMap, HashSet};
 
 /// ParseContext implementation for tests
 #[derive(Clone, Debug, Default)]
-pub struct TestParseContext {
+pub struct TestContext<Constraints> {
     rules: HashMap<RuleIdentity, Option<CreateRule>>,
     ownership: OwnershipCatalog,
     triggers: HashMap<TriggerIdentity, Option<CreateTrigger>>,
@@ -52,6 +52,7 @@ pub struct TestParseContext {
     search_path: Vec<SchemaName>,
     type_definitions: HashMap<FullName, TypeDefinition>,
     forbid_type_enumeration: bool,
+    ordered_types: HashSet<FullName>,
     array_elements: HashMap<TypeReference, TypeReference>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
@@ -69,12 +70,15 @@ pub struct TestParseContext {
     problems: Vec<AnalysisProblem>,
     cursors: CursorBindings,
     analysis_state: AnalysisState,
-    parameter_constraints: ParameterConstraints,
+    parameter_constraints: Constraints,
     parameter_type_hints: ParameterTypeHints,
     report_failure_after: Option<usize>,
     source: Option<SourcePathWithSpan>,
     table_ref_types: Vec<TableName>,
 }
+
+/// Mutable test analysis context, with query-local constraint results.
+pub type TestParseContext = TestContext<ParameterConstraints>;
 
 /// get [TestParseContext]
 #[rstest::fixture]
@@ -83,6 +87,10 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
+    pub(crate) fn setup_ordered_type(&mut self, name: &FullName) {
+        self.ordered_types.insert(name.clone());
+    }
+
     pub(crate) fn set_function_returns_set(
         &mut self,
         name: &FullName,
@@ -176,7 +184,7 @@ impl TestParseContext {
     }
 }
 
-impl GetSourcePathWithSpanOpt for TestParseContext {
+impl<Constraints: std::fmt::Debug> GetSourcePathWithSpanOpt for TestContext<Constraints> {
     fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
         self.source.as_ref()
     }
@@ -188,7 +196,7 @@ impl MutSourcePathWithSpan for TestParseContext {
     }
 }
 
-impl SearchPathRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> SearchPathRead for TestContext<Constraints> {
     fn get_search_path(&self) -> &[SchemaName] {
         self.search_path.as_slice()
     }
@@ -210,7 +218,7 @@ impl TestParseContext {
     }
 }
 
-impl ViewInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> ViewInfoRead for TestContext<Constraints> {
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
         if let Some(v) = self.view_definitions.get(key) {
             v.as_ref()
@@ -282,7 +290,7 @@ impl TestParseContext {
     }
 }
 
-impl TableInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> TableInfoRead for TestContext<Constraints> {
     fn get_table_impl(&self, key: &FullName) -> Option<&CreateTable> {
         if let Some(v) = self.table_definitions.get(key) {
             v.as_ref()
@@ -309,7 +317,7 @@ impl TableInfoWrite for TestParseContext {
     }
 }
 
-impl TypeInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> TypeInfoRead for TestContext<Constraints> {
     fn type_references(&self) -> Vec<TypeReference> {
         assert!(
             !self.forbid_type_enumeration,
@@ -321,8 +329,12 @@ impl TypeInfoRead for TestParseContext {
             .collect()
     }
 
-    fn builtin_type_ordered(&self, _name: &FullName) -> Option<bool> {
-        None
+    fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
+        if self.ordered_types.contains(name) {
+            Some(true)
+        } else {
+            None
+        }
     }
 
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
@@ -341,7 +353,7 @@ impl TypeInfoRead for TestParseContext {
     }
 }
 
-impl SequenceInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> SequenceInfoRead for TestContext<Constraints> {
     fn get_sequence_impl(&self, key: &FullName) -> Option<&CreateSequence> {
         self.sequence_definitions.get(key)
     }
@@ -395,7 +407,7 @@ impl TestParseContext {
     }
 }
 
-impl OperatorInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> OperatorInfoRead for TestContext<Constraints> {
     fn get_operator_op(
         &self,
         name: &OperatorName,
@@ -408,7 +420,7 @@ impl OperatorInfoRead for TestParseContext {
     }
 }
 
-impl FunctionInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> FunctionInfoRead for TestContext<Constraints> {
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
         self.aggregate_functions.contains(name)
     }
@@ -433,7 +445,7 @@ impl FunctionInfoRead for TestParseContext {
     }
 }
 
-impl IndexInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> IndexInfoRead for TestContext<Constraints> {
     fn indexes_for_table(&self, table: &TableName) -> Vec<&CreateIndex> {
         self.create_indexes
             .iter()
@@ -459,7 +471,7 @@ impl DiagnosticContext for TestParseContext {
     }
 }
 
-impl crate::context::RuleInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::RuleInfoRead for TestContext<Constraints> {
     fn local_rule(&self, identity: &RuleIdentity) -> Option<Option<&CreateRule>> {
         self.rules.get(identity).map(Option::as_ref)
     }
@@ -477,7 +489,7 @@ impl crate::context::RuleInfoWrite for TestParseContext {
     }
 }
 
-impl crate::context::TriggerInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::TriggerInfoRead for TestContext<Constraints> {
     fn trigger_is_cancelled(&self, identity: &TriggerIdentity) -> bool {
         self.triggers.get(identity).is_some_and(Option::is_none)
     }
@@ -490,7 +502,7 @@ impl crate::context::TriggerInfoRead for TestParseContext {
     }
 }
 
-impl BaseParseContext for TestParseContext {
+impl<Constraints: std::fmt::Debug> BaseParseContext for TestContext<Constraints> {
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         for (candidate, definition) in &self.table_definitions {
             if candidate.sqlite_eq(name) && definition.is_some() {
@@ -635,7 +647,9 @@ impl crate::context::TriggerInfoWrite for TestParseContext {
     }
 }
 
-impl crate::context::ParameterTypeHintRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::ParameterTypeHintRead
+    for TestContext<Constraints>
+{
     fn get_parameter_typehint(&self, index: usize) -> Option<TypeReference> {
         self.parameter_type_hints.lookup(index)
     }
@@ -715,7 +729,49 @@ impl ParseContext for TestParseContext {
         self.parameter_constraints = ParameterConstraints::default();
         self.parameter_type_hints = Default::default();
         self.report_failure_after = None;
-        FrozenBaseContext::new(self)
+        FrozenBaseContext::new(TestContext {
+            rules: self.rules,
+            ownership: self.ownership,
+            triggers: self.triggers,
+            masters: self.masters,
+            function_set_properties: self.function_set_properties,
+            sampling_methods: self.sampling_methods,
+            collation_results: self.collation_results,
+            operator_class_results: self.operator_class_results,
+            expected_conflict_target: self.expected_conflict_target,
+            expected_conflict_modifiers: self.expected_conflict_modifiers,
+            conflict_arbiters: self.conflict_arbiters,
+            metadata: self.metadata,
+            implicit_cast_results: self.implicit_cast_results,
+            implicit_castable_results: self.implicit_castable_results,
+            operator_op_results: self.operator_op_results,
+            search_path: self.search_path,
+            type_definitions: self.type_definitions,
+            forbid_type_enumeration: self.forbid_type_enumeration,
+            ordered_types: self.ordered_types,
+            array_elements: self.array_elements,
+            table_definitions: self.table_definitions,
+            view_definitions: self.view_definitions,
+            view_delete_support: self.view_delete_support,
+            view_update_support: self.view_update_support,
+            view_insert_support: self.view_insert_support,
+            view_merge_support: self.view_merge_support,
+            function_definitions: self.function_definitions,
+            aggregate_functions: self.aggregate_functions,
+            sequence_definitions: self.sequence_definitions,
+            function_row_properties: self.function_row_properties,
+            alter_tables: self.alter_tables,
+            drop_tables: self.drop_tables,
+            create_indexes: self.create_indexes,
+            problems: self.problems,
+            cursors: self.cursors,
+            analysis_state: self.analysis_state,
+            parameter_constraints: (),
+            parameter_type_hints: self.parameter_type_hints,
+            report_failure_after: self.report_failure_after,
+            source: self.source,
+            table_ref_types: self.table_ref_types,
+        })
     }
 
     fn set_search_path(&mut self, search_path: &[SchemaName]) {
@@ -853,13 +909,13 @@ impl TestParseContext {
             .insert(name.clone(), support.clone());
     }
 }
-impl crate::context::ViewInsertInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::ViewInsertInfoRead for TestContext<Constraints> {
     fn view_insert_support(&self, view: &FullName) -> Option<&ViewInsertSupport> {
         self.view_insert_support.get(view)
     }
 }
 
-impl crate::context::ViewUpdateInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::ViewUpdateInfoRead for TestContext<Constraints> {
     fn view_update_support(&self, view: &FullName) -> Option<&ViewUpdateSupport> {
         self.view_update_support.get(view)
     }
@@ -872,7 +928,7 @@ impl TestParseContext {
     }
 }
 
-impl crate::context::ViewDeleteInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::ViewDeleteInfoRead for TestContext<Constraints> {
     fn view_delete_support(&self, view: &FullName) -> ViewDeleteSupport {
         self.view_delete_support
             .get(view)
@@ -881,7 +937,7 @@ impl crate::context::ViewDeleteInfoRead for TestParseContext {
     }
 }
 
-impl crate::context::ViewMergeInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::ViewMergeInfoRead for TestContext<Constraints> {
     fn view_merge_support(&self, view: &FullName) -> ViewMergeSupport {
         self.view_merge_support
             .get(view)
@@ -902,12 +958,12 @@ impl TestParseContext {
     }
 }
 
-impl crate::context::RoleInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::RoleInfoRead for TestContext<Constraints> {
     fn role_by_name(&self, name: &str) -> Option<&Role> {
         self.ownership.role(name)
     }
 }
-impl crate::context::OwnershipInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::OwnershipInfoRead for TestContext<Constraints> {
     fn ownership_definitions(
         &self,
         kind: ObjectKind,
@@ -928,7 +984,7 @@ impl crate::context::OwnershipInfoRead for TestParseContext {
     }
 }
 
-impl crate::context::ObjectInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::ObjectInfoRead for TestContext<Constraints> {
     fn object_kind(&self, name: &FullName) -> Option<Kind> {
         if self.get_table_impl(name).is_some() {
             Some(Kind::table())
@@ -943,7 +999,7 @@ impl crate::context::ObjectInfoRead for TestParseContext {
         }
     }
 }
-impl crate::context::ExtensionInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> crate::context::ExtensionInfoRead for TestContext<Constraints> {
     fn extension_exists(&self, _: &str) -> bool {
         false
     }

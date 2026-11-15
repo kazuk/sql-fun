@@ -39,6 +39,7 @@ fn binds_system_attribute(
             .parameter_constraints()
             .result_column(0)
             .unwrap()
+            .resolved()
             .admissible_types(),
         Some(std::slice::from_ref(&TypeReference::from_master_type_name(
             ty

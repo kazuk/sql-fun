@@ -1,7 +1,7 @@
 use crate::sem::CommonType;
 use crate::sem::{
     AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, ParseContext,
-    PgBuiltInType, SemScalarExpr, TypeReference,
+    PgBuiltInType, ResolvedTypes, SemScalarExpr, TypeReference,
     parameter_resolution::ParameterResolution,
     problem::TruthTestProblem,
     scalar_expr::SemScalarExprNode,
@@ -14,7 +14,7 @@ pub struct TruthTestExpr {
     argument: Box<SemScalarExpr>,
     value: Option<bool>,
     negated: bool,
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     #[serde(skip)]
     node: Option<usize>,
 }
@@ -30,7 +30,7 @@ impl TruthTestExpr {
             argument: Box::new(argument.clone()),
             value,
             negated,
-            types: InputTypeConstraint::exact(&PgBuiltInType::bool()),
+            types: ResolvedTypes::exact(&PgBuiltInType::bool()),
             node: None,
         };
         if let Some(ty) = SemScalarExpr::common_type_input(argument) {
@@ -53,7 +53,7 @@ impl TruthTestExpr {
             .as_truth_test()
             .is_some_and(|test| test.types.admissible_types() == Some(&[]))
         {
-            result.types = InputTypeConstraint::types([]);
+            result.types = ResolvedTypes::types([]);
         }
         // Parameter-free analyses intentionally skip the inference pass.
         if !context.parameter_inference_needed() && result.types.single_type().is_some() {
@@ -261,7 +261,7 @@ impl TruthTestExpr {
         context: &mut impl ParseContext,
         problem: TruthTestProblem,
     ) -> Result<(), AnalysisError> {
-        self.types = InputTypeConstraint::types([]);
+        self.types = ResolvedTypes::types([]);
         context.report_analysis_problem(AnalysisProblem::truth_test(problem))
     }
 
@@ -312,7 +312,7 @@ impl TruthTestExpr {
 
     /// Boolean result domain, or an empty domain for impossible inputs.
     #[must_use]
-    pub const fn types(&self) -> &InputTypeConstraint {
+    pub const fn types(&self) -> &ResolvedTypes {
         &self.types
     }
 
@@ -331,9 +331,8 @@ impl TruthTestExpr {
         parameters: &mut ParameterResolution<'_>,
         context: &impl ParseContext,
     ) {
-        let (node, types) = parameters.truth_test(context, &self.argument, &self.types);
+        let (node, _) = parameters.truth_test(context, &self.argument, &self.types.constraint());
         self.node = Some(node);
-        self.types = types;
     }
 }
 
@@ -440,7 +439,7 @@ impl TruthTestExpr {
 
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
-            self.types = constraints.node_domain(node).clone();
+            self.types = constraints.node_domain(node).into();
         }
         if self.types.single_type().is_some() {
             self.coerce();
@@ -470,5 +469,11 @@ impl SemScalarExprNode for TruthTestExpr {
         } else {
             None
         }
+    }
+}
+
+impl TruthTestExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
     }
 }

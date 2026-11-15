@@ -1,6 +1,7 @@
 use crate::StringSpan;
 use crate::sem::{
-    InputTypeConstraint, ParameterConstraints, TypeReference, scalar_expr::SemScalarExprNode,
+    InputTypeConstraint, ParameterConstraints, ResolvedTypes, TypeReference,
+    scalar_expr::SemScalarExprNode,
 };
 
 /// A numbered SQL input with its selected application type when available.
@@ -9,12 +10,9 @@ pub struct ParamRef {
     position: u32,
     #[serde(skip)]
     location: Option<StringSpan>,
-    constraint: InputTypeConstraint,
-    // Recollection must not feed finalized application types into SQL inputs.
+    constraint: ResolvedTypes,
     #[serde(skip)]
-    input_constraint: Option<InputTypeConstraint>,
-    #[serde(skip)]
-    node: usize,
+    node: Option<usize>,
 }
 
 impl ParamRef {
@@ -22,9 +20,8 @@ impl ParamRef {
         Self {
             position,
             location: None,
-            node,
-            constraint: constraint.clone(),
-            input_constraint: None,
+            node: Some(node),
+            constraint: constraint.into(),
         }
     }
     pub(crate) const fn with_location(mut self, location: Option<StringSpan>) -> Self {
@@ -40,13 +37,10 @@ impl ParamRef {
     }
     /// Types used by this occurrence, narrowed to a selected application binding.
     /// [`ParameterConstraints`] retains the complete SQL-admissible input domain.
-    pub const fn constraint(&self) -> &InputTypeConstraint {
+    pub const fn constraint(&self) -> &ResolvedTypes {
         &self.constraint
     }
-    pub(crate) fn input_constraint(&self) -> &InputTypeConstraint {
-        self.input_constraint.as_ref().unwrap_or(&self.constraint)
-    }
-    pub(crate) const fn node(&self) -> usize {
+    pub(crate) const fn node(&self) -> Option<usize> {
         self.node
     }
 }
@@ -61,19 +55,26 @@ impl SemScalarExprNode for ParamRef {
 }
 
 impl ParamRef {
-    pub(super) fn canonicalize_grouping_key(&mut self) {
-        self.node = 0;
+    pub(super) const fn canonicalize_grouping_key(&mut self) {
+        self.node = None;
         self.location = None;
-        self.input_constraint = None;
     }
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
-        self.input_constraint = Some(constraints.sql_node_domain(self.node).clone());
+        let Some(node) = self.node else {
+            return;
+        };
         self.constraint = if let Some(parameter) = constraints.parameter(self.position)
             && let Some(binding) = parameter.binding_type()
         {
-            InputTypeConstraint::exact(&binding)
+            ResolvedTypes::exact(&binding)
         } else {
-            constraints.node_domain(self.node).clone()
+            constraints.node_domain(node).into()
         };
+    }
+}
+
+impl ParamRef {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
     }
 }

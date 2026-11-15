@@ -63,6 +63,19 @@ impl KeyFragment<'_> {
     }
 }
 
+// Optimization history (#1121; measured 2026-11-15 with Rust 1.100.0, release):
+// Owned byte fragments were tested with SmallVec capacities 8 and 16, including
+// capacity 16 with `union`; borrowed KeyFragment remained a slice. Wrapper size
+// grew from 16 to 24/32 bytes. In a 577-key rank-payload model, preformatted hits
+// slowed from 38.6 ns to 70.7-78.0 ns. Capacity 16 + union reduced construction
+// allocations by 46%, but retained map memory grew 9%. Complete-workload medians
+// for inline storage alone differed by -1.5% (default) / -0.4% (all), within the
+// observed variation, and did not justify adoption. Separately marking heap paths
+// with std::hint::cold_path() gave no improvement (+0.22% median, all features).
+// These results concern those layouts/hint placements, not all inline storage;
+// no custom niche-packed layout was evaluated. Consult the evidence before
+// repeating them; assess node layout and lookup costs, not allocation count alone:
+// https://github.com/kazuk/sql-fun/pull/1122#issuecomment-6892389106
 #[derive(Debug)]
 pub(super) struct BoxedKeyFragment(Box<[u8]>);
 

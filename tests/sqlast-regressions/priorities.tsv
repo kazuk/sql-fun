@@ -5,17 +5,16 @@ heavy	between-symmetric-17
 heavy	between-symmetric-18
 heavy	bounded-parameter-inference-17
 heavy	bounded-parameter-inference-18
+heavy	case-common-types-17
 heavy	parameter-bindings-17
 heavy	parameter-bindings-18
-heavy	truth-tests-17
-heavy	truth-tests-18
+heavy	project-roles-empty-18
 medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
 medium	arrays-consumers-18
 medium	arrays-parameters-17
 medium	arrays-parameters-18
-medium	case-common-types-17
 medium	case-common-types-18
 medium	collate-17
 medium	collate-18
@@ -43,14 +42,12 @@ medium	postgres18-syntax-17-17
 medium	project-roles-17
 medium	project-roles-18
 medium	project-roles-empty-17
-medium	project-roles-empty-18
 medium	rows-17
 medium	rows-18
 medium	rows-from-17
 medium	rows-from-18
 medium	schema-composites-17
 medium	schema-composites-18
-medium	schema-delete-18
 medium	schema-domains-defaults-17
 medium	schema-domains-defaults-18
 medium	schema-domains-equal-ranks-17
@@ -64,6 +61,7 @@ medium	schema-domains-variadic-18
 medium	schema-domains-variadic-precedence-17
 medium	schema-domains-variadic-precedence-18
 medium	schema-domains-variadic-precedence-reverse-17
+medium	schema-domains-variadic-precedence-reverse-18
 medium	schema-expressions-17
 medium	schema-expressions-18
 medium	schema-insert-17
@@ -78,7 +76,7 @@ medium	schema-update-17
 medium	schema-update-18
 medium	schema-views-diagnostics-17
 medium	schema-views-diagnostics-18
-medium	schema-views-mechanisms-17
+medium	schema-views-mechanisms-18
 medium	schema-views-precedence-17
 medium	schema-views-precedence-18
 medium	set-operations-17
@@ -89,6 +87,8 @@ medium	table-checks-17
 medium	table-checks-18
 medium	table-renames-17
 medium	table-renames-18
+medium	truth-tests-17
+medium	truth-tests-18
 light	arrays-diagnostics-17
 light	arrays-diagnostics-18
 light	arrays-metadata-17
@@ -126,6 +126,7 @@ light	project-roles-omitted-18
 light	row-security-17
 light	row-security-18
 light	schema-delete-17
+light	schema-delete-18
 light	schema-domains-builtin-17
 light	schema-domains-builtin-18
 light	schema-domains-default-tie-17
@@ -136,7 +137,6 @@ light	schema-domains-order-forward-17
 light	schema-domains-order-forward-18
 light	schema-domains-order-reverse-17
 light	schema-domains-order-reverse-18
-light	schema-domains-variadic-precedence-reverse-18
 light	schema-enums-17
 light	schema-enums-18
 light	schema-expressions-array-catalog-shape-17
@@ -157,7 +157,7 @@ light	schema-views-assignments-17
 light	schema-views-assignments-18
 light	schema-views-automatic-17
 light	schema-views-automatic-18
-light	schema-views-mechanisms-18
+light	schema-views-mechanisms-17
 light	schema-views-special-17
 light	schema-views-special-18
 light	serial-family-17

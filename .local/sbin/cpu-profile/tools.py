@@ -104,7 +104,7 @@ class Tools:
             return
         commands = [
             ["perf", "script", "-i", str(directory / "perf.data"), "--demangle",
-             "-F", "comm,pid,tid,cpu,time,event,ip,sym,dso"],
+             "-F", "comm,pid,tid,time,event,ip,sym,dso"],
             ["c++filt", "--format=rust"],
             ["perl", str(self.args.flamegraph / "stackcollapse-perf.pl"), "--event-filter=cpu-clock:u"],
             ["perl", str(self.args.flamegraph / "flamegraph.pl"), "--title=Server user-space CPU samples",

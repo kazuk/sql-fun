@@ -1,26 +1,34 @@
 # Next-major compatibility migration specifications
 
-When a breaking public API cleanup is deferred to preserve the current release
-intent, record the temporary compatibility debt in a Markdown specification
-under the affected crate's `next-major/` directory.
+While a crate's release intent is below `major`, preserve existing public API
+compatibility. For example, when replacing a public type or API, retain the old
+API with a deprecation annotation or another compatible transition mechanism
+instead of removing or breaking it.
 
-This directory is a work queue for the **next major release**, not a permanent
-documentation archive. Keep each specification focused on one migration and
+Record each such temporary compatibility measure and its planned removal in a
+Markdown specification under the affected crate's `next-major/` directory.
+
+This directory inventories compatibility measures to remove or complete when
+the crate's release intent becomes `major`; it is not a permanent documentation
+archive. Keep each specification focused on one migration and
 name it after the affected API or compatibility layer, for example
 `sql-fun-core/next-major/remove-legacy-type-adapter.md`.
 
 ## When to create a specification
 
 Create the specification in the same PR that introduces or deliberately retains
-a compatibility workaround for a future breaking release. Do not create a
+a temporary API compatibility measure, such as a deprecated type, for a future
+breaking release. Do not create a
 specification for an ordinary compatible change that has no planned migration.
 
 Include enough information for a later contributor or agent to complete the
 migration without reconstructing the original decision:
 
-- **Reason:** why the compatibility behavior must remain for the current release.
+- **Reason:** which existing API is preserved and why the compatibility measure
+  is needed while release intent remains below `major`.
 - **Next-major change:** the intended public API or behavior after the breaking change.
-- **Removal/simplification:** the concrete compatibility code to remove or simplify.
+- **Removal/simplification:** the concrete deprecated APIs, compatibility
+  aliases, adapters, or other transitional code to remove or simplify.
 - **References:** affected APIs, relevant tests, and the introducing PR or issue.
 - **Completion criteria:** observable conditions that establish the migration is done.
 

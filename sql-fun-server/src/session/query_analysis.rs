@@ -388,19 +388,14 @@ impl<'a> StatementAnalysis<'a> {
         expand_asterisk: bool,
         analyze_access: bool,
         cache_context: &mut CacheContext,
+        lint_configuration: &::sql_fun_core::LintConfigurations,
     ) -> QueryResult {
         let base = self.schema.base_context();
         let mut result = QueryResult::for_statement(self.statement, self.mapping);
         let mut context =
             SchemaFileContext::new(&self.source.path, base, base.get_args(), base.metadata());
         if self.schema.has_project_schema() {
-            match base.metadata().load_lint_configuration() {
-                Ok(configuration) => context.set_lint_configuration(&configuration),
-                Err(error) => {
-                    result.report(self, QueryAnalysisStage::analysis(), &error.to_string());
-                    return result;
-                }
-            }
+            context.set_lint_configuration(lint_configuration);
         }
         context.set_diagnostic_source(self.statement_text());
         context.set_statement_span(*self.statement.span());
@@ -761,6 +756,7 @@ fn analyze(
     schema: &InitializedSchema,
     expand_asterisk: bool,
     cache_context: &mut CacheContext,
+    lint_configuration: &::sql_fun_core::LintConfigurations,
 ) -> Vec<QueryResult> {
     let dialect = Dialect::from(schema.base_context().metadata());
     let fail = |stage: QueryAnalysisStage, message: &str| {
@@ -801,6 +797,7 @@ fn analyze(
                                     expand_asterisk,
                                     *args.analyze_access(),
                                     cache_context,
+                                    lint_configuration,
                                 ),
                             ]
                         }
@@ -825,10 +822,14 @@ fn analyze(
     };
     parse_statements(&mapping.rendered, dialect)
         .map(|statement| match statement {
-            Ok(statement) => StatementAnalysis::new(
-                &statement, &bindings, source, schema, &mapping,
-            )
-            .run(expand_asterisk, *args.analyze_access(), cache_context),
+            Ok(statement) => {
+                StatementAnalysis::new(&statement, &bindings, source, schema, &mapping).run(
+                    expand_asterisk,
+                    *args.analyze_access(),
+                    cache_context,
+                    lint_configuration,
+                )
+            }
             Err(error) => QueryResult::parse_failure(&error, source, schema, &mapping),
         })
         .collect()
@@ -842,6 +843,7 @@ impl Session<'_, '_> {
         let schema = self
             .context(args.context_handle())
             .ok_or_else(SqlFunServerApiError::invalid_context_handle)?;
+        let configuration = self.lint_configuration(args.context_handle())?;
         let source = QuerySource::from_request(args)?;
         let results = analyze(
             args,
@@ -849,7 +851,11 @@ impl Session<'_, '_> {
             schema,
             self.expand_asterisk(args.context_handle()),
             self.cache_context(args.context_handle()),
+            &configuration,
         );
+        for result in &results {
+            self.observe_lints(args.context_handle(), &result.lint_observations);
+        }
         let mut handles = Vec::new();
         let response = (|| {
             let mut items = Vec::new();
@@ -879,7 +885,7 @@ impl Session<'_, '_> {
         response
     }
 
-    fn query_page<T: ::serde::Serialize + ::serde::de::DeserializeOwned>(
+    pub(super) fn query_page<T: ::serde::Serialize + ::serde::de::DeserializeOwned>(
         &mut self,
         items: Vec<T>,
         handles: &mut Vec<CollectionHandle>,

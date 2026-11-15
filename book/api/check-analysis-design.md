@@ -33,7 +33,8 @@ The call sequence is:
 ```text
 initialize                -> authenticate connection
 initialize_schema_context -> receive a context_handle and schema diagnostics
-analyze_query             -> send a query with that context_handle
+analyze_query             -> send a query with that context_handle (repeatable)
+report_lint_expectations  -> report currently unmet expectations (repeatable)
 read_collection           -> read remaining results, when a collection is returned
 release_collection        -> release collections when no longer needed
 ```
@@ -42,6 +43,46 @@ A client can analyze multiple queries against the same initialized context.
 The client must supply the context handle with every analysis request; the
 server does not infer a datasource from the SQL text. A client using more
 than one datasource initializes and selects their contexts separately.
+
+### Report current lint expectations
+
+Call `report_lint_expectations` with an existing `context_handle` to obtain a
+`problems` collection containing `unmet_lint_expectation` warnings for configured
+`expect = true` targets whose deprecated diagnostic has not occurred for that
+handle. This also works before submitting any queries. Unresolved or
+uninterpretable expected targets remain eligible; configuration warnings do not
+satisfy an expectation. Duplicate resolved targets have one effective expectation
+with logical-OR `expect`.
+
+Reporting does not end analysis, freeze the context, consume observations, or
+reset them. Repeated reports are valid. Continue calling `analyze_query` on the
+same handle; if a matching deprecated diagnostic occurs, a later report no longer
+includes that unmet expectation. Other context operations are unaffected.
+Unknown handles and handles from another connection return `InvalidContextHandle`.
+
+The first diagnostic page and further `read_collection` pages are a snapshot as
+of that report. Later analysis does not change earlier collections. Release each
+collection when it is no longer needed; releasing it does not reset observations.
+Disconnecting drops connection-owned state without an unsolicited report.
+
+Each initialization retains its selected lint configuration for the handle's
+lifetime. Editing the file does not change existing contexts; initialize a new
+context to select the updated configuration. Observations are independent across
+handles and connections, including when the immutable schema cache is shared.
+Lower schema prefixes do not load or apply project lint configuration.
+
+The server reports observations from the analyses it performed. It does not
+assert that every intended application SQL statement was submitted, and SQL
+failures do not suppress unmet expectations or cancel previous observations.
+The caller decides when to report and whether unmet warnings are actionable.
+Typed-client and CLI workflow integration remains tracked in
+[#1088](https://github.com/kazuk/sql-fun/issues/1088).
+
+<!-- Method pages are generated in the staged manual build. -->
+<!-- rumdl-disable MD057 -->
+See the generated [`report_lint_expectations` reference](methods/report_lint_expectations.md)
+for the request and response schemas.
+<!-- rumdl-enable MD057 -->
 
 ### 1. Initialize a schema context
 

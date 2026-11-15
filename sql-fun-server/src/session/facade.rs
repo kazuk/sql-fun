@@ -4,7 +4,7 @@ use crate::{
     process_request as local_process_request,
     session::{
         SessionState, context_handle_registry::ContextHandleRegistry,
-        initialization::Initialization,
+        initialization::Initialization, lint_expectations::LintExpectations,
     },
 };
 use std::sync::Arc;
@@ -13,7 +13,8 @@ use sql_fun_server_api::{
     SqlFunServerApiError,
     payloads::{
         AnalysisProbrem, CollectionHandle, ContextHandle, DiagnosticSeverity, InitializeSchemaArgs,
-        ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, StatementByteRange,
+        ReadCollectionArgs, ReleaseCollectionArgs, ReportLintExpectationsArgs,
+        ReportLintExpectationsResponse, SchemaContext, StatementByteRange,
     },
 };
 
@@ -115,12 +116,21 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
     ) -> Result<SchemaContext, SqlFunServerApiError> {
         let initialization = Initialization::from_request(args)?;
         let schema = Arc::new(initialization.initialize(api).await?);
+        let (lint_expectations, warnings) = LintExpectations::new(
+            &schema,
+            initialization.lint_configuration(),
+            initialization.lint_path(),
+        )?;
         let context_handle = self
             .contexts
             .register_with_options(&schema, *initialization.rewrite_options())
             .map_err(|error| SqlFunServerApiError::new_unexpected(&error.to_string()))?;
+        self.state
+            .lint_expectations
+            .insert(context_handle.clone(), lint_expectations);
         let retained = self.context(&context_handle).expect("registered schema");
-        let diagnostics = Diagnostics::from(retained);
+        let mut diagnostics = Diagnostics::from(retained);
+        diagnostics.warnings = warnings;
         let handle = self.register_collection(diagnostics, Diagnostics::len, Diagnostics::map)?;
         // Reading and decoding this page cannot fail for the mapping below. Roll
         // back its registration if serialization contracts ever change.
@@ -139,6 +149,51 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
             schema.actual_hash(),
             page,
         ))
+    }
+
+    pub(super) fn lint_configuration(
+        &self,
+        handle: &ContextHandle,
+    ) -> Result<Arc<::sql_fun_core::LintConfigurations>, SqlFunServerApiError> {
+        self.state
+            .lint_expectations
+            .get(handle)
+            .map(LintExpectations::configuration)
+            .ok_or_else(SqlFunServerApiError::invalid_context_handle)
+    }
+
+    pub(super) fn observe_lints(
+        &mut self,
+        handle: &ContextHandle,
+        observations: &::sql_fun_sqlast::sem::DeprecatedObservations,
+    ) {
+        self.state
+            .lint_expectations
+            .get_mut(handle)
+            .expect("validated lint state")
+            .observe(observations);
+    }
+
+    fn report_lint_expectations(
+        &mut self,
+        args: &ReportLintExpectationsArgs,
+    ) -> Result<ReportLintExpectationsResponse, SqlFunServerApiError> {
+        let problems = self
+            .state
+            .lint_expectations
+            .get(args.context_handle())
+            .ok_or_else(SqlFunServerApiError::invalid_context_handle)?
+            .report();
+        let mut handles = Vec::new();
+        let result = self
+            .query_page(problems, &mut handles)
+            .map(ReportLintExpectationsResponse::new);
+        if result.is_err() {
+            for handle in handles {
+                self.release_collection(&ReleaseCollectionArgs::new(&handle))?;
+            }
+        }
+        result
     }
 
     fn tokenize_sql(
@@ -188,6 +243,9 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
                 let result = self.initialize_schema_context(api, &args).await?;
                 Ok(::serde_json::to_value(result)?)
             }
+            "report_lint_expectations" => Ok(::serde_json::to_value(
+                self.report_lint_expectations(&Self::arguments(request)?)?,
+            )?),
             "read_collection" => Ok(self.read_collection(&Self::arguments(request)?)?),
             "release_collection" => {
                 self.release_collection(&Self::arguments(request)?)?;
@@ -213,19 +271,25 @@ mod tests;
 /// This source borrows cached diagnostics and maps only the requested items.
 struct Diagnostics<'ctx> {
     layers: &'ctx [Arc<LayerDiagnostics>],
+    warnings: Vec<AnalysisProbrem>,
 }
 
 impl<'ctx> From<&'ctx InitializedSchema> for Diagnostics<'ctx> {
     fn from(schema: &'ctx InitializedSchema) -> Self {
         Self {
             layers: schema.analysis().diagnostics(),
+            warnings: Vec::new(),
         }
     }
 }
 
 impl Diagnostics<'_> {
     fn len(&self) -> usize {
-        self.layers.iter().map(|layer| layer.problems().len()).sum()
+        self.layers
+            .iter()
+            .map(|layer| layer.problems().len())
+            .sum::<usize>()
+            + self.warnings.len()
     }
 }
 
@@ -241,7 +305,13 @@ impl Diagnostics<'_> {
         StatementByteRange::new(span.offset(), span.len())
     }
 
-    fn map(item: Diagnostic<'_>) -> ::serde_json::Value {
+    fn map(item: DiagnosticItem<'_>) -> ::serde_json::Value {
+        let item = match item {
+            DiagnosticItem::Schema(item) => item,
+            DiagnosticItem::Configuration(problem) => {
+                return ::serde_json::to_value(problem).expect("diagnostic serializes");
+            }
+        };
         let span = item.problem.statement_relative_span().map(Self::span);
         let severity = DiagnosticSeverity::from(item.problem.severity());
         ::serde_json::to_value(
@@ -252,12 +322,24 @@ impl Diagnostics<'_> {
     }
 }
 
+#[derive(Clone, Copy)]
+enum DiagnosticItem<'a> {
+    Schema(Diagnostic<'a>),
+    Configuration(&'a AnalysisProbrem),
+}
+
 impl<'read> IntoIterator for &'read Diagnostics<'_> {
-    type Item = Diagnostic<'read>;
+    type Item = DiagnosticItem<'read>;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'read>;
 
     fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.layers.iter().flat_map(LayerProblems::items))
+        Box::new(
+            self.layers
+                .iter()
+                .flat_map(LayerProblems::items)
+                .map(DiagnosticItem::Schema)
+                .chain(self.warnings.iter().map(DiagnosticItem::Configuration)),
+        )
     }
 }
 

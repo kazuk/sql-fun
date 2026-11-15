@@ -45,6 +45,17 @@ impl DeprecatedObservation {
 #[derive(Debug, Clone, Default)]
 pub struct DeprecatedObservations(Vec<DeprecatedObservation>);
 impl DeprecatedObservations {
+    /// Interpret configured expectations without requiring a SQL statement.
+    ///
+    /// Reports configuration warnings through the supplied project analysis context.
+    /// Resolved duplicate entries share their first declaration index and OR `expect`.
+    /// Uninterpretable entries retain their own index and remain unobserved.
+    /// # Errors
+    /// Returns an error when configuration diagnostic delivery fails.
+    pub fn from_context(context: &mut impl ParseContext) -> Result<Self, AnalysisError> {
+        Ok(DeprecatedHandler::new(context)?.observations)
+    }
+
     /// Effective configured expectations, including inapplicable declarations.
     pub fn entries(&self) -> &[DeprecatedObservation] {
         &self.0

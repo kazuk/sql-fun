@@ -1,4 +1,5 @@
 pub(crate) mod heavy;
+pub(crate) mod lint_expectations;
 pub(crate) mod pid_file;
 
 /// Create independent cache state for a test-owned analysis base.

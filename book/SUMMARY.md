@@ -154,6 +154,7 @@
   - [deprecated](diagnostics/deprecated.md)
   - [duplicate_lint_target](diagnostics/duplicate_lint_target.md)
   - [lint_configuration](diagnostics/lint_configuration.md)
+  - [unmet_lint_expectation](diagnostics/unmet_lint_expectation.md)
   - [duplicate_alias](diagnostics/duplicate_alias.md)
   - [duplicate_def_elem_key](diagnostics/duplicate_def_elem_key.md)
   - [explicit_cast_not_defined](diagnostics/explicit_cast_not_defined.md)

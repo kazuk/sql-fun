@@ -40,6 +40,7 @@ enum LintProblemKind {
     Deprecated,
     Configuration,
     Duplicate,
+    UnmetExpectation,
 }
 impl LintProblemKind {
     const fn code(&self) -> &'static str {
@@ -47,6 +48,7 @@ impl LintProblemKind {
             Self::Deprecated => "deprecated",
             Self::Configuration => "lint_configuration",
             Self::Duplicate => "duplicate_lint_target",
+            Self::UnmetExpectation => "unmet_lint_expectation",
         }
     }
 }
@@ -82,6 +84,15 @@ impl LintProblem {
             LintProblemKind::Duplicate,
             target,
             "duplicate deprecated lint target",
+        )
+    }
+    /// An explicitly expected deprecated diagnostic has not occurred yet.
+    #[must_use]
+    pub fn unmet_expectation(target: &LintTarget) -> Self {
+        Self::new(
+            LintProblemKind::UnmetExpectation,
+            target,
+            "expected deprecated diagnostic has not occurred",
         )
     }
     fn new(kind: LintProblemKind, target: &LintTarget, reason: &str) -> Self {
@@ -130,6 +141,7 @@ mod test_lint_diagnostics {
     #[case::deprecated("deprecated")]
     #[case::configuration("lint_configuration")]
     #[case::duplicate("duplicate_lint_target")]
+    #[case::unmet("unmet_lint_expectation")]
     fn structured_warnings_round_trip(#[case] code: &str) {
         let target = LintTarget::new(
             "table",
@@ -142,7 +154,8 @@ mod test_lint_diagnostics {
             "lint_configuration" => {
                 LintProblem::configuration(&target, "column cannot be resolved")
             }
-            _ => LintProblem::duplicate(&target),
+            "duplicate_lint_target" => LintProblem::duplicate(&target),
+            _ => LintProblem::unmet_expectation(&target),
         };
         let problem = AnalysisProblem::lint(&problem);
         let restored: AnalysisProblem =

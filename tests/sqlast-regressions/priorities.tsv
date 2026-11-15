@@ -46,7 +46,6 @@ medium	project-roles-17
 medium	project-roles-18
 medium	project-roles-empty-17
 medium	project-roles-empty-18
-medium	rows-17
 medium	rows-18
 medium	rows-from-17
 medium	rows-from-18
@@ -81,6 +80,7 @@ medium	schema-update-18
 medium	schema-views-diagnostics-17
 medium	schema-views-diagnostics-18
 medium	schema-views-precedence-17
+medium	schema-views-precedence-18
 medium	set-operations-17
 medium	set-operations-18
 medium	table-additions-17
@@ -123,6 +123,7 @@ light	project-roles-omitted-17
 light	project-roles-omitted-18
 light	row-security-17
 light	row-security-18
+light	rows-17
 light	schema-delete-17
 light	schema-delete-18
 light	schema-domains-builtin-17
@@ -157,7 +158,6 @@ light	schema-views-automatic-17
 light	schema-views-automatic-18
 light	schema-views-mechanisms-17
 light	schema-views-mechanisms-18
-light	schema-views-precedence-18
 light	schema-views-special-17
 light	schema-views-special-18
 light	serial-family-17

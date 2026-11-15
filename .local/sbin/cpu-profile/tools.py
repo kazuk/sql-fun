@@ -29,33 +29,45 @@ def run(command, output, **kwargs):
 
 
 class Tools:
-    def __init__(self, args, metadata):
+    def __init__(self, args, metadata, root, flamegraph):
         self.args, self.metadata = args, metadata
-        self.env = dict(os.environ, LC_ALL="C")
+        # linux-tools-common supplies a kernel-selecting wrapper. Use the actual
+        # packaged binary and let real capture establish host-kernel compatibility.
+        self.perf, = root.glob("usr/lib/linux-tools/*/perf")
+        self.flamegraph = flamegraph
+        self.demangler = root / "usr/bin/c++filt"
+        self.perl = root / "usr/bin/perl"
+        triplet = subprocess.check_output(["dpkg-architecture", "-qDEB_HOST_MULTIARCH"], text=True).strip()
+        self.env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=":".join(
+            str(root / path) for path in (f"usr/lib/{triplet}", f"lib/{triplet}", "usr/lib", "lib")))
+        self.env["PERL5LIB"] = ":".join(str(path) for pattern in (
+            "usr/share/perl/*", f"usr/lib/{triplet}/perl/*") for path in root.glob(pattern) if path.is_dir())
+        self.env.pop("LD_PRELOAD", None)
+        self.env.pop("APT_CONFIG", None)
         self.events = []
         self.metadata["profiling"] = dict(event="cpu-clock:u", frequency_hz=99, call_graph="fp") \
             if args.mode == "record" else dict(events=self.events)
 
     def command(self, directory, workload):
         if self.args.mode == "record":
-            return ["perf", "record", "-e", "cpu-clock:u", "-F", "99", "--call-graph", "fp",
+            return [str(self.perf), "record", "-e", "cpu-clock:u", "-F", "99", "--call-graph", "fp",
                     "-o", str(directory / "perf.data"), "--", *map(str, workload)]
-        return ["perf", "stat", "-e", ",".join(self.events),
+        return [str(self.perf), "stat", "-e", ",".join(self.events),
                 "-o", str(directory / "stat.txt"), "--", *map(str, workload)]
 
     def check(self, reports):
         self.metadata["tools"] = dict(perf=subprocess.check_output(
-            ["perf", "version"], env=self.env, text=True).strip())
+            [str(self.perf), "version"], env=self.env, text=True).strip())
         if self.args.mode == "record":
             self.metadata["tools"].update(
-                flamegraph_directory=str(self.args.flamegraph),
+                flamegraph_directory=str(self.flamegraph),
                 flamegraph_revision=subprocess.check_output(
-                    ["git", "-C", str(self.args.flamegraph), "rev-parse", "HEAD"], text=True).strip(),
-                flamegraph_sha256={name: digest(self.args.flamegraph / name)
+                    ["git", "-C", str(self.flamegraph), "rev-parse", "HEAD"], text=True).strip(),
+                flamegraph_sha256={name: digest(self.flamegraph / name)
                                    for name in ("stackcollapse-perf.pl", "flamegraph.pl")},
-                demangler=subprocess.check_output(["c++filt", "--version"], text=True).splitlines()[0])
-            readable = subprocess.check_output(["c++filt", "--format=rust"],
-                                               input="_RNvC4test4main\n", text=True)
+                demangler=subprocess.check_output([str(self.demangler), "--version"], env=self.env, text=True).splitlines()[0])
+            readable = subprocess.check_output([str(self.demangler), "--format=rust"],
+                                               input="_RNvC4test4main\n", env=self.env, text=True)
             if "test" not in readable or "::main" not in readable:
                 raise RuntimeError("c++filt must support Rust v0 symbols")
         smoke = reports / "smoke"
@@ -81,7 +93,7 @@ class Tools:
         unavailable = {}
         for event in EVENTS:
             report = smoke / (event + ".txt")
-            command = ["perf", "stat", "-e", event, "-o", str(report), "--", "true"]
+            command = [str(self.perf), "stat", "-e", event, "-o", str(report), "--", "true"]
             result = subprocess.run(command, env=self.env, stdout=log, stderr=log)
             text = report.read_text() if report.exists() else ""
             if "<not supported>" in text or "not supported" in text.lower():
@@ -103,11 +115,11 @@ class Tools:
                 raise RuntimeError("Selected perf stat events were not measured; inspect stat.txt")
             return
         commands = [
-            ["perf", "script", "-i", str(directory / "perf.data"), "--demangle",
+            [str(self.perf), "script", "-i", str(directory / "perf.data"), "--demangle",
              "-F", "comm,pid,tid,time,event,ip,sym,dso"],
-            ["c++filt", "--format=rust"],
-            ["perl", str(self.args.flamegraph / "stackcollapse-perf.pl"), "--event-filter=cpu-clock:u"],
-            ["perl", str(self.args.flamegraph / "flamegraph.pl"), "--title=Server user-space CPU samples",
+            [str(self.demangler), "--format=rust"],
+            [str(self.perl), str(self.flamegraph / "stackcollapse-perf.pl"), "--event-filter=cpu-clock:u"],
+            [str(self.perl), str(self.flamegraph / "flamegraph.pl"), "--title=Server user-space CPU samples",
              "--countname=samples"],
         ]
         # Files keep diagnostics/recovery simple and avoid a failed pipeline

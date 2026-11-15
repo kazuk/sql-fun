@@ -23,7 +23,8 @@ class ProfiledServer:
         command = self.tools.command(self.reports, [self.binary, "--server-idle-timeout", str(IDLE_TIMEOUT)])
         self.metadata["capture_command"] = command
         self.log = (self.reports / "server.log").open("w")
-        self.process = subprocess.Popen(command, env=self.env, stdin=subprocess.DEVNULL,
+        env = dict(self.env, LD_LIBRARY_PATH=self.tools.env["LD_LIBRARY_PATH"])
+        self.process = subprocess.Popen(command, env=env, stdin=subprocess.DEVNULL,
                                         stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
         self.metadata["perf_pid"] = self.process.pid
         deadline = time.monotonic() + 60

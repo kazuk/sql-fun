@@ -19,6 +19,7 @@ sys.path.insert(0, str(SUITE))
 import parallel_runner as regression
 import scheduling
 
+from provision import provision
 from server import IDLE_TIMEOUT, ProfiledServer
 from tools import Tools, digest, run
 
@@ -34,34 +35,26 @@ def arguments(argv):
                         help="One measurement per invocation")
     parser.add_argument("--features", required=True, choices=("default", "all"), help="Feature variant")
     parser.add_argument("--sql-fun-home", required=True, type=Path, help="Absolute builtin catalog installation")
-    parser.add_argument("--flamegraph", type=Path, help="Explicit FlameGraph Git checkout (record mode only)")
     parser.add_argument("--output", type=Path, default=ROOT / "target/cpu-reports", help="Report parent directory")
     args = parser.parse_args(argv)
-    if sys.platform != "linux":
-        parser.error("CPU profiling requires Linux; initial supported environment is Ubuntu 24.04")
-    for name in ("sql_fun_home", "output", "flamegraph"):
+    if (sys.platform != "linux" or 'ID=ubuntu\n' not in Path("/etc/os-release").read_text()
+            or 'VERSION_ID="24.04"' not in Path("/etc/os-release").read_text()
+            or os.uname().machine != "x86_64"):
+        parser.error("Automatic profiling tool provisioning supports Ubuntu 24.04 amd64 only")
+    for name in ("sql_fun_home", "output"):
         path = getattr(args, name)
-        if path is not None and not path.is_absolute():
-            parser.error(f"--{name.replace('_', '-')} must be an absolute path")
-    if args.mode == "record" and args.flamegraph is None:
-        parser.error("--mode record requires --flamegraph /absolute/path/to/FlameGraph")
-    if args.mode == "stat" and args.flamegraph is not None:
-        parser.error("--flamegraph applies only to --mode record")
+        if not path.is_absolute() or any(char in str(path) for char in '\n\r"\\%'):
+            parser.error(f"--{name.replace('_', '-')} must be an absolute path without quotes, backslashes, percent signs or newlines")
     return args
 
 
 def prerequisites(args):
-    commands = ["perf", "cargo", "rustc", "git", "bash", "jq", "cc"]
-    if args.mode == "record":
-        commands.extend(("perl", "c++filt"))
+    commands = ["cargo", "rustc", "git", "bash", "jq", "cc",
+                "apt-get", "dpkg-deb", "dpkg-architecture"]
     for command in commands:
         if not shutil.which(command):
             raise RuntimeError(f"Required profiling tool is unavailable: {command}. "
                                "See docs/internal-rules/server-cpu-profiling.md for setup.")
-    if args.mode == "record":
-        for name in ("stackcollapse-perf.pl", "flamegraph.pl"):
-            if not (args.flamegraph / name).is_file():
-                raise RuntimeError(f"Missing FlameGraph script: {args.flamegraph / name}")
     groups = sorted(regression.inventory(), key=lambda group: group["id"])
     priorities = scheduling.read_priorities(SUITE / "priorities.tsv", groups)
     for version in {group["version"] for group in groups}:
@@ -183,7 +176,7 @@ def capture(args, tools, binaries, groups, priorities, reports, metadata):
             server.close()
 
 
-def measurement(args, reports, metadata):
+def measurement(args, reports, metadata, scratch):
     groups, priorities = prerequisites(args)
     metadata["expected_groups"] = len(groups)
     metadata["expected_cases"] = sum(group["count"] for group in groups)
@@ -192,7 +185,10 @@ def measurement(args, reports, metadata):
     metadata["catalog_metadata_sha256"] = {
         version: digest(args.sql_fun_home / "postgres" / version / "metadata.json")
         for version in sorted({group["version"] for group in groups})}
-    tools = Tools(args, metadata)
+    began = time.monotonic()
+    root, flamegraph = provision(scratch, reports, args.mode)
+    metadata["seconds"]["provision"] = time.monotonic() - began
+    tools = Tools(args, metadata, root, flamegraph)
     began = time.monotonic()
     try:
         tools.check(reports)
@@ -282,7 +278,8 @@ def main(argv=None):
                         dirty=bool(subprocess.check_output(["git", "status", "--porcelain"], text=True)),
                         kernel=os.uname().release,
                         perf_event_paranoid=Path("/proc/sys/kernel/perf_event_paranoid").read_text().strip())
-        measurement(args, reports, metadata)
+        with tempfile.TemporaryDirectory(prefix="cpu-tools-", dir=args.output) as scratch:
+            measurement(args, reports, metadata, Path(scratch))
         status = 0
     except (Exception, KeyboardInterrupt) as error:
         metadata["error"] = str(error) or "Interrupted"

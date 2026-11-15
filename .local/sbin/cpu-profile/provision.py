@@ -66,4 +66,3 @@ def provision(scratch, reports, mode):
         sources=(apt / "etc/sources.list").read_text(), packages=packages,
         seconds=time.monotonic() - began), indent=2) + "\n")
     return root, flamegraph
-

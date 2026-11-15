@@ -157,7 +157,7 @@ impl ColumnReferenceExpr {
             &IVec::default(),
             false,
         );
-        SemScalarExpr::column_reference(Self::TableFuncColumn(reference))
+        SemScalarExpr::column_reference(Self::table_function(reference))
     }
 }
 
@@ -165,13 +165,13 @@ impl ColumnReferenceExpr {
     fn with_function_source_nullability(self, nullable: bool) -> Self {
         match self {
             Self::TableFuncColumn(reference) => {
-                Self::TableFuncColumn(reference.with_nullability(nullable))
+                Self::table_function(reference.with_nullability(nullable))
             }
             _ => self,
         }
     }
-    const fn table_function(reference: TableFunctionColumnRef) -> Self {
-        Self::TableFuncColumn(reference)
+    pub(super) fn table_function(reference: TableFunctionColumnRef) -> Self {
+        Self::TableFuncColumn(Box::new(reference))
     }
 }
 impl SemScalarExpr {

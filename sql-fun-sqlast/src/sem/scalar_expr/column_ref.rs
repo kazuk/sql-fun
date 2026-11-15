@@ -62,7 +62,7 @@ pub enum ColumnReferenceExpr {
     /// View column
     ViewColumn(ViewColumnRef),
     /// table function result column
-    TableFuncColumn(TableFunctionColumnRef),
+    TableFuncColumn(Box<TableFunctionColumnRef>),
     /// Sub-query column
     SubQueryColumn(SubQueryColumnRef),
 
@@ -183,7 +183,7 @@ impl ColumnReferenceExpr {
                 Self::SubQueryColumn(value.with_reference_name(alias, column))
             }
             Self::TableFuncColumn(value) => {
-                Self::TableFuncColumn(value.with_reference_name(alias, column))
+                Self::table_function(value.with_reference_name(alias, column))
             }
             _ => self,
         }

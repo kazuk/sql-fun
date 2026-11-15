@@ -127,9 +127,10 @@ incomplete captures never count as successful results.
 
 ## Permission failures and storage
 
-A working `perf version` does not establish permission to profile. The smoke
-check exercises the selected mode and, for `record`, stack extraction and
-symbolization. On failure inspect `smoke/smoke.log`, the smoke stat reports and
+For download or tool preparation failures, inspect `provision.log`. Successful
+tool preparation does not establish permission to profile. The smoke check
+exercises the selected mode and, for `record`, stack extraction and symbolization.
+For capture failures inspect `smoke/smoke.log`, the smoke stat reports and
 `run.json`. Check the host's `kernel.perf_event_paranoid`, permissions such as
 `CAP_PERFMON`, and container seccomp restrictions on `perf_event_open`. A host
 administrator must choose any necessary permission changes. A changed host

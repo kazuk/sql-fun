@@ -10,36 +10,24 @@ selected installed builtin catalogs; it is not executed against a live database.
 ## Prerequisites
 
 Use the [contributor environment](../../CONTRIBUTING.md#getting-started).
-The initial supported environment is local Linux development on Ubuntu 24.04.
-Both modes require Cargo/Rust, uv with Python 3.12, Bash, jq, a C compiler for
-the short capability check, Git and a working Linux `perf`. These profiling
-prerequisites are not required for normal development or installed sql-fun use.
+Automatic tool preparation supports Ubuntu 24.04 amd64. Both modes require
+Cargo/Rust, uv with Python 3.12, Bash, jq, a C compiler for the short capability
+check, Git, APT and dpkg tools from that environment.
 
-Install perf appropriate to the **running kernel**. On Ubuntu, for example:
+The command downloads Ubuntu packages into a private temporary APT tree and
+extracts perf and its runtime dependencies without installing system packages or
+changing the host's APT configuration/cache. Record mode also prepares binutils,
+Perl and the project's pinned FlameGraph revision. Stat does not prepare those
+record-only tools. Network access to Ubuntu package archives and GitHub is
+required. Temporary tools are removed when the invocation finishes; reports
+retain package identities/hashes, preparation logs and time, and FlameGraph
+revision/script hashes.
 
-```sh
-sudo apt-get install linux-tools-common "linux-tools-$(uname -r)"
-perf version
-```
-
-A container uses its host kernel: its distribution's default tools package
-might not match that kernel, and the exact package might not be available in
-its configured archives. Make a compatible perf executable available on `PATH`;
-installing a generic package alone does not prove capture works.
-
-`record` additionally requires Perl, GNU binutils `c++filt` with Rust v0
-symbol support, and an explicitly selected checkout of
-[FlameGraph](https://github.com/brendangregg/FlameGraph):
-
-```sh
-sudo apt-get install perl binutils
-git clone https://github.com/brendangregg/FlameGraph.git /absolute/path/to/FlameGraph
-```
-
-The checkout must contain `stackcollapse-perf.pl` and `flamegraph.pl`.
-Its revision and script hashes are recorded. The command does not download tools,
-install packages, change permissions or alter kernel settings. `stat` does not
-require Perl, binutils or a FlameGraph checkout.
+The actual packaged perf executable is used instead of Ubuntu's kernel-selecting
+wrapper. A container shares its host kernel; compatibility and capture permission
+are verified by real mode-specific smoke measurements before the expensive build.
+Tool preparation does not change kernel settings, capabilities or seccomp policy.
+See [permission failures](#permission-failures-and-storage) below.
 
 ## Choose one measurement
 
@@ -47,8 +35,7 @@ Select the feature variant and catalog installation explicitly. For a FlameGraph
 
 ```sh
 profile-server-cpu --mode record --features default \
-  --sql-fun-home /absolute/path/to/sql-fun-home \
-  --flamegraph /absolute/path/to/FlameGraph
+  --sql-fun-home /absolute/path/to/sql-fun-home
 ```
 
 Omitting `--mode` selects `record`. For aggregate statistics:
@@ -69,7 +56,8 @@ the actual repository root, regardless of the caller's directory. Override the
 parent with `--output /absolute/path/to/reports`. All path arguments must be
 absolute. Outputs from different invocations are independent measurements.
 
-A small mode-specific capture check runs before the expensive build. The command
+Private tool preparation and a small mode-specific capture check run before the
+expensive build. The command
 then builds the selected CLI and server with locked release dependencies,
 optimization level 3, full debug information, no stripping and frame pointers.
 Settings apply only to this invocation; normal Cargo profiles are unchanged.
@@ -105,6 +93,7 @@ Inspect the printed run directory for the complete evidence:
 - `run.json`: overall result, selected mode/features, revision and dirty state,
   kernel, tool/build settings, binary/catalog hashes, server identity, workload,
   capture and report outcomes, timings and report storage.
+- `provision.log`, `packages.json`: private tool acquisition and package provenance.
 - `build.log`, `server.log`, `smoke/`: build output, server/perf diagnostics and
   capability-check evidence. Perf's lost-sample warnings remain in its log.
 - `suite/`: unchanged worker logs, JUnit reports, aggregation, claims, isolation

@@ -284,6 +284,10 @@ impl<'ctx> From<&'ctx InitializedSchema> for Diagnostics<'ctx> {
 }
 
 impl Diagnostics<'_> {
+    fn map(item: DiagnosticItem<'_>) -> ::serde_json::Value {
+        item.into_value()
+    }
+
     fn len(&self) -> usize {
         self.layers
             .iter()
@@ -300,15 +304,25 @@ struct Diagnostic<'ctx> {
     presentation: Option<&'ctx ::sql_fun_core::DiagnosticPresentation>,
 }
 
-impl Diagnostics<'_> {
-    const fn span(span: ::sql_fun_core::analysis_problem::StringSpan) -> StatementByteRange {
-        StatementByteRange::new(span.offset(), span.len())
+#[derive(Clone, Copy)]
+enum DiagnosticItem<'a> {
+    Schema(Diagnostic<'a>),
+    Configuration(&'a AnalysisProbrem),
+}
+
+impl<'a> DiagnosticItem<'a> {
+    const fn schema(diagnostic: Diagnostic<'a>) -> Self {
+        Self::Schema(diagnostic)
     }
 
-    fn map(item: DiagnosticItem<'_>) -> ::serde_json::Value {
-        let item = match item {
-            DiagnosticItem::Schema(item) => item,
-            DiagnosticItem::Configuration(problem) => {
+    const fn configuration(problem: &'a AnalysisProbrem) -> Self {
+        Self::Configuration(problem)
+    }
+
+    fn into_value(self) -> ::serde_json::Value {
+        let item = match self {
+            Self::Schema(item) => item,
+            Self::Configuration(problem) => {
                 return ::serde_json::to_value(problem).expect("diagnostic serializes");
             }
         };
@@ -320,12 +334,10 @@ impl Diagnostics<'_> {
         )
         .expect("diagnostic serializes")
     }
-}
 
-#[derive(Clone, Copy)]
-enum DiagnosticItem<'a> {
-    Schema(Diagnostic<'a>),
-    Configuration(&'a AnalysisProbrem),
+    const fn span(span: ::sql_fun_core::analysis_problem::StringSpan) -> StatementByteRange {
+        StatementByteRange::new(span.offset(), span.len())
+    }
 }
 
 impl<'read> IntoIterator for &'read Diagnostics<'_> {
@@ -337,8 +349,8 @@ impl<'read> IntoIterator for &'read Diagnostics<'_> {
             self.layers
                 .iter()
                 .flat_map(LayerProblems::items)
-                .map(DiagnosticItem::Schema)
-                .chain(self.warnings.iter().map(DiagnosticItem::Configuration)),
+                .map(DiagnosticItem::schema)
+                .chain(self.warnings.iter().map(DiagnosticItem::configuration)),
         )
     }
 }

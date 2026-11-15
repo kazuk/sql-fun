@@ -29,10 +29,12 @@ automation, or validation infrastructure is required.
 
 ## Completing a migration
 
-During a major release cycle, use the applicable specifications as an
-implementation backlog. In the PR that implements the migration, remove its
-`next-major/*.md` specification in the **same PR**. Git history and the PR
-record retain the decision and the completed migration.
+When a crate's release intent is raised to `major`, all outstanding
+`next-major/*.md` specifications for that crate must be implemented and
+resolved as part of that change. Remove each specification in the same change
+that applies its migration; do not leave deferred compatibility work for later
+in the major release cycle. Git history and the PR record retain the completed
+migration decisions.
 
 Keep the ordinary SemVer release-intent check and its declared release level
 as the authority for whether the breaking change is permitted. A migration

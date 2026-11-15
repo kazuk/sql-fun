@@ -4,7 +4,7 @@ use crate::{
     names::OperatorName,
     sem::{
         AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, ParameterConstraints,
-        ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr, TypeReference,
+        ParseContext, PgBuiltInType, ResolvedOperator, ResolvedTypes, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         problem::DistinctProblem,
         scalar_expr::{ScalarConstExpr, SemScalarExprNode},
@@ -17,7 +17,7 @@ use crate::{
 pub struct DistinctExpr {
     comparison: DistinctComparison,
     negated: bool,
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     not_null: Option<bool>,
     #[serde(skip)]
     node: Option<usize>,
@@ -198,7 +198,7 @@ impl DistinctExpr {
         let mut result = Self {
             comparison: DistinctComparison::rows(Vec::new()),
             negated,
-            types: InputTypeConstraint::exact(&PgBuiltInType::bool()),
+            types: ResolvedTypes::exact(&PgBuiltInType::bool()),
             node: None,
             not_null: Some(true),
         };
@@ -211,7 +211,7 @@ impl DistinctExpr {
             if let Some(comparisons) = left.distinct_row_comparisons(context, &right)? {
                 DistinctComparison::rows(comparisons)
             } else {
-                result.types = InputTypeConstraint::types([]);
+                result.types = ResolvedTypes::types([]);
                 DistinctComparison::invalid(left, right)
             }
         } else {
@@ -221,7 +221,7 @@ impl DistinctExpr {
             result.not_null = not_null;
         }
         if result.comparison.has_impossible_field() {
-            result.types = InputTypeConstraint::types([]);
+            result.types = ResolvedTypes::types([]);
         }
         Ok(result)
     }
@@ -510,7 +510,7 @@ impl DistinctExpr {
         self.not_null = context.resolved_operator_result_is_not_null(&name);
         let binding = ResolvedOperator::resolve_comparison(context, &name);
         if !binding.resolution().is_resolved() {
-            self.types = InputTypeConstraint::types([]);
+            self.types = ResolvedTypes::types([]);
         }
         let has_unknown = [&left, &right]
             .into_iter()
@@ -534,10 +534,10 @@ impl DistinctExpr {
                 context.report_analysis_problem(AnalysisProblem::distinct(
                     DistinctProblem::equality_result(&ty),
                 ))?;
-                self.types = InputTypeConstraint::types([]);
+                self.types = ResolvedTypes::types([]);
             }
         } else if !deferred {
-            self.types = InputTypeConstraint::types([]);
+            self.types = ResolvedTypes::types([]);
         }
         Ok(DistinctComparison::equality(equality))
     }
@@ -577,7 +577,7 @@ impl DistinctExpr {
 
     /// Admissible boolean result domain; empty when inputs are impossible.
     #[must_use]
-    pub const fn types(&self) -> &InputTypeConstraint {
+    pub const fn types(&self) -> &ResolvedTypes {
         &self.types
     }
 
@@ -600,7 +600,7 @@ impl DistinctExpr {
         self.node = Some(parameters.distinct_result(
             self.comparison.expressions(),
             self.comparison.requires_boolean(),
-            &self.types,
+            &self.types.constraint(),
         ));
         Ok(())
     }
@@ -685,7 +685,7 @@ impl DistinctExpr {
 
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
-            self.types = constraints.node_domain(node).clone();
+            self.types = constraints.node_domain(node).into();
         }
     }
 
@@ -729,5 +729,11 @@ impl super::RowExpr {
             )?));
         }
         Ok(Some(comparisons))
+    }
+}
+
+impl DistinctExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
     }
 }

@@ -147,15 +147,15 @@ pub(crate) fn local_binding_domains(
                 for source in inputs[index].admissible_types().unwrap_or(&[]) {
                     if signature.score(source, index).is_some() {
                         accepted.push(source.clone());
-                        if source == &signature.signature.inputs()[index] {
+                        if source.as_ref() == &signature.signature.inputs()[index] {
                             identity.push(source.clone());
                         }
                     }
                 }
             }
             (
-                InputTypeConstraint::types(accepted),
-                InputTypeConstraint::types(identity),
+                InputTypeConstraint::shared_types(accepted),
+                InputTypeConstraint::shared_types(identity),
             )
         })
         .collect()
@@ -458,7 +458,8 @@ impl CallFacts {
             inputs
                 .iter()
                 .filter_map(InputTypeConstraint::admissible_types)
-                .flatten(),
+                .flatten()
+                .map(AsRef::as_ref),
         );
         facts
     }
@@ -584,7 +585,7 @@ impl CallFacts {
                     continue;
                 }
                 for ty in input.admissible_types().unwrap_or(&[]) {
-                    if *ty == CommonType::unknown() {
+                    if **ty == CommonType::unknown() {
                         continue;
                     }
                     if declared.is_any_compatible_array() {
@@ -592,7 +593,7 @@ impl CallFacts {
                             known.insert(element);
                         }
                     } else {
-                        known.insert(ty.clone());
+                        known.insert(ty.as_ref().clone());
                     }
                 }
             }
@@ -656,7 +657,7 @@ impl CallFacts {
                 .all(|(_, input)| {
                     input.is_any()
                         || input.admissible_types().is_some_and(|types| {
-                            types.iter().all(|ty| *ty == CommonType::unknown())
+                            types.iter().all(|ty| **ty == CommonType::unknown())
                         })
                 });
         let needs_witnesses =
@@ -762,7 +763,7 @@ impl CallFacts {
                 .flat_map(|assignment| {
                     types.iter().map(move |ty| {
                         let mut assignment = assignment.clone();
-                        assignment[index] = Some(ty.clone());
+                        assignment[index] = Some(ty.as_ref().clone());
                         assignment
                     })
                 })
@@ -772,7 +773,7 @@ impl CallFacts {
             .iter()
             .filter_map(InputTypeConstraint::admissible_types)
             .flatten()
-            .cloned()
+            .map(|ty| ty.as_ref().clone())
             .chain(default_types())
             .collect();
         for declared in template.inputs() {
@@ -882,7 +883,8 @@ impl CallConstraint {
                     .iter()
                     .chain([&result])
                     .filter_map(InputTypeConstraint::admissible_types)
-                    .flatten(),
+                    .flatten()
+                    .map(AsRef::as_ref),
             );
         }
         let Some(compatible_default_inference) =
@@ -1347,7 +1349,7 @@ impl SourcePartition {
         let mut choices = Vec::new();
         for (index, input) in inputs.iter().enumerate() {
             let sources = if let Some(types) = input.admissible_types() {
-                types.iter().cloned().collect()
+                types.iter().map(|ty| ty.as_ref().clone()).collect()
             } else {
                 signatures.sources_for_argument(index)
             };

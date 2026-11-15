@@ -97,7 +97,11 @@ fn outer_cast_constrains_coalesce_output() -> testresult::TestResult {
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int8())])));
     assert_eq!(
-        constraints.result_column(0).unwrap().admissible_types(),
+        constraints
+            .result_column(0)
+            .unwrap()
+            .resolved()
+            .admissible_types(),
         Some([TypeReference::from_master_type_name("int2")].as_slice())
     );
     Ok(())

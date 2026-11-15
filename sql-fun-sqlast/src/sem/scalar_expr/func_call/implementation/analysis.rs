@@ -860,6 +860,7 @@ mod test_function_argument_constraints {
                     .parameter(position)
                     .unwrap()
                     .constraint()
+                    .resolved()
                     .admissible_types(),
                 Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
             );
@@ -912,6 +913,7 @@ mod test_function_argument_constraints {
                 .parameter(1)
                 .unwrap()
                 .constraint()
+                .resolved()
                 .admissible_types(),
             Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
         );
@@ -947,6 +949,7 @@ mod test_function_argument_constraints {
                 .parameter_constraints()
                 .result_column(0)
                 .unwrap()
+                .resolved()
                 .admissible_types(),
             Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
         );

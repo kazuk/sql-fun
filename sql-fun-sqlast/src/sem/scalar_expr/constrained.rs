@@ -1,6 +1,7 @@
 use crate::sem::{
     AnalysisError, FuncCallExpr, IndirectionExpr, InputTypeConstraint, ParameterConstraints,
-    ParseContext, QueryNameResolution, ResolvedOperator, SemScalarExpr, TypeReference,
+    ParseContext, QueryNameResolution, ResolvedOperator, ResolvedTypes, SemScalarExpr,
+    TypeReference,
     scalar_expr::func_call::FunctionBinding,
     traversal::{SemanticVisitor, SemanticVisitorMut},
 };
@@ -21,11 +22,11 @@ pub struct ConstrainedExpr {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     indirection: Option<Box<IndirectionExpr>>,
     arguments: Vec<SemScalarExpr>,
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     not_null: Option<bool>,
     name: String,
     #[serde(skip)]
-    node: usize,
+    node: Option<usize>,
 }
 
 impl ConstrainedExpr {
@@ -38,7 +39,7 @@ impl ConstrainedExpr {
         name: &str,
     ) -> Self {
         Self {
-            node,
+            node: Some(node),
             operation: operation.to_owned(),
             operator_binding: None,
             binding_validation_pending: false,
@@ -46,7 +47,7 @@ impl ConstrainedExpr {
             semantic_call: None,
             indirection: None,
             arguments: arguments.to_vec(),
-            types: types.clone(),
+            types: types.into(),
             not_null,
             name: name.to_owned(),
         }
@@ -95,10 +96,10 @@ impl ConstrainedExpr {
         &self.arguments
     }
     /// Admissible output types, retaining alternatives without picking a Rust type.
-    pub const fn types(&self) -> &InputTypeConstraint {
+    pub const fn types(&self) -> &ResolvedTypes {
         &self.types
     }
-    pub(crate) const fn node(&self) -> usize {
+    pub(crate) const fn node(&self) -> Option<usize> {
         self.node
     }
     pub(crate) fn name(&self) -> &str {
@@ -144,16 +145,19 @@ impl ConstrainedExpr {
 
 impl ConstrainedExpr {
     pub(super) fn canonicalize_grouping_key(&mut self) {
-        self.node = 0;
+        self.node = None;
         self.binding_validation_pending = false;
         if let Some(binding) = &mut self.operator_binding {
             binding.canonicalize_grouping_key();
         }
     }
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
-        let domain = constraints.node_domain(self.node);
+        let Some(node) = self.node else {
+            return;
+        };
+        let domain = constraints.node_domain(node);
         if !domain.is_any() {
-            self.types = domain.clone();
+            self.types = domain.into();
         }
         if let Some(indirection) = &mut self.indirection {
             indirection.set_result_type(&domain.single_type());
@@ -178,9 +182,16 @@ impl ConstrainedExpr {
             && let Some(binding) = &self.operator_binding
             && let Some(types) = binding.validate_application_inputs(&self.arguments, context)?
         {
-            self.types = types;
+            self.types = types.into();
             self.binding_validation_pending = false;
         }
         Ok(())
+    }
+}
+
+impl ConstrainedExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
+        self.binding_validation_pending = false;
     }
 }

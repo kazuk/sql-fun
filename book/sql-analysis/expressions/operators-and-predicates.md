@@ -130,6 +130,11 @@ distinct from analysis support.
 
 ### Remaining comparison and operator limitations
 
+PostgreSQL membership analysis can incorrectly reject explicitly cast parameters
+in value lists. For example, `SELECT $1::integer IN (1::integer, 2::integer)`
+reports `parameter_constraint` and leaves the result type unknown, although this
+is valid PostgreSQL SQL ([#1112](https://github.com/kazuk/sql-fun/issues/1112)).
+
 Parameter constraint analysis for some `ANY`/`ALL` array comparisons and `NULLIF`
 expressions is unimplemented and can terminate analysis
 ([#513](https://github.com/kazuk/sql-fun/issues/513)). Parameter-free support

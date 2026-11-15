@@ -2,7 +2,7 @@
 
 mod argument_rank;
 
-use crate::sem::{ConstraintMemo, array_cast_ranks as sem_array_cast_ranks};
+use crate::sem::array_cast_ranks as sem_array_cast_ranks;
 
 use self::argument_rank::{ArgumentRankInput, ArgumentRanks};
 
@@ -18,10 +18,9 @@ use std::collections::{HashMap, HashSet};
 /// it only for calculations against that base. The server owns this association;
 /// cache lookups do not validate or fingerprint the environment.
 /// It supplements the shared parse context without providing catalog,
-/// configuration, or diagnostic services. Query-derived operation results are
-/// cleared when their inference pass ends.
+/// configuration, or diagnostic services. Query-local solver memoization belongs
+/// to the inference pass.
 pub struct CacheContext {
-    constraint_memo: ConstraintMemo,
     declared_implicit_cast_sources: HashMap<TypeReference, HashSet<TypeReference>>,
     array_cast_ranks: HashMap<TypeReference, HashMap<TypeReference, OverloadRank>>,
     assignment_sources: HashMap<TypeReference, HashSet<TypeReference>>,
@@ -47,7 +46,6 @@ impl CacheContext {
     )]
     pub fn new() -> Self {
         Self {
-            constraint_memo: ConstraintMemo::default(),
             declared_implicit_cast_sources: HashMap::new(),
             array_cast_ranks: HashMap::new(),
             assignment_sources: HashMap::new(),
@@ -64,16 +62,6 @@ impl CacheContext {
             #[cfg(test)]
             array_rank_computations: 0,
         }
-    }
-
-    /// Share operation results across branches of the current inference pass.
-    pub(crate) const fn constraint_memo(&mut self) -> &mut ConstraintMemo {
-        &mut self.constraint_memo
-    }
-
-    /// Query-derived combinations must not accumulate across requests.
-    pub(crate) fn clear_constraint_memo(&mut self) {
-        self.constraint_memo = ConstraintMemo::default();
     }
 
     /// Memoize declared sources without broadening the finite candidate domain.

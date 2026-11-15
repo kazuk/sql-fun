@@ -89,6 +89,7 @@ fn explicitly_typed_parameters_agree_with_immediate_selection(
             .parameter_constraints()
             .result_column(0)
             .unwrap()
+            .resolved()
             .admissible_types(),
         Some(std::slice::from_ref(&expected))
     );
@@ -278,6 +279,7 @@ fn vector_polymorphism_retains_binding_and_result(
                 .parameter_constraints()
                 .result_column(0)
                 .unwrap()
+                .resolved()
                 .admissible_types(),
             Some(std::slice::from_ref(&expected))
         );
@@ -348,7 +350,11 @@ fn deferred_vector_element_preserves_array_result() -> testresult::TestResult {
     )])));
     let expected = TypeReference::from_master_type_name("int2vector");
     assert_eq!(
-        constraints.result_column(0).unwrap().admissible_types(),
+        constraints
+            .result_column(0)
+            .unwrap()
+            .resolved()
+            .admissible_types(),
         Some(std::slice::from_ref(&expected))
     );
     Ok(())

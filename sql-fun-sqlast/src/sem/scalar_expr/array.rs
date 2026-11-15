@@ -2,7 +2,7 @@ use crate::sem::CommonType;
 use crate::{
     context::ParseContext,
     sem::{
-        AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, SemScalarExpr,
+        AnalysisError, AnalysisProblem, ParameterConstraints, ResolvedTypes, SemScalarExpr,
         TypeReference,
         parameter_resolution::ParameterResolution,
         problem::ArrayProblem,
@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArrayExpr {
     values: Vec<SemScalarExpr>,
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     explicit_target: Option<TypeReference>,
     multidimensional: bool,
     #[serde(skip)]
@@ -30,7 +30,7 @@ impl ArrayExpr {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut value = Self {
             values: values.to_vec(),
-            types: InputTypeConstraint::any(),
+            types: ResolvedTypes::any(),
             explicit_target: target.cloned(),
             multidimensional: values.iter().any(|value| {
                 value.as_array().is_some()
@@ -50,7 +50,7 @@ impl ArrayExpr {
             {
                 value.fail(context, ArrayProblem::incompatible(&source, &element))?;
             } else {
-                value.types = InputTypeConstraint::exact(target);
+                value.types = ResolvedTypes::exact(target);
                 value.coerce(target, false);
             }
         } else if values
@@ -67,7 +67,7 @@ impl ArrayExpr {
             match CommonType::select_common_type(context, &inputs) {
                 Ok(element) => {
                     let target = element.array_type();
-                    value.types = InputTypeConstraint::exact(&target);
+                    value.types = ResolvedTypes::exact(&target);
                     value.coerce(&target, false);
                 }
                 Err(problem) => {
@@ -88,7 +88,7 @@ impl ArrayExpr {
         context: &mut impl ParseContext,
         problem: ArrayProblem,
     ) -> Result<(), AnalysisError> {
-        self.types = InputTypeConstraint::types([]);
+        self.types = ResolvedTypes::types([]);
         context.report_analysis_problem(AnalysisProblem::array(problem))
     }
 
@@ -100,7 +100,7 @@ impl ArrayExpr {
 
     /// Output types: `any` while unresolved, empty on failure, or analyzed candidates.
     #[must_use]
-    pub const fn types(&self) -> &InputTypeConstraint {
+    pub const fn types(&self) -> &ResolvedTypes {
         &self.types
     }
 
@@ -219,21 +219,20 @@ impl ArrayExpr {
             .iter()
             .any(|value| value.constraint_node().is_some())
         {
-            let (node, types) = parameters.array(
+            let (node, _) = parameters.array(
                 context,
                 &self.constraint_values(),
                 self.explicit_target.as_ref(),
                 self.multidimensional,
             )?;
             self.node = Some(node);
-            self.types = types;
         }
         Ok(())
     }
 
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
-            self.types = constraints.node_domain(node).clone();
+            self.types = constraints.node_domain(node).into();
             if let Some(target) = self.types.single_type() {
                 self.coerce(&target, true);
             }
@@ -255,5 +254,11 @@ impl SemScalarExprNode for ArrayExpr {
         } else {
             Some(true)
         }
+    }
+}
+
+impl ArrayExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
     }
 }

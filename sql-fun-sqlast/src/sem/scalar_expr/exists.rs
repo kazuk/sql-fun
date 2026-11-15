@@ -227,6 +227,7 @@ mod test_child_parameter_is_independent_of_boolean_result {
                 .parameter(1)
                 .unwrap()
                 .constraint()
+                .resolved()
                 .admissible_types(),
             Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
         );

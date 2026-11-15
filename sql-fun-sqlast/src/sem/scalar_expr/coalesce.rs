@@ -4,7 +4,7 @@ use crate::{
     context::ParseContext,
     names::ColumnName,
     sem::{
-        AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, SemScalarExpr,
+        AnalysisError, AnalysisProblem, ParameterConstraints, ResolvedTypes, SemScalarExpr,
         TypeReference, WildcardQualifiers, WildcardRewriteError,
         parameter_resolution::ParameterResolution,
         scalar_expr::SemScalarExprNode,
@@ -22,7 +22,7 @@ pub struct CoalesceExpr {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     join_key_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    types: Option<InputTypeConstraint>,
+    types: Option<ResolvedTypes>,
     #[serde(skip)]
     node: Option<usize>,
 }
@@ -52,7 +52,7 @@ impl CoalesceExpr {
             coalesce_type: None,
             join_key_not_null: None,
             join_key_name: None,
-            types: Some(InputTypeConstraint::any()),
+            types: Some(ResolvedTypes::any()),
             node: None,
         };
         let mut first_non_null = None;
@@ -70,7 +70,7 @@ impl CoalesceExpr {
                 context.report_analysis_problem(AnalysisProblem::parameter_constraint(
                     "SQLite COALESCE requires at least two arguments",
                 ))?;
-                value.types = Some(InputTypeConstraint::types([]));
+                value.types = Some(ResolvedTypes::types([]));
             }
             // SQLite does not coerce all operands to a PostgreSQL common type.
             // Parameter-dependent and heterogeneous result typing stays explicit.
@@ -87,11 +87,11 @@ impl CoalesceExpr {
             match CommonType::select_common_type(context, &inputs) {
                 Ok(target) => {
                     value.coalesce_type = Some(target.clone());
-                    value.types = Some(InputTypeConstraint::exact(&target));
+                    value.types = Some(ResolvedTypes::exact(&target));
                     value.coerce(&target);
                 }
                 Err(_) => {
-                    value.types = Some(InputTypeConstraint::types([]));
+                    value.types = Some(ResolvedTypes::types([]));
                     context.report_analysis_problem(
                         AnalysisProblem::coalesce_expr_type_unknown(arguments.iter()),
                     )?;
@@ -380,7 +380,7 @@ impl CoalesceExpr {
     }
 
     /// Inferred output domain, when retained by semantic analysis.
-    pub const fn types(&self) -> Option<&InputTypeConstraint> {
+    pub const fn types(&self) -> Option<&ResolvedTypes> {
         self.types.as_ref()
     }
 
@@ -438,7 +438,6 @@ impl CoalesceExpr {
             let (node, types) = parameters.unify_coalesce_types(context, &self.arg_exprs)?;
             self.node = Some(node);
             self.coalesce_type = types.single_type();
-            self.types = Some(types);
         }
         Ok(())
     }
@@ -500,7 +499,7 @@ impl CoalesceExpr {
         };
         let types = constraints.node_domain(node).clone();
         self.coalesce_type = types.single_type();
-        self.types = Some(types);
+        self.types = Some(types.into());
         if let Some(target) = self.coalesce_type.clone() {
             self.coerce(&target);
         }
@@ -519,5 +518,11 @@ impl CoalesceExpr {
         Ok(Expr::projection_call(&Call::coalesce_projection(
             &arguments,
         )))
+    }
+}
+
+impl CoalesceExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
     }
 }

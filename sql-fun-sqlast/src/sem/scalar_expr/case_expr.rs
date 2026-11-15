@@ -4,7 +4,7 @@ use crate::{
     names::OperatorName,
     sem::{
         AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, ParameterConstraints,
-        ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr, TypeReference,
+        ParseContext, PgBuiltInType, ResolvedOperator, ResolvedTypes, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         scalar_expr::SemScalarExprNode,
         traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
@@ -111,7 +111,7 @@ pub struct CaseExpr {
     case_expr_type: Option<TypeReference>,
     is_not_null: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    types: Option<InputTypeConstraint>,
+    types: Option<ResolvedTypes>,
     #[serde(skip)]
     node: Option<usize>,
     #[serde(skip)]
@@ -274,7 +274,6 @@ impl CaseExpr {
         let (node, types) = parameters.unify_case_types(context, &results)?;
         self.node = Some(node);
         self.case_expr_type = types.single_type();
-        self.types = Some(types);
         Ok(())
     }
 
@@ -295,7 +294,7 @@ impl CaseExpr {
             types = InputTypeConstraint::types([]);
         }
         self.case_expr_type = types.single_type();
-        self.types = Some(types);
+        self.types = Some(types.into());
         if let Some(target) = &self.case_expr_type {
             let target = target.clone();
             self.coerce_results(&target);
@@ -457,7 +456,7 @@ impl CaseExpr {
             None,
         );
         value.bind_comparisons(context)?;
-        value.types = Some(InputTypeConstraint::any());
+        value.types = Some(ResolvedTypes::any());
         if context.dialect() == Dialect::postgres() {
             // Eager typing keeps the result available to enclosing resolvers.
             // Parameter-dependent errors retain the existing graph diagnostic.
@@ -483,7 +482,7 @@ impl CaseExpr {
                     Ok(target) => {
                         value.case_expr_type = Some(target.clone());
                         value.types = if dependent {
-                            Some(InputTypeConstraint::exact(&target))
+                            Some(ResolvedTypes::exact(&target))
                         } else {
                             None
                         };
@@ -493,7 +492,7 @@ impl CaseExpr {
                         context.report_analysis_problem(
                             AnalysisProblem::incompatible_case_values(inputs.iter()),
                         )?;
-                        value.types = Some(InputTypeConstraint::types([]));
+                        value.types = Some(ResolvedTypes::types([]));
                     }
                     Err(_) => {}
                 }
@@ -501,5 +500,12 @@ impl CaseExpr {
         }
         value.is_not_null = value.result_nullability();
         Ok(Some(SemScalarExpr::case(&value)))
+    }
+}
+
+impl CaseExpr {
+    pub(crate) fn finish_inference(&mut self) {
+        self.node = None;
+        self.condition_nodes.clear();
     }
 }

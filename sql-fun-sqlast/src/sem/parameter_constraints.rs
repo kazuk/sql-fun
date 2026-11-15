@@ -13,13 +13,13 @@ pub(crate) use self::structural::TypeProjection;
 use crate::{
     CacheContext,
     sem::{
-        AnalysisError, AnalysisProblem, ParseContext, parameter_resolution::Signature,
-        problem::MinMaxProblem, with_stack,
+        AnalysisError, AnalysisProblem, ParseContext, ResolvedTypes,
+        parameter_resolution::Signature, problem::MinMaxProblem, with_stack,
     },
 };
 
 use self::common_type::{CommonTypeConstraint, CommonTypeFacts};
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use self::structural::StructuralConstraint;
 
@@ -38,7 +38,7 @@ pub(crate) fn default_types() -> [TypeReference; 7] {
 
 /// Admissible SQL types. An unconstrained domain is `any`, not inference failure.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct InputTypeConstraint(Option<Vec<TypeReference>>);
+pub struct InputTypeConstraint(Option<Vec<Rc<TypeReference>>>);
 
 impl std::fmt::Display for InputTypeConstraint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -60,12 +60,20 @@ impl std::fmt::Display for InputTypeConstraint {
 }
 
 impl InputTypeConstraint {
+    /// Copy the completed type alternatives independently of this solver domain.
+    pub fn resolved(&self) -> ResolvedTypes {
+        self.into()
+    }
     /// No restriction on the input type.
     pub const fn any() -> Self {
         Self(None)
     }
 
     pub(crate) fn types(types: impl IntoIterator<Item = TypeReference>) -> Self {
+        Self::shared_types(types.into_iter().map(Rc::new))
+    }
+
+    pub(crate) fn shared_types(types: impl IntoIterator<Item = Rc<TypeReference>>) -> Self {
         let mut types: Vec<_> = types.into_iter().collect();
         types.sort_by_cached_key(|ty| format!("{ty:?}"));
         types.dedup();
@@ -82,21 +90,23 @@ impl InputTypeConstraint {
     }
 
     /// Finite admissible types, or `None` for `any`.
-    pub fn admissible_types(&self) -> Option<&[TypeReference]> {
+    pub fn admissible_types(&self) -> Option<&[Rc<TypeReference>]> {
         self.0.as_deref()
     }
 
     /// Test membership in this domain. Correlated uses also need
     /// [`ParameterConstraints::allows`].
     pub fn allows(&self, ty: &TypeReference) -> bool {
-        self.0.as_ref().is_none_or(|types| types.contains(ty))
+        self.0
+            .as_ref()
+            .is_none_or(|types| types.iter().any(|candidate| candidate.as_ref() == ty))
     }
 
     /// A definite SQL type only when exactly one candidate remains.
     #[must_use]
     pub fn single_type(&self) -> Option<TypeReference> {
         match self.0.as_deref() {
-            Some([ty]) => Some(ty.clone()),
+            Some([ty]) => Some(ty.as_ref().clone()),
             _ => None,
         }
     }
@@ -118,7 +128,7 @@ impl InputTypeConstraint {
 
     fn exclude(&mut self, excluded: &[TypeReference]) {
         if let Some(types) = &mut self.0 {
-            types.retain(|ty| !excluded.contains(ty));
+            types.retain(|ty| !excluded.contains(ty.as_ref()));
         }
     }
 
@@ -127,7 +137,7 @@ impl InputTypeConstraint {
             .as_deref()
             .unwrap_or(&[])
             .iter()
-            .map(Into::into)
+            .map(|ty| ty.as_ref().into())
             .collect()
     }
 
@@ -256,13 +266,6 @@ pub struct ParameterConstraints {
 }
 
 impl ParameterConstraints {
-    pub(crate) fn sql_node_domain(&self, node: usize) -> &InputTypeConstraint {
-        self.graph
-            .as_ref()
-            .expect("inferred SQL graph")
-            .domain(node)
-    }
-
     pub(crate) fn node_domain(&self, node: usize) -> &InputTypeConstraint {
         self.application
             .as_ref()
@@ -483,6 +486,8 @@ impl OverloadConstraint {
 pub(crate) struct ConstraintGraph {
     domains: Vec<InputTypeConstraint>,
     parameters: BTreeMap<u32, usize>,
+    // SQL-admissible parameter results reused by same-query recollection.
+    solved_parameters: BTreeMap<u32, InputTypeConstraint>,
     overloads: Vec<OverloadConstraint>,
     equalities: Vec<(usize, usize)>,
     structural: Vec<StructuralConstraint>,
@@ -492,7 +497,7 @@ pub(crate) struct ConstraintGraph {
     common_facts: Option<Arc<CommonTypeFacts>>,
     calls: Vec<call::CallConstraint>,
     unsupported_inference: Vec<String>,
-    inspection: Option<Arc<Self>>,
+    inspection: Option<Rc<Self>>,
 }
 
 impl ConstraintGraph {
@@ -500,8 +505,14 @@ impl ConstraintGraph {
     // or alternatives eliminated by a previous inference attempt.
     fn resume_collection(&mut self) {
         if let Some(original) = self.inspection.take() {
+            let solved_parameters = std::mem::take(&mut self.solved_parameters);
             *self = (*original).clone();
+            self.solved_parameters = solved_parameters;
         }
+    }
+
+    pub(crate) fn solved_parameter(&self, position: u32) -> Option<&InputTypeConstraint> {
+        self.solved_parameters.get(&position)
     }
 
     fn parameter_constraints(&self) -> Vec<ParameterConstraint> {
@@ -712,13 +723,13 @@ impl ConstraintGraph {
             }
             for relation in &mut self.structural {
                 if let Some(result) = relation.prepare(context, &ty) {
-                    types.push(result);
+                    types.push(Rc::new(result));
                 }
             }
             visited.push(ty);
         }
         for relation in &mut self.calls {
-            relation.retain(context, cache, visited.iter());
+            relation.retain(context, cache, visited.iter().map(AsRef::as_ref));
         }
     }
 
@@ -869,9 +880,14 @@ impl ConstraintGraph {
         let original = if self.calls.is_empty() && self.common_types.is_empty() {
             None
         } else {
-            Some(Arc::new(self.clone()))
+            Some(Rc::new(self.clone()))
         };
         let result = self.solve_domains(memo);
+        self.solved_parameters = self
+            .parameters
+            .iter()
+            .map(|(position, node)| (*position, self.domain(*node).clone()))
+            .collect();
         self.inspection = original;
         result
     }
@@ -914,12 +930,12 @@ impl ConstraintGraph {
             let mut retained = Vec::new();
             for ty in types {
                 let mut branch = self.clone();
-                branch.domains[node].intersect(&InputTypeConstraint::exact(&ty));
+                branch.domains[node].intersect(&InputTypeConstraint(Some(vec![ty.clone()])));
                 if branch.satisfiable(memo) {
                     retained.push(ty);
                 }
             }
-            self.domains[node] = InputTypeConstraint::types(retained);
+            self.domains[node] = InputTypeConstraint::shared_types(retained);
         }
         Ok(())
     }

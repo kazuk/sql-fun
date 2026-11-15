@@ -6,7 +6,7 @@ use crate::{
         DatabaseCollation, InsertArbiter, InsertConflict, InsertInferenceModifiers,
         OperatorClassDefinition, infer_from_catalog,
     },
-    test_helpers::test_parse_context::TestParseContext,
+    test_helpers::test_parse_context::{TestContext, TestParseContext},
 };
 
 impl TestParseContext {
@@ -37,7 +37,7 @@ impl TestParseContext {
         self.conflict_arbiters = arbiters.to_vec();
     }
 }
-impl ConflictInfoRead for TestParseContext {
+impl<Constraints: std::fmt::Debug> ConflictInfoRead for TestContext<Constraints> {
     fn database_collation(&self) -> Option<&DatabaseCollation> {
         let masters = self.masters.as_ref()?;
         masters.database()

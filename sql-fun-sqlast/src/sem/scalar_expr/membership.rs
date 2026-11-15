@@ -5,7 +5,7 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, ArithExpr, BinaryOperatorDefinition, InputTypeConstraint,
         OperatorDefinition, ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator,
-        SelectStatement, SemScalarExpr, TypeReference,
+        ResolvedTypes, SelectStatement, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         problem::MembershipProblem,
         scalar_expr::{SemScalarExprNode, arith_expr::UndefinedOperatorCallSite},
@@ -22,7 +22,7 @@ pub struct MembershipExpr {
     negated: bool,
     binding: Option<MembershipOperator>,
     comparisons: Vec<MembershipComparison>,
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     invalid: bool,
     comparison_not_null: Option<bool>,
     #[serde(skip)]
@@ -312,7 +312,7 @@ impl MembershipExpr {
             negated,
             binding,
             comparisons: Vec::new(),
-            types: InputTypeConstraint::exact(&result),
+            types: ResolvedTypes::exact(&result),
             invalid: false,
             comparison_not_null,
             node: None,
@@ -468,7 +468,7 @@ impl MembershipExpr {
         &self.comparisons
     }
     /// Predicate result domain, empty for an invalid membership operation.
-    pub const fn types(&self) -> &InputTypeConstraint {
+    pub const fn types(&self) -> &ResolvedTypes {
         &self.types
     }
 
@@ -478,7 +478,7 @@ impl MembershipExpr {
         problem: MembershipProblem,
     ) -> Result<(), AnalysisError> {
         self.invalid = true;
-        self.types = InputTypeConstraint::types([]);
+        self.types = ResolvedTypes::types([]);
         context.report_analysis_problem(AnalysisProblem::membership(problem))
     }
     fn analyze(
@@ -649,7 +649,7 @@ impl MembershipExpr {
                 && !right.requires_argument_type())
         {
             self.invalid = true;
-            self.types = InputTypeConstraint::types([]);
+            self.types = ResolvedTypes::types([]);
         }
         self.comparisons.push(comparison);
         Ok(())
@@ -687,7 +687,7 @@ impl MembershipExpr {
         let result = parameters.membership_result(
             &expressions,
             self.binding.is_some(),
-            &self.types,
+            &self.types.constraint(),
             self.node,
         );
         self.node = Some(result);
@@ -703,7 +703,7 @@ impl MembershipExpr {
     }
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
-            self.types = constraints.node_domain(node).clone();
+            self.types = constraints.node_domain(node).into();
         }
         for comparison in &mut self.comparisons {
             comparison.apply_constraints(constraints);
@@ -817,5 +817,27 @@ impl<C: ParseContext> SemanticVisitorMut for UnknownOutput<'_, C> {
         {
             *value = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::text(), value);
         }
+    }
+}
+
+impl MembershipExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
+    }
+}
+
+impl MembershipExpr {
+    pub(crate) fn finish_comparisons<V: SemanticVisitorMut>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for comparison in &mut self.comparisons {
+            comparison.left.walk(visitor)?;
+            comparison.right.walk(visitor)?;
+            if let Some(expression) = &mut comparison.expression {
+                expression.walk(visitor)?;
+            }
+        }
+        Ok(())
     }
 }

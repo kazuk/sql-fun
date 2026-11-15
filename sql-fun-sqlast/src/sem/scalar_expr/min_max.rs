@@ -1,6 +1,6 @@
 use crate::sem::{
-    AnalysisError, AnalysisProblem, CommonType, InputTypeConstraint, ParameterConstraints,
-    ParseContext, SemScalarExpr, TypeReference,
+    AnalysisError, AnalysisProblem, CommonType, ParameterConstraints, ParseContext, ResolvedTypes,
+    SemScalarExpr, TypeReference,
     parameter_resolution::ParameterResolution,
     problem::MinMaxProblem,
     scalar_expr::SemScalarExprNode,
@@ -12,7 +12,7 @@ use crate::sem::{
 pub struct MinMaxExpr {
     operation: String,
     arguments: Vec<SemScalarExpr>,
-    types: InputTypeConstraint,
+    types: ResolvedTypes,
     #[serde(skip)]
     node: Option<usize>,
 }
@@ -26,7 +26,7 @@ impl MinMaxExpr {
         let mut value = Self {
             operation: operation.to_owned(),
             arguments: arguments.to_vec(),
-            types: InputTypeConstraint::any(),
+            types: ResolvedTypes::any(),
             node: None,
         };
         if arguments.is_empty() {
@@ -41,7 +41,7 @@ impl MinMaxExpr {
                 .collect();
             match Self::common_type(context, &inputs) {
                 Ok(ty) => {
-                    value.types = InputTypeConstraint::exact(&ty);
+                    value.types = ResolvedTypes::exact(&ty);
                     value.coerce(&ty);
                 }
                 Err(problem) => {
@@ -61,7 +61,7 @@ impl MinMaxExpr {
         &self.arguments
     }
     /// SQL-derived output domain, including correlated parameter alternatives.
-    pub const fn types(&self) -> &InputTypeConstraint {
+    pub const fn types(&self) -> &ResolvedTypes {
         &self.types
     }
     pub(crate) const fn node(&self) -> Option<usize> {
@@ -189,9 +189,8 @@ impl MinMaxExpr {
             .iter()
             .any(|value| value.constraint_node().is_some())
         {
-            let (node, types) = parameters.min_max(context, &self.operation, &self.arguments)?;
+            let (node, _) = parameters.min_max(context, &self.operation, &self.arguments)?;
             self.node = Some(node);
-            self.types = types;
         }
         Ok(())
     }
@@ -200,7 +199,7 @@ impl MinMaxExpr {
     }
     pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
-            self.types = constraints.node_domain(node).clone();
+            self.types = constraints.node_domain(node).into();
             if let Some(ty) = self.types.single_type() {
                 self.coerce(&ty);
             }
@@ -228,5 +227,11 @@ impl SemScalarExprNode for MinMaxExpr {
         } else {
             None
         }
+    }
+}
+
+impl MinMaxExpr {
+    pub(crate) const fn finish_inference(&mut self) {
+        self.node = None;
     }
 }

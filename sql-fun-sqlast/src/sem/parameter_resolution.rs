@@ -13,11 +13,11 @@ use crate::{
     names::{ColumnName, OperatorName},
     sem::{
         AliasSpec, AnalysisProblem, ArraySubqueryExpr, ColumnCollection, ColumnDefinition,
-        ColumnReferenceExpr, CommonType, DeleteStatement, InsertStatement, InsertTarget,
-        MembershipExpr, MergeStatement, ParseContext, PgBuiltInType, QueryName, QueryOrder,
-        QueryWindow, ResolvedOperator, ResultColumnCollection, SelectStatement, SetOperationQuery,
-        TableSampleSource, TruthTestExpr, UpdateStatement, parameter_constraints::TypeProjection,
-        problem::MinMaxProblem,
+        ColumnReferenceExpr, CommonType, ConstraintMemo, DeleteStatement, InsertStatement,
+        InsertTarget, MembershipExpr, MergeStatement, ParseContext, PgBuiltInType, QueryName,
+        QueryOrder, QueryWindow, ResolvedOperator, ResultColumnCollection, SelectStatement,
+        SetOperationQuery, TableSampleSource, TruthTestExpr, UpdateStatement,
+        parameter_constraints::TypeProjection, problem::MinMaxProblem,
     },
 };
 
@@ -125,6 +125,7 @@ mod test_plain_projection_keeps_any_input_and_postgres_text_output {
                 .parameter_constraints()
                 .result_column(0)
                 .unwrap()
+                .resolved()
                 .admissible_types(),
             Some([PgBuiltInType::text()].as_slice())
         );
@@ -216,18 +217,11 @@ impl QueryScope {
 pub(crate) struct ParameterResolution<'cache> {
     cache: &'cache mut CacheContext,
     graph: ConstraintGraph,
+    memo: ConstraintMemo,
     bindings: BindingSelections,
     selected: BTreeMap<u32, InputTypeConstraint>,
     scopes: Vec<QueryScope>,
     completed: Outputs,
-}
-
-// Memoized graph combinations belong to this inference, including provisional
-// solves, not to the lifetime of the retained immutable catalog base.
-impl Drop for ParameterResolution<'_> {
-    fn drop(&mut self) {
-        self.cache.clear_constraint_memo();
-    }
 }
 
 impl<'cache> ParameterResolution<'cache> {
@@ -253,6 +247,7 @@ impl<'cache> ParameterResolution<'cache> {
         Self {
             cache,
             graph: ConstraintGraph::default(),
+            memo: ConstraintMemo::default(),
             bindings: BindingSelections::default(),
             selected: BTreeMap::new(),
             scopes: Vec::new(),
@@ -263,7 +258,7 @@ impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn constraints(&mut self) -> ParameterConstraints {
         let mut constraints = ParameterConstraints::from_graph(&self.graph);
         constraints.set_outputs(&self.completed.constraints(&self.graph));
-        constraints.select_bindings(&self.selected, self.cache.constraint_memo());
+        constraints.select_bindings(&self.selected, &mut self.memo);
         constraints
     }
 
@@ -273,8 +268,8 @@ impl<'cache> ParameterResolution<'cache> {
         }
         self.graph.prepare_projections(context, self.cache);
         self.graph
-            .report_projection_problems(context, self.cache.constraint_memo())?;
-        if let Err(problem) = self.graph.solve_with(self.cache.constraint_memo())
+            .report_projection_problems(context, &mut self.memo)?;
+        if let Err(problem) = self.graph.solve_with(&mut self.memo)
             && self
                 .bindings
                 .conflicts(context, self.cache, &self.selected)
@@ -376,7 +371,7 @@ impl<'cache> ParameterResolution<'cache> {
         // as a predicate). Keep that application failure as well.
         if conflicts.is_empty()
             && let Some(problem) = constraints.application_failure()
-            && self.graph.solve_with(self.cache.constraint_memo()).is_ok()
+            && self.graph.solve_with(&mut self.memo).is_ok()
         {
             context.report_analysis_problem(AnalysisProblem::parameter_constraint(
                 problem.message(),
@@ -398,7 +393,7 @@ impl<'cache> ParameterResolution<'cache> {
         // UPDATE/DELETE subqueries resolve unknown projected parameters before
         // surrounding expressions or assignments constrain them. Keep solver failure
         // in the graph for the final diagnostic-producing solve.
-        let _ = self.graph.solve_with(self.cache.constraint_memo());
+        let _ = self.graph.solve_with(&mut self.memo);
         if let Some(scope) = self.scopes.last() {
             for output in &scope.outputs.0 {
                 if let Some(node) = output.node
@@ -511,9 +506,24 @@ mod test_postgres_returning_defaults_unknown_parameters_to_text {
 }
 
 impl<'cache> ParameterResolution<'cache> {
-    pub(crate) fn parameter_occurrence(&mut self, value: &ParamRef) -> SemScalarExpr {
+    pub(crate) fn parameter_occurrence(
+        &mut self,
+        value: &ParamRef,
+        context: &impl ParseContext,
+    ) -> SemScalarExpr {
         self.bindings.register(value);
-        self.parameter(value.position(), value.input_constraint())
+        let domain = self
+            .graph
+            .solved_parameter(value.position())
+            .cloned()
+            .unwrap_or_else(|| {
+                context
+                    .get_parameter_typehint(value.position() as usize)
+                    .as_ref()
+                    .map(InputTypeConstraint::exact)
+                    .unwrap_or_else(InputTypeConstraint::any)
+            });
+        self.parameter(value.position(), &domain)
             .with_parameter_location(value.location())
     }
 
@@ -686,6 +696,7 @@ mod test_parameter_field_remains_connected_to_its_source {
                 .parameter_constraints()
                 .result_column(output)
                 .unwrap()
+                .resolved()
                 .admissible_types(),
             Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
         );
@@ -1050,7 +1061,7 @@ impl<'cache> ParameterResolution<'cache> {
             if let Some(node) = argument.constraint_node()
                 && let Some(types) = self.graph.domain(node).admissible_types()
             {
-                choices.extend(types.iter().cloned());
+                choices.extend(types.iter().map(|ty| ty.as_ref().clone()));
             }
         }
         if choices.is_empty()
@@ -1108,7 +1119,7 @@ impl<'cache> ParameterResolution<'cache> {
             for left in candidate_types.admissible_types().unwrap_or(&[]) {
                 for right in domain.admissible_types().unwrap_or(&[]) {
                     let selected = if left == right {
-                        Ok(left.clone())
+                        Ok(left.as_ref().clone())
                     } else {
                         CommonType::next_candidate(
                             context,
@@ -1136,10 +1147,10 @@ impl<'cache> ParameterResolution<'cache> {
         let mut targets = Vec::new();
         let mut unordered = None;
         for source in candidate_types.admissible_types().unwrap_or(&[]) {
-            let target = if *source == CommonType::unknown() {
+            let target = if **source == CommonType::unknown() {
                 PgBuiltInType::text()
             } else {
-                source.clone()
+                source.as_ref().clone()
             };
             let ordering = if comparison {
                 MinMaxExpr::ordered(context, &target)
@@ -1184,7 +1195,7 @@ impl<'cache> ParameterResolution<'cache> {
                     .filter(|source| CommonType::can_coerce(context, source, target))
                     .cloned();
                 alternatives.push(SignatureAlternative::new(&[
-                    InputTypeConstraint::types(sources),
+                    InputTypeConstraint::shared_types(sources),
                     InputTypeConstraint::exact(target),
                 ]));
             }
@@ -2092,6 +2103,7 @@ impl<'cache> ParameterResolution<'cache> {
             };
             expand_root = expanded_arrays;
             if !expanded_arrays && !expanded_root {
+                query.walk(&mut FinishInference)?;
                 return collector
                     .parameters
                     .complete(collector.context, constraints);
@@ -2180,6 +2192,7 @@ mod test_uses_clause_specific_constraints {
                 .parameter(2)
                 .unwrap()
                 .constraint()
+                .resolved()
                 .admissible_types(),
             Some([PgBuiltInType::bool()].as_slice())
         );
@@ -2222,6 +2235,7 @@ impl<'cache> ParameterResolution<'cache> {
                 insert.truncate_implicit_targets();
             }
             if !expanded_arrays && !expanded {
+                insert.walk(&mut FinishInference)?;
                 return Ok((
                     collector
                         .parameters
@@ -2334,6 +2348,7 @@ impl<'cache> ParameterResolution<'cache> {
             update.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
+                update.walk(&mut FinishInference)?;
                 return collector
                     .parameters
                     .complete(collector.context, constraints);
@@ -2452,6 +2467,7 @@ impl<'cache> ParameterResolution<'cache> {
             delete.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
+                delete.walk(&mut FinishInference)?;
                 return collector
                     .parameters
                     .complete(collector.context, constraints);
@@ -2530,6 +2546,7 @@ impl<'cache> ParameterResolution<'cache> {
             merge.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
+                merge.walk(&mut FinishInference)?;
                 return collector
                     .parameters
                     .complete(collector.context, constraints);
@@ -2628,6 +2645,7 @@ impl<'cache> ParameterResolution<'cache> {
             expression.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
+                expression.walk(&mut FinishInference)?;
                 return collector
                     .parameters
                     .complete(collector.context, constraints);
@@ -2677,4 +2695,82 @@ std::thread_local! {
 #[cfg(test)]
 pub(crate) fn inference_runs() -> usize {
     INFERENCE_RUNS.with(std::cell::Cell::get)
+}
+
+// Runs once, after star expansion and every other inference revisit has finished.
+struct FinishInference;
+impl crate::sem::traversal::SemanticVisitorMut for FinishInference {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        expression.finish_inference();
+        Ok(())
+    }
+    fn set_operation(&mut self, query: &mut SetOperationQuery) -> Result<(), AnalysisError> {
+        query.finish_inference(self)
+    }
+    fn membership(&mut self, value: &mut MembershipExpr) -> Result<(), AnalysisError> {
+        value.finish_comparisons(self)
+    }
+}
+
+#[cfg(test)]
+mod test_finished_inference {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        parse_statements,
+        sem::{PgBuiltInType, SemAst, TypeReference},
+        test_helpers::{
+            analysis_lifecycle::{analyze_inference, inference_nodes},
+            create_cache_context,
+        },
+    };
+    use std::collections::BTreeMap;
+
+    #[rstest::rstest]
+    #[case::array("SELECT ARRAY[$1::integer]", PgBuiltInType::int4())]
+    #[case::array_query("SELECT ARRAY(SELECT $1::integer)", PgBuiltInType::int4())]
+    #[case::coalesce("SELECT COALESCE($1::integer, 1)", PgBuiltInType::int4())]
+    #[case::case(
+        "SELECT CASE WHEN true THEN $1::integer ELSE 1 END",
+        PgBuiltInType::int4()
+    )]
+    #[case::min_max("SELECT GREATEST($1::integer, 1)", PgBuiltInType::int4())]
+    #[case::truth("SELECT $1::boolean IS TRUE", PgBuiltInType::bool())]
+    #[case::distinct("SELECT $1::integer IS DISTINCT FROM 1", PgBuiltInType::int4())]
+    #[case::membership("SELECT $1 IN (1, 2)", PgBuiltInType::int4())]
+    #[case::set_output("SELECT $1::integer UNION SELECT 1", PgBuiltInType::int4())]
+    #[case::projection_revisit(
+        "SELECT r.* FROM (SELECT $1::integer AS n) r",
+        PgBuiltInType::int4()
+    )]
+    fn completed_results_survive_an_independent_analysis(
+        #[case] sql: &str,
+        #[case] ty: TypeReference,
+    ) {
+        let analyzed = analyze_inference(sql);
+        let query = analyzed.ast().select_statement().unwrap().clone();
+        let context = analyzed.into_context();
+        assert!(inference_nodes(&query).is_empty());
+        assert_eq!(context.problems().len(), 0, "{:?}", context.problems());
+        let original = context.parameter_constraints().clone();
+        let statement = parse_statements("SELECT $2::text", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let next = SemAst::from_ast(&statement, context, &mut create_cache_context()).unwrap();
+        assert!(inference_nodes(next.ast().select_statement().unwrap()).is_empty());
+        assert!(
+            next.context()
+                .parameter_constraints()
+                .parameter(1)
+                .is_none()
+        );
+        assert!(
+            next.context()
+                .parameter_constraints()
+                .allows(&BTreeMap::from([(2, PgBuiltInType::text())]))
+        );
+        assert!(original.allows(&BTreeMap::from([(1, ty)])), "{original:?}");
+        assert!(query.result_columns().scalar_type().is_some());
+    }
 }

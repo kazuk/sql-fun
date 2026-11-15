@@ -342,7 +342,7 @@ impl CommonTypeConstraint {
             .chain(std::iter::once(&self.result))
             .filter_map(|node| graph.domain(*node).admissible_types())
             .flatten()
-            .cloned()
+            .map(|ty| ty.as_ref().clone())
             .collect::<Vec<_>>();
         let unseeded = seeds.iter().all(|ty| *ty == CommonType::unknown());
         if unseeded {
@@ -400,10 +400,10 @@ impl CommonTypeConstraint {
         let mut unordered = None;
         let candidate_types = graph.domain(candidate).clone();
         for source in candidate_types.admissible_types().unwrap_or(&[]) {
-            let target = if *source == CommonType::unknown() {
+            let target = if **source == CommonType::unknown() {
                 PgBuiltInType::text()
             } else {
-                source.clone()
+                source.as_ref().clone()
             };
             let ordering = if self.comparison {
                 facts.ordered(&target)
@@ -448,7 +448,7 @@ impl CommonTypeConstraint {
                     .filter(|source| facts.coerce(source, target))
                     .cloned();
                 alternatives.push(SignatureAlternative::new(&[
-                    InputTypeConstraint::types(sources),
+                    InputTypeConstraint::shared_types(sources),
                     InputTypeConstraint::exact(target),
                 ]));
             }

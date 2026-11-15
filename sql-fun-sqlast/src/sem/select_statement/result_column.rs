@@ -6,7 +6,7 @@ use crate::{
     names::ColumnName,
     sem::{
         AnalysisError, AnalysisProblem, ColumnDefinition, ColumnReferenceExpr, IndirectionExpr,
-        InputTypeConstraint, InsertTarget, ParameterConstraints, QueryProblem, SemScalarExpr,
+        InsertTarget, ParameterConstraints, QueryProblem, ResolvedTypes, SemScalarExpr,
         TypeReference,
         create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
         parameter_resolution::ParameterResolution,
@@ -840,7 +840,7 @@ impl ResultColumnCollection {
     pub(crate) fn set_output(
         &mut self,
         index: usize,
-        types: &InputTypeConstraint,
+        types: &ResolvedTypes,
         not_null: Option<bool>,
         expression: Option<SemScalarExpr>,
     ) {

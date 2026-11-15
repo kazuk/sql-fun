@@ -26,11 +26,14 @@ migration without reconstructing the original decision:
 
 - **Reason:** which existing API is preserved and why the compatibility measure
   is needed while release intent remains below `major`.
-- **Next-major change:** the intended public API or behavior after the breaking change.
+- **Next-major change:** the intended public API or behavior after the
+  breaking change.
 - **Removal/simplification:** the concrete deprecated APIs, compatibility
   aliases, adapters, or other transitional code to remove or simplify.
-- **References:** affected APIs, relevant tests, and the introducing PR or issue.
-- **Completion criteria:** observable conditions that establish the migration is done.
+- **References:** affected APIs, relevant tests, and the introducing PR or
+  issue.
+- **Completion criteria:** observable conditions that establish the migration
+  is done.
 
 Use a simple Markdown file with those headings; no special format, index,
 automation, or validation infrastructure is required.

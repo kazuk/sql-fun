@@ -18,7 +18,7 @@ pub struct WholeRowExpr {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 enum RowLookup {
-    Source(RowSource),
+    Source(Box<RowSource>),
     Failed(RowFailure),
 }
 
@@ -155,9 +155,9 @@ impl RowLookup {
         levels_up: usize,
         not_null: Option<bool>,
     ) -> Self {
-        Self::Source(RowSource::new(
+        Self::Source(Box::new(RowSource::new(
             alias, relation, type_ref, levels_up, not_null,
-        ))
+        )))
     }
     const fn failed(failure: RowFailure) -> Self {
         Self::Failed(failure)

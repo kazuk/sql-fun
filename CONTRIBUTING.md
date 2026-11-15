@@ -204,6 +204,8 @@ discuss the direction.
 Implementation and review guidelines are maintained in
 [docs/internal-rules/](docs/internal-rules/). Read the documents relevant to your
 change before starting work.
+For compatibility code intentionally retained until a major release, follow
+[the next-major migration specification convention](docs/internal-rules/next-major-migrations.md).
 
 In general:
 

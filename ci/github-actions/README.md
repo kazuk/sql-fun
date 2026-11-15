@@ -19,6 +19,20 @@ To compare sizes, run `check --build-only` before and after editing the
 Dockerfile. Use `docker history ci-builder:local` to inspect individual layer
 sizes.
 
+## Local CPU profiling permissions
+
+The interactive builder requests `PERFMON` so Docker's default seccomp profile
+allows `perf_event_open` for local CPU profiling. This applies only to the
+interactive builder launched by `check`; image-build smoke containers and
+PostgreSQL oracles keep their existing permissions. The host perf policy still
+applies to the non-root builder user. See the
+[CPU profiling guide](../../docs/internal-rules/server-cpu-profiling.md) for
+optional tools and the actual capture smoke check.
+
+After updating `check`, exit the existing builder session and relaunch it from
+the host so the new container receives the capability. The launcher does not
+change the host's `kernel.perf_event_paranoid` setting.
+
 ## PostgreSQL development oracles
 
 Interactive launches require the Docker Compose plugin on the **host**, with

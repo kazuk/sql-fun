@@ -119,7 +119,8 @@ mod rpc_schema {
         Collection,
         payloads::{
             AnalyzeQueryArgs, AnalyzeQueryResponse, EchoArgs, InitializeSchemaArgs,
-            ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, SqlToken, TokenizeSqlArgs,
+            ReadCollectionArgs, ReleaseCollectionArgs, ReportLintExpectationsArgs,
+            ReportLintExpectationsResponse, SchemaContext, SqlToken, TokenizeSqlArgs,
         },
     };
     use ::typed_openrpc::RpcMethod;
@@ -182,6 +183,16 @@ mod rpc_schema {
         type Result = AnalyzeQueryResponse;
     }
 
+    pub struct ReportLintExpectationsMethod;
+
+    impl RpcMethod for ReportLintExpectationsMethod {
+        const NAME: &'static str = "report_lint_expectations";
+        const SUMMARY: &'static str =
+            "report current unmet lint expectations without ending analysis";
+        type Params = ReportLintExpectationsArgs;
+        type Result = ReportLintExpectationsResponse;
+    }
+
     /// register all JSON-RPC methods
     pub fn register_methods(registry: &mut typed_openrpc::Registry) {
         registry.register_method::<EchoMethod>();
@@ -190,6 +201,34 @@ mod rpc_schema {
         registry.register_method::<ReadCollectionMethod>();
         registry.register_method::<ReleaseCollectionMethod>();
         registry.register_method::<AnalyzeQueryMethod>();
+        registry.register_method::<ReportLintExpectationsMethod>();
+    }
+}
+
+#[cfg(all(test, feature = "openrpc-schema"))]
+mod test_report_lint_expectations_openrpc {
+    use crate::register_methods;
+    #[test]
+    fn registers_report_with_context_and_structured_diagnostic_collection() {
+        let mut registry = ::typed_openrpc::Registry::new();
+        register_methods(&mut registry);
+        let info = ::typed_openrpc::OpenRpcInfo {
+            title: "test".to_owned(),
+            version: "test".to_owned(),
+            description: None,
+        };
+        let doc = ::serde_json::to_value(registry.generate_openrpc_doc_with_info(&info)).unwrap();
+        let method = doc["methods"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|method| method["name"] == "report_lint_expectations")
+            .unwrap();
+        let text = method.to_string();
+        assert!(text.contains("context_handle"));
+        assert!(text.contains("semantic_problem"));
+        assert!(text.contains("problems"));
+        assert!(method.get("result").is_some());
     }
 }
 

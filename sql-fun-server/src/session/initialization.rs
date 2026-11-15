@@ -9,6 +9,8 @@ pub(super) struct Initialization {
     home: PathBuf,
     selection: SchemaSelection,
     rewrite_options: ::sql_fun_core::RewriteOptions,
+    lint_configuration: ::sql_fun_core::LintConfigurations,
+    lint_path: Option<PathBuf>,
 }
 
 impl Initialization {
@@ -50,15 +52,37 @@ impl Initialization {
             request.expected_hash().as_deref(),
             level,
         )?;
+        let (lint_configuration, lint_path) = if level.includes_project() {
+            (
+                metadata
+                    .load_lint_configuration()
+                    .map_err(|error| SchemaLoadError::source(&error))?,
+                metadata
+                    .lint_configuration()
+                    .map(std::path::Path::to_path_buf),
+            )
+        } else {
+            (::sql_fun_core::LintConfigurations::default(), None)
+        };
         Ok(Self {
             home,
             selection,
             rewrite_options: *metadata.rewrite_options(),
+            lint_configuration,
+            lint_path,
         })
     }
 
     pub(super) const fn rewrite_options(&self) -> &::sql_fun_core::RewriteOptions {
         &self.rewrite_options
+    }
+
+    pub(super) const fn lint_configuration(&self) -> &::sql_fun_core::LintConfigurations {
+        &self.lint_configuration
+    }
+
+    pub(super) fn lint_path(&self) -> Option<&std::path::Path> {
+        self.lint_path.as_deref()
     }
 
     pub(super) async fn initialize(

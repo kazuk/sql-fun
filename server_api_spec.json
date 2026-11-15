@@ -1297,7 +1297,8 @@
               "enum": [
                 "Deprecated",
                 "Configuration",
-                "Duplicate"
+                "Duplicate",
+                "UnmetExpectation"
               ]
             },
             "LintTarget": {
@@ -5920,7 +5921,8 @@
               "enum": [
                 "Deprecated",
                 "Configuration",
-                "Duplicate"
+                "Duplicate",
+                "UnmetExpectation"
               ]
             },
             "LintTarget": {
@@ -9427,6 +9429,4043 @@
                 "ordinal",
                 "name",
                 "nullability"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "report_lint_expectations",
+      "summary": "report current unmet lint expectations without ending analysis",
+      "deprecated": null,
+      "tags": [],
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "ReportLintExpectationsArgs",
+            "description": "Report current unmet lint expectations without ending or resetting analysis.",
+            "type": "object",
+            "properties": {
+              "context_handle": {
+                "description": "Schema context whose accumulated observations are inspected.",
+                "$ref": "#/$defs/ContextHandle"
+              }
+            },
+            "required": [
+              "context_handle"
+            ],
+            "$defs": {
+              "ContextHandle": {
+                "description": "Opaque identifier for a connection's registered semantic analysis context.\n\nConstructing a handle does not register a context or grant access. Handles\nresolve only in the connection that issued them.",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "title": "ReportLintExpectationsResponse",
+          "description": "Immutable snapshot of unmet expectations as of this report call.",
+          "type": "object",
+          "properties": {
+            "problems": {
+              "description": "Unmet expectations, with no SQL reference spans.",
+              "$ref": "#/$defs/Collection"
+            }
+          },
+          "required": [
+            "problems"
+          ],
+          "$defs": {
+            "Collection": {
+              "description": "collection",
+              "type": "object",
+              "properties": {
+                "handle": {
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
+                },
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "offset": {
+                  "description": "offset of items",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "require_release": {
+                  "description": "When true, the client must call `release_collection`.",
+                  "type": "boolean"
+                },
+                "items": {
+                  "description": "collection items",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/AnalysisProbrem"
+                  }
+                }
+              },
+              "required": [
+                "handle",
+                "total_length",
+                "offset",
+                "require_release",
+                "items"
+              ]
+            },
+            "CollectionHandle": {
+              "description": "collection handle",
+              "type": "string"
+            },
+            "AnalysisProbrem": {
+              "description": "semantic analysis probrem",
+              "type": "object",
+              "properties": {
+                "semantic_problem": {
+                  "description": "Structured semantic problem when a reliable source presentation is unavailable.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/AnalysisProblem"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "presentation": {
+                  "description": "Structured diagnostic and analyzed source for optional CLI presentation.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/DiagnosticPresentation"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "severity": {
+                  "description": "Diagnostic severity, retained independently of its code.",
+                  "$ref": "#/$defs/DiagnosticSeverity"
+                },
+                "code": {
+                  "description": "error code",
+                  "type": "string"
+                },
+                "file_path": {
+                  "description": "file path",
+                  "type": "string"
+                },
+                "statement_span": {
+                  "description": "Statement span, or None when not retained by analysis.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "probrem_span": {
+                  "description": "Problem span, or None when not retained by analysis.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "statement_relative_span": {
+                  "description": "Byte range relative to the SQL statement, when a file position is unavailable.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StatementByteRange"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "severity",
+                "code",
+                "file_path"
+              ]
+            },
+            "AnalysisProblem": {
+              "description": "Semantic analysis problems",
+              "oneOf": [
+                {
+                  "description": "Row-security actions were requested through a non-table ALTER statement.",
+                  "type": "string",
+                  "const": "RowSecurityRequiresTable"
+                },
+                {
+                  "description": "Project lint finding or configuration warning.",
+                  "type": "object",
+                  "properties": {
+                    "Lint": {
+                      "$ref": "#/$defs/LintProblem"
+                    }
+                  },
+                  "required": [
+                    "Lint"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An invalid CHECK constraint definition.",
+                  "type": "object",
+                  "properties": {
+                    "Check": {
+                      "$ref": "#/$defs/CheckProblem"
+                    }
+                  },
+                  "required": [
+                    "Check"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An invalid serial column declaration.",
+                  "type": "object",
+                  "properties": {
+                    "Serial": {
+                      "$ref": "#/$defs/SerialProblem"
+                    }
+                  },
+                  "required": [
+                    "Serial"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Syntax is unavailable on the explicitly selected engine version.",
+                  "type": "object",
+                  "properties": {
+                    "IncompatibleEngineVersion": {
+                      "$ref": "#/$defs/EngineVersionProblem"
+                    }
+                  },
+                  "required": [
+                    "IncompatibleEngineVersion"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "SQL analysis could not establish a finalized parameter type.",
+                  "type": "object",
+                  "properties": {
+                    "ParameterTypeUnresolved": {
+                      "$ref": "#/$defs/ParameterBindingAmbiguity"
+                    }
+                  },
+                  "required": [
+                    "ParameterTypeUnresolved"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Inference would need an unsupported catalog-wide candidate search.\nThis reports an analysis limitation, not invalid SQL.",
+                  "type": "object",
+                  "properties": {
+                    "InferenceCandidateSpaceUnsupported": {
+                      "type": "object",
+                      "properties": {
+                        "operation": {
+                          "description": "SQL operation whose unresolved input requires that search.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "operation"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InferenceCandidateSpaceUnsupported"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Malformed operator-name components.",
+                  "type": "object",
+                  "properties": {
+                    "OperatorNameSyntax": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "OperatorNameSyntax"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A `PostgreSQL` operator reference has database qualification.",
+                  "type": "object",
+                  "properties": {
+                    "CrossDatabaseOperatorReference": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "CrossDatabaseOperatorReference"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Input could not be parsed, realized, hinted, analyzed, or deparsed.",
+                  "type": "object",
+                  "properties": {
+                    "QueryAnalysis": {
+                      "$ref": "#/$defs/QueryAnalysisProblem"
+                    }
+                  },
+                  "required": [
+                    "QueryAnalysis"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid ARRAY constructor typing.",
+                  "type": "object",
+                  "properties": {
+                    "Array": {
+                      "$ref": "#/$defs/ArrayProblem"
+                    }
+                  },
+                  "required": [
+                    "Array"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid boolean input to a truth predicate.",
+                  "type": "object",
+                  "properties": {
+                    "TruthTest": {
+                      "$ref": "#/$defs/TruthTestProblem"
+                    }
+                  },
+                  "required": [
+                    "TruthTest"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Explicit COLLATE binding or operand applicability failed.",
+                  "type": "object",
+                  "properties": {
+                    "Collate": {
+                      "$ref": "#/$defs/CollateProblem"
+                    }
+                  },
+                  "required": [
+                    "Collate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "TABLESAMPLE binding or validation failed.",
+                  "type": "object",
+                  "properties": {
+                    "TableSample": {
+                      "$ref": "#/$defs/TableSampleProblem"
+                    }
+                  },
+                  "required": [
+                    "TableSample"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid null-safe distinctness predicate.",
+                  "type": "object",
+                  "properties": {
+                    "Distinct": {
+                      "$ref": "#/$defs/DistinctProblem"
+                    }
+                  },
+                  "required": [
+                    "Distinct"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid membership predicate.",
+                  "type": "object",
+                  "properties": {
+                    "Membership": {
+                      "$ref": "#/$defs/MembershipProblem"
+                    }
+                  },
+                  "required": [
+                    "Membership"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid index alteration or a statistics warning.",
+                  "type": "object",
+                  "properties": {
+                    "Index": {
+                      "$ref": "#/$defs/IndexProblem"
+                    }
+                  },
+                  "required": [
+                    "Index"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An ALTER COLUMN binding or attribute is invalid.",
+                  "type": "object",
+                  "properties": {
+                    "AlterColumn": {
+                      "$ref": "#/$defs/ColumnAttributeProblem"
+                    }
+                  },
+                  "required": [
+                    "AlterColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid `PostgreSQL` GREATEST/LEAST common type or comparison capability.",
+                  "type": "object",
+                  "properties": {
+                    "MinMax": {
+                      "$ref": "#/$defs/MinMaxProblem"
+                    }
+                  },
+                  "required": [
+                    "MinMax"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A function invocation has an invalid argument order or repeated name.",
+                  "type": "object",
+                  "properties": {
+                    "CallArgument": {
+                      "$ref": "#/$defs/CallArgumentProblem"
+                    }
+                  },
+                  "required": [
+                    "CallArgument"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A creation conflicts with an existing catalog identity.",
+                  "type": "object",
+                  "properties": {
+                    "Creation": {
+                      "$ref": "#/$defs/CreationProblem"
+                    }
+                  },
+                  "required": [
+                    "Creation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid rule definition.",
+                  "type": "object",
+                  "properties": {
+                    "Rule": {
+                      "$ref": "#/$defs/RuleProblem"
+                    }
+                  },
+                  "required": [
+                    "Rule"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "ALTER OWNER target or role lookup failed.",
+                  "type": "object",
+                  "properties": {
+                    "Ownership": {
+                      "$ref": "#/$defs/OwnershipProblem"
+                    }
+                  },
+                  "required": [
+                    "Ownership"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid trigger semantics.",
+                  "type": "object",
+                  "properties": {
+                    "Trigger": {
+                      "$ref": "#/$defs/TriggerProblem"
+                    }
+                  },
+                  "required": [
+                    "Trigger"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A view declaration or catalog capability violation.",
+                  "type": "object",
+                  "properties": {
+                    "View": {
+                      "$ref": "#/$defs/ViewProblem"
+                    }
+                  },
+                  "required": [
+                    "View"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A violation of INSERT semantic rules.",
+                  "type": "object",
+                  "properties": {
+                    "Insert": {
+                      "$ref": "#/$defs/InsertProblem"
+                    }
+                  },
+                  "required": [
+                    "Insert"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A violation of DELETE semantic rules.",
+                  "type": "object",
+                  "properties": {
+                    "Delete": {
+                      "$ref": "#/$defs/DeleteProblem"
+                    }
+                  },
+                  "required": [
+                    "Delete"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A violation of UPDATE semantic rules.",
+                  "type": "object",
+                  "properties": {
+                    "Update": {
+                      "$ref": "#/$defs/UpdateProblem"
+                    }
+                  },
+                  "required": [
+                    "Update"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A structured SELECT clause violation.",
+                  "type": "object",
+                  "properties": {
+                    "Query": {
+                      "$ref": "#/$defs/QueryProblem"
+                    }
+                  },
+                  "required": [
+                    "Query"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid table-function output declarations.",
+                  "type": "object",
+                  "properties": {
+                    "TableFunction": {
+                      "$ref": "#/$defs/TableFunctionProblem"
+                    }
+                  },
+                  "required": [
+                    "TableFunction"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "SQL-derived parameter requirements cannot be reconciled.",
+                  "type": "object",
+                  "properties": {
+                    "ParameterConstraint": {
+                      "$ref": "#/$defs/ParameterConstraintProblem"
+                    }
+                  },
+                  "required": [
+                    "ParameterConstraint"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Name resolution problems",
+                  "type": "object",
+                  "properties": {
+                    "NameResolution": {
+                      "$ref": "#/$defs/NameResolution"
+                    }
+                  },
+                  "required": [
+                    "NameResolution"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Overload resolution problems",
+                  "type": "object",
+                  "properties": {
+                    "OverloadResolution": {
+                      "$ref": "#/$defs/OverloadResolution"
+                    }
+                  },
+                  "required": [
+                    "OverloadResolution"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An omitted foreign-key column list requires a referenced primary key.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignKeyReferencedPrimaryKeyMissing": {
+                      "$ref": "#/$defs/TableName"
+                    }
+                  },
+                  "required": [
+                    "ForeignKeyReferencedPrimaryKeyMissing"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "extension not found",
+                  "type": "object",
+                  "properties": {
+                    "ExtensionNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ExtensionNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "can not to guess nullablity",
+                  "type": "object",
+                  "properties": {
+                    "NullabilityUnknown": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "NullabilityUnknown"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Argument type mismatch",
+                  "type": "object",
+                  "properties": {
+                    "ArgumentTypeMismatch": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "type": "integer",
+                          "format": "uint",
+                          "minimum": 0
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ArgumentTypeMismatch"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "duplicate def elem key",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateDefElemKey": {
+                      "$ref": "#/$defs/DefElemKey"
+                    }
+                  },
+                  "required": [
+                    "DuplicateDefElemKey"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "explicit cast not defined",
+                  "type": "object",
+                  "properties": {
+                    "ExplicitCastNotDefined": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ExplicitCastNotDefined"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A COALESCE argument follows a proven non-null operand.",
+                  "type": "object",
+                  "properties": {
+                    "UnreachableCoalesceArgument": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        },
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnreachableCoalesceArgument"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Coalesce expr type unknown",
+                  "type": "object",
+                  "properties": {
+                    "CoalesceExprTypeUnknown": {
+                      "$ref": "#/$defs/ExpressionList"
+                    }
+                  },
+                  "required": [
+                    "CoalesceExprTypeUnknown"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Expression type not known",
+                  "type": "object",
+                  "properties": {
+                    "ExpressionTypeNotKnown": {
+                      "$ref": "#/$defs/SemScalarExpr"
+                    }
+                  },
+                  "required": [
+                    "ExpressionTypeNotKnown"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Operator Not Defined",
+                  "type": "object",
+                  "properties": {
+                    "UndefinedOperator": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/AExprKind"
+                        },
+                        {
+                          "$ref": "#/$defs/OperatorName"
+                        },
+                        {
+                          "$ref": "#/$defs/OptionalExpression"
+                        },
+                        {
+                          "$ref": "#/$defs/OptionalExpression"
+                        }
+                      ],
+                      "minItems": 4,
+                      "maxItems": 4
+                    }
+                  },
+                  "required": [
+                    "UndefinedOperator"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Array Required",
+                  "type": "object",
+                  "properties": {
+                    "RequireArray": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "RequireArray"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sub query not have a derived column",
+                  "type": "string",
+                  "const": "SubQueryNotHaveColumnForDerivedColumnName"
+                },
+                {
+                  "description": "incompatible case values",
+                  "type": "object",
+                  "properties": {
+                    "IncompatibleCaseValues": {
+                      "$ref": "#/$defs/TypeList"
+                    }
+                  },
+                  "required": [
+                    "IncompatibleCaseValues"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "case when expr type unknown",
+                  "type": "object",
+                  "properties": {
+                    "CaseWhenExprTypeUnknown": {
+                      "$ref": "#/$defs/SemScalarExpr"
+                    }
+                  },
+                  "required": [
+                    "CaseWhenExprTypeUnknown"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "array type mismatch",
+                  "type": "object",
+                  "properties": {
+                    "ArrayIndexTypeMismatch": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ArrayIndexTypeMismatch"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "member access requires composite type",
+                  "type": "object",
+                  "properties": {
+                    "MemberAccessRequiresCompositeType": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "MemberAccessRequiresCompositeType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "function argument implicit cast not found",
+                  "type": "object",
+                  "properties": {
+                    "FunctionArgImplicitCastNotFound": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "type": "integer",
+                          "format": "uint",
+                          "minimum": 0
+                        },
+                        {
+                          "$ref": "#/$defs/TypeDefinition"
+                        },
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        }
+                      ],
+                      "minItems": 4,
+                      "maxItems": 4
+                    }
+                  },
+                  "required": [
+                    "FunctionArgImplicitCastNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "implicit cast not found",
+                  "type": "object",
+                  "properties": {
+                    "ImplicitCastNotFound": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ImplicitCastNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "no compatible table-function overload",
+                  "type": "object",
+                  "properties": {
+                    "ParameterTypeMismatchForTableFunction": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "$ref": "#/$defs/ArgumentBindingCollection"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ParameterTypeMismatchForTableFunction"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "LintProblem": {
+              "description": "Structured warning produced by project semantic linting.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/LintProblemKind"
+                },
+                "target": {
+                  "$ref": "#/$defs/LintTarget"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "span": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StringSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "target",
+                "reason"
+              ]
+            },
+            "LintProblemKind": {
+              "type": "string",
+              "enum": [
+                "Deprecated",
+                "Configuration",
+                "Duplicate",
+                "UnmetExpectation"
+              ]
+            },
+            "LintTarget": {
+              "description": "Structured target facts for a project lint diagnostic.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "column": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "name"
+              ]
+            },
+            "StringSpan": {
+              "description": "Statement-relative byte range retained by analysis.",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "len": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "len"
+              ]
+            },
+            "CheckProblem": {
+              "description": "A CHECK definition that cannot be applied to the analysis catalog.",
+              "oneOf": [
+                {
+                  "description": "The expression cannot be coerced to boolean. Diagnostic code: `check_boolean_type`.",
+                  "type": "string",
+                  "const": "BooleanType"
+                },
+                {
+                  "description": "An unknown string is not valid boolean input. Diagnostic code: `check_boolean_literal`.",
+                  "type": "object",
+                  "properties": {
+                    "BooleanLiteral": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "BooleanLiteral"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "CHECK cannot contain a subquery, aggregate, window or set-returning expression. Diagnostic code: `check_expression_placement`.",
+                  "type": "string",
+                  "const": "ExpressionPlacement"
+                },
+                {
+                  "description": "CHECK cannot contain a bind parameter. Diagnostic code: `check_parameter`.",
+                  "type": "string",
+                  "const": "Parameter"
+                },
+                {
+                  "description": "CHECK constraints cannot be deferred. Diagnostic code: `check_deferrability`.",
+                  "type": "string",
+                  "const": "Deferrability"
+                },
+                {
+                  "description": "An explicit constraint name is already used on this table. Diagnostic code: `check_duplicate_name`.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateName"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "SerialProblem": {
+              "description": "An invalid `PostgreSQL` serial-family column declaration.",
+              "oneOf": [
+                {
+                  "description": "Serial arrays cannot be declared. Diagnostic code: `serial_array`.",
+                  "type": "string",
+                  "const": "Array"
+                },
+                {
+                  "description": "The underlying integer type does not accept modifiers. Diagnostic code: `serial_modifier`.",
+                  "type": "string",
+                  "const": "Modifier"
+                },
+                {
+                  "description": "Explicit NULL conflicts with implicit NOT NULL. Diagnostic code: `serial_nullable`.",
+                  "type": "string",
+                  "const": "Nullable"
+                },
+                {
+                  "description": "An explicit default conflicts with the sequence default. Diagnostic code: `serial_default_conflict`.",
+                  "type": "string",
+                  "const": "Default"
+                },
+                {
+                  "description": "Identity conflicts with the sequence default. Diagnostic code: `serial_identity_conflict`.",
+                  "type": "string",
+                  "const": "Identity"
+                },
+                {
+                  "description": "A generated expression conflicts with the sequence default. Diagnostic code: `serial_generated_conflict`.",
+                  "type": "string",
+                  "const": "Generated"
+                }
+              ]
+            },
+            "EngineVersionProblem": {
+              "description": "Syntax version requirement and the explicitly selected target.",
+              "type": "object",
+              "properties": {
+                "feature": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "feature",
+                "required"
+              ]
+            },
+            "ParameterBindingAmbiguity": {
+              "description": "An application input whose local binding choice is ambiguous.",
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "candidates"
+              ]
+            },
+            "TypeReference": {
+              "description": "Retained diagnostic text for `TypeReference`.",
+              "type": "string"
+            },
+            "QueryAnalysisProblem": {
+              "description": "A query-input or analysis-capability failure, distinct from semantic inference.",
+              "type": "object",
+              "properties": {
+                "stage": {
+                  "$ref": "#/$defs/QueryAnalysisStage"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "stage",
+                "message"
+              ]
+            },
+            "QueryAnalysisStage": {
+              "description": "Structured failure stage; kept distinct from semantic name/type diagnostics.",
+              "oneOf": [
+                {
+                  "description": "Parse capability or input failure.",
+                  "type": "string",
+                  "const": "parse"
+                },
+                {
+                  "description": "Realization capability or input failure.",
+                  "type": "string",
+                  "const": "realization"
+                },
+                {
+                  "description": "Hint capability or input failure.",
+                  "type": "string",
+                  "const": "hint"
+                },
+                {
+                  "description": "Statement capability or input failure.",
+                  "type": "string",
+                  "const": "statement"
+                },
+                {
+                  "description": "Analysis capability or input failure.",
+                  "type": "string",
+                  "const": "analysis"
+                },
+                {
+                  "description": "Deparse capability or input failure.",
+                  "type": "string",
+                  "const": "deparse"
+                }
+              ]
+            },
+            "ArrayProblem": {
+              "description": "A `PostgreSQL` ARRAY constructor type-resolution failure.",
+              "oneOf": [
+                {
+                  "description": "An empty constructor has no explicit element type.",
+                  "type": "string",
+                  "const": "Empty"
+                },
+                {
+                  "description": "ARRAY(query) requires exactly one output column.",
+                  "type": "object",
+                  "properties": {
+                    "SubqueryColumns": {
+                      "type": "integer",
+                      "format": "uint",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "SubqueryColumns"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Operand types cannot be matched or coerced to the target.",
+                  "type": "object",
+                  "properties": {
+                    "Incompatible": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Incompatible"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Required type-category metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTypeFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingTypeFacts"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "TruthTestProblem": {
+              "description": "Invalid input to a `PostgreSQL` truth predicate.",
+              "oneOf": [
+                {
+                  "description": "The operand cannot be implicitly converted to boolean.",
+                  "type": "object",
+                  "properties": {
+                    "OperandType": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "OperandType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An unknown string literal is not valid `PostgreSQL` boolean input.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidLiteral": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidLiteral"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CollateProblem": {
+              "description": "A failed explicit COLLATE binding or type applicability check.",
+              "oneOf": [
+                {
+                  "description": "The independently known operand type does not support collations.",
+                  "type": "object",
+                  "properties": {
+                    "OperandType": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "OperandType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More than one definition remains after name visibility is applied.",
+                  "type": "object",
+                  "properties": {
+                    "Ambiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Ambiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The catalog does not establish whether the declared type supports collations.",
+                  "type": "object",
+                  "properties": {
+                    "UndefinedCapability": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "UndefinedCapability"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "TableSampleProblem": {
+              "description": "A TABLESAMPLE binding, input, or capability problem.",
+              "oneOf": [
+                {
+                  "description": "sampling method does not exist.",
+                  "type": "object",
+                  "properties": {
+                    "MethodNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MethodNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MetadataUnavailable": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MetadataUnavailable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method is ambiguous.",
+                  "type": "object",
+                  "properties": {
+                    "MethodAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MethodAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid sampling handler.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidHandler": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidHandler"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "TABLESAMPLE requires a table or materialized view.",
+                  "type": "object",
+                  "properties": {
+                    "Relation": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Relation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid sampling argument count.",
+                  "type": "object",
+                  "properties": {
+                    "Arity": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Arity"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method does not support REPEATABLE.",
+                  "type": "object",
+                  "properties": {
+                    "Repeatable": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Repeatable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid TABLESAMPLE argument type.",
+                  "type": "object",
+                  "properties": {
+                    "ArgumentType": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ArgumentType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid REPEATABLE seed type.",
+                  "type": "object",
+                  "properties": {
+                    "SeedType": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "SeedType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling expression cannot use aggregate, window or set-returning functions.",
+                  "type": "object",
+                  "properties": {
+                    "Expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Expression"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "DistinctProblem": {
+              "description": "Invalid operands or equality result for a null-safe distinctness predicate.",
+              "oneOf": [
+                {
+                  "description": "Explicit row constructors have different numbers of fields.",
+                  "type": "object",
+                  "properties": {
+                    "RowArity": {
+                      "$ref": "#/$defs/RowArity"
+                    }
+                  },
+                  "required": [
+                    "RowArity"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The selected equality operator does not return boolean.",
+                  "type": "object",
+                  "properties": {
+                    "EqualityResult": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "EqualityResult"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "RowArity": {
+              "description": "The field counts of an incompatible explicit row pair.",
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "right": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "left",
+                "right"
+              ]
+            },
+            "MembershipProblem": {
+              "description": "Invalid shape or comparison in an IN/NOT IN predicate.",
+              "oneOf": [
+                {
+                  "description": "The operands have incompatible widths.",
+                  "type": "object",
+                  "properties": {
+                    "Width": {
+                      "$ref": "#/$defs/MembershipWidth"
+                    }
+                  },
+                  "required": [
+                    "Width"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A selected comparison does not return boolean.",
+                  "type": "object",
+                  "properties": {
+                    "ComparisonResult": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "ComparisonResult"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "MembershipWidth": {
+              "description": "Expected and actual membership operand widths.",
+              "type": "object",
+              "properties": {
+                "expected": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "actual": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "expected",
+                "actual"
+              ]
+            },
+            "IndexProblem": {
+              "description": "Structured index diagnostic, retained independently of diagnostic delivery.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "kind": {
+                  "$ref": "#/$defs/IndexProblemKind"
+                },
+                "parameter": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "column": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32"
+                }
+              },
+              "required": [
+                "target",
+                "kind"
+              ]
+            },
+            "FullName": {
+              "description": "Retained diagnostic text for `FullName`.",
+              "type": "string"
+            },
+            "IndexProblemKind": {
+              "description": "Classification of a rejected index alteration or a statistics warning.",
+              "oneOf": [
+                {
+                  "description": "No relation occupies the requested name.",
+                  "type": "string",
+                  "const": "MissingTarget"
+                },
+                {
+                  "description": "The visible relation is not an index.",
+                  "type": "string",
+                  "const": "WrongKind"
+                },
+                {
+                  "description": "An option namespace is not accepted by `PostgreSQL`.",
+                  "type": "string",
+                  "const": "InvalidNamespace"
+                },
+                {
+                  "description": "A storage parameter is not supported by the access method.",
+                  "type": "string",
+                  "const": "UnknownParameter"
+                },
+                {
+                  "description": "A SET list repeats a parameter.",
+                  "type": "string",
+                  "const": "DuplicateParameter"
+                },
+                {
+                  "description": "A storage value has the wrong type or range.",
+                  "type": "string",
+                  "const": "InvalidValue"
+                },
+                {
+                  "description": "A RESET parameter supplies a value.",
+                  "type": "string",
+                  "const": "ResetValue"
+                },
+                {
+                  "description": "The column ordinal is outside the index layout.",
+                  "type": "string",
+                  "const": "InvalidColumn"
+                },
+                {
+                  "description": "An ordinary key column cannot have index statistics.",
+                  "type": "string",
+                  "const": "NonExpressionColumn"
+                },
+                {
+                  "description": "An included column cannot have index statistics.",
+                  "type": "string",
+                  "const": "IncludedColumn"
+                },
+                {
+                  "description": "A statistics target is below -1.",
+                  "type": "string",
+                  "const": "StatisticsTooLow"
+                },
+                {
+                  "description": "`PostgreSQL` lowers a statistics target above 10000 to 10000.",
+                  "type": "string",
+                  "const": "StatisticsClamped"
+                }
+              ]
+            },
+            "ColumnAttributeProblem": {
+              "description": "A structured ALTER COLUMN diagnostic with its semantic target identity.",
+              "type": "object",
+              "properties": {
+                "table": {
+                  "$ref": "#/$defs/TableName"
+                },
+                "column": {
+                  "$ref": "#/$defs/ColumnName"
+                },
+                "reason": {
+                  "$ref": "#/$defs/AlterColumnProblem"
+                }
+              },
+              "required": [
+                "table",
+                "column",
+                "reason"
+              ]
+            },
+            "TableName": {
+              "description": "Retained diagnostic text for `TableName`.",
+              "type": "string"
+            },
+            "ColumnName": {
+              "description": "Retained diagnostic text for `ColumnName`.",
+              "type": "string"
+            },
+            "AlterColumnProblem": {
+              "description": "A completed ALTER COLUMN binding or validation outcome.",
+              "oneOf": [
+                {
+                  "description": "SQLite cannot drop the final non-generated column of a table.",
+                  "type": "string",
+                  "const": "DropLastColumn"
+                },
+                {
+                  "description": "A retained dependency prevents this column removal.",
+                  "type": "object",
+                  "properties": {
+                    "DropDependency": {
+                      "$ref": "#/$defs/ColumnDropDependency"
+                    }
+                  },
+                  "required": [
+                    "DropDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The parser-retained column replacement is not SQLite engine syntax.",
+                  "type": "string",
+                  "const": "DefinitionSyntax"
+                },
+                {
+                  "description": "SQLite forbids PRIMARY KEY and UNIQUE in ADD COLUMN.",
+                  "type": "string",
+                  "const": "AddSqliteKey"
+                },
+                {
+                  "description": "A PostgreSQL table cannot acquire a second primary key.",
+                  "type": "string",
+                  "const": "AddPrimaryKey"
+                },
+                {
+                  "description": "An added default is not a valid scalar assignment to the column.",
+                  "type": "string",
+                  "const": "AddDefault"
+                },
+                {
+                  "description": "Added column has contradictory NULL and NOT NULL declarations.",
+                  "type": "string",
+                  "const": "AddNullability"
+                },
+                {
+                  "description": "The requested type change occurs twice for one column.",
+                  "type": "string",
+                  "const": "DuplicateType"
+                },
+                {
+                  "description": "The existing column cannot be assigned to the requested type.",
+                  "type": "string",
+                  "const": "TypeConversion"
+                },
+                {
+                  "description": "The existing default cannot be assigned to the requested type.",
+                  "type": "string",
+                  "const": "DefaultConversion"
+                },
+                {
+                  "description": "USING contains a prohibited expression or unresolved binding.",
+                  "type": "string",
+                  "const": "UsingExpression"
+                },
+                {
+                  "description": "The requested type modifier is invalid.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTypmod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidTypmod"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The target relation does not exist or has the wrong kind.",
+                  "type": "string",
+                  "const": "MissingRelation"
+                },
+                {
+                  "description": "The named column is absent from the resolved relation.",
+                  "type": "string",
+                  "const": "MissingColumn"
+                },
+                {
+                  "description": "A primary key requires the column to remain NOT NULL.",
+                  "type": "string",
+                  "const": "PrimaryKey"
+                },
+                {
+                  "description": "An identity column must remain NOT NULL.",
+                  "type": "string",
+                  "const": "Identity"
+                },
+                {
+                  "description": "DROP EXPRESSION requires a stored generated column.",
+                  "type": "string",
+                  "const": "NotStoredGenerated"
+                },
+                {
+                  "description": "A virtual generated column does not support this operation.",
+                  "type": "string",
+                  "const": "VirtualGenerated"
+                },
+                {
+                  "description": "The selected `PostgreSQL` version does not support this spelling.",
+                  "type": "string",
+                  "const": "Version"
+                },
+                {
+                  "description": "A statistics target is below -1.",
+                  "type": "object",
+                  "properties": {
+                    "StatisticsTooLow": {
+                      "type": "integer",
+                      "format": "int32"
+                    }
+                  },
+                  "required": [
+                    "StatisticsTooLow"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "`PostgreSQL` limits the requested statistics target to 10000.",
+                  "type": "object",
+                  "properties": {
+                    "StatisticsReduced": {
+                      "type": "integer",
+                      "format": "int32"
+                    }
+                  },
+                  "required": [
+                    "StatisticsReduced"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The option is not a recognized column attribute.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "UnknownOption"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An option occurs more than once in the same action.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateOption"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A SET value is missing, invalid, or outside its domain.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidOption"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "RESET cannot contain an option value.",
+                  "type": "object",
+                  "properties": {
+                    "ResetValue": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ResetValue"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "ColumnDropDependency": {
+              "description": "The retained identity of an object preventing a column removal.",
+              "type": "object",
+              "properties": {
+                "relation": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "member": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "relation",
+                "member"
+              ]
+            },
+            "MinMaxProblem": {
+              "description": "A `PostgreSQL` GREATEST/LEAST type-resolution failure.",
+              "oneOf": [
+                {
+                  "description": "No operand was supplied.",
+                  "type": "string",
+                  "const": "Empty"
+                },
+                {
+                  "description": "Two operand types cannot be coerced to the selected common type.",
+                  "type": "object",
+                  "properties": {
+                    "Incompatible": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Incompatible"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Required type-category metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTypeFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingTypeFacts"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Comparison metadata is unavailable for the result type.",
+                  "type": "object",
+                  "properties": {
+                    "MissingComparisonFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingComparisonFacts"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The result type has no `PostgreSQL` comparison implementation.",
+                  "type": "object",
+                  "properties": {
+                    "NotOrdered": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "NotOrdered"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CallArgumentProblem": {
+              "description": "Invocation syntax and candidate-set argument binding failures.",
+              "oneOf": [
+                {
+                  "description": "A supplied argument name occurs more than once.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateName": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "DuplicateName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No candidate recognizes the supplied argument name.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "UnknownName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Every candidate requires this omitted input.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRequired": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingRequired"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Every candidate assigns this formal both positionally and by name.",
+                  "type": "object",
+                  "properties": {
+                    "AssignedTwice": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AssignedTwice"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A positional argument follows a named argument (zero-based call position).",
+                  "type": "object",
+                  "properties": {
+                    "PositionalAfterNamed": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "integer",
+                          "format": "uint",
+                          "minimum": 0
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "PositionalAfterNamed"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CreationProblem": {
+              "description": "A rejected creation, retaining namespace and qualified semantic identity.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "requested": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Kind"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "existing": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Kind"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "signature": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "container": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/FullName"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "span": {
+                  "$ref": "#/$defs/StringSpan"
+                }
+              },
+              "required": [
+                "name",
+                "namespace",
+                "span"
+              ]
+            },
+            "Kind": {
+              "description": "Retained diagnostic text for `Kind`.",
+              "type": "string"
+            },
+            "OwnershipIdentity": {
+              "description": "Retained diagnostic text for `OwnershipIdentity`.",
+              "type": "string"
+            },
+            "RuleProblem": {
+              "description": "Structured rule-definition or application failure.",
+              "oneOf": [
+                {
+                  "description": "Missing or unsuitable target relation.",
+                  "type": "object",
+                  "properties": {
+                    "Target": {
+                      "$ref": "#/$defs/DebugName"
+                    }
+                  },
+                  "required": [
+                    "Target"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An existing definition conflicts with CREATE.",
+                  "type": "object",
+                  "properties": {
+                    "Duplicate": {
+                      "$ref": "#/$defs/RuleIdentity"
+                    }
+                  },
+                  "required": [
+                    "Duplicate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No effective rule exists under this relation-scoped identity.",
+                  "type": "object",
+                  "properties": {
+                    "Missing": {
+                      "$ref": "#/$defs/RuleIdentity"
+                    }
+                  },
+                  "required": [
+                    "Missing"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A rule-specific legality constraint was violated.",
+                  "type": "object",
+                  "properties": {
+                    "Definition": {
+                      "$ref": "#/$defs/RuleDefinitionProblem"
+                    }
+                  },
+                  "required": [
+                    "Definition"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "DebugName": {
+              "description": "Retained diagnostic text for `DebugName`.",
+              "type": "string"
+            },
+            "RuleIdentity": {
+              "description": "Retained diagnostic text for `RuleIdentity`.",
+              "type": "string"
+            },
+            "RuleDefinitionProblem": {
+              "description": "A rule identity and the semantic restriction it violates.",
+              "type": "object",
+              "properties": {
+                "identity": {
+                  "$ref": "#/$defs/RuleIdentity"
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "identity",
+                "detail"
+              ]
+            },
+            "OwnershipProblem": {
+              "description": "Structured ownership lookup failure, preserving semantic identities.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/OwnershipLookup"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "role": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "OwnershipLookup": {
+              "description": "Diagnostic text for an ownership lookup outcome.",
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ]
+            },
+            "TriggerProblem": {
+              "description": "Structured trigger-definition validation failure.",
+              "oneOf": [
+                {
+                  "description": "Missing or invalid target relation.",
+                  "type": "object",
+                  "properties": {
+                    "Target": {
+                      "$ref": "#/$defs/DebugName"
+                    }
+                  },
+                  "required": [
+                    "Target"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Duplicate trigger in its dialect namespace.",
+                  "type": "object",
+                  "properties": {
+                    "Duplicate": {
+                      "$ref": "#/$defs/TriggerIdentity"
+                    }
+                  },
+                  "required": [
+                    "Duplicate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Requested trigger does not exist in the resolved relation namespace.",
+                  "type": "object",
+                  "properties": {
+                    "Missing": {
+                      "$ref": "#/$defs/TriggerIdentity"
+                    }
+                  },
+                  "required": [
+                    "Missing"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No `SQLite` trigger matched an unbound requested name.",
+                  "type": "object",
+                  "properties": {
+                    "MissingName": {
+                      "$ref": "#/$defs/DebugName"
+                    }
+                  },
+                  "required": [
+                    "MissingName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Unknown event column.",
+                  "type": "object",
+                  "properties": {
+                    "Column": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/DebugName"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Column"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Missing or invalid zero-input trigger function.",
+                  "type": "object",
+                  "properties": {
+                    "Function": {
+                      "$ref": "#/$defs/DebugName"
+                    }
+                  },
+                  "required": [
+                    "Function"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Incompatible trigger options.",
+                  "type": "object",
+                  "properties": {
+                    "Options": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/DebugName"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Options"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "TriggerIdentity": {
+              "description": "Retained diagnostic text for `TriggerIdentity`.",
+              "type": "string"
+            },
+            "ViewProblem": {
+              "description": "A view declaration or capability cannot be analyzed as requested.",
+              "oneOf": [
+                {
+                  "description": "The declaration target is absent or is not an ordinary view.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTarget": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "InvalidTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A view default refers to an unknown column.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownDefaultColumn": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnknownDefaultColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Explicitly loaded catalog data lacks required write facts.",
+                  "type": "object",
+                  "properties": {
+                    "MissingMetadata": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "MissingMetadata"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "`PostgreSQL` does not allow this ALTER operation on a view.",
+                  "type": "string",
+                  "const": "InvalidAlter"
+                }
+              ]
+            },
+            "InsertProblem": {
+              "description": "A violation of INSERT destination, source or conflict rules.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/InsertProblemKind"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "message"
+              ]
+            },
+            "InsertProblemKind": {
+              "description": "Structured INSERT violation, independently of its rendered message.",
+              "oneOf": [
+                {
+                  "description": "Source and destination arity differ.",
+                  "type": "string",
+                  "const": "Arity"
+                },
+                {
+                  "description": "A `PostgreSQL` destination column is assigned more than once.",
+                  "type": "string",
+                  "const": "DuplicateTarget"
+                },
+                {
+                  "description": "A destination view or assigned view column is read-only.",
+                  "type": "string",
+                  "const": "ReadOnlyTarget"
+                },
+                {
+                  "description": "A writable view does not support RETURNING or ON CONFLICT.",
+                  "type": "string",
+                  "const": "ViewOperation"
+                },
+                {
+                  "description": "An explicit value targets a generated column.",
+                  "type": "string",
+                  "const": "GeneratedTarget"
+                },
+                {
+                  "description": "An explicit value violates identity override rules.",
+                  "type": "string",
+                  "const": "IdentityTarget"
+                },
+                {
+                  "description": "A source type has no assignment conversion to its destination.",
+                  "type": "string",
+                  "const": "AssignmentType"
+                },
+                {
+                  "description": "A RETURNING qualifier is not visible or is illegal in this dialect.",
+                  "type": "string",
+                  "const": "ReturningQualifier"
+                },
+                {
+                  "description": "A named constraint is absent or is not an eligible arbiter.",
+                  "type": "string",
+                  "const": "ConflictConstraint"
+                },
+                {
+                  "description": "An inference target has no eligible unique key.",
+                  "type": "string",
+                  "const": "ConflictTarget"
+                },
+                {
+                  "description": "A collation or operator class was not found in the applicable namespace.",
+                  "type": "string",
+                  "const": "ConflictNameMissing"
+                },
+                {
+                  "description": "A collation or operator class has multiple visible matching definitions.",
+                  "type": "string",
+                  "const": "ConflictNameAmbiguous"
+                },
+                {
+                  "description": "A conflict predicate does not have boolean type.",
+                  "type": "string",
+                  "const": "ConflictPredicate"
+                },
+                {
+                  "description": "A non-final `SQLite` UPSERT clause omits its target.",
+                  "type": "string",
+                  "const": "ConflictChain"
+                },
+                {
+                  "description": "A CTE declares more names than its RETURNING output.",
+                  "type": "string",
+                  "const": "CteAliases"
+                }
+              ]
+            },
+            "DeleteProblem": {
+              "description": "A violation of DELETE destination, predicate or result rules.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/DeleteProblemKind"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "DeleteProblemKind": {
+              "description": "Structured DELETE violation, independently of its rendered message.",
+              "oneOf": [
+                {
+                  "description": "INDEXED BY does not identify an index of the destination.",
+                  "type": "string",
+                  "const": "IndexHint"
+                },
+                {
+                  "description": "A relation or column does not accept DELETE.",
+                  "type": "string",
+                  "const": "ReadOnlyTarget"
+                },
+                {
+                  "description": "A view does not support the requested operation.",
+                  "type": "string",
+                  "const": "ViewOperation"
+                },
+                {
+                  "description": "A RETURNING source is invalid.",
+                  "type": "string",
+                  "const": "ReturningQualifier"
+                },
+                {
+                  "description": "A CTE declares too many aliases.",
+                  "type": "string",
+                  "const": "CteAliases"
+                },
+                {
+                  "description": "WHERE requires boolean type.",
+                  "type": "string",
+                  "const": "Predicate"
+                },
+                {
+                  "description": "The named cursor is absent from the current session.",
+                  "type": "object",
+                  "properties": {
+                    "MissingCursor": {
+                      "$ref": "#/$defs/CursorNameProblem"
+                    }
+                  },
+                  "required": [
+                    "MissingCursor"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The named cursor is statically non-updatable.",
+                  "type": "object",
+                  "properties": {
+                    "NonUpdatableCursor": {
+                      "$ref": "#/$defs/CursorNameProblem"
+                    }
+                  },
+                  "required": [
+                    "NonUpdatableCursor"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The cursor targets another relation.",
+                  "type": "object",
+                  "properties": {
+                    "CursorTargetMismatch": {
+                      "$ref": "#/$defs/CursorTargetMismatchProblem"
+                    }
+                  },
+                  "required": [
+                    "CursorTargetMismatch"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A procedural cursor parameter needs an unavailable variable resolver.",
+                  "type": "object",
+                  "properties": {
+                    "CursorParameter": {
+                      "type": "integer",
+                      "format": "int32"
+                    }
+                  },
+                  "required": [
+                    "CursorParameter"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "DELETE is not permitted as a `SQLite` CTE body.",
+                  "type": "string",
+                  "const": "SqliteCte"
+                },
+                {
+                  "description": "Reading a DELETE CTE requires RETURNING.",
+                  "type": "object",
+                  "properties": {
+                    "UnreadableCte": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "UnreadableCte"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CursorNameProblem": {
+              "description": "A normalized portal name retained by a cursor diagnostic.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            },
+            "CursorTargetMismatchProblem": {
+              "description": "The requested DELETE destination and a cursor's established target.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "expected": {
+                  "$ref": "#/$defs/TableName"
+                },
+                "actual": {
+                  "$ref": "#/$defs/TableName"
+                }
+              },
+              "required": [
+                "name",
+                "expected",
+                "actual"
+              ]
+            },
+            "UpdateProblem": {
+              "description": "A violation of UPDATE destination, assignment or result rules.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/UpdateProblemKind"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "message"
+              ]
+            },
+            "UpdateProblemKind": {
+              "description": "Structured UPDATE violation, independently of its rendered message.",
+              "oneOf": [
+                {
+                  "description": "INDEXED BY does not identify an index of the destination.",
+                  "type": "string",
+                  "const": "IndexHint"
+                },
+                {
+                  "description": "DEFAULT targets an element or subfield instead of a whole column.",
+                  "type": "string",
+                  "const": "DefaultTarget"
+                },
+                {
+                  "description": "A column has overlapping assignments.",
+                  "type": "string",
+                  "const": "DuplicateTarget"
+                },
+                {
+                  "description": "A relation or column does not accept UPDATE.",
+                  "type": "string",
+                  "const": "ReadOnlyTarget"
+                },
+                {
+                  "description": "A view does not support the requested operation.",
+                  "type": "string",
+                  "const": "ViewOperation"
+                },
+                {
+                  "description": "An assignment violates generated-column rules.",
+                  "type": "string",
+                  "const": "GeneratedTarget"
+                },
+                {
+                  "description": "An assignment violates identity-column rules.",
+                  "type": "string",
+                  "const": "IdentityTarget"
+                },
+                {
+                  "description": "The RHS has no assignment conversion.",
+                  "type": "string",
+                  "const": "AssignmentType"
+                },
+                {
+                  "description": "A RETURNING source is invalid.",
+                  "type": "string",
+                  "const": "ReturningQualifier"
+                },
+                {
+                  "description": "A CTE declares too many aliases.",
+                  "type": "string",
+                  "const": "CteAliases"
+                },
+                {
+                  "description": "WHERE requires boolean type.",
+                  "type": "string",
+                  "const": "Predicate"
+                },
+                {
+                  "description": "A CURRENT OF portal is missing or statically incompatible with the target.",
+                  "type": "string",
+                  "const": "Cursor"
+                }
+              ]
+            },
+            "QueryProblem": {
+              "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
+              "oneOf": [
+                {
+                  "description": "A binary operation has unequal operand widths.",
+                  "type": "object",
+                  "properties": {
+                    "SetWidth": {
+                      "$ref": "#/$defs/SetWidthProblem"
+                    }
+                  },
+                  "required": [
+                    "SetWidth"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A positional result has no legal common type.",
+                  "type": "object",
+                  "properties": {
+                    "SetType": {
+                      "$ref": "#/$defs/SetTypeProblem"
+                    }
+                  },
+                  "required": [
+                    "SetType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An internal list or dialect-specific row value cannot be consumed as a scalar.",
+                  "type": "string",
+                  "const": "ScalarValueRequired"
+                },
+                {
+                  "description": "Database-name metadata is required for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnDatabaseNameRequired": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnDatabaseNameRequired"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Cross-database column reference is not supported.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnCrossDatabase": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnCrossDatabase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Column qualification is invalid for the selected dialect.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnQualificationInvalid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnQualificationInvalid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Visible source not found for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnSourceNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnSourceNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Ambiguous visible source for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnSourceAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnSourceAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "GROUPING argument does not match a grouping expression of its owner.",
+                  "type": "string",
+                  "const": "GroupingArgumentNotGrouped"
+                },
+                {
+                  "description": "GROUPING is not allowed in this expression context.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidGroupingPlacement": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidGroupingPlacement"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "GROUPING accepts at most 31 arguments.",
+                  "type": "string",
+                  "const": "TooManyGroupingArguments"
+                },
+                {
+                  "description": "A WITH body violates data-modifying or SELECT INTO placement rules.",
+                  "type": "string",
+                  "const": "InvalidCtePlacement"
+                },
+                {
+                  "description": "A WINDOW declaration repeats an existing definition name.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateWindowDefinition": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateWindowDefinition"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A clause name has no applicable definition.",
+                  "type": "object",
+                  "properties": {
+                    "ReferenceNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ReferenceNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A clause name identifies more than one applicable definition.",
+                  "type": "object",
+                  "properties": {
+                    "AmbiguousReference": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AmbiguousReference"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An ORDER/GROUP BY ordinal is outside the output list.",
+                  "type": "object",
+                  "properties": {
+                    "PositionOutOfRange": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  },
+                  "required": [
+                    "PositionOutOfRange"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A compound ORDER BY expression does not identify an output column.",
+                  "type": "string",
+                  "const": "InvalidCompoundOrder"
+                },
+                {
+                  "description": "A row expansion target does not have a composite type.",
+                  "type": "string",
+                  "const": "StarProjectionRequiresCompositeType"
+                },
+                {
+                  "description": "Row expansion appears outside a projection target.",
+                  "type": "string",
+                  "const": "InvalidStarProjectionPlacement"
+                }
+              ]
+            },
+            "SetWidthProblem": {
+              "description": "Operand shape retained for a rejected set operation.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "left": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "right": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "operation",
+                "left",
+                "right"
+              ]
+            },
+            "SetTypeProblem": {
+              "description": "Common-type failure retained with its positional output identity.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "column": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "problem": {
+                  "$ref": "#/$defs/MinMaxProblem"
+                }
+              },
+              "required": [
+                "operation",
+                "column",
+                "problem"
+              ]
+            },
+            "TableFunctionProblem": {
+              "description": "Invalid table-function invocations or caller-supplied output definitions.",
+              "oneOf": [
+                {
+                  "description": "Aggregate/window or nested set-returning expression in a FROM element.",
+                  "type": "string",
+                  "const": "InvalidExpression"
+                },
+                {
+                  "description": "A record result needs a caller-supplied shape.",
+                  "type": "string",
+                  "const": "DefinitionRequired"
+                },
+                {
+                  "description": "Outer definitions conflict with ROWS FROM placement or WITH ORDINALITY.",
+                  "type": "string",
+                  "const": "InvalidPlacement"
+                },
+                {
+                  "description": "The function already declares its result shape.",
+                  "type": "string",
+                  "const": "DefinitionNotAllowed"
+                },
+                {
+                  "description": "A definition repeats a column name.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateColumn": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A declared type cannot be resolved.",
+                  "type": "object",
+                  "properties": {
+                    "TypeNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "TypeNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A declared collation cannot be uniquely resolved.",
+                  "type": "object",
+                  "properties": {
+                    "CollationNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "CollationNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More column aliases than output columns were supplied.",
+                  "type": "string",
+                  "const": "TooManyAliases"
+                },
+                {
+                  "description": "Invalid declaration-local type modifiers.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTypmod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidTypmod"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "ParameterConstraintProblem": {
+              "description": "Recoverable inconsistency between SQL-derived parameter requirements.",
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "binding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ParameterBindingConflict"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "message"
+              ]
+            },
+            "ParameterBindingConflict": {
+              "description": "Structured evidence for a use that rejects a previously selected binding.",
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "$ref": "#/$defs/TypeReference"
+                },
+                "required": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "selected",
+                "required"
+              ]
+            },
+            "NameResolution": {
+              "description": "Name resolution problems",
+              "oneOf": [
+                {
+                  "title": "Domain base type not found : `domain_base_type_not_found`",
+                  "description": "Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)\n\n## Situation\n\n```SQL\nCREATE DOMAIN name AS base_type;\n```\n\n- `base_type` not found in schema semantic analysis context.\n\n## Why\n\n- Typo in `base_type`.\n- `PostgreSQL` extension not enabled in context.\n- When `base_type` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
+                  "type": "object",
+                  "properties": {
+                    "DomainTypeNameNotFound": {
+                      "$ref": "#/$defs/DomainBaseTypeNameNotFound"
+                    }
+                  },
+                  "required": [
+                    "DomainTypeNameNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "title": "Function not found : `function_not_found`",
+                  "description": "## Situation\n\n Function or procedure not found.\n\n```SQL\n-- calling scalar function\nSELECT function_name();\n\n-- calling set of function\nSELECT * from function_name()\n```\n\n- `function_name` not found in schema semantic analysis context.\n\n## Why\n\n- Type in `function_name`\n- `PostgreSQL` extension not enabled in context.\n- When `function_name` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
+                  "type": "object",
+                  "properties": {
+                    "FunctionNotFound": {
+                      "$ref": "#/$defs/FunctionNotFound"
+                    }
+                  },
+                  "required": [
+                    "FunctionNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "table function not found",
+                  "type": "object",
+                  "properties": {
+                    "TableFunctionNotFound": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "TableFunctionNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column reference not resolved",
+                  "type": "object",
+                  "properties": {
+                    "UndefinedColumn": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "UndefinedColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "type not found in column definition",
+                  "type": "object",
+                  "properties": {
+                    "ColumnTypeNotFound": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TableName"
+                        },
+                        {
+                          "$ref": "#/$defs/ColumnName"
+                        },
+                        {
+                          "$ref": "#/$defs/FullName"
+                        }
+                      ],
+                      "minItems": 3,
+                      "maxItems": 3
+                    }
+                  },
+                  "required": [
+                    "ColumnTypeNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column not found in table function",
+                  "type": "object",
+                  "properties": {
+                    "ColumnNotFoundInTableFunction": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/AliasName"
+                        },
+                        {
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ColumnNotFoundInTableFunction"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column not found in table",
+                  "type": "object",
+                  "properties": {
+                    "ColumnNotFoundInTable": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TableName"
+                        },
+                        {
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ColumnNotFoundInTable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column already exists in table",
+                  "type": "object",
+                  "properties": {
+                    "ColumnAlreadyExists": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TableName"
+                        },
+                        {
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ColumnAlreadyExists"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column not found in CTE",
+                  "type": "object",
+                  "properties": {
+                    "ColumnNotFoundInCte": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/CteName"
+                        },
+                        {
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ColumnNotFoundInCte"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column not found in subquery",
+                  "type": "object",
+                  "properties": {
+                    "ColumnNotFoundInSubQuery": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/AliasName"
+                        },
+                        {
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ColumnNotFoundInSubQuery"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column not found in source",
+                  "type": "object",
+                  "properties": {
+                    "ColumnNotFoundInSource": {
+                      "$ref": "#/$defs/ColumnName"
+                    }
+                  },
+                  "required": [
+                    "ColumnNotFoundInSource"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column not found in view",
+                  "type": "object",
+                  "properties": {
+                    "ColumnNotFoundInView": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/ViewName"
+                        },
+                        {
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "ColumnNotFoundInView"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "column reference ambiguous",
+                  "type": "object",
+                  "properties": {
+                    "AmbiguousColumn": {
+                      "$ref": "#/$defs/ColumnName"
+                    }
+                  },
+                  "required": [
+                    "AmbiguousColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "same alias defined",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateAlias": {
+                      "$ref": "#/$defs/AliasName"
+                    }
+                  },
+                  "required": [
+                    "DuplicateAlias"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "data source not defined in from clause",
+                  "type": "object",
+                  "properties": {
+                    "UndefinedAlias": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "UndefinedAlias"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "table .0 not found in current context",
+                  "type": "object",
+                  "properties": {
+                    "RelationNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "RelationNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "relation already exists in current context",
+                  "type": "object",
+                  "properties": {
+                    "RelationAlreadyExists": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "RelationAlreadyExists"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "view not found",
+                  "type": "object",
+                  "properties": {
+                    "ViewNotFound": {
+                      "$ref": "#/$defs/ViewName"
+                    }
+                  },
+                  "required": [
+                    "ViewNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "index not found",
+                  "type": "object",
+                  "properties": {
+                    "IndexNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "IndexNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sequence not found",
+                  "type": "object",
+                  "properties": {
+                    "SequenceNotFound": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "SequenceNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "table not found",
+                  "type": "object",
+                  "properties": {
+                    "TableNotFound": {
+                      "$ref": "#/$defs/TableName"
+                    }
+                  },
+                  "required": [
+                    "TableNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "composite type field not found",
+                  "type": "object",
+                  "properties": {
+                    "CompositeTypeFieldNotFound": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "CompositeTypeFieldNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "collation not found",
+                  "type": "object",
+                  "properties": {
+                    "CollationNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "CollationNotFound"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "DomainBaseTypeNameNotFound": {
+              "description": "Domain base type name not found",
+              "type": "object",
+              "properties": {
+                "domain_type_name": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "base_type_name": {
+                  "type": "string"
+                },
+                "base_type_name_span": {
+                  "$ref": "#/$defs/StringSpan"
+                }
+              },
+              "required": [
+                "domain_type_name",
+                "base_type_name",
+                "base_type_name_span"
+              ]
+            },
+            "FunctionNotFound": {
+              "description": "A function name that could not be resolved.",
+              "type": "object",
+              "properties": {
+                "function_name": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "function_span": {
+                  "$ref": "#/$defs/StringSpan"
+                }
+              },
+              "required": [
+                "function_name",
+                "function_span"
+              ]
+            },
+            "AliasName": {
+              "description": "Retained diagnostic text for `AliasName`.",
+              "type": "string"
+            },
+            "CteName": {
+              "description": "Retained diagnostic text for `CteName`.",
+              "type": "string"
+            },
+            "ViewName": {
+              "description": "Retained diagnostic text for `ViewName`.",
+              "type": "string"
+            },
+            "OverloadResolution": {
+              "description": "Function and operator overload failures.",
+              "oneOf": [
+                {
+                  "description": "function overload resolve failed",
+                  "type": "object",
+                  "properties": {
+                    "FunctionOverloadResolutionFailed": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "$ref": "#/$defs/ArgumentBindingCollection"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "FunctionOverloadResolutionFailed"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Binary operator overload resolve failed",
+                  "type": "object",
+                  "properties": {
+                    "BinaryOperatorOverloadResolutionFailed": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/OperatorDefinition"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 3,
+                      "maxItems": 3
+                    }
+                  },
+                  "required": [
+                    "BinaryOperatorOverloadResolutionFailed"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Unary operator overload resolve failed",
+                  "type": "object",
+                  "properties": {
+                    "UnaryOperatorOverloadResolutionFailed": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/OperatorDefinition"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnaryOperatorOverloadResolutionFailed"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Ambiguous operator overload",
+                  "type": "object",
+                  "properties": {
+                    "BinaryOperatorOverloadAmbiguous": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/OperatorDefinition"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 3,
+                      "maxItems": 3
+                    }
+                  },
+                  "required": [
+                    "BinaryOperatorOverloadAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Unary operator overload ambiguous",
+                  "type": "object",
+                  "properties": {
+                    "UnaryOperatorOverloadAmbiguous": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/OperatorDefinition"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnaryOperatorOverloadAmbiguous"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "ArgumentBindingCollection": {
+              "description": "Ordered supplied argument types, retaining unknown arguments explicitly.",
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/TypeReference"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "OperatorDefinition": {
+              "description": "The actual operator name and its declared overloads.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/OperatorName"
+                },
+                "signatures": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/OperatorSignature"
+                  }
+                },
+                "left_operand": {
+                  "type": "boolean"
+                },
+                "right_operand": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "signatures",
+                "left_operand",
+                "right_operand"
+              ]
+            },
+            "OperatorName": {
+              "description": "Retained diagnostic text for `OperatorName`.",
+              "type": "string"
+            },
+            "OperatorSignature": {
+              "description": "A declared operator candidate signature, with its existing strictness fact.",
+              "type": "object",
+              "properties": {
+                "operands": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                },
+                "result": {
+                  "$ref": "#/$defs/TypeReference"
+                },
+                "strict": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "operands",
+                "result",
+                "strict"
+              ]
+            },
+            "DefElemKey": {
+              "description": "Retained diagnostic text for `DefElemKey`.",
+              "type": "string"
+            },
+            "SemScalarExpr": {
+              "description": "Known properties of an analyzed expression, without an internal expression dump.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "identity": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type_reference": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TypeReference"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "not_null": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "ExpressionList": {
+              "description": "Ordered expression facts in an expression requiring a common type.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SemScalarExpr"
+              }
+            },
+            "AExprKind": {
+              "description": "Retained diagnostic text for `AExprKind`.",
+              "type": "string"
+            },
+            "OptionalExpression": {
+              "description": "An operand's presence and known facts. An absent operand is not an unknown type.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SemScalarExpr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "TypeList": {
+              "description": "Ordered known types of incompatible CASE results.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TypeReference"
+              }
+            },
+            "TypeDefinition": {
+              "description": "Retained diagnostic text for `TypeDefinition`.",
+              "type": "string"
+            },
+            "DiagnosticPresentation": {
+              "description": "An analyzed SQL statement and its diagnostic, supplied for presentation.\n\nDiagnostic label spans are relative to `source`, while `statement_offset`\nrecords the statement's byte offset in the explicitly analyzed file.",
+              "type": "object",
+              "properties": {
+                "problem": {
+                  "$ref": "#/$defs/AnalysisProblem"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "dialect": {
+                  "$ref": "#/$defs/SqlDialect"
+                },
+                "statement_offset": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "problem",
+                "source",
+                "dialect",
+                "statement_offset"
+              ]
+            },
+            "SqlDialect": {
+              "description": "SQL Dialect",
+              "oneOf": [
+                {
+                  "description": "postgres using a `pg_query` crate for parsing a syntax.",
+                  "type": "string",
+                  "const": "postgres"
+                }
+              ]
+            },
+            "DiagnosticSeverity": {
+              "description": "Severity of a retained semantic diagnostic.",
+              "oneOf": [
+                {
+                  "description": "SQL semantic error.",
+                  "type": "string",
+                  "const": "error"
+                },
+                {
+                  "description": "Accepted SQL with a warning.",
+                  "type": "string",
+                  "const": "warning"
+                },
+                {
+                  "description": "Informational advice.",
+                  "type": "string",
+                  "const": "advice"
+                }
+              ]
+            },
+            "TextSpan": {
+              "description": "span in SQL text",
+              "type": "object",
+              "properties": {
+                "from": {
+                  "description": "span start position",
+                  "$ref": "#/$defs/TextPosition"
+                },
+                "to": {
+                  "description": "span end position",
+                  "$ref": "#/$defs/TextPosition"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "TextPosition": {
+              "description": "position in SQL text",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "description": "seek offset from file start",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "line": {
+                  "description": "line number",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "col": {
+                  "description": "column number",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "line",
+                "col"
+              ]
+            },
+            "StatementByteRange": {
+              "description": "A retained byte range within a SQL statement, not a file position.",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "description": "UTF-8 byte offset from the SQL statement start.",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "length": {
+                  "description": "Number of bytes in the retained range.",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "length"
               ]
             }
           }

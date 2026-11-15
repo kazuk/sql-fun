@@ -27,8 +27,9 @@ the application SQL itself is invalid.
 
 Configuration warnings do not satisfy `expect = true`, which asks for a
 corresponding deprecated-reference warning. An unresolved entry retains that
-expectation. End-of-period expectation reporting remains in
-[#1087](https://github.com/kazuk/sql-fun/issues/1087).
+expectation. The Server API reports currently unmet expectations through
+`report_lint_expectations`; see
+[unmet_lint_expectation](unmet_lint_expectation.md).
 A query source position is provided only when a reliable location is available.
 
 ## How to address it

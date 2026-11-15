@@ -2,10 +2,12 @@ mod collection_registry;
 mod context_handle_registry;
 mod facade;
 mod initialization;
+mod lint_expectations;
 mod query_analysis;
 
 use self::{
     collection_registry::CollectionRegistry, context_handle_registry::ContextHandleRegistry,
+    lint_expectations::LintExpectations,
 };
 
 use crate::{
@@ -80,6 +82,8 @@ impl SessionWrapper {
 
 /// Lives inside the connection future, strictly shorter than its schema owners.
 struct SessionState<'ctx> {
+    lint_expectations:
+        std::collections::HashMap<::sql_fun_server_api::payloads::ContextHandle, LintExpectations>,
     // A registration selects one immutable base for the lifetime of the session.
     // Each handle owns its analysis cache; SQLAST trusts this association.
     cache_contexts: std::collections::HashMap<
@@ -93,6 +97,7 @@ impl SessionState<'_> {
     fn new(page_limit: NonZeroUsize) -> Self {
         Self {
             cache_contexts: std::collections::HashMap::new(),
+            lint_expectations: std::collections::HashMap::new(),
             collections: CollectionRegistry::new(page_limit),
         }
     }

@@ -130,6 +130,13 @@ symbolization. On failure inspect `smoke/smoke.log`, the smoke stat reports and
 administrator must choose any necessary permission changes. A changed host
 sysctl alone does not establish that capture works inside a container.
 
+The repository's `ci/github-actions/check` launcher requests `PERFMON` for its
+interactive builder, enabling `perf_event_open` under Docker's default seccomp
+profile. After updating the launcher, exit the old builder and start a new
+session from the host; an already-running container does not acquire the new
+setting. The non-root user still needs permission under the host perf policy,
+and the command's smoke check remains the test of actual capture capability.
+
 Reserve at least 20 GiB free before building; 40–60 GiB is a preliminary allowance
 for symbol-rich builds, ordinary verification and retained captures. Actual use
 depends on the build cache and workload. Large `perf.script` files and raw data

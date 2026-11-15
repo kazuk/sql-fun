@@ -141,7 +141,9 @@ compose=(docker compose --env-file /dev/null
 export BUILDER_UID="$(id -u)" BUILDER_GID="$(id -g)"
 GITHUB_TOKEN=$(gh auth token)
 export GITHUB_TOKEN
-compose_args=(-e GITHUB_TOKEN)
+# Docker's default seccomp profile permits perf_event_open with CAP_PERFMON.
+# Host perf policy still applies to measurements by the non-root builder user.
+compose_args=(--cap-add PERFMON -e GITHUB_TOKEN)
 if [[ -n "${OPENAI_API_KEY:-}" ]]; then
     export OPENAI_API_KEY
     compose_args+=(-e OPENAI_API_KEY)

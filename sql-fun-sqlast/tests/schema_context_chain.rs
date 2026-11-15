@@ -230,6 +230,102 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
     Ok(())
 }
 
+// Query analysis, catalog publication and inherited public metadata reads must agree.
+#[test]
+fn materialized_view_metadata_survives_frozen_catalog_inheritance()
+-> Result<(), Box<dyn std::error::Error>> {
+    // Real PostgreSQL 17 metadata verifies the original canonical int4 reproduction.
+    let root = heavy::builtin_root()?;
+    let parsed = load_schema(
+        &root,
+        "CREATE MATERIALIZED VIEW public.mv AS SELECT 1 AS n; \
+         CREATE MATERIALIZED VIEW public.aliased(renamed) AS \
+         SELECT 1 AS original, NULL::integer AS nullable; \
+         CREATE VIEW public.ordinary(renamed) AS \
+         SELECT 1 AS original, NULL::integer AS nullable;",
+    )?;
+    assert!(parsed.problems().is_empty(), "{:?}", parsed.problems());
+    let name = FullName::with_schema("public", "mv");
+    let view = parsed
+        .get_view_impl(&name)
+        .expect("published materialized view");
+    assert!(view.is_materialized());
+    assert!(view.has_column(&ColumnName::from("n")));
+    let column = view.get_column_def(&ColumnName::from("n")).expect("n");
+    assert_eq!(column.name(), &Some(ColumnName::from("n")));
+    assert_eq!(column.get_type(), Some(&PgBuiltInType::int4()));
+    assert_eq!(column.is_not_null(), Some(true));
+    assert!(!view.has_column(&ColumnName::from("missing")));
+    assert!(view.get_column_def(&ColumnName::from("missing")).is_none());
+
+    let prefix = parsed.base_context().clone();
+    drop(parsed);
+    let child = load_schema(&prefix, "CREATE TABLE public.child_only(id integer);")?;
+    let sibling = load_schema(&prefix, "CREATE TABLE public.sibling_only(id integer);")?;
+    assert!(child.problems().is_empty());
+    assert!(sibling.problems().is_empty());
+    // Re-read through independently retained frozen handles and descendant layers.
+    for catalog in [&prefix, child.base_context(), sibling.base_context()] {
+        let view = catalog
+            .get_view_impl(&name)
+            .expect("retained materialized view");
+        assert!(view.has_column(&ColumnName::from("n")));
+        let retained = view.get_column_def(&ColumnName::from("n")).expect("n");
+        assert_eq!(retained.name(), column.name());
+        assert_eq!(retained.get_type(), column.get_type());
+        assert_eq!(retained.is_not_null(), column.is_not_null());
+        assert!(!view.has_column(&ColumnName::from("missing")));
+        assert!(view.get_column_def(&ColumnName::from("missing")).is_none());
+
+        // The ordinary-view control and materialized view expose the same query facts.
+        for relation in ["aliased", "ordinary"] {
+            let view = catalog
+                .get_view_impl(&FullName::with_schema("public", relation))
+                .expect("retained aliased view");
+            assert_eq!(view.is_materialized(), relation == "aliased");
+            for (name, not_null) in [("renamed", Some(true)), ("nullable", Some(false))] {
+                let name = ColumnName::from(name);
+                assert!(view.has_column(&name));
+                let column = view.get_column_def(&name).expect("query output");
+                assert_eq!(column.name(), &Some(name));
+                assert_eq!(column.get_type(), Some(&PgBuiltInType::int4()));
+                assert_eq!(column.is_not_null(), not_null);
+            }
+            for absent in ["original", "missing"] {
+                let absent = ColumnName::from(absent);
+                assert!(!view.has_column(&absent));
+                assert!(view.get_column_def(&absent).is_none());
+            }
+        }
+    }
+    assert!(root.get_view_impl(&name).is_none());
+    assert!(
+        prefix
+            .get_table(&TableName::from(FullName::with_schema(
+                "public",
+                "child_only"
+            )))
+            .is_none()
+    );
+    assert!(
+        sibling
+            .get_table(&TableName::from(FullName::with_schema(
+                "public",
+                "child_only"
+            )))
+            .is_none()
+    );
+    assert!(
+        child
+            .get_table(&TableName::from(FullName::with_schema(
+                "public",
+                "sibling_only"
+            )))
+            .is_none()
+    );
+    Ok(())
+}
+
 #[rstest::rstest]
 #[case::scalar(false, None)]
 #[case::array(true, Some(PgBuiltInType::int4()))]

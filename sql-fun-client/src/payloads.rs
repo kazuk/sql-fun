@@ -12,6 +12,7 @@ mod describe_table;
 mod echo;
 mod initialize_schema;
 mod object_kind;
+mod report_lint_expectations;
 mod tokenize_sql;
 mod traversal;
 
@@ -33,6 +34,7 @@ pub use self::{
         EngineDialect, EngineVersion, ExtensionSpec, InitializeSchemaArgs, SchemaContext,
     },
     object_kind::ObjectKind,
+    report_lint_expectations::{ReportLintExpectationsArgs, ReportLintExpectationsResponse},
 };
 
 use std::path::PathBuf;

@@ -24,9 +24,10 @@ invalid, and it does not identify a replacement object for the application.
 A query source position is provided only when a reliable location is available.
 
 `expect = true` records that a corresponding deprecated-reference warning is
-required during the analysis period; it does not control whether this warning
-is emitted. End-of-period expectation reporting remains in
-[#1087](https://github.com/kazuk/sql-fun/issues/1087).
+required for the initialized schema context; it does not control whether this
+warning is emitted. The Server API reports currently unmet expectations through
+`report_lint_expectations`; see
+[unmet_lint_expectation](unmet_lint_expectation.md).
 
 Valid `enum_label` declarations currently produce no deprecated-reference
 warnings because enum-label references are not yet distinguished by analysis

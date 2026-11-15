@@ -448,3 +448,71 @@ async fn initialization_rpc_accepts_prefix_and_omits_project_only_requirements(
     connection.end_requests().await;
     connection.finish().await.unwrap();
 }
+
+// Real authenticated connections verify reporting isolation and transport cleanup;
+// the project catalog is synthetic and does not load the full PostgreSQL builtins.
+#[tokio::test(flavor = "multi_thread")]
+async fn lint_reports_preserve_connection_isolation_and_allow_more_analysis() {
+    use crate::test_helpers::lint_expectations::{LintProject, rule};
+    use ::serde_json::json;
+
+    let project = LintProject::new(&rule(r#"["retained"]"#, "expect = true"));
+    let api = api();
+    let mut first = heavy::Connection::start_with_api(4096, 2, &api).await;
+    let mut second = heavy::Connection::start_with_api(4096, 2, &api).await;
+    first.authenticate().await;
+    second.authenticate().await;
+    let one = first
+        .rpc("initialize_schema_context", project.request())
+        .await;
+    let two = second
+        .rpc("initialize_schema_context", project.request())
+        .await;
+    let first_selection = json!({"context_handle":one["result"]["context_handle"]});
+    let second_selection = json!({"context_handle":two["result"]["context_handle"]});
+    let (initial_one, initial_two) = ::tokio::join!(
+        first.rpc("report_lint_expectations", &first_selection),
+        second.rpc("report_lint_expectations", &second_selection),
+    );
+    assert_eq!(initial_one["result"]["problems"]["total_length"], 1);
+    assert_eq!(initial_two["result"]["problems"]["total_length"], 1);
+    assert_eq!(
+        second
+            .rpc("report_lint_expectations", &first_selection)
+            .await["error"]["data"],
+        "InvalidContextHandle"
+    );
+    assert_eq!(
+        first
+            .rpc(
+                "report_lint_expectations",
+                &json!({"context_handle":"unknown"})
+            )
+            .await["error"]["data"],
+        "InvalidContextHandle"
+    );
+    let query = json!({"context_handle":first_selection["context_handle"], "query":{"Text":"SELECT id FROM retained"}});
+    let analyzed = first.rpc("analyze_query", &query).await;
+    assert_eq!(
+        analyzed["result"]["queries"]["items"][0]["probrems"]["items"][0]["code"],
+        "deprecated"
+    );
+    assert_eq!(
+        first
+            .rpc("report_lint_expectations", &first_selection)
+            .await["result"]["problems"]["total_length"],
+        0
+    );
+    assert_eq!(
+        second
+            .rpc("report_lint_expectations", &second_selection)
+            .await["result"]["problems"]["total_length"],
+        1
+    );
+    first.end_requests().await;
+    second.end_requests().await;
+    first.assert_eof().await;
+    second.assert_eof().await;
+    first.finish().await.unwrap();
+    second.finish().await.unwrap();
+}

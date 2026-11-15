@@ -1,9 +1,9 @@
 # SQL Analysis Configuration
 
 Project lint declarations can be interpreted against a loaded project schema
-and applied to application queries. CLI configuration transport and
-end-of-analysis expectation evaluation remain tracked in the follow-up issues
-below.
+and applied to application queries. Current lint expectations can be reported
+through the Server API. Client/CLI workflow integration remains tracked in the
+follow-up issue below.
 
 To select a project lint configuration file, add `lint_configuration` to the
 selected datasource table:
@@ -73,12 +73,25 @@ missing label never becomes a whole-type rule. Duplicate entries are detected
 after name resolution and produce `duplicate_lint_target` warnings. They form
 one effective target with `expect = true` if any duplicate requests it.
 
-`expect = true` requires a corresponding deprecated-reference warning during the
-analysis period. Configuration warnings do not meet that expectation;
-unresolved entries retain their expectation. Period accumulation and final
-expectation reporting are tracked in
-[#1087](https://github.com/kazuk/sql-fun/issues/1087). CLI configuration transport
-and end-to-end invocation are tracked in
+`expect = true` requires a corresponding deprecated-reference warning for the
+initialized schema context. Configuration warnings do not meet that expectation;
+unresolved or uninterpretable entries retain their expectation. The Server API's
+`report_lint_expectations` operation returns `unmet_lint_expectation` warnings for
+expectations not yet satisfied, even when no queries have been submitted.
+Resolved duplicate targets have only one effective expectation.
+
+Reporting does not end or reset analysis. It may be called repeatedly, and
+additional `analyze_query` calls on the same handle can satisfy an expectation
+reported as unmet earlier. Each report's diagnostic collection remains a snapshot
+of that call. Handles have independent observations even when sharing cached
+schema data. Each context retains the lint configuration selected at
+initialization; initialize another context to use an edited configuration.
+
+The caller decides when to report, whether it has analyzed all intended SQL, and
+how analysis failures affect its conclusions. The server does not suppress unmet
+warnings based on a completeness judgment. See the
+[API workflow](api/check-analysis-design.md#report-current-lint-expectations).
+CLI configuration transport and invocation remain tracked in
 [#1088](https://github.com/kazuk/sql-fun/issues/1088).
 
 Enum-label references are not yet distinguished by semantic analysis, so valid

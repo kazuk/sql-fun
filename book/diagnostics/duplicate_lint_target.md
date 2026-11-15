@@ -25,8 +25,10 @@ cancel that expectation. Duplicate detection does not disable the target or
 make otherwise valid application SQL invalid.
 
 This configuration warning does not itself satisfy a reference expectation.
-Only a corresponding `deprecated` warning does. End-of-period expectation
-reporting remains in [#1087](https://github.com/kazuk/sql-fun/issues/1087).
+Only a corresponding `deprecated` warning does. The Server API reports currently
+unmet expectations through
+`report_lint_expectations`; see
+[unmet_lint_expectation](unmet_lint_expectation.md).
 A query source position is provided only when a reliable location is available.
 
 ## How to address it

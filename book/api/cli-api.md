@@ -93,7 +93,9 @@ method names are `initialize_schema_context`, `read_collection`,
 `release_collection`, `tokenize_sql`, `analyze_query`, and `describe_table`,
 with parameters matching their public API argument types.
 The server dispatches `echo`, `tokenize_sql`, `initialize_schema_context`,
-`read_collection`, `release_collection`, and `analyze_query`. The CLI accepts
+`read_collection`, `release_collection`, `analyze_query`, and
+`report_lint_expectations`. Client/CLI transport for `report_lint_expectations`
+is tracked in [#1088](https://github.com/kazuk/sql-fun/issues/1088). The CLI accepts
 `describe_table`, but the server does not dispatch it and returns an
 unknown-method error. See the
 [schema context and query analysis workflow](check-analysis-design.md) for

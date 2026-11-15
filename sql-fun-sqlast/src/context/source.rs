@@ -26,6 +26,10 @@ pub trait SourceAccessService: std::fmt::Debug {
 
         if !source_path.exists() {
             AnalysisError::file_not_found(source_path)?;
+            #[allow(
+                unreachable_code,
+                reason = "Rust 1.100 recognizes the preceding Infallible result"
+            )]
             AnalysisError::never()
         };
 

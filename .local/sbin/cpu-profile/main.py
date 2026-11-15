@@ -222,6 +222,51 @@ def measurement(args, reports, metadata):
         raise RuntimeError("Capture or report extraction is incomplete; inspect run.json and logs")
 
 
+def publish_latest(output, reports, mode):
+    published = output / mode
+    published.mkdir(exist_ok=True)
+    names = ("flamegraph.svg", "run.json") if mode == "record" else ("stat.txt", "run.json")
+    # Keep the report and metadata on one atomically replaced directory link,
+    # following the heap profiler's publication approach, independently per mode.
+    for name in names:
+        path = published / name
+        target = Path("latest") / name
+        if path.is_symlink():
+            if path.readlink() != target:
+                raise RuntimeError(f"Unexpected stable output link: {path}")
+        elif path.exists():
+            raise RuntimeError(f"Stable output path already exists: {path}")
+    for name in names:
+        path = published / name
+        if not path.is_symlink():
+            path.symlink_to(Path("latest") / name)
+    pending = reports / ".latest"
+    pending.symlink_to(Path("..") / reports.name, target_is_directory=True)
+    pending.replace(published / "latest")
+
+
+def finish_run(args, reports, metadata, status):
+    metadata.update(ok=status == 0, finished=datetime.now(timezone.utc).isoformat(),
+                    persistent_bytes=sum(path.stat().st_size for path in reports.rglob("*") if path.is_file()))
+    write_json(reports / "run.json", metadata)
+    if status == 0:
+        try:
+            publish_latest(args.output, reports, args.mode)
+        except Exception as error:
+            status = 1
+            metadata.update(ok=False, error=str(error))
+            write_json(reports / "run.json", metadata)
+    if status == 0:
+        name = "flamegraph.svg" if args.mode == "record" else "stat.txt"
+        print(f"SUCCESS: {args.mode} workload, capture and report complete.", flush=True)
+        print(f"Latest report: {args.output / args.mode / name}\n"
+              f"Latest metadata: {args.output / args.mode / 'run.json'}", flush=True)
+    else:
+        print(f"FAILURE: {metadata['error']}", file=sys.stderr, flush=True)
+    print(f"Reports: {reports}", flush=True)
+    return status
+
+
 def main(argv=None):
     args = arguments(argv)
     os.chdir(ROOT)
@@ -244,14 +289,7 @@ def main(argv=None):
         if isinstance(error, KeyboardInterrupt):
             status = 130
     finally:
-        metadata.update(ok=status == 0, finished=datetime.now(timezone.utc).isoformat(),
-                        persistent_bytes=sum(path.stat().st_size for path in reports.rglob("*") if path.is_file()))
-        write_json(reports / "run.json", metadata)
-    if status == 0:
-        print(f"SUCCESS: {args.mode} workload, capture and report complete.", flush=True)
-    else:
-        print(f"FAILURE: {metadata['error']}", file=sys.stderr, flush=True)
-    print(f"Reports: {reports}", flush=True)
+        status = finish_run(args, reports, metadata, status)
     return status
 
 

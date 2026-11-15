@@ -84,7 +84,23 @@ and retain available evidence. A readable profile does not turn a failed suite
 or an incomplete capture into a successful run. Expected negative-control
 failures are checked by the existing suite and are not workload failures.
 
-Inspect the printed run directory:
+After success, open the latest successful result at its fixed path:
+
+- `target/cpu-reports/record/flamegraph.svg`: latest successful FlameGraph.
+- `target/cpu-reports/record/run.json`: metadata for that recording.
+- `target/cpu-reports/stat/stat.txt`: latest successful native statistics.
+- `target/cpu-reports/stat/run.json`: metadata for those statistics.
+
+With `--output`, these paths are beneath the selected report parent instead.
+Each mode publishes independently: running `stat` preserves the published
+`record` result, and vice versa. Failed or incomplete runs do not replace the
+last successful result. Before a mode's first success its published result is
+unavailable. Each mode's report and metadata follow its `latest` directory link;
+if reading both while another run finishes, resolve that link once and read
+both files from that run directory.
+
+Historical `run-*` directories remain available, including failed runs.
+Inspect the printed run directory for the complete evidence:
 
 - `run.json`: overall result, selected mode/features, revision and dirty state,
   kernel, tool/build settings, binary/catalog hashes, server identity, workload,

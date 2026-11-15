@@ -1,11 +1,10 @@
+use crate::identifier::CanonicalIdentifier;
 use std::fmt::Display;
-
-use ::compact_str::CompactString;
 
 /// part of name specifies schema
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
-pub struct SchemaName(CompactString);
+pub struct SchemaName(CanonicalIdentifier);
 
 #[cfg(test)]
 mod identity_tests {
@@ -40,27 +39,31 @@ mod identity_tests {
 }
 
 impl SchemaName {
+    pub(crate) const fn canonical(&self) -> &CanonicalIdentifier {
+        &self.0
+    }
+
     /// create from string
     #[must_use]
     pub fn from(value: &str) -> Self {
-        Self(CompactString::new(value))
+        Self(CanonicalIdentifier::from(value))
     }
 
     /// convert to string
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.0
+        self.0.as_str()
     }
 
     /// test schema is `pg_catalog`
     #[must_use]
     pub fn is_pg_catalog(&self) -> bool {
-        &self.0 == "pg_catalog"
+        self.as_str() == "pg_catalog"
     }
 }
 
 impl Display for SchemaName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        f.write_str(self.as_str())
     }
 }

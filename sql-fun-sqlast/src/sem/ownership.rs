@@ -2,9 +2,7 @@
 
 mod ddl;
 use crate::{
-    ast::ObjectKind,
-    context::BaseParseContext,
-    names::{FullName, OperatorName, SchemaName},
+    ast::ObjectKind, context::BaseParseContext, identifier::CanonicalIdentifier, names::FullName,
     sem::TypeReference,
 };
 
@@ -131,7 +129,7 @@ pub struct OwnershipIdentity {
     kind: ObjectKind,
     name: FullName,
     arguments: Option<Vec<Option<TypeReference>>>,
-    access_method: Option<String>,
+    access_method: Option<CanonicalIdentifier>,
 }
 impl OwnershipIdentity {
     /// Identity of an object which does not have an argument signature.
@@ -162,7 +160,7 @@ impl OwnershipIdentity {
             kind,
             name: name.clone(),
             arguments: None,
-            access_method: Some(method.to_owned()),
+            access_method: Some(CanonicalIdentifier::from(method)),
         }
     }
     /// Actual PostgreSQL object kind, not the ROUTINE lookup category.
@@ -179,7 +177,7 @@ impl OwnershipIdentity {
     }
     /// Access method for an operator class or family.
     pub fn access_method(&self) -> Option<&str> {
-        self.access_method.as_deref()
+        self.access_method.as_ref().map(CanonicalIdentifier::as_str)
     }
     pub(crate) fn with_name(&self, name: &FullName) -> Self {
         let mut value = self.clone();
@@ -199,17 +197,12 @@ impl std::fmt::Display for OwnershipIdentity {
         write!(f, "{} ", Self::owner_kind_label(self.kind))?;
         if self.kind == ObjectKind::OPERATOR {
             if let Some(catalog) = self.name.catalog() {
-                write!(
-                    f,
-                    "{}.",
-                    crate::identifier::CanonicalIdentifier::from(catalog.as_str())
-                )?;
+                write!(f, "{}.", catalog.canonical())?;
             }
-            let name = OperatorName::from_parts(
-                self.name.schema().map(SchemaName::as_str),
-                self.name.name().as_str(),
-            );
-            write!(f, "{name}")?;
+            if let Some(schema) = self.name.schema() {
+                write!(f, "{}.", schema.canonical())?;
+            }
+            f.write_str(self.name.name().as_str())?;
         } else {
             write!(f, "{}", self.name)?;
         }
@@ -230,11 +223,7 @@ impl std::fmt::Display for OwnershipIdentity {
             f.write_str(")")?;
         }
         if let Some(method) = &self.access_method {
-            write!(
-                f,
-                " USING {}",
-                crate::identifier::CanonicalIdentifier::from(method.as_str())
-            )?;
+            write!(f, " USING {}", method)?;
         }
         Ok(())
     }

@@ -1,9 +1,9 @@
-use crate::trie_map::{BoxedKeyFragment, KeyFragment, TrieLeafIter, TrieLeaves};
+use crate::trie_map::{KeyFragment, OwnedKeyFragment, TrieLeafIter, TrieLeaves};
 
 #[derive(Debug)]
 pub(super) struct TrieNode<TValue> {
     /// key for this node
-    key: BoxedKeyFragment,
+    key: OwnedKeyFragment,
     /// value of full match of `key_bytes`
     pub(super) value: Option<TValue>,
     /// values for continuing the key
@@ -13,7 +13,7 @@ pub(super) struct TrieNode<TValue> {
 impl<TValue> TrieNode<TValue> {
     pub(super) fn new(key: KeyFragment<'_>, value: TValue) -> Self {
         Self {
-            key: BoxedKeyFragment::from(key),
+            key: OwnedKeyFragment::from(key),
             value: Some(value),
             children: TrieLeaves::with_capacity(0),
         }
@@ -37,11 +37,11 @@ impl<TValue> TrieNode<TValue> {
             let mut old_children = TrieLeaves::new();
             std::mem::swap(&mut self.children, &mut old_children);
             let child = Self {
-                key: BoxedKeyFragment::from(other_key),
+                key: OwnedKeyFragment::from(other_key),
                 value: self.value.take(),
                 children: old_children,
             };
-            self.key = BoxedKeyFragment::from(common_key);
+            self.key = OwnedKeyFragment::from(common_key);
             self.value = Some(value);
             self.children.insert(child);
             return None;
@@ -73,16 +73,16 @@ impl<TValue> TrieNode<TValue> {
             let mut children = TrieLeaves::with_capacity(2);
             std::mem::swap(&mut self.children, &mut children);
             let new_self = Self {
-                key: BoxedKeyFragment::from(other_key),
+                key: OwnedKeyFragment::from(other_key),
                 value: self.value.take(),
                 children,
             };
             let new_other = Self {
-                key: BoxedKeyFragment::from(least_key),
+                key: OwnedKeyFragment::from(least_key),
                 value: Some(value),
                 children: TrieLeaves::new(),
             };
-            self.key = BoxedKeyFragment::from(common_key);
+            self.key = OwnedKeyFragment::from(common_key);
             self.children.insert(new_self);
             self.children.insert(new_other);
             // No existing value, return None

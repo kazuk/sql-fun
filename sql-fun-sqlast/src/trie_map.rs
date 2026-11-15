@@ -23,7 +23,7 @@ mod leaf;
 mod node;
 
 use self::{
-    key_fragment::{BoxedKeyFragment, KeyFragment},
+    key_fragment::{KeyFragment, OwnedKeyFragment},
     leaf::{TrieLeafIter, TrieLeaves},
     node::{TrieNode, TrieNodeIter},
 };

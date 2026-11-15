@@ -1,3 +1,5 @@
+use ::smallvec::SmallVec;
+
 #[derive(Clone)]
 pub(super) struct KeyFragment<'a>(&'a [u8]);
 
@@ -64,15 +66,15 @@ impl KeyFragment<'_> {
 }
 
 #[derive(Debug)]
-pub(super) struct BoxedKeyFragment(Box<[u8]>);
+pub(super) struct OwnedKeyFragment(SmallVec<[u8; 16]>);
 
-impl From<KeyFragment<'_>> for BoxedKeyFragment {
+impl From<KeyFragment<'_>> for OwnedKeyFragment {
     fn from(value: KeyFragment<'_>) -> Self {
-        Self(value.0.to_vec().into_boxed_slice())
+        Self(SmallVec::from_slice(value.0))
     }
 }
 
-impl BoxedKeyFragment {
+impl OwnedKeyFragment {
     pub(super) fn start_byte(&self) -> u8 {
         self.0[0]
     }

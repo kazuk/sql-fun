@@ -37,6 +37,7 @@ miette = { workspace = true }
 pg_query = { workspace = true }
 serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true }
+smallvec = { workspace = true, features = ["union"] }
 sql-fun-core = { workspace = true }
 stacker = { workspace = true }
 thiserror = { workspace = true }

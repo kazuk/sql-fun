@@ -163,6 +163,12 @@ measurements using the default feature set and repository paths. See the
 provisions its own heaptrack tools and runs the complete SQL regression workload;
 it is separate from normal verification and CI.
 
+For optional local CPU measurements, use `profile-server-cpu` with the explicit
+feature and catalog selections shown in the
+[CPU profiling guide](docs/internal-rules/server-cpu-profiling.md). Select `record`
+(the default) for a FlameGraph or `stat` for aggregate statistics. Each invocation
+runs the complete workload once and is separate from normal verification and CI.
+
 ## Release workflow validation
 
 For additional local workflow syntax validation, optionally install

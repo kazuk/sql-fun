@@ -25,6 +25,8 @@ SET row_security = off;
 
 CREATE SCHEMA pg18_constraints;
 
+CREATE TYPE pg18_constraints.fake_range AS ENUM ('x');
+
 
 SET default_tablespace = '';
 

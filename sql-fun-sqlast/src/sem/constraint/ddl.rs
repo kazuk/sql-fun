@@ -7,11 +7,11 @@ use crate::{
         ddl::AlterDefinition as AstAlterDefinition,
     },
     context::ParseContext,
-    names::{ColumnName, FullName, TableName},
+    names::{ColumnName, FullName, SchemaName, TableName},
     sem::{
         AlterObjSubCommand, AnalysisError, AnalysisProblem, CheckConstraint,
         ColumnNullabilityConstraint, Constraint, CreateTable, ForeignKeyConstraint,
-        ForeignKeyTarget, PrimaryKeyConstraint, UniqueConstraint,
+        ForeignKeyTarget, PrimaryKeyConstraint, TypeDefinition, UniqueConstraint,
     },
 };
 
@@ -61,12 +61,13 @@ impl Constraint {
         Ok(Some(Self::NotNull(value, applicable)))
     }
 
-    fn validate_period_type(
+    fn validate_temporal_key(
         context: &mut impl ParseContext,
         table: &CreateTable,
-        column: Option<&ColumnName>,
+        keys: &[ColumnName],
     ) -> Result<bool, AnalysisError> {
-        let Some(column) = column else {
+        let [_, .., column] = keys else {
+            context.report_analysis_problem(AnalysisProblem::TemporalKeyTooShort)?;
             return Ok(false);
         };
         let Some(definition) = table.get_column_def(column) else {
@@ -75,7 +76,14 @@ impl Constraint {
         let Some(ty) = definition.get_type() else {
             return Ok(false);
         };
-        if ty.is_range() || ty.is_multi_range() {
+        if ty.is_array() == Some(false)
+            && let Some(name) = ty.full_name()
+            && name.schema().is_some_and(SchemaName::is_pg_catalog)
+            && let Some(definition @ TypeDefinition::Builtin(_)) = context.get_type_impl(name)
+            && definition
+                .intrinsic_category()
+                .is_some_and(|category| category.code() == 'R')
+        {
             return Ok(true);
         }
         context.report_analysis_problem(AnalysisProblem::TemporalPeriodType(column.into()))?;
@@ -112,7 +120,7 @@ impl Constraint {
                     &keys,
                 )?;
                 if ast.extras().without_overlaps() {
-                    valid &= Self::validate_period_type(context, pending, keys.last())?;
+                    valid &= Self::validate_temporal_key(context, pending, &keys)?;
                     result.mark_temporal_key(valid);
                 }
                 return Ok((result, valid));
@@ -151,7 +159,7 @@ impl Constraint {
             &keys,
         )?;
         if ast.extras().without_overlaps() {
-            let valid = Self::validate_period_type(context, table, keys.last())? && valid;
+            let valid = Self::validate_temporal_key(context, table, &keys)? && valid;
             constraint.mark_temporal_key(valid);
         }
         Ok(Some(constraint))
@@ -200,7 +208,7 @@ impl Constraint {
         if ast.extras().without_overlaps() {
             let definition = context.get_table(table).cloned();
             let valid = if let Some(definition) = &definition {
-                Self::validate_period_type(context, definition, keys.last())?
+                Self::validate_temporal_key(context, definition, &keys)?
                     && keys
                         .iter()
                         .all(|key| definition.get_column_def(key).is_some())
@@ -417,13 +425,13 @@ impl Constraint {
         };
         let source_period = ast.extras().fk_with_period();
         let target_period = ast.extras().pk_with_period();
-        if !source_period && !target_period {
-            return Ok(());
-        }
         let AstColumnConstraint::ForeignKey(reference) = ast.constraint() else {
             return Ok(());
         };
         let primary_only = reference.columns().is_empty();
+        if !primary_only && !source_period && !target_period {
+            return Ok(());
+        }
         if !primary_only && source_period != target_period {
             context.report_analysis_problem(AnalysisProblem::ForeignKeyPeriodMismatch)?;
             key.bind_temporal_key(None);
@@ -449,6 +457,14 @@ impl Constraint {
             } else {
                 None
             };
+        if !source_period && !target_period {
+            if identity.is_some() {
+                context.report_analysis_problem(AnalysisProblem::ForeignKeyPeriodMismatch)?;
+                key.bind_temporal_key(identity);
+                key.restrict_reference_application(false);
+            }
+            return Ok(());
+        }
         if identity.is_none()
             && key.references_can_apply()
             && let Some(target) = key.target_table()
@@ -539,7 +555,7 @@ mod temporal_foreign_key_tests {
     use crate::{
         context::{ParseContext, TableInfoRead},
         names::{ColumnName, FullName, SchemaName},
-        sem::TypeReference,
+        sem::{TypeCategory, TypeDefinition, TypeReference},
         test_helpers::{TestParseContext, foreign_keys},
     };
 
@@ -547,10 +563,12 @@ mod temporal_foreign_key_tests {
     fn period_foreign_key_retains_its_target_key() {
         let mut base = TestParseContext::default().with_postgres_version("18");
         base.set_search_path(&[SchemaName::from("a")]);
-        base.setup_type(TypeReference::concrete_type_ref(
-            &FullName::with_schema("pg_catalog", "daterange"),
-            false,
-        ));
+        let range = FullName::with_schema("pg_catalog", "daterange");
+        base.setup_type(TypeReference::concrete_type_ref(&range, false));
+        base.set_get_type_impl_result(
+            &range,
+            &TypeDefinition::builtin_with_category(&range, TypeCategory::try_from('R').ok(), None),
+        );
         let context = foreign_keys::apply(
             foreign_keys::child(&base.freeze()),
             "CREATE TABLE a.parent (a daterange, b daterange,

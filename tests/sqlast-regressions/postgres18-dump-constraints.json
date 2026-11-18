@@ -54,7 +54,7 @@
   },
   {
     "name": "period-column-type",
-    "sql": "CREATE TABLE pg18_constraints.invalid_period (a integer, PRIMARY KEY (a WITHOUT OVERLAPS))",
+    "sql": "CREATE TABLE pg18_constraints.invalid_period (a daterange, b integer, PRIMARY KEY (a, b WITHOUT OVERLAPS))",
     "expected": {
       "diagnostics": [
         "temporal_period_type"
@@ -90,6 +90,46 @@
         "foreign_key_temporal_action"
       ],
       "columns": []
+    }
+  },
+  {
+    "name": "enum-named-range",
+    "sql": "CREATE TABLE pg18_constraints.invalid_enum (a daterange, b pg18_constraints.fake_range, UNIQUE (a, b WITHOUT OVERLAPS))",
+    "expected": {
+      "columns": [],
+      "diagnostics": [
+        "temporal_period_type"
+      ]
+    }
+  },
+  {
+    "name": "missing-period",
+    "sql": "CREATE TABLE pg18_constraints.missing_period (a daterange, b daterange, FOREIGN KEY (a, b) REFERENCES pg18_constraints.parent)",
+    "expected": {
+      "columns": [],
+      "diagnostics": [
+        "foreign_key_period_mismatch"
+      ]
+    }
+  },
+  {
+    "name": "short-create-key",
+    "sql": "CREATE TABLE pg18_constraints.short_key (p daterange, PRIMARY KEY (p WITHOUT OVERLAPS))",
+    "expected": {
+      "columns": [],
+      "diagnostics": [
+        "temporal_key_too_short"
+      ]
+    }
+  },
+  {
+    "name": "short-added-key",
+    "sql": "ALTER TABLE pg18_constraints.child ADD UNIQUE (a WITHOUT OVERLAPS)",
+    "expected": {
+      "columns": [],
+      "diagnostics": [
+        "temporal_key_too_short"
+      ]
     }
   }
 ]

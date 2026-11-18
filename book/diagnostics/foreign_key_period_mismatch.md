@@ -6,8 +6,8 @@ Code: `foreign_key_period_mismatch`. Severity: Error.
 
 ## When it is reported
 
-An explicit PostgreSQL PERIOD foreign key column list marks only one side with
-PERIOD.
+A foreign key omits PERIOD when defaulting to a temporal primary key, or marks
+only one side when both column lists are explicit.
 
 ## What analysis knows and does not know
 
@@ -15,7 +15,8 @@ This check uses the foreign key declaration. It does not inspect stored rows.
 
 ## How to address it
 
-Mark the final referencing and referenced columns PERIOD.
+Mark the final referencing column PERIOD. When the referenced column list is
+explicit, mark its final column PERIOD as well.
 
 ## Example
 

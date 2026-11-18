@@ -1,3 +1,4 @@
+use crate::sem::ColumnConstraintTrait;
 mod ddl;
 mod serial;
 pub use self::column_def::ColumnDefinition;
@@ -786,6 +787,7 @@ impl CreateTable {
                 AlterObjSubCommand::DropColumnDefault(_) => todo!(),
                 AlterObjSubCommand::AddConstraint(constraint) => {
                     if alter_table.addition_indexes().is_some() {
+                        self.apply_not_null_constraint(constraint);
                         self.record_declared_constraint(constraint)?;
                     } else {
                         implicit_changes.extend(self.apply_added_constraint(constraint)?);
@@ -828,11 +830,21 @@ impl CreateTable {
         }
     }
 
+    pub(crate) fn apply_not_null_constraint(&mut self, constraint: &Constraint) {
+        if let Constraint::NotNull(value, true) = constraint
+            && value.is_validated()
+            && let Some(column) = self.columns.get_column_mut(value.column_name())
+        {
+            column.set_not_null(Some(true));
+        }
+    }
+
     fn apply_added_constraint(
         &mut self,
         constraint: &Constraint,
     ) -> Result<Vec<ImplicitChange>, AnalysisError> {
-        if constraint.as_check().is_some() {
+        self.apply_not_null_constraint(constraint);
+        if constraint.as_check().is_some() || matches!(constraint, Constraint::NotNull(..)) {
             self.record_declared_constraint(constraint)?;
         } else {
             self.constraints
@@ -963,6 +975,28 @@ impl CreateTable {
             arbiters.push(InsertArbiter::column_constraint(&columns[0]));
         }
         arbiters
+    }
+
+    pub(crate) fn matching_temporal_key(
+        &self,
+        columns: &[ColumnName],
+        primary_only: bool,
+    ) -> Option<&str> {
+        self.constraints
+            .iter()
+            .filter(|(_, constraint)| {
+                if (primary_only && !constraint.is_primary_key_constraint())
+                    || constraint.period_column().is_none()
+                    || constraint.period_column() != columns.last()
+                {
+                    return false;
+                }
+                let key_columns = constraint.unique_key_columns();
+                key_columns.len() == columns.len()
+                    && key_columns.iter().all(|column| columns.contains(column))
+            })
+            .map(|(identity, _)| identity.as_str())
+            .min()
     }
 
     /// get primary key column names

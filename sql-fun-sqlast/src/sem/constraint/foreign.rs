@@ -22,6 +22,7 @@ pub struct ForeignKeyConstraint {
     validity: Option<Validity>,
     delete_columns: Vec<ColumnName>,
     references_valid: bool,
+    temporal_key: Option<Option<String>>,
 }
 
 impl ForeignKeyConstraint {
@@ -251,8 +252,19 @@ impl ForeignKeyConstraint {
             validity: None,
             delete_columns: Vec::new(),
             references_valid: true,
+            temporal_key: None,
         }
     }
+    pub(crate) fn bind_temporal_key(&mut self, key: Option<String>) {
+        self.references_valid &= key.is_some();
+        self.temporal_key = Some(key);
+    }
+
+    /// Temporal key lookup, with an inner absence for a failed binding.
+    pub fn temporal_key(&self) -> Option<Option<&str>> {
+        self.temporal_key.as_ref().map(|name| name.as_deref())
+    }
+
     /// Canonical referenced relation, or `None` after failed target lookup.
     ///
     /// This binding is retained independently of later search-path changes.

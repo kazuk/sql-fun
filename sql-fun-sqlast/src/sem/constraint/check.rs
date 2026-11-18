@@ -71,6 +71,10 @@ impl CheckConstraint {
         self.not_valid = not_valid;
         self.enforced = enforced;
     }
+    pub(crate) const fn set_enforcement(&mut self, enforced: bool) {
+        self.enforced = Some(enforced);
+        self.validated &= enforced;
+    }
     pub(crate) fn reject(
         &mut self,
         context: &mut impl ParseContext,
@@ -95,7 +99,7 @@ impl CheckConstraint {
     pub(crate) const fn set_validated(&mut self, validated: bool) {
         self.validated = validated;
     }
-    /// Catalog validation state; CREATE is validated even when NOT VALID was written.
+    /// Catalog validation state; a non-enforced CHECK is unvalidated.
     /// This metadata does not establish anything about live database rows.
     pub const fn validated(&self) -> bool {
         self.validated
@@ -257,7 +261,9 @@ impl CheckConstraint {
         if ast.extras().deferrable() || ast.extras().initially_deferred() {
             check.reject(context, CheckProblem::Deferrability)?;
         }
-        check.set_validated(!alter || !ast.extras().skip_validation());
+        check.set_validated(
+            ast.extras().enforced() != Some(false) && (!alter || !ast.extras().skip_validation()),
+        );
         Ok(check)
     }
 }

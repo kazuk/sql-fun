@@ -8,8 +8,9 @@ use crate::{
     ast::{Column as AstColumn, ColumnConstraint as AstColumnConstraint, Dialect},
     names::{ColumnName, FullName, TableName},
     sem::{
-        AnalysisError, ColumnDrop, ColumnRename, CreateIndex, CreateTable, DropDependencyKind,
-        ImplicitChange, ParseContext, traversal::SemanticVisitor, traversal::SemanticVisitorMut,
+        AnalysisError, ColumnConstraintTrait, ColumnDrop, ColumnNullabilityConstraint,
+        ColumnRename, CreateIndex, CreateTable, DropDependencyKind, ImplicitChange, ParseContext,
+        traversal::SemanticVisitor, traversal::SemanticVisitorMut,
     },
 };
 use std::collections::HashMap;
@@ -24,6 +25,8 @@ mod unique;
 pub enum Constraint {
     /// Table CHECK expression and applicability.
     Check(CheckConstraint),
+    /// Named table-level NOT NULL and its applicability.
+    NotNull(ColumnNullabilityConstraint, bool),
     /// primary key constraint
     PrimaryKey(PrimaryKeyConstraint),
     /// unique constraint
@@ -104,7 +107,12 @@ impl Constraint {
         } else if let Self::Foreign(value) = self {
             value.references_can_apply()
         } else {
-            true
+            match self {
+                Self::NotNull(_, applicable) => *applicable,
+                Self::PrimaryKey(key) => key.can_apply(),
+                Self::Unique(key) => key.can_apply(),
+                _ => true,
+            }
         }
     }
 
@@ -127,6 +135,7 @@ impl Constraint {
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Check(value) => value.rename_column(rename)?,
+            Self::NotNull(value, _) => value.rename_column(rename, owned),
             Self::PrimaryKey(value) => value.rename_column(rename, owned),
             Self::Unique(value) => value.rename_column(rename, owned),
             Self::Foreign(value) => value.rename_column(rename, owned),
@@ -137,6 +146,7 @@ impl Constraint {
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         match self {
             Self::Check(value) => value.rename_relation(old, new),
+            Self::NotNull(value, _) => value.rename_relation(old, new),
             Self::PrimaryKey(value) => value.rename_relation(old, new),
             Self::Unique(value) => value.rename_relation(old, new),
             Self::Foreign(value) => value.rename_relation(old, new),
@@ -147,18 +157,38 @@ impl Constraint {
         match self {
             Self::PrimaryKey(key) => key.keys().to_vec(),
             Self::Unique(key) => key.key_columns(),
-            Self::Foreign(_) | Self::Check(_) => Vec::new(),
+            Self::Foreign(_) | Self::Check(_) | Self::NotNull(..) => Vec::new(),
+        }
+    }
+
+    pub(crate) const fn mark_temporal_key(&mut self, valid: bool) {
+        match self {
+            Self::PrimaryKey(key) => key.mark_temporal(valid),
+            Self::Unique(key) => key.mark_temporal(valid),
+            _ => {}
+        }
+    }
+
+    /// The final column of a WITHOUT OVERLAPS key.
+    pub fn period_column(&self) -> Option<&ColumnName> {
+        match self {
+            Self::PrimaryKey(key) => key.period_column(),
+            Self::Unique(key) => key.period_column(),
+            _ => None,
         }
     }
 
     pub(crate) fn matches_unique_columns(&self, columns: &[ColumnName]) -> bool {
+        if self.period_column().is_some() {
+            return false;
+        }
         match self {
             Self::PrimaryKey(key) => {
                 key.keys().len() == columns.len()
                     && key.keys().iter().all(|name| columns.contains(name))
             }
             Self::Unique(key) => key.matches_columns(columns),
-            Self::Foreign(_) | Self::Check(_) => false,
+            Self::Foreign(_) | Self::Check(_) | Self::NotNull(..) => false,
         }
     }
 
@@ -185,6 +215,7 @@ impl Constraint {
     pub fn name(&self) -> &str {
         match self {
             Self::Check(check) => check.name(),
+            Self::NotNull(value, _) => value.name().unwrap_or_default(),
             Self::PrimaryKey(pk) => pk.name(),
             Self::Unique(u) => u.name(),
             Self::Foreign(f) => f.name(),
@@ -194,7 +225,7 @@ impl Constraint {
     /// get constraint derive index definition
     pub fn implicit_changes(&self) -> Result<Vec<ImplicitChange>, AnalysisError> {
         match self {
-            Self::Check(_) => Ok(Vec::new()),
+            Self::Check(_) | Self::NotNull(..) => Ok(Vec::new()),
             Self::PrimaryKey(pk) => pk.implicit_changes(),
             Self::Unique(u) => u.implicit_changes(),
             Self::Foreign(f) => f.implicit_changes(),
@@ -313,6 +344,7 @@ impl Constraint {
             Self::Check(check) => {
                 owned && change.expression_dependency(context, check.expression())?
             }
+            Self::NotNull(value, _) => owned && change.matches_name(context, value.column_name()),
             Self::PrimaryKey(key) => {
                 owned
                     && key

@@ -2,16 +2,16 @@
 
 use crate::{
     ast::{
-        AlterCommand as AstAlterCommand, ColumnConstraint as AstColumnConstraint,
+        AlterCommand as AstAlterCommand, ColumnConstraint as AstColumnConstraint, ForeignKeyAction,
         ForeignReference as AstForeignReference, TableConstraint as AstTableConstraint,
         ddl::AlterDefinition as AstAlterDefinition,
     },
     context::ParseContext,
     names::{ColumnName, FullName, TableName},
     sem::{
-        AlterObjSubCommand, AnalysisError, AnalysisProblem, CheckConstraint, Constraint,
-        CreateTable, ForeignKeyConstraint, ForeignKeyTarget, PrimaryKeyConstraint,
-        UniqueConstraint,
+        AlterObjSubCommand, AnalysisError, AnalysisProblem, CheckConstraint,
+        ColumnNullabilityConstraint, Constraint, CreateTable, ForeignKeyConstraint,
+        ForeignKeyTarget, PrimaryKeyConstraint, UniqueConstraint,
     },
 };
 
@@ -31,6 +31,57 @@ impl Constraint {
         Some(definition)
     }
 
+    pub(crate) fn from_ast_not_null(
+        ast: &AstTableConstraint,
+        context: &mut impl ParseContext,
+        target: &TableName,
+        pending: Option<&CreateTable>,
+    ) -> Result<Option<Self>, AnalysisError> {
+        let AstColumnConstraint::Nullability(true, conflict, validity) = ast.constraint() else {
+            return Ok(None);
+        };
+        let keys = Self::columns_from_ast(ast);
+        let [column] = keys.as_slice() else {
+            return AnalysisError::raise_unexpected_input("NOT NULL constraint column");
+        };
+        let applicable = if let Some(table) = pending {
+            table.check_reference_columns(context, target, &keys)?
+        } else {
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(target))?;
+            false
+        };
+        let mut value = ColumnNullabilityConstraint::new(
+            target,
+            column,
+            true,
+            conflict.clone(),
+            validity.clone(),
+        );
+        value.retain_declaration(ast.name().as_deref(), ast.extras().no_inherit());
+        Ok(Some(Self::NotNull(value, applicable)))
+    }
+
+    fn validate_period_type(
+        context: &mut impl ParseContext,
+        table: &CreateTable,
+        column: Option<&ColumnName>,
+    ) -> Result<bool, AnalysisError> {
+        let Some(column) = column else {
+            return Ok(false);
+        };
+        let Some(definition) = table.get_column_def(column) else {
+            return Ok(false);
+        };
+        let Some(ty) = definition.get_type() else {
+            return Ok(false);
+        };
+        if ty.is_range() || ty.is_multi_range() {
+            return Ok(true);
+        }
+        context.report_analysis_problem(AnalysisProblem::TemporalPeriodType(column.into()))?;
+        Ok(false)
+    }
+
     pub(crate) fn from_ast_added_constraint(
         ast: &AstTableConstraint,
         context: &mut impl ParseContext,
@@ -42,20 +93,28 @@ impl Constraint {
                 CheckConstraint::from_ast_table_constraint(ast, context, target, pending, true)?;
             return Ok((Self::check(&check), check.can_apply()));
         }
+        if let Some(constraint) = Self::from_ast_not_null(ast, context, target, pending)? {
+            let applicable = constraint.references_can_apply();
+            return Ok((constraint, applicable));
+        }
         if let Some(pending) = pending {
             if ast.constraint().is_unique_key() {
                 if ast.extras().deferrable() {
                     todo!("deferrable unique-key catalog representation (#563)");
                 }
                 let keys = Self::columns_from_ast(ast);
-                let valid = pending.check_reference_columns(context, target, &keys)?;
-                let result = Self::from_ast_column_table(
+                let mut valid = pending.check_reference_columns(context, target, &keys)?;
+                let mut result = Self::from_ast_column_table(
                     ast.constraint(),
                     context,
                     target,
                     ast.name().as_deref().unwrap_or_default(),
                     &keys,
                 )?;
+                if ast.extras().without_overlaps() {
+                    valid &= Self::validate_period_type(context, pending, keys.last())?;
+                    result.mark_temporal_key(valid);
+                }
                 return Ok((result, valid));
             }
             if let Some(mut constraint) =
@@ -83,15 +142,19 @@ impl Constraint {
             todo!("deferrable unique-key catalog representation");
         }
         let keys = Self::columns_from_ast(ast);
-        table.check_reference_columns(context, table.name(), &keys)?;
-        Self::from_ast_column_table(
+        let valid = table.check_reference_columns(context, table.name(), &keys)?;
+        let mut constraint = Self::from_ast_column_table(
             ast.constraint(),
             context,
             table.name(),
             ast.name().as_deref().unwrap_or_default(),
             &keys,
-        )
-        .map(Some)
+        )?;
+        if ast.extras().without_overlaps() {
+            let valid = Self::validate_period_type(context, table, keys.last())? && valid;
+            constraint.mark_temporal_key(valid);
+        }
+        Ok(Some(constraint))
     }
 
     pub(crate) fn from_ast_table(
@@ -110,6 +173,17 @@ impl Constraint {
             )
             .map(Constraint::Check);
         }
+        if matches!(
+            ast.constraint(),
+            AstColumnConstraint::Nullability(true, _, _)
+        ) {
+            let definition = context.get_table(table).cloned();
+            if let Some(constraint) =
+                Self::from_ast_not_null(ast, context, table, definition.as_ref())?
+            {
+                return Ok(constraint);
+            }
+        }
         let keys = Self::columns_from_ast(ast);
         if context.get_table(table).is_none() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(table))?;
@@ -123,7 +197,20 @@ impl Constraint {
         let name = ast.name().as_deref().unwrap_or_default();
         let mut constraint =
             Self::from_ast_column_table(ast.constraint(), context, table, name, &keys)?;
+        if ast.extras().without_overlaps() {
+            let definition = context.get_table(table).cloned();
+            let valid = if let Some(definition) = &definition {
+                Self::validate_period_type(context, definition, keys.last())?
+                    && keys
+                        .iter()
+                        .all(|key| definition.get_column_def(key).is_some())
+            } else {
+                false
+            };
+            constraint.mark_temporal_key(valid);
+        }
         constraint.set_foreign_key_delete_columns(&Self::delete_columns_from_ast(ast));
+        constraint.bind_ast_temporal_foreign_key(ast, context, None)?;
         Ok(constraint)
     }
 }
@@ -319,6 +406,73 @@ impl Constraint {
 }
 
 impl Constraint {
+    fn bind_ast_temporal_foreign_key(
+        &mut self,
+        ast: &AstTableConstraint,
+        context: &mut impl ParseContext,
+        pending: Option<&CreateTable>,
+    ) -> Result<(), AnalysisError> {
+        let Self::Foreign(key) = self else {
+            return Ok(());
+        };
+        let source_period = ast.extras().fk_with_period();
+        let target_period = ast.extras().pk_with_period();
+        if !source_period && !target_period {
+            return Ok(());
+        }
+        let AstColumnConstraint::ForeignKey(reference) = ast.constraint() else {
+            return Ok(());
+        };
+        let primary_only = reference.columns().is_empty();
+        if !primary_only && source_period != target_period {
+            context.report_analysis_problem(AnalysisProblem::ForeignKeyPeriodMismatch)?;
+            key.bind_temporal_key(None);
+            return Ok(());
+        }
+        let identity =
+            if let (Some(target), Some(columns)) = (key.target_table(), key.target_columns()) {
+                let target_definition = if let Some(pending) = pending
+                    && context.creation_name(pending.name().full_name(), pending.temporary())?
+                        == *target.full_name()
+                {
+                    Some(pending)
+                } else {
+                    context.get_table_impl(target.full_name())
+                };
+                if let Some(table) = target_definition {
+                    table
+                        .matching_temporal_key(columns, primary_only)
+                        .map(str::to_owned)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+        if identity.is_none()
+            && key.references_can_apply()
+            && let Some(target) = key.target_table()
+        {
+            context.report_analysis_problem(AnalysisProblem::ForeignKeyTemporalKeyMissing(
+                target.into(),
+            ))?;
+        }
+        key.bind_temporal_key(identity);
+        if reference
+            .delete_action()
+            .as_ref()
+            .is_some_and(|action| *action != ForeignKeyAction::NoAction)
+            || reference
+                .update_action()
+                .as_ref()
+                .is_some_and(|action| *action != ForeignKeyAction::NoAction)
+        {
+            context.report_analysis_problem(AnalysisProblem::ForeignKeyTemporalAction)?;
+            key.restrict_reference_application(false);
+        }
+        Ok(())
+    }
+
     pub(crate) fn from_ast_declared_foreign_key(
         ast: &AstTableConstraint,
         context: &mut impl ParseContext,
@@ -336,6 +490,7 @@ impl Constraint {
             let valid = table.check_reference_columns(context, table.name(), &columns)?;
             constraint.restrict_reference_application(valid);
             constraint.set_foreign_key_delete_columns(&columns);
+            constraint.bind_ast_temporal_foreign_key(ast, context, Some(table))?;
             Ok(Some(constraint))
         } else {
             Ok(None)
@@ -376,5 +531,62 @@ impl Constraint {
             Some(table),
         )
         .map(Some)
+    }
+}
+
+#[cfg(test)]
+mod temporal_foreign_key_tests {
+    use crate::{
+        context::{ParseContext, TableInfoRead},
+        names::{ColumnName, FullName, SchemaName},
+        sem::TypeReference,
+        test_helpers::{TestParseContext, foreign_keys},
+    };
+
+    #[test]
+    fn period_foreign_key_retains_its_target_key() {
+        let mut base = TestParseContext::default().with_postgres_version("18");
+        base.set_search_path(&[SchemaName::from("a")]);
+        base.setup_type(TypeReference::concrete_type_ref(
+            &FullName::with_schema("pg_catalog", "daterange"),
+            false,
+        ));
+        let context = foreign_keys::apply(
+            foreign_keys::child(&base.freeze()),
+            "CREATE TABLE a.parent (a daterange, b daterange,
+             CONSTRAINT span_key PRIMARY KEY (a, b WITHOUT OVERLAPS))",
+        );
+        let context = foreign_keys::apply(
+            context,
+            "CREATE TABLE a.child (a daterange, b daterange,
+             CONSTRAINT span_reference FOREIGN KEY (a, PERIOD b) REFERENCES a.parent)",
+        );
+
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let parent = context
+            .get_table_impl(&FullName::with_schema("a", "parent"))
+            .unwrap();
+        let key = parent.constraint("span_key").unwrap();
+        assert_eq!(key.period_column(), Some(&ColumnName::from("b")));
+        assert_eq!(
+            key.implicit_changes().unwrap()[0]
+                .clone()
+                .into_index()
+                .access_method(),
+            "gist"
+        );
+        let child = context
+            .get_table_impl(&FullName::with_schema("a", "child"))
+            .unwrap();
+        let reference = child
+            .constraint("span_reference")
+            .unwrap()
+            .as_foreign_key()
+            .unwrap();
+        assert_eq!(
+            reference.target_table(),
+            Some(&foreign_keys::name("a", "parent"))
+        );
+        assert_eq!(reference.temporal_key(), Some(Some("span_key")));
     }
 }

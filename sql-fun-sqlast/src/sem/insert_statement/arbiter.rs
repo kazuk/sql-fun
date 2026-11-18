@@ -39,7 +39,9 @@ impl Constraint {
         match self {
             Self::PrimaryKey(_) => InsertConstraintKind::primary_key(),
             Self::Unique(_) => InsertConstraintKind::unique(),
-            Self::Foreign(_) | Self::Check(_) => InsertConstraintKind::wrong_kind(),
+            Self::Foreign(_) | Self::Check(_) | Self::NotNull(..) => {
+                InsertConstraintKind::wrong_kind()
+            }
         }
     }
 }

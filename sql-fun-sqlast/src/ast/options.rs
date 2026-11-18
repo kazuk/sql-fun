@@ -319,6 +319,10 @@ impl Validity {
         }
     }
 
+    pub(crate) const fn skips_validation(&self) -> bool {
+        self.skip_validation
+    }
+
     /// create from [`crate::syn::Constraint`]
     pub const fn from_constraint(syn: &SynConstraint) -> Self {
         Self::new(syn.get_skip_validation(), syn.get_initially_valid())

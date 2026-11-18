@@ -68,9 +68,9 @@ Constraint names, NO INHERIT and applicable explicit enforcement choices are
 retained. CREATE table-level CHECK accepts NOT VALID but records it as validated;
 ALTER ADD CHECK NOT VALID instead retains an unvalidated constraint.
 CHECK is not deferrable. Inheritance propagation remains
-[#546](https://github.com/kazuk/sql-fun/issues/546);
-PostgreSQL 18 NOT ENFORCED remains
-[#887](https://github.com/kazuk/sql-fun/issues/887). SQLite table and inline CHECK
+[#546](https://github.com/kazuk/sql-fun/issues/546). PostgreSQL 18 CHECK NOT
+ENFORCED retains the bound expression and records it as unvalidated.
+SQLite table and inline CHECK
 constraints use SQLite truth values rather than PostgreSQL boolean coercion.
 SQLite CHECK constraints using ordinary comparison/arithmetic operators can still
 reach the shared unimplemented
@@ -153,12 +153,20 @@ above, but column compression and storage attributes are not yet applied by
 CREATE TABLE analysis
 ([#564](https://github.com/kazuk/sql-fun/issues/564)).
 
-PostgreSQL 18 temporal keys (`WITHOUT OVERLAPS`), foreign-key PERIOD columns,
-NOT ENFORCED checks, table-level NOT NULL, inline NOT NULL NO INHERIT and new
-NOT NULL validation attributes do not have complete constraint semantics
-([#887](https://github.com/kazuk/sql-fun/issues/887)). Retention/version gating
-can precede an unimplemented path; accepting PostgreSQL 18 grammar does not
-establish successful catalog application.
+### PostgreSQL 18 constraint declarations
+
+Schema analysis retains named NOT NULL declarations and NO INHERIT. A
+validated NOT NULL contributes to column nullability in later queries.
+An unvalidated NOT NULL can coexist with NULLs in existing rows, so the
+declaration alone does not establish a non-null query result.
+
+For temporal primary and unique keys, WITHOUT OVERLAPS identifies the
+final range or multirange column, with a GiST supporting index. A PERIOD
+foreign key binds to a matching temporal key on the referenced table.
+PostgreSQL checks overlap and coverage against stored rows at execution time.
+Analysis does not verify that the GiST operator family supplies the required
+equality and overlap operators. General operator-family resolution is tracked
+in [#797](https://github.com/kazuk/sql-fun/issues/797).
 
 ## Diagnostics
 

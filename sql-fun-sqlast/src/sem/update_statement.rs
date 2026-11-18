@@ -206,9 +206,7 @@ impl UpdateStatement {
         visitor.access_action(self.target.full_name(), AccessKind::update_rows());
         visitor.access_purpose(AccessKind::update_source());
         visitor.table_binding(&self.target);
-        for cte in &self.with {
-            cte.visit(visitor)?;
-        }
+        QueryCte::visit_all(&self.with, visitor)?;
         self.from.visit(visitor)?;
         visitor.access_purpose(AccessKind::update_filter());
         if let Some(predicate) = &self.predicate {

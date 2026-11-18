@@ -167,6 +167,9 @@ impl SelectStatement {
 
 struct SetOperationValidity(bool);
 impl crate::sem::traversal::SemanticVisitorMut for SetOperationValidity {
+    fn invalid_recursive_cte(&mut self) {
+        self.0 = false;
+    }
     fn walk_source_column_values(&self) -> bool {
         false
     }

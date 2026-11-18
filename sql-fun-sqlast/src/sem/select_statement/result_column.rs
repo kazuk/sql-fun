@@ -195,6 +195,17 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn unresolved_aliases(aliases: &[String]) -> Self {
+        Self(
+            aliases
+                .iter()
+                .map(|alias| {
+                    ResultColumn::new(&Some(ColumnName::from(alias.as_str())), &None, &None)
+                })
+                .collect(),
+        )
+    }
+
     pub(crate) fn push_projection(
         &mut self,
         name: &ColumnName,

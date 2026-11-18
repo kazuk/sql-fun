@@ -13,6 +13,9 @@ use crate::{
 /// Observe completed semantic bindings through shared references only.
 /// Visitor state can change; semantic nodes and their retained metadata cannot.
 pub(crate) trait SemanticVisitor {
+    fn cte_dependency_order(&self) -> bool {
+        false
+    }
     fn enter_rows_functions(&mut self) {}
     fn leave_rows_functions(&mut self, _alias: &AliasSpec, _ordinality: bool) {}
     fn access_purpose(&mut self, _kind: AccessKind) {}
@@ -138,6 +141,7 @@ pub(crate) trait SemanticVisitor {
 
 /// Rewrite semantic nodes and refresh metadata through mutable references.
 pub(crate) trait SemanticVisitorMut {
+    fn invalid_recursive_cte(&mut self) {}
     fn table_function(
         &mut self,
         _expression: &mut SemScalarExpr,

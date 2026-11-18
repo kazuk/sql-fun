@@ -162,9 +162,7 @@ impl InsertStatement {
         visitor.access_action(self.target.full_name(), AccessKind::insert_rows());
         visitor.access_purpose(AccessKind::insert_input());
         visitor.table_binding(&self.target);
-        for entry in &self.with {
-            entry.visit(visitor)?;
-        }
+        QueryCte::visit_all(&self.with, visitor)?;
         self.source.visit(visitor, self.columns.as_slice())?;
         visitor.access_purpose(AccessKind::insert_conflict());
         for conflict in &self.conflicts {

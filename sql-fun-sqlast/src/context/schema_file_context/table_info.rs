@@ -105,7 +105,7 @@ impl SchemaFileContext {
 impl TableInfoWrite for SchemaFileContext {
     #[tracing::instrument(skip(self))]
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
-        if !alter_table.can_apply() {
+        if !alter_table.can_apply() || alter_table.has_constraint_changes() {
             return Ok(self);
         }
         if let Some(destination) = alter_table.rename_destination() {

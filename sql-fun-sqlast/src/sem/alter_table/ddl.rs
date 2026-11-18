@@ -12,10 +12,11 @@ use crate::{
     context::ParseContext,
     names::{ColumnName, FullName, LocalName, TableName, ViewName},
     sem::{
-        AlterColumnAttributes, AlterObjSubCommand, AlterTable, AlterView, AnalysisError,
-        AnalysisProblem, ColumnAddition, ColumnAttributeAction, ColumnAttributeBinding,
-        ColumnDefinition, ColumnDrop, ColumnRename, Constraint, CreateTable, FromClause,
-        OwnerSpecification, ResolutionFailure, ScalarAnalysisContext, SemScalarExpr, WithClause,
+        AlterColumnAttributes, AlterConstraint, AlterObjSubCommand, AlterTable, AlterView,
+        AnalysisError, AnalysisProblem, ColumnAddition, ColumnAttributeAction,
+        ColumnAttributeBinding, ColumnDefinition, ColumnDrop, ColumnRename, Constraint,
+        CreateTable, FromClause, OwnerSpecification, ResolutionFailure, ScalarAnalysisContext,
+        SemScalarExpr, WithClause,
         problem::{AlterColumnProblem, ViewProblem},
         search_path::expand_relation_search_path,
     },
@@ -359,6 +360,9 @@ impl AlterObjSubCommand {
         context: &mut impl ParseContext,
         table: &TableName,
     ) -> Result<Self, AnalysisError> {
+        if let Some(command) = AlterConstraint::from_ast_command(ast, context, table)? {
+            return Ok(command);
+        }
         if ColumnAttributeAction::phase_from_ast_operation(&ast.operation()).is_some() {
             return Self::from_ast_single_column_attribute(ast, context, table);
         }

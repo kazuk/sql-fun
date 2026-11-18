@@ -1,0 +1,106 @@
+[
+  {
+    "name": "alter-inline-fk",
+    "sql": "ALTER TABLE constraint_child ALTER CONSTRAINT inline_fk DEFERRABLE INITIALLY DEFERRED",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-fk",
+    "sql": "ALTER TABLE constraint_child ALTER CONSTRAINT child_fk INITIALLY DEFERRED",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "deferrable-check",
+    "sql": "ALTER TABLE constraint_child ALTER CONSTRAINT child_check DEFERRABLE",
+    "expected": {
+      "diagnostics": [
+        "alter_constraint_invalid"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "validate-check",
+    "sql": "ALTER TABLE constraint_child VALIDATE CONSTRAINT pending_check",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "validate-fk",
+    "sql": "ALTER TABLE constraint_child VALIDATE CONSTRAINT child_fk",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "validate-unique",
+    "sql": "ALTER TABLE constraint_child VALIDATE CONSTRAINT child_unique",
+    "expected": {
+      "diagnostics": [
+        "alter_constraint_invalid"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "drop-with-cascade",
+    "sql": "ALTER TABLE constraint_parent DROP CONSTRAINT parent_pk CASCADE",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "conditional-drop",
+    "sql": "ALTER TABLE constraint_child DROP CONSTRAINT IF EXISTS absent",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-constraint",
+    "sql": "ALTER TABLE constraint_child DROP CONSTRAINT absent",
+    "expected": {
+      "diagnostics": [
+        "alter_constraint_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-table",
+    "sql": "ALTER TABLE absent DROP CONSTRAINT IF EXISTS child_check",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "conditional-table",
+    "sql": "ALTER TABLE IF EXISTS absent VALIDATE CONSTRAINT child_check",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "multiple-commands",
+    "sql": "ALTER TABLE constraint_child ALTER CONSTRAINT child_fk DEFERRABLE, VALIDATE CONSTRAINT pending_check, DROP CONSTRAINT child_unique",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

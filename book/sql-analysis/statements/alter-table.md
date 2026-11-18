@@ -80,6 +80,25 @@ This increment does not implement all ADD COLUMN definitions:
   operator path remain [#504](https://github.com/kazuk/sql-fun/issues/504).
   Supported truth/null tests and logical expressions use SQLite truth semantics.
 
+### Analyzing changes to existing PostgreSQL constraints
+
+`ALTER CONSTRAINT` resolves the named constraint and analyzes changes to
+foreign-key deferrability and initial timing. `VALIDATE CONSTRAINT` accepts
+foreign keys and CHECK constraints, and named NOT NULL constraints on
+PostgreSQL 18. Validation of an already validated constraint is a no-op.
+A NOT ENFORCED constraint cannot be validated.
+
+`DROP CONSTRAINT` resolves the target and retains RESTRICT or CASCADE.
+`IF EXISTS` permits the indicated missing table or constraint. Name lookup
+uses the names retained from the schema declarations. PostgreSQL-generated
+names absent from those declarations are not reconstructed.
+
+These commands produce semantic results for the named targets. Catalog updates,
+dependency handling, and history are tracked in
+[#1146](https://github.com/kazuk/sql-fun/issues/1146). PostgreSQL 18 ALTER
+CONSTRAINT enforcement and inheritance attribute changes remain tracked in
+[#887](https://github.com/kazuk/sql-fun/issues/887).
+
 ### Adding table CHECK constraints
 
 `ADD [CONSTRAINT name] CHECK (condition)` retains the analyzed expression and

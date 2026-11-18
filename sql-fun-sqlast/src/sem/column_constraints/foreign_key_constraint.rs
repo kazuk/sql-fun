@@ -1,5 +1,8 @@
 use crate::{
-    ast::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
+    ast::{
+        ColumnConstraint as AstColumnConstraint, Deferrability, ForeignKeyAction,
+        ForeignKeyMatchType, TableConstraint as AstTableConstraint, Validity,
+    },
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
@@ -20,6 +23,8 @@ pub struct ForeignKeyColumnConstraint {
     update_action: Option<ForeignKeyAction>,
     deferrablity: Option<Deferrability>,
     validity: Option<Validity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
 }
 
 impl ForeignKeyColumnConstraint {
@@ -81,6 +86,7 @@ impl ForeignKeyColumnConstraint {
             update_action,
             deferrablity,
             validity,
+            name: None,
         }
     }
 }
@@ -125,6 +131,45 @@ mod test_foreign_key_serialization {
 }
 
 impl ForeignKeyColumnConstraint {
+    pub(crate) fn retain_name(&mut self, name: Option<&str>) {
+        self.name = name.map(str::to_owned);
+    }
+
+    pub(crate) fn retain_postgres_deferrability(&mut self, following: &[AstTableConstraint]) {
+        let mut deferrable = None;
+        let mut deferred = None;
+        for attribute in following {
+            match attribute.constraint() {
+                AstColumnConstraint::Deferrability(value) => deferrable = Some(*value),
+                AstColumnConstraint::Deferred => deferred = Some(true),
+                AstColumnConstraint::Immediate => deferred = Some(false),
+                AstColumnConstraint::Enforcement(_) => {}
+                _ => break,
+            }
+        }
+        if deferrable.is_some() || deferred.is_some() {
+            let deferred = deferred.unwrap_or(false);
+            self.deferrablity = Some(Deferrability::new(deferrable.unwrap_or(deferred), deferred));
+        }
+    }
+
+    /// Explicit constraint name.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Declared deferrability, when supplied.
+    pub const fn deferrability(&self) -> Option<&Deferrability> {
+        self.deferrablity.as_ref()
+    }
+
+    /// Whether the constraint validates existing rows.
+    pub fn is_validated(&self) -> bool {
+        self.validity
+            .as_ref()
+            .is_none_or(|value| !value.skips_validation())
+    }
+
     /// Canonical referenced relation, or `None` after failed target lookup.
     ///
     /// Later search-path changes do not alter this retained binding.

@@ -239,9 +239,8 @@ pub(crate) struct AlterColumnType {
 }
 #[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct AlterConstraintFlags {
-    #[getter(skip)]
     name: String,
-    #[getter(skip)]
+    #[getter(copy)]
     deferrability: Option<(bool, bool)>,
     #[getter(copy)]
     enforced: Option<bool>,

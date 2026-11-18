@@ -9,8 +9,8 @@ use crate::{
     context::ParseContext,
     names::{FullName, TableName, ViewName},
     sem::{
-        AlterColumnDefinition, AlterColumnType, AlterIndex, AlterObjSubCommand, AlterSequence,
-        AlterTable, AlterView, AnalysisError, AnalysisProblem, ColumnAddition,
+        AlterColumnDefinition, AlterColumnType, AlterConstraint, AlterIndex, AlterObjSubCommand,
+        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, ColumnAddition,
         ColumnAttributeAction, ColumnDrop, ColumnRename, EngineFeatureValidation, IndexAlteration,
         Kind, ResolutionFailure, RowSecurityChange, SemAst, SourcePathWithSpan,
         problem::ViewProblem, search_path::expand_relation_search_path,
@@ -104,6 +104,9 @@ impl RelationAlteration {
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
+        if ast.kind().supports_table_column_attributes() && AlterConstraint::is_ast_relation(ast) {
+            return AlterConstraint::analyze_relation(ast, context, source);
+        }
         if RowSecurityChange::is_ast_relation(ast) {
             return RowSecurityChange::analyze_relation(ast, context, source);
         }

@@ -9,8 +9,8 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, CheckConstraint, ColumnAttributeAction,
-        ColumnDrop, ColumnRename, Constraint, ConstraintNames, CreateIndex, CreateSequence,
-        ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
+        ColumnConstraint, ColumnDrop, ColumnRename, Constraint, ConstraintNames, CreateIndex,
+        CreateSequence, ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
         OwnerSpecification, RuleIdentity, RuleReferences, SemScalarExpr, SourcePathWithSpan,
         TriggerReferences, TypeReference,
         alter_table::AlterObjSubCommand,
@@ -770,6 +770,9 @@ impl CreateTable {
                     &mut self.row_security_enabled,
                     &mut self.row_security_forced,
                 ),
+                AlterObjSubCommand::ChangeConstraint(_) => {
+                    todo!("constraint change application (#1146)")
+                }
                 AlterObjSubCommand::ColumnDefinition(_) | AlterObjSubCommand::ColumnType(_) => {
                     todo!("ALTER COLUMN TYPE catalog application (#1057)")
                 }
@@ -945,6 +948,27 @@ impl CreateTable {
         self.constraints
             .values()
             .filter_map(Constraint::as_foreign_key)
+    }
+
+    pub(crate) fn named_inline_constraints(
+        &self,
+        name: &str,
+    ) -> impl Iterator<Item = &ColumnConstraint> {
+        self.columns
+            .0
+            .iter()
+            .flat_map(ColumnDefinition::constraints)
+            .filter(move |constraint| {
+                constraint
+                    .as_check()
+                    .is_some_and(|check| check.name() == Some(name))
+                    || constraint
+                        .as_foreign_key()
+                        .is_some_and(|key| key.name() == Some(name))
+                    || constraint
+                        .as_nullability()
+                        .is_some_and(|value| value.is_not_null() && value.name() == Some(name))
+            })
     }
 
     /// Look up an explicitly named table constraint.

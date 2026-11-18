@@ -6,11 +6,12 @@ use crate::{
     context::GetSourcePathWithSpan,
     names::{ColumnName, FullName, TableName, ViewName},
     sem::{
-        AlterColumnAttributes, AlterColumnDefinition, AlterColumnType, AnalysisError,
-        AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnDrop, ColumnRename, Constraint,
-        ConstraintNames, CreateIndex, CreateSequence, CreateTable, CreateView, OwnerSpecification,
-        ParseContext, RelationAlteration, RowSecurityChange, SemScalarExpr, SourcePathWithSpan,
-        problem::ViewProblem, traversal::SemanticVisitor,
+        AlterColumnAttributes, AlterColumnDefinition, AlterColumnType, AlterConstraint,
+        AnalysisError, AnalysisProblem, ColumnAddition, ColumnDefinition, ColumnDrop, ColumnRename,
+        Constraint, ConstraintChangeOutcome, ConstraintNames, CreateIndex, CreateSequence,
+        CreateTable, CreateView, OwnerSpecification, ParseContext, RelationAlteration,
+        RowSecurityChange, SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
+        traversal::SemanticVisitor,
     },
 };
 
@@ -219,9 +220,17 @@ impl AlterTable {
     /// Whether final dependency validation remains with schema application.
     pub fn requires_application_validation(&self) -> bool {
         self.commands.iter().any(|command| {
-            command.column_type_change().is_some() || command.column_drop().is_some()
+            command.column_type_change().is_some()
+                || command.column_drop().is_some()
+                || matches!(command, AlterObjSubCommand::ChangeConstraint(_))
         })
     }
+    pub(crate) fn has_constraint_changes(&self) -> bool {
+        self.commands
+            .iter()
+            .any(|command| matches!(command, AlterObjSubCommand::ChangeConstraint(_)))
+    }
+
     /// Canonical target binding retained by semantic analysis.
     pub const fn resolved_target(&self) -> Option<&TableName> {
         self.resolved_target.as_ref()
@@ -378,6 +387,8 @@ pub enum AlterObjSubCommand {
     /// Remove a column default.
     DropColumnDefault(ColumnName),
     AddConstraint(Constraint),
+    /// Analyzed constraint change with catalog application deferred to #1146.
+    ChangeConstraint(Box<AlterConstraint>),
     ClusterOn(String),
 
     RenameTo(TableName),
@@ -430,6 +441,7 @@ impl AlterObjSubCommand {
                 Ok(())
             }
             Self::AddConstraint(constraint) => constraint.visit_references(visitor),
+            Self::ChangeConstraint(change) => change.visit_references(visitor),
             Self::AddColumn(addition) => {
                 if let Some(definition) = addition.definition() {
                     definition.visit_references(visitor)?;
@@ -536,6 +548,7 @@ impl AlterObjSubCommand {
     fn declaration_can_apply(&self) -> bool {
         match self {
             Self::RowSecurity(change) => change.can_apply(),
+            Self::ChangeConstraint(change) => change.outcome() != ConstraintChangeOutcome::Rejected,
             Self::ColumnAttributes(change) => change.can_apply(),
             Self::ColumnType(change) => change.is_valid(),
             Self::DropColumn(change) => change.is_locally_applicable(),

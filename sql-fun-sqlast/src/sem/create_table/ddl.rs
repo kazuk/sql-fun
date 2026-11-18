@@ -249,6 +249,14 @@ impl CreateTable {
                 Constraint::from_ast_declared_key(definition, context, &table)?
             {
                 table.record_declared_constraint(&constraint)?;
+            } else if let Some(mut constraint) =
+                Constraint::from_ast_not_null(definition, context, &name, Some(&table))?
+            {
+                if let Constraint::NotNull(value, _) = &mut constraint {
+                    value.validate_on_create();
+                }
+                table.apply_not_null_constraint(&constraint);
+                table.record_declared_constraint(&constraint)?;
             }
         }
         for column in ast.columns() {

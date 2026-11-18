@@ -261,22 +261,23 @@ impl ColumnDefinition {
             if constraint.is_check() {
                 continue;
             }
-            // ENFORCED is the existing constraint behavior. Retain its explicit
-            // syntax, but it does not add a separate semantic column constraint.
-            if matches!(
-                constraint.constraint(),
-                AstColumnConstraint::Enforcement(true)
-            ) {
+            // Enforcement is applied to its owning CHECK during expression analysis.
+            if matches!(constraint.constraint(), AstColumnConstraint::Enforcement(_)) {
                 continue;
             }
             if constraint.constraint().is_unique_key() && constraint.extras().deferrable() {
                 todo!("deferrable unique-key catalog representation");
             }
-            let constraint =
+            let mut resolved =
                 ColumnConstraint::from_ast(constraint.constraint(), context, table, name)?;
-            if let Some(nullability) = constraint.as_nullability() {
+            if let ColumnConstraint::Nullability(nullability) = &mut resolved {
+                nullability.retain_declaration(
+                    constraint.name().as_deref(),
+                    constraint.extras().no_inherit(),
+                );
                 column.set_not_null(Some(nullability.is_not_null()));
             }
+            let constraint = resolved;
             if context.dialect() == AstDialect::sqlite() {
                 if let Some(default) = constraint.as_default() {
                     column.set_default(default.expr());
@@ -413,11 +414,17 @@ impl ColumnDefinition {
         };
         let name = ColumnName::from(ast.name().as_str());
         let mut index = 0;
-        for definition in ast.constraints() {
+        let mut definitions = ast.constraints().iter().peekable();
+        while let Some(definition) = definitions.next() {
             if definition.is_check() {
                 let mut check = CheckConstraint::from_ast_expression(
                     definition, context, target, &scope, false,
                 )?;
+                if let Some(AstColumnConstraint::Enforcement(enforced)) =
+                    definitions.peek().map(|next| next.constraint())
+                {
+                    check.set_enforcement(*enforced);
+                }
                 if !names.reserve(check.name()) {
                     check.reject_duplicate_name(context)?;
                 }

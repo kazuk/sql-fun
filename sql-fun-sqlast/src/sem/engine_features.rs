@@ -218,9 +218,6 @@ mod unimplemented_analysis_tests {
         "MERGE INTO t USING s ON true WHEN MATCHED THEN DELETE RETURNING WITH (OLD AS o) o.id"
     )]
     #[case::cte_alias("WITH c AS (DELETE FROM t RETURNING WITH (OLD AS o) o.id) SELECT * FROM c")]
-    #[case::temporal("CREATE TABLE t (id int, p int4range, PRIMARY KEY (id,p WITHOUT OVERLAPS))")]
-    #[case::non_enforced("CREATE TABLE t (id int CHECK (true) NOT ENFORCED)")]
-    #[case::table_not_null("CREATE TABLE t (id int, NOT NULL id)")]
     #[case::alter_enforcement("ALTER TABLE t ALTER CONSTRAINT c NOT ENFORCED")]
     #[case::alter_inheritance("ALTER TABLE t ALTER CONSTRAINT c NO INHERIT")]
     #[case::domain("CREATE DOMAIN d AS int CHECK (true) ENFORCED")]
@@ -277,7 +274,11 @@ impl EngineFeatureValidation {
         }
         let mut valid = Self::temporal_constraint(ast, context)?;
         if let Some(enforced) = ast.extras().enforced() {
-            valid &= Self::enforcement(context, enforced)?;
+            if ast.is_check() {
+                valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
+            } else {
+                valid &= Self::enforcement(context, enforced)?;
+            }
         }
         valid &= Self::column_constraint(ast.constraint(), context, ast.extras(), column)?;
         Ok(valid)
@@ -293,10 +294,7 @@ impl EngineFeatureValidation {
         {
             return Ok(true);
         }
-        if !context.postgres18_syntax_used(Postgres18Syntax::TemporalConstraint)? {
-            return Ok(false);
-        }
-        todo!("temporal constraint analysis (#887)")
+        context.postgres18_syntax_used(Postgres18Syntax::TemporalConstraint)
     }
 
     pub(crate) fn column_constraint(
@@ -315,7 +313,7 @@ impl EngineFeatureValidation {
             AstColumnConstraint::Nullability(true, _, _)
                 if !column || extras.no_inherit() || extras.skip_validation() =>
             {
-                Self::not_null(context)
+                context.postgres18_syntax_used(Postgres18Syntax::NotNullConstraint)
             }
             _ => Ok(true),
         }
@@ -334,20 +332,21 @@ impl EngineFeatureValidation {
         Ok(true)
     }
 
-    pub(crate) fn not_null(context: &mut impl ParseContext) -> Result<bool, AnalysisError> {
-        if !context.postgres18_syntax_used(Postgres18Syntax::NotNullConstraint)? {
-            return Ok(false);
-        }
-        todo!("PostgreSQL 18 NOT NULL constraint analysis (#887)")
-    }
-
     pub(crate) fn column(
         ast: &AstColumn,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
+        let mut follows_check = false;
         for constraint in ast.constraints() {
-            valid &= Self::table_constraint(constraint, context, true)?;
+            if follows_check
+                && matches!(constraint.constraint(), AstColumnConstraint::Enforcement(_))
+            {
+                valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
+            } else {
+                valid &= Self::table_constraint(constraint, context, true)?;
+            }
+            follows_check = constraint.is_check();
         }
         Ok(valid)
     }

@@ -86,8 +86,11 @@ This increment does not implement all ADD COLUMN definitions:
 its target-column bindings. Multiple unnamed checks remain distinct. NO INHERIT
 and NOT VALID are retained; NOT VALID describes omitted validation of existing
 rows, not permission to accept an invalid expression. Analysis does not inspect
-live rows. CHECK is not deferrable. PostgreSQL 18 NOT ENFORCED and constraint
-state transitions remain [#887](https://github.com/kazuk/sql-fun/issues/887).
+live rows. CHECK is not deferrable. On PostgreSQL 18, CHECK NOT ENFORCED
+retains the expression and records the constraint as unvalidated. ADD CONSTRAINT
+also retains named NOT NULL declarations (including NOT VALID), WITHOUT OVERLAPS
+keys, and PERIOD foreign-key bindings for subsequent schema analysis. Enforcement
+and inheritance attribute changes remain [#887](https://github.com/kazuk/sql-fun/issues/887).
 
 An invalid CHECK leaves the entire ALTER statement unapplied. Column and table
 renames update retained CHECK bindings. See [table CHECK rules](create-table.md#check-constraints)

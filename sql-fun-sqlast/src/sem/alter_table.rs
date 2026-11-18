@@ -540,6 +540,15 @@ impl AlterObjSubCommand {
             Self::ColumnType(change) => change.is_valid(),
             Self::DropColumn(change) => change.is_locally_applicable(),
             Self::ColumnDefinition(change) => change.is_valid(),
+            Self::AddConstraint(constraint)
+                if matches!(constraint, Constraint::NotNull(..))
+                    || constraint.period_column().is_some()
+                    || constraint
+                        .as_foreign_key()
+                        .is_some_and(|key| key.temporal_key().is_some()) =>
+            {
+                constraint.references_can_apply()
+            }
             Self::AddConstraint(constraint) => {
                 constraint.as_check().is_none_or(|check| check.can_apply())
             }

@@ -919,6 +919,42 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A PERIOD foreign key has no matching WITHOUT OVERLAPS target key.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignKeyTemporalKeyMissing": {
+                      "$ref": "#/$defs/TableName"
+                    }
+                  },
+                  "required": [
+                    "ForeignKeyTemporalKeyMissing"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A temporal key period column has an incompatible type.",
+                  "type": "object",
+                  "properties": {
+                    "TemporalPeriodType": {
+                      "$ref": "#/$defs/ColumnName"
+                    }
+                  },
+                  "required": [
+                    "TemporalPeriodType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An explicit foreign-key column list must use PERIOD on both sides.",
+                  "type": "string",
+                  "const": "ForeignKeyPeriodMismatch"
+                },
+                {
+                  "description": "A PERIOD foreign key supports only the NO ACTION referential action.",
+                  "type": "string",
+                  "const": "ForeignKeyTemporalAction"
+                },
+                {
                   "description": "extension not found",
                   "type": "object",
                   "properties": {
@@ -5543,6 +5579,42 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A PERIOD foreign key has no matching WITHOUT OVERLAPS target key.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignKeyTemporalKeyMissing": {
+                      "$ref": "#/$defs/TableName"
+                    }
+                  },
+                  "required": [
+                    "ForeignKeyTemporalKeyMissing"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A temporal key period column has an incompatible type.",
+                  "type": "object",
+                  "properties": {
+                    "TemporalPeriodType": {
+                      "$ref": "#/$defs/ColumnName"
+                    }
+                  },
+                  "required": [
+                    "TemporalPeriodType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An explicit foreign-key column list must use PERIOD on both sides.",
+                  "type": "string",
+                  "const": "ForeignKeyPeriodMismatch"
+                },
+                {
+                  "description": "A PERIOD foreign key supports only the NO ACTION referential action.",
+                  "type": "string",
+                  "const": "ForeignKeyTemporalAction"
+                },
+                {
                   "description": "extension not found",
                   "type": "object",
                   "properties": {
@@ -10057,6 +10129,42 @@
                     "ForeignKeyReferencedPrimaryKeyMissing"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "description": "A PERIOD foreign key has no matching WITHOUT OVERLAPS target key.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignKeyTemporalKeyMissing": {
+                      "$ref": "#/$defs/TableName"
+                    }
+                  },
+                  "required": [
+                    "ForeignKeyTemporalKeyMissing"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A temporal key period column has an incompatible type.",
+                  "type": "object",
+                  "properties": {
+                    "TemporalPeriodType": {
+                      "$ref": "#/$defs/ColumnName"
+                    }
+                  },
+                  "required": [
+                    "TemporalPeriodType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An explicit foreign-key column list must use PERIOD on both sides.",
+                  "type": "string",
+                  "const": "ForeignKeyPeriodMismatch"
+                },
+                {
+                  "description": "A PERIOD foreign key supports only the NO ACTION referential action.",
+                  "type": "string",
+                  "const": "ForeignKeyTemporalAction"
                 },
                 {
                   "description": "extension not found",

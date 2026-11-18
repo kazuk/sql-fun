@@ -1,0 +1,95 @@
+[
+  {
+    "name": "postgres18-schema-dump",
+    "sql": "SELECT t.a, t.b, parent.a AS start_span, parent.b AS end_span FROM pg18_constraints.t CROSS JOIN pg18_constraints.parent",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "start_span",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "daterange",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "end_span",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "daterange",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "omitted-temporal-reference",
+    "sql": "CREATE TABLE pg18_constraints.implicit_parent (a daterange, b daterange, FOREIGN KEY (a, PERIOD b) REFERENCES pg18_constraints.parent)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "period-column-type",
+    "sql": "CREATE TABLE pg18_constraints.invalid_period (a integer, PRIMARY KEY (a WITHOUT OVERLAPS))",
+    "expected": {
+      "diagnostics": [
+        "temporal_period_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "no-temporal-key",
+    "sql": "CREATE TABLE pg18_constraints.invalid_reference (a daterange, b daterange, FOREIGN KEY (a, PERIOD b) REFERENCES pg18_constraints.t(a, PERIOD b))",
+    "expected": {
+      "diagnostics": [
+        "foreign_key_temporal_key_missing"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "period-mismatch",
+    "sql": "CREATE TABLE pg18_constraints.period_mismatch (a daterange, b daterange, FOREIGN KEY (a, PERIOD b) REFERENCES pg18_constraints.parent (a, b))",
+    "expected": {
+      "diagnostics": [
+        "foreign_key_period_mismatch"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "period-action",
+    "sql": "CREATE TABLE pg18_constraints.period_action (a daterange, b daterange, FOREIGN KEY (a, PERIOD b) REFERENCES pg18_constraints.parent ON DELETE CASCADE)",
+    "expected": {
+      "diagnostics": [
+        "foreign_key_temporal_action"
+      ],
+      "columns": []
+    }
+  }
+]

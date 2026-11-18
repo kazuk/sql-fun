@@ -164,6 +164,14 @@ pub enum AnalysisProblem {
 
     /// An omitted foreign-key column list requires a referenced primary key.
     ForeignKeyReferencedPrimaryKeyMissing(TableName),
+    /// A PERIOD foreign key has no matching WITHOUT OVERLAPS target key.
+    ForeignKeyTemporalKeyMissing(TableName),
+    /// A temporal key period column has an incompatible type.
+    TemporalPeriodType(ColumnName),
+    /// An explicit foreign-key column list must use PERIOD on both sides.
+    ForeignKeyPeriodMismatch,
+    /// A PERIOD foreign key supports only the NO ACTION referential action.
+    ForeignKeyTemporalAction,
 
     /// extension not found
     ExtensionNotFound(String),
@@ -547,6 +555,10 @@ impl AnalysisProblem {
             Self::ForeignKeyReferencedPrimaryKeyMissing(_) => {
                 "foreign_key_referenced_primary_key_missing"
             }
+            Self::ForeignKeyTemporalKeyMissing(_) => "foreign_key_temporal_key_missing",
+            Self::TemporalPeriodType(_) => "temporal_period_type",
+            Self::ForeignKeyPeriodMismatch => "foreign_key_period_mismatch",
+            Self::ForeignKeyTemporalAction => "foreign_key_temporal_action",
             Self::ExtensionNotFound(..) => "extension_not_found",
             Self::NullabilityUnknown(..) => "nullability_unknown",
             Self::ArgumentTypeMismatch(..) => "argument_type_mismatch",
@@ -591,6 +603,10 @@ impl AnalysisProblem {
             Self::RowSecurityRequiresTable
             | Self::IncompatibleEngineVersion(_)
             | Self::ForeignKeyReferencedPrimaryKeyMissing(_)
+            | Self::ForeignKeyTemporalKeyMissing(_)
+            | Self::TemporalPeriodType(_)
+            | Self::ForeignKeyPeriodMismatch
+            | Self::ForeignKeyTemporalAction
             | Self::ParameterTypeUnresolved(_)
             | Self::InferenceCandidateSpaceUnsupported { .. }
             | Self::CoalesceExprTypeUnknown(..)
@@ -673,6 +689,10 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::NameResolution(problem) => problem.diagnostic_message(),
             Self::OverloadResolution(problem) => problem.diagnostic_message(),
             Self::ForeignKeyReferencedPrimaryKeyMissing(_)
+            | Self::ForeignKeyTemporalKeyMissing(_)
+            | Self::TemporalPeriodType(_)
+            | Self::ForeignKeyPeriodMismatch
+            | Self::ForeignKeyTemporalAction
             | Self::ArgumentTypeMismatch(..)
             | Self::MemberAccessRequiresCompositeType(..)
             | Self::FunctionArgImplicitCastNotFound(..)
@@ -737,6 +757,22 @@ impl DiagnosticMessage for AnalysisProblem {
                 "referenced table ".into(),
                 table.into(),
                 " has no primary key".into(),
+            ],
+            Self::ForeignKeyTemporalKeyMissing(table) => vec![
+                "referenced table ".into(),
+                table.into(),
+                " has no matching WITHOUT OVERLAPS key".into(),
+            ],
+            Self::TemporalPeriodType(column) => vec![
+                "temporal period column ".into(),
+                column.into(),
+                " must have a range or multirange type".into(),
+            ],
+            Self::ForeignKeyPeriodMismatch => {
+                vec!["an explicit foreign-key column list must specify PERIOD on both sides".into()]
+            }
+            Self::ForeignKeyTemporalAction => vec![
+                "a PERIOD foreign key supports only NO ACTION for ON UPDATE and ON DELETE".into(),
             ],
             Self::ArgumentTypeMismatch(name, index) => vec![
                 format!("argument {index} has an incompatible type for ").into(),

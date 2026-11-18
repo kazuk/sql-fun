@@ -161,12 +161,13 @@ An unvalidated NOT NULL can coexist with NULLs in existing rows, so the
 declaration alone does not establish a non-null query result.
 
 For temporal primary and unique keys, WITHOUT OVERLAPS identifies the
-final range or multirange column, with a GiST supporting index. A PERIOD
+final built-in range or multirange column, with a GiST supporting index. A PERIOD
 foreign key binds to a matching temporal key on the referenced table.
 PostgreSQL checks overlap and coverage against stored rows at execution time.
 Analysis does not verify that the GiST operator family supplies the required
 equality and overlap operators. General operator-family resolution is tracked
-in [#797](https://github.com/kazuk/sql-fun/issues/797).
+in [#797](https://github.com/kazuk/sql-fun/issues/797). User-defined range and
+multirange type relationships remain [#517](https://github.com/kazuk/sql-fun/issues/517).
 
 ## Diagnostics
 

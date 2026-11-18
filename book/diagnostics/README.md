@@ -210,6 +210,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [tablesample_relation](tablesample_relation.md)
 - [tablesample_repeatable](tablesample_repeatable.md)
 - [tablesample_seed_type](tablesample_seed_type.md)
+- [temporal_key_too_short](temporal_key_too_short.md)
 - [temporal_period_type](temporal_period_type.md)
 - [trigger_invalid_definition](trigger_invalid_definition.md)
 - [truth_test_invalid_literal](truth_test_invalid_literal.md)

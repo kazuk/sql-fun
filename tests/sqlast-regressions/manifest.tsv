@@ -88,4 +88,4 @@ table-additions	project	table-additions.sql	22	17,18
 row-security	project	row-security.sql	12	17,18
 recursive-ctes	builtin	-	18	17,18
 deprecated-references	project	deprecated-references.sql	3	17,18
-postgres18-dump-constraints	project	postgres18-dump-constraints.sql	6	18
+postgres18-dump-constraints	project	postgres18-dump-constraints.sql	10	18

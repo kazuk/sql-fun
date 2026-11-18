@@ -157,6 +157,7 @@
   - [foreign_key_temporal_action](diagnostics/foreign_key_temporal_action.md)
   - [foreign_key_temporal_key_missing](diagnostics/foreign_key_temporal_key_missing.md)
   - [lint_configuration](diagnostics/lint_configuration.md)
+  - [temporal_key_too_short](diagnostics/temporal_key_too_short.md)
   - [temporal_period_type](diagnostics/temporal_period_type.md)
   - [unmet_lint_expectation](diagnostics/unmet_lint_expectation.md)
   - [duplicate_alias](diagnostics/duplicate_alias.md)

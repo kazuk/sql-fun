@@ -168,6 +168,8 @@ pub enum AnalysisProblem {
     ForeignKeyTemporalKeyMissing(TableName),
     /// A temporal key period column has an incompatible type.
     TemporalPeriodType(ColumnName),
+    /// A WITHOUT OVERLAPS key must contain an equality column.
+    TemporalKeyTooShort,
     /// An explicit foreign-key column list must use PERIOD on both sides.
     ForeignKeyPeriodMismatch,
     /// A PERIOD foreign key supports only the NO ACTION referential action.
@@ -557,6 +559,7 @@ impl AnalysisProblem {
             }
             Self::ForeignKeyTemporalKeyMissing(_) => "foreign_key_temporal_key_missing",
             Self::TemporalPeriodType(_) => "temporal_period_type",
+            Self::TemporalKeyTooShort => "temporal_key_too_short",
             Self::ForeignKeyPeriodMismatch => "foreign_key_period_mismatch",
             Self::ForeignKeyTemporalAction => "foreign_key_temporal_action",
             Self::ExtensionNotFound(..) => "extension_not_found",
@@ -605,6 +608,7 @@ impl AnalysisProblem {
             | Self::ForeignKeyReferencedPrimaryKeyMissing(_)
             | Self::ForeignKeyTemporalKeyMissing(_)
             | Self::TemporalPeriodType(_)
+            | Self::TemporalKeyTooShort
             | Self::ForeignKeyPeriodMismatch
             | Self::ForeignKeyTemporalAction
             | Self::ParameterTypeUnresolved(_)
@@ -691,6 +695,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::ForeignKeyReferencedPrimaryKeyMissing(_)
             | Self::ForeignKeyTemporalKeyMissing(_)
             | Self::TemporalPeriodType(_)
+            | Self::TemporalKeyTooShort
             | Self::ForeignKeyPeriodMismatch
             | Self::ForeignKeyTemporalAction
             | Self::ArgumentTypeMismatch(..)
@@ -763,13 +768,16 @@ impl DiagnosticMessage for AnalysisProblem {
                 table.into(),
                 " has no matching WITHOUT OVERLAPS key".into(),
             ],
+            Self::TemporalKeyTooShort => {
+                vec!["a WITHOUT OVERLAPS key requires at least two columns".into()]
+            }
             Self::TemporalPeriodType(column) => vec![
                 "temporal period column ".into(),
                 column.into(),
                 " must have a range or multirange type".into(),
             ],
             Self::ForeignKeyPeriodMismatch => {
-                vec!["an explicit foreign-key column list must specify PERIOD on both sides".into()]
+                vec!["a temporal foreign key must specify PERIOD on the referencing and any explicit referenced column list".into()]
             }
             Self::ForeignKeyTemporalAction => vec![
                 "a PERIOD foreign key supports only NO ACTION for ON UPDATE and ON DELETE".into(),

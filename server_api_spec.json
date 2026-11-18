@@ -945,6 +945,11 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A WITHOUT OVERLAPS key must contain an equality column.",
+                  "type": "string",
+                  "const": "TemporalKeyTooShort"
+                },
+                {
                   "description": "An explicit foreign-key column list must use PERIOD on both sides.",
                   "type": "string",
                   "const": "ForeignKeyPeriodMismatch"
@@ -5605,6 +5610,11 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A WITHOUT OVERLAPS key must contain an equality column.",
+                  "type": "string",
+                  "const": "TemporalKeyTooShort"
+                },
+                {
                   "description": "An explicit foreign-key column list must use PERIOD on both sides.",
                   "type": "string",
                   "const": "ForeignKeyPeriodMismatch"
@@ -10155,6 +10165,11 @@
                     "TemporalPeriodType"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "description": "A WITHOUT OVERLAPS key must contain an equality column.",
+                  "type": "string",
+                  "const": "TemporalKeyTooShort"
                 },
                 {
                   "description": "An explicit foreign-key column list must use PERIOD on both sides.",

@@ -217,6 +217,18 @@ By default, checks workspace default packages that depend on `sql-fun`.
 
 `--all-features` conflicts with `--features` and `--no-default-features`.
 
+### Lint expectations
+
+After submitting the collected queries, `check` reports unmet
+[deprecated lint expectations](../analysis-configuration.md) for each
+datasource it analyzed. An unmet expectation produces a warning and causes
+`check` to exit with a non-zero status. The report covers the queries submitted
+by this invocation.
+
+- `--ignore-lint-expectations` keeps the warnings visible and makes unmet
+  expectations alone non-fatal. Analysis, lockfile, inventory, and transport
+  failures still cause a non-zero exit status.
+
 ### Lockfile control options
 
 - `--force-rebuild`: Start with an empty initial lockfile state and regenerate

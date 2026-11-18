@@ -1,4 +1,4 @@
-pub(super) mod heavy;
+pub(crate) mod heavy;
 
 use crate::check::submission::{QueryAnalysis, submit};
 
@@ -16,10 +16,10 @@ use ::tokio::{
 };
 
 /// Small fixture-owned schema and datasource declarations, without catalog loading.
-pub(super) struct Project(::tempfile::TempDir);
+pub(crate) struct Project(::tempfile::TempDir);
 
 impl Project {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let directory = ::tempfile::tempdir().unwrap();
         std::fs::write(
             directory.path().join("metadata.toml"),
@@ -47,7 +47,7 @@ connector = "tokio-postgres"
         Self(directory)
     }
 
-    pub(super) fn enable_asterisk_expansion(&self) {
+    pub(crate) fn enable_asterisk_expansion(&self) {
         let path = self.0.path().join("metadata.toml");
         let mut metadata = std::fs::read_to_string(&path).unwrap();
         metadata.push_str(
@@ -56,11 +56,11 @@ connector = "tokio-postgres"
         std::fs::write(path, metadata).unwrap();
     }
 
-    pub(super) fn schema_hash(&self) -> String {
+    pub(crate) fn schema_hash(&self) -> String {
         ::sql_fun_core::Hasher::hash_file(self.0.path().join("schema.sql")).unwrap()
     }
 
-    pub(super) fn write_lockfile(
+    pub(crate) fn write_lockfile(
         &self,
         datasource: &str,
         hash: &str,
@@ -75,7 +75,7 @@ connector = "tokio-postgres"
             .unwrap();
     }
 
-    pub(super) fn args(&self) -> SqlFunArgs {
+    pub(crate) fn args(&self) -> SqlFunArgs {
         SqlFunArgs::builder(&std::collections::HashMap::new())
             .unwrap()
             .metadata_file(self.0.path().join("metadata.toml").to_str().unwrap())
@@ -87,7 +87,7 @@ connector = "tokio-postgres"
 }
 
 /// A dependency-ordered catalog with a parameter shared across base and CTEs.
-pub(super) fn catalog() -> ResolvedCteCatalog {
+pub(crate) fn catalog() -> ResolvedCteCatalog {
     let leaf = PlaceholderedSql::from_query("SELECT ${shared:int4} AS id");
     let outer = PlaceholderedSql::from_query("SELECT id FROM z_dependency");
     let mut parameters = CteParameterCollection::default();
@@ -106,7 +106,7 @@ pub(super) fn catalog() -> ResolvedCteCatalog {
 }
 
 /// Model the expanded constants consumed by the public extraction API.
-pub(super) fn requirements(
+pub(crate) fn requirements(
     datasources: &[&str],
     query: &str,
     catalog: &ResolvedCteCatalog,
@@ -136,23 +136,24 @@ fn query_{index}() {{
 }
 
 /// A recording peer using the production typed client, without server/catalog setup.
-pub(super) async fn peer(
+pub(crate) async fn peer(
     fail_method: Option<&'static str>,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
-    peer_with_gate(fail_method, None, None).await
+    peer_with_gate(fail_method, None, None, false).await
 }
 
 /// Hold the second RPC until the first envelope has reached its consumer.
-pub(super) async fn gated_second_failure(
+pub(crate) async fn gated_second_failure(
     release: ::tokio::sync::oneshot::Receiver<()>,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
-    peer_with_gate(Some("second_analysis"), Some(release), None).await
+    peer_with_gate(Some("second_analysis"), Some(release), None, false).await
 }
 
 async fn peer_with_gate(
     fail_method: Option<&'static str>,
     mut release: Option<::tokio::sync::oneshot::Receiver<()>>,
     response: Option<Value>,
+    unmet_expectation: bool,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -198,6 +199,25 @@ async fn peer_with_gate(
                     "analyze_query" => response
                         .clone()
                         .unwrap_or_else(|| ::serde_json::json!({"queries":page()})),
+                    "report_lint_expectations" if unmet_expectation => {
+                        ::serde_json::json!({"problems":{
+                            "handle":"lint-report","total_length":2,"offset":0,
+                            "require_release":true,"items":[unmet_warning("first_item")]
+                        }})
+                    }
+                    "read_collection" if unmet_expectation => {
+                        assert_eq!(request["params"]["collection_handle"], "lint-report");
+                        assert_eq!(request["params"]["start_offset"], 1);
+                        ::serde_json::json!({
+                            "handle":"lint-report","total_length":2,"offset":1,
+                            "require_release":true,"items":[unmet_warning("second_item")]
+                        })
+                    }
+                    "release_collection" if unmet_expectation => {
+                        assert_eq!(request["params"]["collection_handle"], "lint-report");
+                        ::serde_json::Value::Null
+                    }
+                    "report_lint_expectations" => ::serde_json::json!({"problems":page()}),
                     "tokenize_sql" => {
                         let source = request["params"]["source"].as_str().unwrap();
                         if source.is_empty() {
@@ -232,13 +252,13 @@ fn page() -> Value {
 }
 
 /// A completed diagnostic collection for an analysis response fixture.
-pub(super) fn diagnostic_page(problems: &[::sql_fun_client::payloads::AnalysisProbrem]) -> Value {
+pub(crate) fn diagnostic_page(problems: &[::sql_fun_client::payloads::AnalysisProbrem]) -> Value {
     ::serde_json::json!({"handle":"diagnostics","total_length":problems.len(),"offset":0,
         "require_release":false,"items":problems})
 }
 
 /// Collect channel items on the consumer side while preserving producer failures.
-pub(super) async fn collect_submission(
+pub(crate) async fn collect_submission(
     client: &mut TcpJsonRpcClientAsync,
     args: &SqlFunArgs,
     requirements: Vec<QueryRequirement>,
@@ -258,14 +278,14 @@ pub(super) async fn collect_submission(
 }
 
 /// Use realistic completed statement DTOs with the existing recording peer.
-pub(super) async fn peer_with_response(
+pub(crate) async fn peer_with_response(
     response: Value,
     fail: Option<&'static str>,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
-    peer_with_gate(fail, None, Some(response)).await
+    peer_with_gate(fail, None, Some(response), false).await
 }
 
-pub(super) fn successful_response(statement_count: usize) -> Value {
+pub(crate) fn successful_response(statement_count: usize) -> Value {
     let statements = (0..statement_count).map(|index| ::serde_json::json!({
         "query_span":null, "execute_sql":format!("SELECT {index}"), "complete":true, "query_kind":"Select",
         "probrems":page(), "column_access":page(), "parameters":page(), "result_columns":page()
@@ -277,7 +297,7 @@ pub(super) fn successful_response(statement_count: usize) -> Value {
 }
 
 /// A successful statement followed by an incomplete one, each with diagnostics.
-pub(super) fn incomplete_diagnostic_response(statement: &str) -> Value {
+pub(crate) fn incomplete_diagnostic_response(statement: &str) -> Value {
     use ::sql_fun_client::payloads::{AnalysisProbrem, DiagnosticSeverity};
     use ::sql_fun_core::{
         DiagnosticPresentation, SqlDialect,
@@ -320,7 +340,7 @@ pub(super) fn incomplete_diagnostic_response(statement: &str) -> Value {
 }
 
 /// A server response whose executable projection differs from its original star.
-pub(super) fn expanded_projection_response(sql: &str) -> Value {
+pub(crate) fn expanded_projection_response(sql: &str) -> Value {
     use ::sql_fun_client::payloads::{
         Nullability, ParameterDescribe, ResultSetColumn, TypeReference,
     };
@@ -352,4 +372,25 @@ pub(super) fn expanded_projection_response(sql: &str) -> Value {
     item["result_columns"] = ::serde_json::json!({"handle":"columns","total_length":columns.len(),"offset":0,
         "require_release":false,"items":columns});
     response
+}
+
+/// A successful query with an unmet report that must be read across two pages.
+pub(crate) async fn peer_with_unmet_expectation()
+-> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
+    peer_with_gate(None, None, Some(successful_response(1)), true).await
+}
+
+fn unmet_warning(name: &str) -> ::sql_fun_client::payloads::AnalysisProbrem {
+    use ::sql_fun_core::analysis_problem::{
+        AnalysisProblem, DiagnosticSeverity, LintProblem, LintTarget,
+    };
+    let target = LintTarget::new("table", &[name.to_owned()], None, None);
+    let problem = AnalysisProblem::lint(&LintProblem::unmet_expectation(&target));
+    ::sql_fun_client::payloads::AnalysisProbrem::new(
+        "unmet_lint_expectation",
+        DiagnosticSeverity::Warning.into(),
+        std::path::Path::new("lint.toml"),
+        None,
+    )
+    .with_semantic_problem(&problem)
 }

@@ -1,9 +1,9 @@
 // Reuse the maintained real-server lifecycle and lightweight schema fixtures.
 #[allow(dead_code)]
-#[path = "../../../../../sql-fun-client/tests/test_helpers/schema.rs"]
+#[path = "../../../../sql-fun-client/tests/test_helpers/schema.rs"]
 mod schema;
 
-use crate::check::submission::test_helpers::{
+use crate::test_helpers::check_submission::{
     catalog as test_helpers_catalog, collect_submission, requirements,
 };
 
@@ -37,7 +37,7 @@ pub(crate) async fn analyze_recovered_catalog() -> ::testresult::TestResult {
     )
     .await?;
     assert_eq!(results.len(), 1);
-    let item = &results[0].response.queries().items()[0];
+    let item = &results[0].response().queries().items()[0];
     assert!(*item.complete());
     assert!(item.execute_sql().as_ref().unwrap().contains("WITH"));
     let parameters = item.parameters().items();

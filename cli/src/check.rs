@@ -2,7 +2,7 @@ mod diagnostics;
 mod inventory;
 mod lockfiles;
 mod progress;
-mod submission;
+pub(crate) mod submission;
 
 use crate::{api::ApiArgs, diagnostic::DiagnosticRenderer};
 
@@ -91,6 +91,10 @@ pub struct CheckArgs {
     /// When specified, Fail if schema dump changed
     #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     expect_schema_dump_valid: bool,
+
+    /// Display unmet lint expectations without failing the check for them.
+    #[clap(long)]
+    ignore_lint_expectations: bool,
 
     /// Number of parallel jobs, default to # of CPUs
     #[clap(short('j'), long, help_heading = Self::COMPILATION_OPTIONS_HEADERS)]
@@ -227,9 +231,9 @@ impl CheckArgs {
         let producer = async {
             let submitted = submission::submit(&mut client, args, requirements, sender).await;
             let finished = client.finish().await;
-            submitted?;
+            let reports = submitted?;
             finished?;
-            Ok::<(), anyhow::Error>(())
+            Ok::<_, anyhow::Error>(reports)
         };
         let consumer = Self::consume_analyses(
             &mut receiver,
@@ -240,10 +244,17 @@ impl CheckArgs {
             &mut inventories,
         );
         let (completed, processed) = ::tokio::join!(producer, consumer);
-        if let Err(error) = completed.and(processed) {
-            eprintln!("warning: inventories were not refreshed; existing files may be stale");
-            return Err(error);
-        }
+        let unmet_expectations = match completed.and_then(|reports| {
+            let lint_result =
+                diagnostics::render_lint_expectations(&reports, &renderer, diagnostics_output);
+            processed.and(lint_result)
+        }) {
+            Ok(unmet) => unmet,
+            Err(error) => {
+                eprintln!("warning: inventories were not refreshed; existing files may be stale");
+                return Err(error);
+            }
+        };
         let phase = if self.validate_only {
             "Validating lockfiles and inventories"
         } else {
@@ -252,7 +263,10 @@ impl CheckArgs {
         progress.phase(phase)?;
         let lockfiles_valid = lockfiles.finalize(self.validate_only)?;
         let inventories_valid = inventories.finalize(self.validate_only)?;
-        if lockfiles_valid && inventories_valid {
+        if lockfiles_valid
+            && inventories_valid
+            && (!unmet_expectations || self.ignore_lint_expectations)
+        {
             Ok(ExitCode::SUCCESS)
         } else {
             Ok(ExitCode::FAILURE)

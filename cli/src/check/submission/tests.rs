@@ -1,6 +1,7 @@
 use crate::{
     analysis::PreparedDiagnostics,
-    check::submission::{submit, test_helpers, test_helpers::collect_submission},
+    check::submission::submit,
+    test_helpers::check_submission::{self as test_helpers, collect_submission},
 };
 
 const QUERY: &str = "SELECT ${shared:int4}, id FROM a_visible";
@@ -24,7 +25,14 @@ async fn submits_recovered_catalogs_with_datasource_scoped_contexts() {
     .unwrap();
     client.finish().await.unwrap();
     let requests = peer.await.unwrap();
-    assert_eq!(requests.len(), 5);
+    assert_eq!(requests.len(), 7);
+    for (request, context) in requests[5..]
+        .iter()
+        .zip(["context-first", "context-second"])
+    {
+        assert_eq!(request["method"], "report_lint_expectations");
+        assert_eq!(request["params"]["context_handle"], context);
+    }
     assert_eq!(analyses.len(), 3);
     assert_eq!(analyses[2].function_name, "query_2");
     assert_eq!(analyses[2].source_file, "src/queries.rs");
@@ -184,7 +192,7 @@ async fn delivers_identity_before_completion_and_distinguishes_partial_failure()
     })
     .await
     .expect("incremental channel delivery must not wait for the full batch");
-    assert!(format!("{:#}", completion.unwrap_err()).contains("injected failure"));
+    assert!(format!("{:#}", completion.err().unwrap()).contains("injected failure"));
     client.finish().await.unwrap();
     assert_eq!(peer.await.unwrap().len(), 3);
 }
@@ -204,7 +212,8 @@ async fn closed_consumer_is_a_delivery_failure() {
     .await;
     assert!(
         result
-            .unwrap_err()
+            .err()
+            .expect("closed result receiver")
             .to_string()
             .contains("receiver closed before delivery")
     );
@@ -258,7 +267,7 @@ async fn check_session_regenerates_multiple_statements_and_removes_stale_entries
         .finish(result == std::process::ExitCode::SUCCESS)
         .unwrap();
     assert_eq!(result, std::process::ExitCode::SUCCESS);
-    assert_eq!(peer.await.unwrap().len(), 3);
+    assert_eq!(peer.await.unwrap().len(), 4);
     let hash = project.schema_hash();
     let reader = Lockfile::from_file(&path, &hash).unwrap();
     assert!(reader.get_entry("stale").unwrap().is_none());
@@ -275,6 +284,7 @@ async fn check_session_regenerates_multiple_statements_and_removes_stale_entries
 #[case::initialization("initialize_schema_context")]
 #[case::first_analysis("analyze_query")]
 #[case::after_partial_results("second_analysis")]
+#[case::report("report_lint_expectations")]
 #[case::connection_completion("finish")]
 #[tokio::test]
 async fn check_session_does_not_write_on_rpc_failure(#[case] failure: &'static str) {
@@ -304,10 +314,11 @@ async fn check_session_does_not_write_on_rpc_failure(#[case] failure: &'static s
         test_helpers::peer_with_response(test_helpers::successful_response(1), Some(failure)).await;
     let mut output = Vec::new();
     let mut progress = Progress::new(&mut output, ProgressMode::dots());
-    let result = CheckArgs::try_parse_from(["check", "--force-rebuild"])
-        .unwrap()
-        .process_analyses(client, &args, requirements, lockfiles, &mut progress)
-        .await;
+    let result =
+        CheckArgs::try_parse_from(["check", "--force-rebuild", "--ignore-lint-expectations"])
+            .unwrap()
+            .process_analyses(client, &args, requirements, lockfiles, &mut progress)
+            .await;
     progress.finish(false).unwrap();
     assert!(result.is_err());
     assert_eq!(std::fs::read_to_string(path).unwrap(), old);
@@ -369,7 +380,7 @@ async fn completed_ineligible_analysis_removes_old_entries_and_returns_failure(
     });
     let (client, peer) = test_helpers::peer_with_response(response, None).await;
     let mut progress = Progress::new(Vec::new(), ProgressMode::silent());
-    let result = CheckArgs::try_parse_from(["check"])
+    let result = CheckArgs::try_parse_from(["check", "--ignore-lint-expectations"])
         .unwrap()
         .process_analyses(client, &args, requirements, lockfiles, &mut progress)
         .await
@@ -485,7 +496,7 @@ async fn conversion_failure_drains_delivery_without_writing_partial_inventory() 
     progress.finish(false).unwrap();
     assert!(format!("{:#}", result.unwrap_err()).contains("parameter index exceeds"));
     assert_eq!(std::fs::read(path).unwrap(), before);
-    assert_eq!(peer.await.unwrap().len(), 13);
+    assert_eq!(peer.await.unwrap().len(), 14);
     assert!(
         String::from_utf8(output)
             .unwrap()
@@ -636,7 +647,7 @@ async fn diagnostics_keep_each_query_function_identity() -> ::testresult::TestRe
     );
     assert_eq!(output.matches("Original SQL:\nSELECT 1").count(), 2);
     assert_eq!(output.matches("unreachable_coalesce_argument").count(), 2);
-    assert_eq!(peer.await?.len(), 3);
+    assert_eq!(peer.await?.len(), 4);
     Ok(())
 }
 
@@ -693,7 +704,7 @@ async fn tokenization_failure_still_renders_received_diagnostic() -> ::testresul
     let output = String::from_utf8(diagnostics)?;
     assert!(output.contains("extension not found: missing_extension"));
     assert!(output.contains(source));
-    assert_eq!(peer.await?.len(), 3);
+    assert_eq!(peer.await?.len(), 4);
     Ok(())
 }
 
@@ -762,4 +773,137 @@ async fn check_preserves_expanded_server_sql_in_lockfile() {
     assert_eq!(statement.result_set_shape()[0].field_index(), 0);
     assert_eq!(statement.result_set_shape()[1].field_name(), "requested");
     assert_eq!(statement.result_set_shape()[1].field_index(), 1);
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn check_expectation_policy_preserves_warnings(
+    #[values(false, true)] ignore: bool,
+    #[values(false, true)] unmet: bool,
+) {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let requirements = test_helpers::requirements(
+        &["first"],
+        "SELECT 1",
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false).unwrap();
+    let (client, peer) = if unmet {
+        test_helpers::peer_with_unmet_expectation().await
+    } else {
+        test_helpers::peer_with_response(test_helpers::successful_response(1), None).await
+    };
+    let command = if ignore {
+        &["check", "--ignore-lint-expectations"][..]
+    } else {
+        &["check"][..]
+    };
+    let options = CheckArgs::try_parse_from(command).unwrap();
+    let mut progress = Progress::new(Vec::new(), ProgressMode::dots());
+    let mut diagnostics = Vec::new();
+    let exit = options
+        .process_analyses_to(
+            client,
+            &args,
+            requirements,
+            lockfiles,
+            &mut progress,
+            &mut diagnostics,
+        )
+        .await
+        .unwrap();
+    assert_eq!(exit == std::process::ExitCode::SUCCESS, ignore || !unmet);
+    let diagnostics = String::from_utf8(diagnostics).unwrap();
+    if unmet {
+        assert_eq!(diagnostics.matches("Datasource first").count(), 2);
+        assert_eq!(diagnostics.matches("unmet_lint_expectation").count(), 2);
+        assert!(diagnostics.contains("first_item") && diagnostics.contains("second_item"));
+    } else {
+        assert_eq!(diagnostics, "");
+    }
+    let requests = peer.await.unwrap();
+    assert_eq!(requests[2]["method"], "report_lint_expectations");
+    if unmet {
+        assert_eq!(requests[3]["method"], "read_collection");
+        assert_eq!(requests[4]["method"], "release_collection");
+    }
+}
+
+#[rstest::rstest]
+#[case::lockfile("lockfile")]
+#[case::inventory("inventory")]
+#[tokio::test]
+async fn ignoring_lint_expectations_keeps_artifact_validation(#[case] artifact: &str) {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let requirements = || {
+        test_helpers::requirements(
+            &["first"],
+            "SELECT 1",
+            &::sql_fun_core::ResolvedCteCatalog::default(),
+        )
+    };
+    let mut progress = Progress::new(Vec::new(), ProgressMode::silent());
+    let mut diagnostics = Vec::new();
+    let (client, peer) = test_helpers::peer_with_unmet_expectation().await;
+    let initial = requirements();
+    let lockfiles = Lockfiles::new(&args, &initial, false, false).unwrap();
+    let setup = CheckArgs::try_parse_from(["check", "--ignore-lint-expectations"]).unwrap();
+    let exit = setup
+        .process_analyses_to(
+            client,
+            &args,
+            initial,
+            lockfiles,
+            &mut progress,
+            &mut diagnostics,
+        )
+        .await
+        .unwrap();
+    assert_eq!(exit, std::process::ExitCode::SUCCESS);
+    peer.await.unwrap();
+
+    let stale = if artifact == "lockfile" {
+        args.lockfile_path("first").unwrap()
+    } else {
+        args.project_dir()
+            .unwrap()
+            .join(format!("sql-fun.first.{}.toml", args.schema()))
+    };
+    std::fs::remove_file(&stale).unwrap();
+    let (client, peer) = test_helpers::peer_with_unmet_expectation().await;
+    let validation = requirements();
+    let lockfiles = Lockfiles::new(&args, &validation, false, false).unwrap();
+    let check =
+        CheckArgs::try_parse_from(["check", "--validate-only", "--ignore-lint-expectations"])
+            .unwrap();
+    let exit = check
+        .process_analyses_to(
+            client,
+            &args,
+            validation,
+            lockfiles,
+            &mut progress,
+            &mut diagnostics,
+        )
+        .await
+        .unwrap();
+    assert_eq!(exit, std::process::ExitCode::FAILURE);
+    assert!(!stale.exists());
+    peer.await.unwrap();
 }

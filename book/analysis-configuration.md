@@ -1,9 +1,8 @@
 # SQL Analysis Configuration
 
 Project lint declarations can be interpreted against a loaded project schema
-and applied to application queries. Current lint expectations can be reported
-through the Server API. Client/CLI workflow integration remains tracked in the
-follow-up issue below.
+and applied to application queries. Report current lint expectations through
+`sql-fun check` or by explicitly requesting a report through the Server API.
 
 To select a project lint configuration file, add `lint_configuration` to the
 selected datasource table:
@@ -91,8 +90,11 @@ The caller decides when to report, whether it has analyzed all intended SQL, and
 how analysis failures affect its conclusions. The server does not suppress unmet
 warnings based on a completeness judgment. See the
 [API workflow](api/check-analysis-design.md#report-current-lint-expectations).
-CLI configuration transport and invocation remain tracked in
-[#1088](https://github.com/kazuk/sql-fun/issues/1088).
+[`sql-fun check`](cli/check.md#lint-expectations) reports unmet expectations after
+submitting the collected queries for each analyzed datasource. By default, unmet
+expectations make the command fail. Use `--ignore-lint-expectations` to keep the
+warnings visible without failing the command for them. `sql-fun analyze` displays
+per-query deprecated warnings.
 
 Enum-label references are not yet distinguished by semantic analysis, so valid
 `enum_label` entries currently produce no deprecated-reference warnings. This

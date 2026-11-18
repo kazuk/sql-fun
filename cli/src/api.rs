@@ -9,7 +9,7 @@ use sql_fun_client::{
     ConnectionOptions, JsonRpcResponse, TcpJsonRpcClientAsync,
     payloads::{
         AnalyzeQueryArgs, DescribeTableArgs, EchoArgs, InitializeSchemaArgs, ReadCollectionArgs,
-        ReleaseCollectionArgs,
+        ReleaseCollectionArgs, ReportLintExpectationsArgs,
     },
 };
 use tokio::{
@@ -176,6 +176,7 @@ impl ApiInput {
             "read_collection" => typed::<ReadCollectionArgs>(params),
             "release_collection" => typed::<ReleaseCollectionArgs>(params),
             "analyze_query" => typed::<AnalyzeQueryArgs>(params),
+            "report_lint_expectations" => typed::<ReportLintExpectationsArgs>(params),
             "describe_table" => typed::<DescribeTableArgs>(params),
             _ => anyhow::bail!("unknown API method {method}"),
         }
@@ -221,6 +222,7 @@ mod test_input {
         "analyze_query",
         r#"{"context_handle":"c","query":{"Text":"select 1"}}"#
     )]
+    #[case::lint_report("report_lint_expectations", r#"{"context_handle":"c"}"#)]
     #[case::describe("describe_table", r#"{"schema_name":"public","local_name":"t"}"#)]
     #[case::positional("describe_table", r#"["public","t"]"#)]
     fn uses_public_argument_types(#[case] method: &str, #[case] params: &str) {
@@ -240,6 +242,7 @@ mod test_input {
             "read_collection",
             "release_collection",
             "analyze_query",
+            "report_lint_expectations",
             "describe_table"
         )]
         method: &str,

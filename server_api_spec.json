@@ -950,6 +950,55 @@
                   "const": "TemporalKeyTooShort"
                 },
                 {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintInvalid": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "$ref": "#/$defs/AlterConstraintReason"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintInvalid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An explicit foreign-key column list must use PERIOD on both sides.",
                   "type": "string",
                   "const": "ForeignKeyPeriodMismatch"
@@ -4184,6 +4233,26 @@
                 "operands",
                 "result",
                 "strict"
+              ]
+            },
+            "AlterConstraintReason": {
+              "description": "Why a resolved constraint cannot accept an ALTER TABLE operation.",
+              "oneOf": [
+                {
+                  "description": "The constraint is not a foreign key.",
+                  "type": "string",
+                  "const": "Deferrability"
+                },
+                {
+                  "description": "The constraint kind cannot be validated.",
+                  "type": "string",
+                  "const": "ValidationKind"
+                },
+                {
+                  "description": "The constraint is not enforced.",
+                  "type": "string",
+                  "const": "NotEnforced"
+                }
               ]
             },
             "DefElemKey": {
@@ -5615,6 +5684,55 @@
                   "const": "TemporalKeyTooShort"
                 },
                 {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintInvalid": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "$ref": "#/$defs/AlterConstraintReason"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintInvalid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An explicit foreign-key column list must use PERIOD on both sides.",
                   "type": "string",
                   "const": "ForeignKeyPeriodMismatch"
@@ -8849,6 +8967,26 @@
                 "operands",
                 "result",
                 "strict"
+              ]
+            },
+            "AlterConstraintReason": {
+              "description": "Why a resolved constraint cannot accept an ALTER TABLE operation.",
+              "oneOf": [
+                {
+                  "description": "The constraint is not a foreign key.",
+                  "type": "string",
+                  "const": "Deferrability"
+                },
+                {
+                  "description": "The constraint kind cannot be validated.",
+                  "type": "string",
+                  "const": "ValidationKind"
+                },
+                {
+                  "description": "The constraint is not enforced.",
+                  "type": "string",
+                  "const": "NotEnforced"
+                }
               ]
             },
             "DefElemKey": {
@@ -10172,6 +10310,55 @@
                   "const": "TemporalKeyTooShort"
                 },
                 {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintInvalid": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "$ref": "#/$defs/AlterConstraintReason"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintInvalid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid ALTER TABLE constraint operation.",
+                  "type": "object",
+                  "properties": {
+                    "AlterConstraintNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AlterConstraintNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An explicit foreign-key column list must use PERIOD on both sides.",
                   "type": "string",
                   "const": "ForeignKeyPeriodMismatch"
@@ -13406,6 +13593,26 @@
                 "operands",
                 "result",
                 "strict"
+              ]
+            },
+            "AlterConstraintReason": {
+              "description": "Why a resolved constraint cannot accept an ALTER TABLE operation.",
+              "oneOf": [
+                {
+                  "description": "The constraint is not a foreign key.",
+                  "type": "string",
+                  "const": "Deferrability"
+                },
+                {
+                  "description": "The constraint kind cannot be validated.",
+                  "type": "string",
+                  "const": "ValidationKind"
+                },
+                {
+                  "description": "The constraint is not enforced.",
+                  "type": "string",
+                  "const": "NotEnforced"
+                }
               ]
             },
             "DefElemKey": {

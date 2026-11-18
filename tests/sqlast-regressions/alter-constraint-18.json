@@ -1,0 +1,52 @@
+[
+  {
+    "name": "validate-named-inline-not-null",
+    "sql": "ALTER TABLE pg18_constraints.t VALIDATE CONSTRAINT nn",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "validate-unvalidated-not-null",
+    "sql": "ALTER TABLE pg18_constraints.t VALIDATE CONSTRAINT bn",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "drop-named-inline-not-null",
+    "sql": "ALTER TABLE pg18_constraints.t DROP CONSTRAINT nn",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "validate-not-enforced",
+    "sql": "ALTER TABLE pg18_constraints.t VALIDATE CONSTRAINT ck",
+    "expected": {
+      "diagnostics": [
+        "alter_constraint_invalid"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "bare-alter-check",
+    "sql": "ALTER TABLE pg18_constraints.t ALTER CONSTRAINT ck",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "drop-period-fk",
+    "sql": "ALTER TABLE pg18_constraints.child DROP CONSTRAINT child_a_b_fkey",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

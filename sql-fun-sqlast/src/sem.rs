@@ -3,6 +3,7 @@
 mod alter_column;
 mod alter_column_definition;
 mod alter_column_type;
+mod alter_constraint;
 mod alter_index;
 mod alter_owner;
 mod alter_seq;
@@ -83,6 +84,9 @@ pub(crate) use self::conflict_info::infer_from_catalog;
 pub use self::{
     alter_column_definition::AlterColumnDefinition,
     alter_column_type::{AlterColumnType, ColumnTypeConversion},
+    alter_constraint::{
+        AlterConstraint, ConstraintAction, ConstraintChangeOutcome, ConstraintTarget,
+    },
     column_drop::{
         ColumnDrop, ColumnDropOutcome, DropDependency, DropDependencyDecision, DropDependencyKind,
         DropKnowledgeGap,
@@ -619,6 +623,7 @@ impl SemAst {
     ) -> Result<TContext, AnalysisError> {
         match self {
             Self::UnresolvedStatement => Ok(context),
+            Self::AlterTable(table) if table.has_constraint_changes() => Ok(context),
             Self::AlterTable(table) => context.apply_alter_table(table),
             Self::AlterView(view) => context.apply_alter_view(view),
             Self::AlterSequence(sequence) => context.apply_alter_sequence(sequence),

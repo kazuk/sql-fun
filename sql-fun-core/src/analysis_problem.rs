@@ -85,6 +85,28 @@ fn fragments_text(fragments: &[DiagnosticMessageFragment<'_>]) -> String {
         .map(DiagnosticMessageFragment::as_str)
         .collect()
 }
+/// Why a resolved constraint cannot accept an ALTER TABLE operation.
+#[derive(Debug, Clone, Copy, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub enum AlterConstraintReason {
+    /// The constraint is not a foreign key.
+    Deferrability,
+    /// The constraint kind cannot be validated.
+    ValidationKind,
+    /// The constraint is not enforced.
+    NotEnforced,
+}
+
+impl AlterConstraintReason {
+    const fn message(self) -> &'static str {
+        match self {
+            Self::Deferrability => "deferrability can only be changed for foreign keys",
+            Self::ValidationKind => "this constraint kind cannot be validated",
+            Self::NotEnforced => "a NOT ENFORCED constraint cannot be validated",
+        }
+    }
+}
+
 /// Semantic analysis problems
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -170,6 +192,12 @@ pub enum AnalysisProblem {
     TemporalPeriodType(ColumnName),
     /// A WITHOUT OVERLAPS key must contain an equality column.
     TemporalKeyTooShort,
+    /// Invalid ALTER TABLE constraint operation.
+    AlterConstraintInvalid(String, AlterConstraintReason),
+    /// Invalid ALTER TABLE constraint operation.
+    AlterConstraintAmbiguous(String),
+    /// Invalid ALTER TABLE constraint operation.
+    AlterConstraintNotFound(String),
     /// An explicit foreign-key column list must use PERIOD on both sides.
     ForeignKeyPeriodMismatch,
     /// A PERIOD foreign key supports only the NO ACTION referential action.
@@ -560,6 +588,9 @@ impl AnalysisProblem {
             Self::ForeignKeyTemporalKeyMissing(_) => "foreign_key_temporal_key_missing",
             Self::TemporalPeriodType(_) => "temporal_period_type",
             Self::TemporalKeyTooShort => "temporal_key_too_short",
+            Self::AlterConstraintInvalid(..) => "alter_constraint_invalid",
+            Self::AlterConstraintAmbiguous(_) => "alter_constraint_ambiguous",
+            Self::AlterConstraintNotFound(_) => "alter_constraint_not_found",
             Self::ForeignKeyPeriodMismatch => "foreign_key_period_mismatch",
             Self::ForeignKeyTemporalAction => "foreign_key_temporal_action",
             Self::ExtensionNotFound(..) => "extension_not_found",
@@ -609,6 +640,9 @@ impl AnalysisProblem {
             | Self::ForeignKeyTemporalKeyMissing(_)
             | Self::TemporalPeriodType(_)
             | Self::TemporalKeyTooShort
+            | Self::AlterConstraintInvalid(..)
+            | Self::AlterConstraintAmbiguous(_)
+            | Self::AlterConstraintNotFound(_)
             | Self::ForeignKeyPeriodMismatch
             | Self::ForeignKeyTemporalAction
             | Self::ParameterTypeUnresolved(_)
@@ -696,6 +730,9 @@ impl DiagnosticMessage for AnalysisProblem {
             | Self::ForeignKeyTemporalKeyMissing(_)
             | Self::TemporalPeriodType(_)
             | Self::TemporalKeyTooShort
+            | Self::AlterConstraintInvalid(..)
+            | Self::AlterConstraintAmbiguous(_)
+            | Self::AlterConstraintNotFound(_)
             | Self::ForeignKeyPeriodMismatch
             | Self::ForeignKeyTemporalAction
             | Self::ArgumentTypeMismatch(..)
@@ -770,6 +807,15 @@ impl DiagnosticMessage for AnalysisProblem {
             ],
             Self::TemporalKeyTooShort => {
                 vec!["a WITHOUT OVERLAPS key requires at least two columns".into()]
+            }
+            Self::AlterConstraintNotFound(name) => {
+                vec![format!("constraint {name} was not found").into()]
+            }
+            Self::AlterConstraintAmbiguous(name) => {
+                vec![format!("constraint name {name} matches multiple declarations").into()]
+            }
+            Self::AlterConstraintInvalid(name, reason) => {
+                vec![format!("cannot change constraint {name}: {}", reason.message()).into()]
             }
             Self::TemporalPeriodType(column) => vec![
                 "temporal period column ".into(),

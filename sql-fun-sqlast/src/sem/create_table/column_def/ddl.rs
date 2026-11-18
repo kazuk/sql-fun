@@ -256,7 +256,7 @@ impl ColumnDefinition {
         name: &ColumnName,
         column: &mut Self,
     ) -> Result<(), AnalysisError> {
-        for constraint in ast.constraints() {
+        for (position, constraint) in ast.constraints().iter().enumerate() {
             // CHECK needs the complete row, which is declared before expression analysis.
             if constraint.is_check() {
                 continue;
@@ -276,6 +276,12 @@ impl ColumnDefinition {
                     constraint.extras().no_inherit(),
                 );
                 column.set_not_null(Some(nullability.is_not_null()));
+            }
+            if let ColumnConstraint::ForeignKey(key) = &mut resolved {
+                key.retain_name(constraint.name().as_deref());
+                if context.dialect() == AstDialect::postgres() {
+                    key.retain_postgres_deferrability(&ast.constraints()[position + 1..]);
+                }
             }
             let constraint = resolved;
             if context.dialect() == AstDialect::sqlite() {

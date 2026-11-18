@@ -101,6 +101,7 @@ impl CreateSequence {
                 | AlterObjSubCommand::ColumnType(_)
                 | AlterObjSubCommand::ColumnAttributes(_)
                 | AlterObjSubCommand::AddConstraint(_)
+                | AlterObjSubCommand::ChangeConstraint(_)
                 | AlterObjSubCommand::ClusterOn(_)
                 | AlterObjSubCommand::RenameTo(_)
                 | AlterObjSubCommand::AddColumn(_)

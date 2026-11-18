@@ -13,6 +13,7 @@ medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
 medium	arrays-consumers-18
+medium	arrays-diagnostics-18
 medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	case-common-types-17
@@ -92,8 +93,10 @@ medium	table-checks-18
 medium	table-renames-17
 medium	table-renames-18
 medium	truth-tests-18
+light	alter-constraint-17
+light	alter-constraint-18
+light	alter-constraint-18-18
 light	arrays-diagnostics-17
-light	arrays-diagnostics-18
 light	arrays-metadata-17
 light	arrays-metadata-18
 light	arrays-names-17

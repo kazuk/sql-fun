@@ -1,3 +1,4 @@
+pub(crate) mod check_submission;
 pub(crate) mod direct_sql;
 pub(crate) mod heavy;
 pub(crate) mod installation;

@@ -1,6 +1,4 @@
 #[cfg(test)]
-mod test_helpers;
-#[cfg(test)]
 mod tests;
 
 use crate::{
@@ -8,13 +6,16 @@ use crate::{
     analysis::{PreparedDiagnostics, initialization},
 };
 
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::{BTreeMap, btree_map::Entry};
 
 use crate::analysis::{prepare_tokens, request_typed};
 use ::anyhow::Context;
 use ::sql_fun_client::{
     TcpJsonRpcClientAsync,
-    payloads::{AnalyzeQueryArgs, AnalyzeQueryResponse, ContextHandle, SchemaContext},
+    payloads::{
+        AnalyzeQueryArgs, AnalyzeQueryResponse, ContextHandle, ReportLintExpectationsArgs,
+        ReportLintExpectationsResponse, SchemaContext,
+    },
 };
 use ::sql_fun_codegen::QueryRequirement;
 use ::sql_fun_core::{PlaceholderedSql, SqlFunArgs};
@@ -22,7 +23,7 @@ use ::tokio::sync::mpsc::Sender;
 
 /// CLI-owned source identity paired with a fully materialized server response.
 /// Original SQL and the core catalog fingerprint are captured before transfer.
-pub(super) struct QueryAnalysis {
+pub(crate) struct QueryAnalysis {
     function_name: String,
     original_query: String,
     query_finger_print: String,
@@ -52,7 +53,7 @@ impl QueryAnalysis {
     pub(super) fn datasource(&self) -> &str {
         &self.datasource
     }
-    pub(super) const fn response(&self) -> &AnalyzeQueryResponse {
+    pub(crate) const fn response(&self) -> &AnalyzeQueryResponse {
         &self.response
     }
 
@@ -87,13 +88,13 @@ impl QueryAnalysis {
 /// The owned sender closes on return; EOF alone is not proof of success. The caller
 /// must also check this result and the client's completion result.
 /// A single connection owns all context handles; reuse only within this batch.
-pub(super) async fn submit(
+pub(crate) async fn submit(
     client: &mut TcpJsonRpcClientAsync,
     args: &SqlFunArgs,
     requirements: Vec<QueryRequirement>,
     results: Sender<QueryAnalysis>,
-) -> Result<(), ::anyhow::Error> {
-    let mut contexts = HashMap::<String, ContextHandle>::new();
+) -> Result<Vec<(String, ReportLintExpectationsResponse)>, ::anyhow::Error> {
+    let mut contexts = BTreeMap::<String, ContextHandle>::new();
     for requirement in requirements {
         let datasource = requirement.datasource().to_owned();
         let function_name = requirement.function_name().to_owned();
@@ -140,5 +141,15 @@ pub(super) async fn submit(
             .await
             .map_err(|_| ::anyhow::anyhow!("analysis result receiver closed before delivery"))?;
     }
-    Ok(())
+    let mut reports = Vec::with_capacity(contexts.len());
+    for (datasource, handle) in contexts {
+        let request = ReportLintExpectationsArgs::new(&handle);
+        let report = request_typed(client, "report_lint_expectations", &request)
+            .await
+            .with_context(|| {
+                format!("cannot report lint expectations for datasource {datasource}")
+            })?;
+        reports.push((datasource, report));
+    }
+    Ok(reports)
 }

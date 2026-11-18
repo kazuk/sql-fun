@@ -75,8 +75,12 @@ The server reports observations from the analyses it performed. It does not
 assert that every intended application SQL statement was submitted, and SQL
 failures do not suppress unmet expectations or cancel previous observations.
 The caller decides when to report and whether unmet warnings are actionable.
-Typed-client and CLI workflow integration remains tracked in
-[#1088](https://github.com/kazuk/sql-fun/issues/1088).
+Rust clients can serialize `ReportLintExpectationsArgs::new(&handle)` and call
+`TcpJsonRpcClientAsync::invoke_typed` with method `report_lint_expectations`.
+Use `ReportLintExpectationsResponse` as the callback's response type to
+materialize all diagnostic pages and release the collection.
+[`sql-fun check`](../cli/check.md#lint-expectations) requests this report after
+submitting collected queries for each analyzed datasource.
 
 <!-- Method pages are generated in the staged manual build. -->
 <!-- rumdl-disable MD057 -->

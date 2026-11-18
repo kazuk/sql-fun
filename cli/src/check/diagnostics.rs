@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use ::anyhow::Context;
+use ::sql_fun_client::payloads::ReportLintExpectationsResponse;
 
 use crate::{check::submission::QueryAnalysis, diagnostic::DiagnosticRenderer};
 
@@ -26,4 +27,27 @@ pub(super) fn render_all(
         }
     }
     Ok(())
+}
+
+/// Render datasource-level warnings and indicate whether any expectation is unmet.
+pub(super) fn render_lint_expectations(
+    reports: &[(String, ReportLintExpectationsResponse)],
+    renderer: &DiagnosticRenderer,
+    output: &mut impl Write,
+) -> Result<bool, ::anyhow::Error> {
+    let mut unmet = false;
+    for (datasource, report) in reports {
+        for diagnostic in report.problems().items() {
+            unmet |= diagnostic.code() == "unmet_lint_expectation";
+            let problem = diagnostic.semantic_problem().as_ref().with_context(|| {
+                format!("missing structured lint diagnostic for datasource {datasource}")
+            })?;
+            let message =
+                renderer.render_problem(problem, (*diagnostic.severity()).into(), None, None)?;
+            writeln!(output, "Datasource {datasource}\n{message}").with_context(|| {
+                format!("cannot write lint diagnostic for datasource {datasource}")
+            })?;
+        }
+    }
+    Ok(unmet)
 }

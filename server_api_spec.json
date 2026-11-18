@@ -12397,6 +12397,19 @@
                   "const": "InvalidCtePlacement"
                 },
                 {
+                  "description": "A recursive WITH definition violates scope, shape or output rules.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidRecursiveCte": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidRecursiveCte"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "A WINDOW declaration repeats an existing definition name.",
                   "type": "object",
                   "properties": {

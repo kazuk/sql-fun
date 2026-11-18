@@ -14,6 +14,10 @@ METADATA
   # Optional fixture-owned datasource fields are shared by source/installed checks.
   if [[ -f "$suite/$fixture.metadata.toml" ]]; then
     cat "$suite/$fixture.metadata.toml" >>"$metadata"
+    # The lint path in the metadata is relative to this worker's directory.
+    if [[ -f "$suite/$fixture.lint.toml" ]]; then
+      cp -- "$suite/$fixture.lint.toml" "$runtime/$fixture.lint.toml"
+    fi
   fi
 }
 

@@ -1,0 +1,60 @@
+[
+  {
+    "name": "deprecated-relation",
+    "sql": "SELECT id FROM public.legacy_items",
+    "expected": {
+      "diagnostics": [
+        "deprecated"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "deprecated-column",
+    "sql": "SELECT i.legacy_id FROM public.items AS i",
+    "expected": {
+      "diagnostics": [
+        "deprecated"
+      ],
+      "columns": [
+        {
+          "name": "legacy_id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unrelated-column",
+    "sql": "SELECT i.id FROM public.items AS i",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

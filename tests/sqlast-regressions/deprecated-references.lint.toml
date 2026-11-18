@@ -1,0 +1,8 @@
+[[lint.deprecated]]
+kind = "table"
+name = ["public", "legacy_items"]
+
+[[lint.deprecated]]
+kind = "table"
+name = ["public", "items"]
+column = "legacy_id"

@@ -75,11 +75,24 @@ pub enum ConstraintChangeOutcome {
     Rejected,
 }
 
+fn is_postgres18_or_later(context: &impl ParseContext) -> bool {
+    context
+        .metadata()
+        .engine_version()
+        .as_ref()
+        .is_some_and(|version| {
+            version
+                .to_string()
+                .parse::<PostgresVersion>()
+                .is_ok_and(|version| version.major() >= 18)
+        })
+}
+
 impl ConstraintAction {
-    fn from_ast(
-        command: &PostgresAlterCommand,
-        postgres18: bool,
-    ) -> Result<(&str, Self), AnalysisError> {
+    fn from_ast<'ast>(
+        command: &'ast PostgresAlterCommand,
+        context: &impl ParseContext,
+    ) -> Result<(&'ast str, Self), AnalysisError> {
         let action = match command.operation() {
             AlterOperation::AlterConstraint => {
                 let AlterDefinition::ConstraintFlags(flags) = command.definition() else {
@@ -90,7 +103,7 @@ impl ConstraintAction {
                 }
                 let deferrability = if let Some((deferrable, deferred)) = flags.deferrability() {
                     Some(Deferrability::new(deferrable, deferred))
-                } else if postgres18 {
+                } else if is_postgres18_or_later(context) {
                     None
                 } else {
                     Some(Deferrability::new(false, false))
@@ -112,7 +125,8 @@ impl ConstraintAction {
 }
 
 impl ConstraintTarget {
-    fn lookup(table: &CreateTable, name: &str, postgres18: bool) -> Self {
+    fn lookup(table: &CreateTable, name: &str, context: &impl ParseContext) -> Self {
+        let postgres18 = is_postgres18_or_later(context);
         let table_constraint = table
             .constraint(name)
             .filter(|constraint| postgres18 || !matches!(constraint, Constraint::NotNull(..)));
@@ -319,19 +333,9 @@ impl AlterConstraint {
         definition: Option<&CreateTable>,
         skipped: bool,
     ) -> Result<Self, AnalysisError> {
-        let postgres18 = context
-            .metadata()
-            .engine_version()
-            .as_ref()
-            .is_some_and(|version| {
-                version
-                    .to_string()
-                    .parse::<PostgresVersion>()
-                    .is_ok_and(|version| version.major() >= 18)
-            });
-        let (name, action) = ConstraintAction::from_ast(command, postgres18)?;
+        let (name, action) = ConstraintAction::from_ast(command, context)?;
         let target = if let Some(definition) = definition {
-            ConstraintTarget::lookup(definition, name, postgres18)
+            ConstraintTarget::lookup(definition, name, context)
         } else {
             ConstraintTarget::NoTable
         };

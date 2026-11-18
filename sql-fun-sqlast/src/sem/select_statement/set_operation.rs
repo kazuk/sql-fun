@@ -90,6 +90,16 @@ pub struct SetOperationQuery {
     columns: ResultColumnCollection,
     results: Vec<SetColumnResult>,
     width_invalid: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    recursive_binding: Option<RecursiveBinding>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    recursive_type_invalid: bool,
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+struct RecursiveBinding {
+    name: String,
+    aliases: Vec<String>,
 }
 
 /// Common-type outcome and conversions at one positional output boundary.
@@ -143,9 +153,47 @@ impl SetOperationQuery {
             columns: ResultColumnCollection::default(),
             results: Vec::new(),
             width_invalid: false,
+            recursive_binding: None,
+            recursive_type_invalid: false,
         };
         query.resolve_outputs(context)?;
         Ok(query)
+    }
+
+    pub(crate) fn set_recursive_binding(&mut self, name: &str, aliases: &[String]) {
+        self.recursive_binding = Some(RecursiveBinding {
+            name: name.to_owned(),
+            aliases: aliases.to_owned(),
+        });
+    }
+
+    pub(crate) fn validate_recursive_types(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        let Some(binding) = &self.recursive_binding else {
+            return Ok(());
+        };
+        if context.dialect() != Dialect::postgres() || self.is_invalid() {
+            return Ok(());
+        }
+        for index in 0..self.columns.len() {
+            let anchor = self.left.result_columns().recursive_anchor_type(index);
+            if let Some(anchor) = anchor.as_ref()
+                && let Some(column) = self.columns.get_column_at(index)
+                && let Some(output) = column.col_type()
+                && anchor != output
+            {
+                self.recursive_type_invalid = true;
+                context.report_analysis_problem(AnalysisProblem::query(
+                    QueryProblem::invalid_recursive_cte(&format!(
+                        "recursive CTE {} column {} has anchor type {anchor} but resolves to {output}",
+                        binding.name, index + 1,
+                    )),
+                ))?;
+            }
+        }
+        Ok(())
     }
 
     /// Operation identity, independently of its ALL modifier on the query boundary.
@@ -167,6 +215,7 @@ impl SetOperationQuery {
     /// Whether analysis has established an invalid output shape or column type.
     pub fn is_invalid(&self) -> bool {
         self.width_invalid
+            || self.recursive_type_invalid
             || self
                 .results
                 .iter()
@@ -393,6 +442,9 @@ impl SetOperationQuery {
         visitor.enter_set_operand();
         self.left.walk(visitor)?;
         visitor.leave_set_operand();
+        if let Some(binding) = &self.recursive_binding {
+            visitor.recursive_anchor(&binding.name, &binding.aliases, self.left.result_columns());
+        }
         visitor.enter_set_operand();
         self.right.walk(visitor)?;
         visitor.leave_set_operand();

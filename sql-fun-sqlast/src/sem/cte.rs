@@ -159,11 +159,18 @@ impl CteStatement {
 
 /// Analyzed WITH clause.
 #[derive(Debug, Clone, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct WithClause(HashMap<CteName, CteStatement>);
+#[serde(transparent)]
+pub struct WithClause {
+    definitions: HashMap<CteName, CteStatement>,
+    #[serde(skip)]
+    resolution_order: Vec<CteName>,
+    #[serde(skip)]
+    recursive_anchors: Vec<CteName>,
+}
 
 impl std::hash::Hash for WithClause {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        for (k, v) in &self.0 {
+        for (k, v) in &self.definitions {
             k.hash(state);
             v.hash(state);
         }
@@ -171,8 +178,38 @@ impl std::hash::Hash for WithClause {
 }
 
 impl WithClause {
+    pub(crate) fn with_recursive_anchor(
+        &self,
+        context: &impl ParseContext,
+        name: &CteName,
+        binding: CteStatement,
+    ) -> Self {
+        let mut scope = self.clone();
+        scope.insert_resolved(context, name, binding);
+        scope.recursive_anchors.push(name.clone());
+        scope
+    }
+
+    pub(crate) fn is_recursive_anchor(&self, name: &CteName) -> bool {
+        self.recursive_anchors.contains(name)
+    }
+
+    pub(crate) fn record_resolution(&mut self, name: &CteName) {
+        self.resolution_order.push(name.clone());
+    }
+
+    pub(crate) fn resolution_order(&self, name: &str) -> Option<usize> {
+        self.resolution_order
+            .iter()
+            .position(|candidate| candidate.as_str() == name)
+    }
+
+    pub(crate) fn clear_resolution_order(&mut self) {
+        self.resolution_order.clear();
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.definitions.is_empty()
     }
     pub(crate) fn resolve_name(
         &self,
@@ -182,7 +219,7 @@ impl WithClause {
         if name.schema().is_some() || name.catalog().is_some() {
             return None;
         }
-        self.0.keys().find(|candidate| {
+        self.definitions.keys().find(|candidate| {
             if context.dialect() == Dialect::sqlite() {
                 candidate.eq_ignore_ascii_case(name.name().as_str())
             } else {
@@ -197,23 +234,27 @@ impl WithClause {
         statement: CteStatement,
     ) {
         if context.dialect() == Dialect::sqlite() {
-            self.0
+            self.definitions
                 .retain(|candidate, _| !candidate.eq_ignore_ascii_case(name));
+            self.recursive_anchors
+                .retain(|candidate| !candidate.eq_ignore_ascii_case(name));
+        } else {
+            self.recursive_anchors.retain(|candidate| candidate != name);
         }
         self.insert(name, statement);
     }
     pub(crate) fn take(&mut self, name: &str) -> Option<CteStatement> {
-        self.0.remove(name)
+        self.definitions.remove(name)
     }
     /// get CTE query by name
     #[must_use]
     pub fn get(&self, name: &CteName) -> Option<&CteStatement> {
-        self.0.get(name)
+        self.definitions.get(name)
     }
 
     /// insert named CTE item
     pub fn insert(&mut self, name: &CteName, statement: CteStatement) {
-        self.0.insert(name.clone(), statement);
+        self.definitions.insert(name.clone(), statement);
     }
 }
 
@@ -250,7 +291,7 @@ impl WithClause {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        for (name, query) in &mut self.0 {
+        for (name, query) in &mut self.definitions {
             if let Some(columns) = query.result_columns() {
                 visitor.source_outputs(&columns.names());
             }
@@ -263,7 +304,7 @@ impl WithClause {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
-        for (name, query) in &self.0 {
+        for (name, query) in &self.definitions {
             if let Some(columns) = query.result_columns() {
                 visitor.source_outputs(&columns.names());
             }

@@ -70,6 +70,7 @@ impl WalkSqlMut for DocumentExpr {
 
 impl WalkSqlMut for Merge {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        visitor.enter_with(&self.with_clause);
         self.with_clause.walk_sql_mut(visitor);
         visitor.enter_projection(&mut ProjectionScope::new(
             &mut self.returning_list,
@@ -80,6 +81,7 @@ impl WalkSqlMut for Merge {
         self.merge_when_clauses.walk_sql_mut(visitor);
         self.returning_list.walk_sql_mut(visitor);
         self.source_relation.walk_sql_mut(visitor);
+        visitor.leave_with(&self.with_clause);
         visitor.leave_projection(&mut ProjectionScope::new(
             &mut self.returning_list,
             std::slice::from_mut(&mut self.source_relation),

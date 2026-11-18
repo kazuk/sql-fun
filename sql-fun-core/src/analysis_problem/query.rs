@@ -29,6 +29,8 @@ pub enum QueryProblem {
 
     /// A WITH body violates data-modifying or SELECT INTO placement rules.
     InvalidCtePlacement,
+    /// A recursive WITH definition violates scope, shape or output rules.
+    InvalidRecursiveCte(String),
     /// A WINDOW declaration repeats an existing definition name.
     DuplicateWindowDefinition(String),
     /// A clause name has no applicable definition.
@@ -135,6 +137,11 @@ impl QueryProblem {
     pub const fn invalid_cte_placement() -> Self {
         Self::InvalidCtePlacement
     }
+    /// Report an invalid recursive CTE definition.
+    #[must_use]
+    pub fn invalid_recursive_cte(message: &str) -> Self {
+        Self::InvalidRecursiveCte(message.to_owned())
+    }
     /// Diagnostic duplicate window definition.
     #[must_use]
     pub fn duplicate_window_definition(name: &str) -> Self {
@@ -185,6 +192,7 @@ impl QueryProblem {
             Self::InvalidGroupingPlacement(_) => "query_invalid_grouping_placement",
             Self::TooManyGroupingArguments => "query_too_many_grouping_arguments",
             Self::InvalidCtePlacement => "query_invalid_cte_placement",
+            Self::InvalidRecursiveCte(_) => "query_invalid_recursive_cte",
             Self::DuplicateWindowDefinition(_) => "query_duplicate_window_definition",
             Self::ReferenceNotFound(_) => "query_reference_not_found",
             Self::AmbiguousReference(_) => "query_reference_ambiguous",
@@ -212,6 +220,7 @@ impl QueryProblem {
             Self::InvalidGroupingPlacement(placement) => format!("grouping operations are not allowed in {placement}"),
             Self::TooManyGroupingArguments => "GROUPING must have fewer than 32 arguments".to_owned(),
             Self::InvalidCtePlacement => "data-modifying WITH must be at the top level; nested WITH bodies cannot contain modifying WITH or SELECT INTO".to_owned(),
+            Self::InvalidRecursiveCte(message) => message.clone(),
             Self::DuplicateWindowDefinition(name) => format!("duplicate window definition: {name}"),
             Self::ReferenceNotFound(name) => format!("clause reference not found: {name}"),
             Self::AmbiguousReference(name) => format!("ambiguous clause reference: {name}"),

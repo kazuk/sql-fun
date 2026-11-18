@@ -10,7 +10,9 @@ types that do not support collation are diagnosed when their type is available.
 
 Nested annotations are recognized, but analysis does not yet derive
 collations across expressions or check precedence and collation conflicts among
-function/operator inputs, query boundaries or ordering expressions.
+function/operator inputs, query boundaries or ordering expressions. Validation
+of PostgreSQL recursive CTE output collations is tracked in
+[issue #1137](https://github.com/kazuk/sql-fun/issues/1137).
 
 ## Dialect and engine-specific behavior
 

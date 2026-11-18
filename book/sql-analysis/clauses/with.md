@@ -24,19 +24,50 @@ workflow.
 ## Dialect and engine-specific behavior
 
 PostgreSQL MERGE bodies require configured PostgreSQL 17 or later. Ordinary
-supported nonrecursive CTEs participate in SELECT and DML analysis. Recursive
-analysis remains incomplete: recognition of `WITH RECURSIVE` does not establish
-recursive name resolution, SEARCH/CYCLE semantics, or recursive type checking.
-MERGE with recursive WITH remains unsupported.
+supported CTEs participate in SELECT and DML analysis. `WITH RECURSIVE` allows
+forward references between CTEs. A recursive CTE uses `UNION` or `UNION ALL`
+between a nonrecursive term and a recursive term. The anchor supplies the
+columns visible to the recursive term. Explicit aliases rename leading columns.
+PostgreSQL analysis checks that the overall result types agree with the anchor.
+Both terms share the enclosing statement's parameter constraints. A recursive
+column reference has unknown nullability during analysis because later
+iterations can produce values absent from the anchor.
 
-With the `sqlite` feature, SQLite supports nonrecursive SELECT CTEs and WITH
-before INSERT, UPDATE and DELETE. SQLite does not permit these modifying
-statements as CTE bodies. library analysis support does not establish that the
-CLI/server supports the same datasource initialization path; see the [analysis
-overview](../../sql-analysis.md).
+```sql
+WITH RECURSIVE counter(n) AS (
+    SELECT 1
+    UNION ALL
+    SELECT n + 1 FROM counter WHERE n < 3
+)
+SELECT n FROM counter;
+```
+
+PostgreSQL validation of recursive output collations and type modifiers such as
+`varchar(10)` remains incomplete. See [#1137](https://github.com/kazuk/sql-fun/issues/1137)
+and [#1138](https://github.com/kazuk/sql-fun/issues/1138). `SEARCH` and `CYCLE`
+generated columns and `MERGE` with recursive `WITH` remain unsupported
+([#1140](https://github.com/kazuk/sql-fun/issues/1140)).
+
+With the `sqlite` feature, SQLite supports SELECT CTEs and WITH before INSERT,
+UPDATE and DELETE. SQLite does not permit these modifying statements as CTE
+bodies. A single recursive SELECT with an explicit `WITH RECURSIVE` uses the
+shared CTE lookup and column binding. Expressions in each term still depend
+on SQLite expression support, including [operator analysis tracked in #504](https://github.com/kazuk/sql-fun/issues/504).
+Static output metadata follows the
+existing SQLite compound-query rules. SQLite can return different storage
+classes in one result column. SQLite requires a direct FROM reference in
+the recursive SELECT, while PostgreSQL can resolve the reference through a
+derived table. SQLite permits the recursive table on the nullable side of
+an outer join, where PostgreSQL rejects it. Multiple recursive SELECT arms,
+recursion without the keyword, and SQLite-specific alias-count and recursive
+ordering/limit rules are tracked in [#1139](https://github.com/kazuk/sql-fun/issues/1139).
+See the [analysis overview](../../sql-analysis.md) for CLI datasource support.
 
 ## Diagnostics
 
+- [query_invalid_recursive_cte](../../diagnostics/query_invalid_recursive_cte.md)
+  reports invalid recursive references, cycles, or incompatible recursive
+  output definitions.
 - [query_invalid_cte_placement](../../diagnostics/query_invalid_cte_placement.md):
   a modifying CTE is nested where top-level placement is required, or a CTE body
   has forbidden modifying-WITH/SELECT-INTO placement.
@@ -52,7 +83,7 @@ overview](../../sql-analysis.md).
 - [incompatible_engine_version](../../diagnostics/incompatible_engine_version.md):
   a version-gated feature is unavailable for the selected engine version.
 
-Missing RETURNING, unsupported body forms and recursive analysis can also stop
+Missing RETURNING and unsupported body forms can also stop
 at an unimplemented or analysis-error boundary; a structured diagnostic is not
 promised for every unsupported CTE. Rule-local OLD/NEW conflicts use the
 [rules](../statements/rules.md) diagnostics. Body expressions retain their own

@@ -193,6 +193,7 @@
   - [query_grouping_argument_not_grouped](diagnostics/query_grouping_argument_not_grouped.md)
   - [query_invalid_compound_order](diagnostics/query_invalid_compound_order.md)
   - [query_invalid_cte_placement](diagnostics/query_invalid_cte_placement.md)
+  - [query_invalid_recursive_cte](diagnostics/query_invalid_recursive_cte.md)
   - [query_invalid_grouping_placement](diagnostics/query_invalid_grouping_placement.md)
   - [query_invalid_star_projection_placement](diagnostics/query_invalid_star_projection_placement.md)
   - [query_parse](diagnostics/query_parse.md)

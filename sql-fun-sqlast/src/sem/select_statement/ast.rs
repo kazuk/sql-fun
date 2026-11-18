@@ -6,8 +6,8 @@ use crate::{
         AnalysisError, AnalysisProblem, CteStatement, DataSource, FromClause, QueryGrouping,
         QueryLock, QueryOrder, QueryWindow, ResolutionFailure, ResultColumnCollection,
         RuleIdentity, ScalarAnalysisContext, SelectClauses, SelectDestination, SelectStatement,
-        SelectStatementNode, SemScalarExpr, SemanticQuery, SetOperationKind, WithClause,
-        problem::RuleProblem, query::ClauseBinding, with_stack,
+        SelectStatementNode, SemScalarExpr, SemanticQuery, SetOperationKind, SetOperationQuery,
+        WithClause, problem::RuleProblem, query::ClauseBinding, with_stack,
     },
 };
 
@@ -358,6 +358,22 @@ impl SelectStatement {
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<Self, AnalysisError> {
+        Self::analyze_ast_query_with(ast, context, outer, |context, with, outer, query_id| {
+            Self::from_ast_body(ast.body(), context, with, outer, query_id)
+        })
+    }
+
+    pub(crate) fn analyze_ast_query_with<C: ParseContext>(
+        ast: &Query,
+        context: &mut C,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+        analyze_body: impl FnOnce(
+            &mut C,
+            &WithClause,
+            Option<&ScalarAnalysisContext<'_>>,
+            usize,
+        ) -> Result<Self, AnalysisError>,
+    ) -> Result<Self, AnalysisError> {
         let with = WithClause::from_ast(ast.with(), context, outer)?;
         let restricted = if Self::ast_is_compound(ast.body())
             && outer.is_some_and(|scope| scope.direct_rule_identity().is_some())
@@ -367,13 +383,7 @@ impl SelectStatement {
             None
         };
         let query_id = context.analysis_state_mut().grouping_mut().new_query();
-        let body = Self::from_ast_body(
-            ast.body(),
-            context,
-            &with,
-            restricted.as_ref().or(outer),
-            query_id,
-        )?;
+        let body = analyze_body(context, &with, restricted.as_ref().or(outer), query_id)?;
         if body.select_clauses().is_none() {
             context.analysis_state_mut().grouping_mut().set_keys(
                 query_id,
@@ -597,6 +607,12 @@ impl SelectStatement {
     ) -> Result<Self, AnalysisError> {
         Self::validate_ast_rule_destination(ast, context, outer)?;
         let from = Self::from_ast_from(ast, context, with, outer, query_id)?;
+        if from.has_recursive_anchor(with) {
+            context
+                .analysis_state_mut()
+                .grouping_mut()
+                .register_recursive_query(query_id);
+        }
         let mut scope = Self::ast_scope(ast, with, &from, outer, query_id);
         let windows = Self::from_ast_windows(ast, context, &scope)?;
         let predicate = Self::from_ast_where(ast, context, &scope)?;
@@ -867,5 +883,21 @@ impl SelectStatement {
             CteStatement::validate_ast_select_rule_ctes(entry.body(), identity)?;
         }
         Ok(())
+    }
+}
+
+impl SelectStatement {
+    pub(crate) fn recursive_union(
+        context: &mut impl ParseContext,
+        name: &str,
+        aliases: &[String],
+        anchor: Self,
+        recursive: Self,
+    ) -> Result<Self, AnalysisError> {
+        let mut result =
+            SetOperationQuery::resolve(context, SetOperationKind::union(), anchor, recursive)?;
+        result.set_recursive_binding(name, aliases);
+        result.validate_recursive_types(context)?;
+        Ok(Self::Set(Box::new(result)))
     }
 }

@@ -5,11 +5,11 @@ use crate::{
         Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Column,
         ColumnConstraint, Conflict, ConstraintExtras, Cte, CteBody, Cycle, Delete, DerivedTable,
         ExclusionElement, Expr, Frame, FrameBound, FromGroup, FromItem, Grouping, InTable,
-        IndexExpression, Indirection, Insert, Into, Join, NamedArgument, NullTest, OperatorExpr,
-        Order, PartitionBound, PartitionDatum, Query, QueryBody, Raise, Select, SetQuery, Slice,
-        StatementNode, Subquery, SyntaxOption, SyntaxValue, TableConstraint, TableFunction,
-        TableFunctions, TableSample, Target, TruthTest, TypeName, TypedColumn, Update, Window,
-        With, projection::ProjectionScope,
+        IndexExpression, Indirection, Insert, Into, Join, JoinKind, NamedArgument, NullTest,
+        OperatorExpr, Order, PartitionBound, PartitionDatum, Query, QueryBody, Raise, Select,
+        SetOperation, SetQuery, Slice, StatementNode, Subquery, SyntaxOption, SyntaxValue,
+        TableConstraint, TableFunction, TableFunctions, TableSample, Target, TruthTest, TypeName,
+        TypedColumn, Update, Window, With, projection::ProjectionScope,
     },
     stack::with_stack as stack_with_stack,
 };
@@ -17,6 +17,11 @@ use crate::{
 pub(in crate::ast) trait AstVisitorMut {
     fn enter_query(&mut self, _query: &mut Query) {}
     fn leave_query(&mut self, _query: &mut Query) {}
+    fn enter_with(&mut self, _with: &With) {}
+    fn leave_with(&mut self, _with: &With) {}
+    fn enter_recursive_restriction(&mut self, _restriction: RecursionRestriction) {}
+    fn leave_recursive_restriction(&mut self, _restriction: RecursionRestriction) {}
+    fn leave_cte(&mut self, _cte: &mut Cte) {}
     fn expression(&mut self, _expression: &mut Expr) {}
     fn source(&mut self, _source: &mut FromItem) {}
     fn target(&mut self, _target: &mut Target) {}
@@ -63,16 +68,12 @@ walk_fields! {
     ConstraintExtras => options, predicate, exclusions;
     ExclusionElement => expression;
     PartitionBound => list, lower, upper;
-    SetQuery => left, right;
-
     Order => expression;
-    Cte => body, cycle;
     Cycle => value, default;
     TypeName => modifiers;
     TypedColumn => type_name;
     DerivedTable => query;
     FromGroup => items;
-    Join => left, right, condition;
     TableFunctions => calls, columns;
     TableFunction => expression, columns;
     TableSample => relation, arguments, repeatable;
@@ -92,7 +93,6 @@ walk_fields! {
     Call => arguments, within_order, order, filter, over;
     Case => argument, arms, otherwise;
     CaseArm => condition, result;
-    Subquery => query, test;
     Indirection => argument, items;
     Slice => lower, upper;
     NamedArgument => argument;
@@ -130,6 +130,7 @@ impl Select {
 }
 impl WalkSqlMut for Insert {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        visitor.enter_with(&self.with);
         self.with.walk_sql_mut(visitor);
         visitor.enter_projection(&mut ProjectionScope::new(
             &mut self.returning,
@@ -145,10 +146,12 @@ impl WalkSqlMut for Insert {
             &mut [],
             true,
         ));
+        visitor.leave_with(&self.with);
     }
 }
 impl WalkSqlMut for Update {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        visitor.enter_with(&self.with);
         self.with.walk_sql_mut(visitor);
         visitor.enter_projection(&mut ProjectionScope::new(
             &mut self.returning,
@@ -164,10 +167,12 @@ impl WalkSqlMut for Update {
             &mut self.from,
             true,
         ));
+        visitor.leave_with(&self.with);
     }
 }
 impl WalkSqlMut for Delete {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        visitor.enter_with(&self.with);
         self.with.walk_sql_mut(visitor);
         visitor.enter_projection(&mut ProjectionScope::new(
             &mut self.returning,
@@ -182,6 +187,7 @@ impl WalkSqlMut for Delete {
             &mut self.using,
             true,
         ));
+        visitor.leave_with(&self.with);
     }
 }
 impl WalkSqlMut for StatementNode {
@@ -288,7 +294,9 @@ impl WalkSqlMut for FromItem {
         visitor.source(self);
         stack_with_stack(|| match self {
             Self::Relation(_) => {}
-            Self::Query(node) => node.walk_sql_mut(visitor),
+            Self::Query(node) => {
+                walk_restricted(node, visitor, Some(RecursionRestriction::Derived))
+            }
             Self::Join(node) => node.walk_sql_mut(visitor),
             Self::Functions(node) => node.walk_sql_mut(visitor),
             Self::Group(node) => node.walk_sql_mut(visitor),
@@ -353,11 +361,14 @@ impl WalkSqlMut for Query {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
         stack_with_stack(|| {
             visitor.enter_query(self);
+            visitor.enter_with(&self.with);
             self.with.walk_sql_mut(visitor);
             self.body.walk_with_order(visitor, &mut self.order);
             // LIMIT/OFFSET resolve against the outer scope, without this SELECT's FROM.
             self.limit.walk_sql_mut(visitor);
             self.offset.walk_sql_mut(visitor);
+
+            visitor.leave_with(&self.with);
             visitor.leave_query(self);
         });
     }
@@ -397,5 +408,80 @@ impl WalkSqlMut for PartitionDatum {
         if let Self::Value(value) = self {
             value.walk_sql_mut(visitor);
         }
+    }
+}
+
+impl WalkSqlMut for Cte {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        self.body.walk_sql_mut(visitor);
+        self.cycle.walk_sql_mut(visitor);
+        visitor.leave_cte(self);
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::ast) enum RecursionRestriction {
+    Subquery,
+    Derived,
+    NullableJoin,
+    SetOperand,
+}
+
+fn walk_restricted(
+    value: &mut impl WalkSqlMut,
+    visitor: &mut impl AstVisitorMut,
+    restriction: Option<RecursionRestriction>,
+) {
+    if let Some(restriction) = restriction {
+        visitor.enter_recursive_restriction(restriction);
+    }
+    value.walk_sql_mut(visitor);
+    if let Some(restriction) = restriction {
+        visitor.leave_recursive_restriction(restriction);
+    }
+}
+
+impl WalkSqlMut for Subquery {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        walk_restricted(
+            &mut self.query,
+            visitor,
+            Some(RecursionRestriction::Subquery),
+        );
+        self.test.walk_sql_mut(visitor);
+    }
+}
+
+impl WalkSqlMut for SetQuery {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        let both = match self.operation {
+            SetOperation::Except | SetOperation::Intersect if self.all => {
+                Some(RecursionRestriction::SetOperand)
+            }
+            _ => None,
+        };
+        let right = if matches!(self.operation, SetOperation::Except) {
+            Some(RecursionRestriction::SetOperand)
+        } else {
+            both
+        };
+        walk_restricted(&mut self.left, visitor, both);
+        walk_restricted(&mut self.right, visitor, right);
+    }
+}
+
+impl WalkSqlMut for Join {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        let left = match self.kind {
+            JoinKind::Right | JoinKind::Full => Some(RecursionRestriction::NullableJoin),
+            _ => None,
+        };
+        let right = match self.kind {
+            JoinKind::Left | JoinKind::Full => Some(RecursionRestriction::NullableJoin),
+            _ => None,
+        };
+        walk_restricted(&mut self.left, visitor, left);
+        walk_restricted(&mut self.right, visitor, right);
+        self.condition.walk_sql_mut(visitor);
     }
 }

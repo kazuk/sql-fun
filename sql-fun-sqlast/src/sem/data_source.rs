@@ -92,6 +92,16 @@ pub enum DataSource {
 }
 
 impl DataSource {
+    pub(crate) fn has_recursive_anchor(&self, with: &WithClause) -> bool {
+        match self {
+            Self::CteQuery(source) => with.is_recursive_anchor(source.name()),
+            Self::JoinExpr(join) => join.has_recursive_anchor(with),
+            Self::Group(group) => group.has_recursive_anchor(with),
+            Self::RangeTableSample(sample) => sample.source().has_recursive_anchor(with),
+            _ => false,
+        }
+    }
+
     pub(crate) fn projection_shape_is_resolved(&self) -> bool {
         with_stack(|| match self {
             Self::RangeTableSample(sample) => sample.source().projection_shape_is_resolved(),

@@ -161,6 +161,16 @@ pub(crate) trait SemanticVisitorMut {
     fn source_outputs(&mut self, _columns: &[ColumnName]) {}
     fn assignment_target(&mut self, _target: &mut SemScalarExpr) {}
     fn cte_columns(&mut self, _name: &str, _columns: &[ColumnName]) {}
+    fn cte_dependency_order(&self) -> bool {
+        false
+    }
+    fn recursive_anchor(
+        &mut self,
+        _name: &str,
+        _aliases: &[String],
+        _columns: &ResultColumnCollection,
+    ) {
+    }
     fn cte_source(&mut self, _name: &str, _alias: &AliasSpec) {}
     fn table_binding(&mut self, _name: &mut TableName) {}
 

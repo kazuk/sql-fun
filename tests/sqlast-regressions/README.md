@@ -35,7 +35,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 166 groups are split 10/78/78.
+in the committed file. The current 172 groups are split 10/81/81.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -492,3 +492,9 @@ SELECT result shape. Rust schema-chain tests retain the semantic actions,
 completed target outcomes and independently observable enabled/forced catalog
 flags, including operation sequences. These checks do not evaluate row policies
 or runtime permissions.
+
+Issue #480 adds `recursive-ctes.json` for PostgreSQL 17/18 through the shared
+source and installed checks. The cases cover UNION and UNION ALL, positional
+aliases, forward dependencies, nested shadowing, recursion placement, and
+output width and type diagnostics. Rust tests cover recursive parameter edges
+and the shared SQLite binding path.

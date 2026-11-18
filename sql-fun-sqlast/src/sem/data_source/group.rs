@@ -21,6 +21,10 @@ pub struct GroupedDataSource {
 }
 
 impl GroupedDataSource {
+    pub(super) fn has_recursive_anchor(&self, with: &WithClause) -> bool {
+        self.source.has_recursive_anchor(with)
+    }
+
     pub(super) fn projection_shape_is_resolved(&self) -> bool {
         self.source.projection_shape_is_resolved()
     }

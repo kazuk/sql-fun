@@ -312,6 +312,7 @@ impl DiagnosticMessage for QueryProblem {
             Self::GroupingArgumentNotGrouped => "arguments to GROUPING must be grouping expressions of the associated query level".to_owned(),
             Self::InvalidGroupingPlacement(placement) => format!("grouping operations are not allowed in {placement}"),
             Self::TooManyGroupingArguments => "GROUPING must have fewer than 32 arguments".to_owned(),
+            Self::InvalidRecursiveCte(message) => message.clone(),
             Self::InvalidCtePlacement => "data-modifying WITH must be at the top level; nested WITH bodies cannot contain modifying WITH or SELECT INTO".to_owned(),
             Self::DuplicateWindowDefinition(name) => format!("duplicate window definition: {name}"),
             Self::ReferenceNotFound(name) => format!("clause reference not found: {name}"),

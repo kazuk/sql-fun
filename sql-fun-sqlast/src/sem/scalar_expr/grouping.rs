@@ -417,8 +417,17 @@ impl SelectStatement {
 pub(crate) struct GroupingAnalysis {
     has_operations: bool,
     keys: Vec<Option<Vec<Option<SemScalarExpr>>>>,
+    recursive_queries: Vec<usize>,
 }
 impl GroupingAnalysis {
+    pub(crate) fn register_recursive_query(&mut self, query: usize) {
+        self.recursive_queries.push(query);
+    }
+
+    pub(crate) fn is_recursive_query(&self, query: Option<usize>) -> bool {
+        query.is_some_and(|query| self.recursive_queries.contains(&query))
+    }
+
     pub(crate) const fn register_operation(&mut self) {
         self.has_operations = true;
     }

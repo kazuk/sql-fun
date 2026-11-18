@@ -318,12 +318,6 @@ impl CteBody {
     }
 }
 
-impl Cte {
-    const fn requires_recursive(&self) -> bool {
-        self.search.is_some() || self.cycle.is_some()
-    }
-}
-
 impl With {
     fn requires_recursive(&self) -> bool {
         self.entries.iter().any(Cte::requires_recursive)

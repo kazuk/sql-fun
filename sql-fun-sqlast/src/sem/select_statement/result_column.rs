@@ -5,9 +5,9 @@ use crate::{
     context::ParseContext,
     names::ColumnName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnReferenceExpr, IndirectionExpr,
-        InsertTarget, ParameterConstraints, QueryProblem, ResolvedTypes, SemScalarExpr,
-        TypeReference,
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnReferenceExpr, CommonType,
+        IndirectionExpr, InsertTarget, ParameterConstraints, PgBuiltInType, QueryProblem,
+        ResolvedTypes, SemScalarExpr, TypeReference,
         create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
         parameter_resolution::ParameterResolution,
         source_flag::SourceFlag,
@@ -812,6 +812,30 @@ impl ResultColumnCollection {
 }
 
 impl ResultColumnCollection {
+    pub(crate) fn recursive_anchor_type(&self, index: usize) -> Option<TypeReference> {
+        let column = self.0.get(index)?;
+        if let Some(expression) = column.expression()
+            && expression.common_type_input() == Some(CommonType::unknown())
+        {
+            return Some(PgBuiltInType::text());
+        }
+        column.col_type.clone()
+    }
+
+    pub(crate) fn recursive_binding(&self, dialect: Dialect, aliases: &[String]) -> Self {
+        let mut binding = self.clone();
+        for (index, column) in binding.0.iter_mut().enumerate() {
+            if dialect == Dialect::postgres() {
+                column.col_type = self.recursive_anchor_type(index);
+            }
+            // The recursive term can see values from later iterations.
+            column.is_not_null = None;
+            column.expression = None;
+        }
+        binding.rename(aliases);
+        binding
+    }
+
     // A set boundary consumes the operand's SQL type before unknown literals
     // acquire a standalone projection's text representation.
     pub(crate) fn set_operand(&self, index: usize) -> Option<SemScalarExpr> {

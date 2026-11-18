@@ -157,6 +157,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [query_grouping_argument_not_grouped](query_grouping_argument_not_grouped.md)
 - [query_invalid_compound_order](query_invalid_compound_order.md)
 - [query_invalid_cte_placement](query_invalid_cte_placement.md)
+- [query_invalid_recursive_cte](query_invalid_recursive_cte.md)
 - [query_invalid_grouping_placement](query_invalid_grouping_placement.md)
 - [query_invalid_star_projection_placement](query_invalid_star_projection_placement.md)
 - [query_parse](query_parse.md)

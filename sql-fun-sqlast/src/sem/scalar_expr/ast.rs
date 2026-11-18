@@ -840,6 +840,15 @@ impl SemScalarExpr {
         if let Some(capture) = &capture {
             let (owner, levels_up, placement) = capture.owner(scope.grouping_scope());
             SamplingInput::validate_aggregate_placement(context, &placement)?;
+            if context
+                .analysis_state()
+                .grouping()
+                .is_recursive_query(owner)
+            {
+                context.report_analysis_problem(AnalysisProblem::query(
+                    QueryProblem::invalid_recursive_cte("aggregate functions are not allowed in the SELECT that reads its recursive CTE"),
+                ))?;
+            }
             scope.grouping_scope().aggregate(owner, levels_up);
         } else if ast.over().is_some() {
             scope.grouping_scope().window();

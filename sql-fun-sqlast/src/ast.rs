@@ -22,6 +22,7 @@ pub(crate) mod postgres;
 pub(crate) mod projection;
 mod public;
 mod query_construction;
+pub(crate) mod recursive_cte;
 mod returning_options;
 mod rows_from;
 mod rule;
@@ -1298,6 +1299,10 @@ pub(crate) struct CteColumn {
 }
 
 impl Cte {
+    pub(crate) const fn requires_recursive(&self) -> bool {
+        self.search.is_some() || self.cycle.is_some()
+    }
+
     pub(crate) fn column_names(&self) -> Vec<String> {
         self.columns
             .iter()

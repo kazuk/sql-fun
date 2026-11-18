@@ -145,9 +145,7 @@ impl DeleteStatement {
     }
     fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.table_binding(&mut self.target);
-        for cte in &mut self.with {
-            cte.walk(visitor)?;
-        }
+        QueryCte::walk_all(&mut self.with, visitor)?;
         self.from.walk(visitor)?;
         if let Some(predicate) = &mut self.predicate {
             predicate.walk(visitor)?;

@@ -32,6 +32,12 @@ struct MergeRowImageNullability {
 }
 
 impl FromClause {
+    pub(crate) fn has_recursive_anchor(&self, with: &WithClause) -> bool {
+        self.0
+            .iter()
+            .any(|source| source.has_recursive_anchor(with))
+    }
+
     pub(crate) fn wildcard_projection(
         &self,
         context: &mut impl ParseContext,

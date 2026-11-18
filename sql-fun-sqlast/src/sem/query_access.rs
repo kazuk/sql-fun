@@ -641,14 +641,11 @@ mod tests {
         }
     }
     #[test]
-    fn unresolved_recursive_names_keep_their_existing_diagnostic() {
+    fn recursive_cte_accesses_are_attributed_to_the_anchor_relation() {
         let (accesses, problems) = query_access::analyze_diagnosed(
-            "WITH RECURSIVE c(id) AS (SELECT id FROM a UNION ALL SELECT id FROM c) SELECT id FROM c",
+            "WITH RECURSIVE c(id) AS (SELECT id FROM a UNION ALL SELECT id FROM c WHERE false) SELECT id FROM c",
         );
-        assert!(
-            problems.iter().any(|code| code == "relation_not_found"),
-            "{problems:?}"
-        );
+        assert!(problems.is_empty(), "{problems:?}");
         assert!(
             accesses
                 .records()

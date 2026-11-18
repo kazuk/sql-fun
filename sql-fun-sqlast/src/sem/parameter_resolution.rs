@@ -1886,6 +1886,20 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Collector<'_
         self.parameters.leave_query();
         self.set_scopes.leave_query();
     }
+    fn cte_dependency_order(&self) -> bool {
+        true
+    }
+    fn recursive_anchor(
+        &mut self,
+        name: &str,
+        aliases: &[String],
+        columns: &ResultColumnCollection,
+    ) {
+        if self.context.dialect() == Dialect::postgres() {
+            columns.default_returning_parameters(&mut self.parameters);
+        }
+        self.parameters.cte(name, aliases);
+    }
     fn cte(&mut self, name: &str) {
         self.parameters.cte(name, &[]);
     }
@@ -2039,7 +2053,7 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Finalizer<'_
 
     fn set_operation(&mut self, query: &mut SetOperationQuery) -> Result<(), AnalysisError> {
         query.apply_constraints(self.constraints);
-        Ok(())
+        query.validate_recursive_types(self.context)
     }
 
     fn table_sample(&mut self, sample: &mut TableSampleSource) -> Result<(), AnalysisError> {

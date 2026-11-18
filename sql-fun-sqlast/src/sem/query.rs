@@ -746,7 +746,7 @@ impl SemanticQuery {
     pub fn with(&self) -> &[QueryCte] {
         &self.with
     }
-    /// Whether WITH RECURSIVE was specified (recursive binding remains separate).
+    /// Whether WITH RECURSIVE was specified.
     pub const fn recursive(&self) -> bool {
         self.recursive
     }
@@ -786,9 +786,7 @@ impl SemanticQuery {
         visitor: &mut V,
         targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
-        for entry in &mut self.with {
-            entry.walk(visitor)?;
-        }
+        QueryCte::walk_all(&mut self.with, visitor)?;
         self.body.walk_body_assigned(visitor, targets)?;
         for order in &mut self.order {
             order.walk(visitor)?;
@@ -925,6 +923,8 @@ pub struct QueryCte {
     columns: Vec<String>,
     materialized: Option<bool>,
     statement: CteStatement,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    resolution_order: Option<usize>,
 }
 impl QueryCte {
     pub(crate) fn new(
@@ -938,8 +938,34 @@ impl QueryCte {
             columns,
             materialized,
             statement,
+            resolution_order: None,
         }
     }
+
+    pub(crate) const fn set_resolution_order(&mut self, order: Option<usize>) {
+        self.resolution_order = order;
+    }
+
+    pub(crate) fn walk_all<V: SemanticVisitorMut>(
+        entries: &mut [Self],
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if visitor.cte_dependency_order()
+            && entries.iter().any(|entry| entry.resolution_order.is_some())
+        {
+            let mut ordered: Vec<_> = entries.iter_mut().collect();
+            ordered.sort_by_key(|entry| entry.resolution_order);
+            for entry in ordered {
+                entry.walk(visitor)?;
+            }
+        } else {
+            for entry in entries {
+                entry.walk(visitor)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Declared name.
     pub fn name(&self) -> &str {
         &self.name

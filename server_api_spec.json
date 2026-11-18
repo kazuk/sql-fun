@@ -3174,6 +3174,19 @@
                   "const": "InvalidCtePlacement"
                 },
                 {
+                  "description": "A recursive WITH definition violates scope, shape or output rules.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidRecursiveCte": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidRecursiveCte"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "A WINDOW declaration repeats an existing definition name.",
                   "type": "object",
                   "properties": {
@@ -7700,6 +7713,19 @@
                   "description": "A WITH body violates data-modifying or SELECT INTO placement rules.",
                   "type": "string",
                   "const": "InvalidCtePlacement"
+                },
+                {
+                  "description": "A recursive WITH definition violates scope, shape or output rules.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidRecursiveCte": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidRecursiveCte"
+                  ],
+                  "additionalProperties": false
                 },
                 {
                   "description": "A WINDOW declaration repeats an existing definition name.",

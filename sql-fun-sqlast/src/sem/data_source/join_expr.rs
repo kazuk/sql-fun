@@ -44,6 +44,10 @@ pub struct JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn has_recursive_anchor(&self, with: &WithClause) -> bool {
+        self.left.has_recursive_anchor(with) || self.right.has_recursive_anchor(with)
+    }
+
     pub(super) fn projection_shape_is_resolved(&self) -> bool {
         self.left.projection_shape_is_resolved() && self.right.projection_shape_is_resolved()
     }

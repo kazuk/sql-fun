@@ -151,9 +151,7 @@ impl InsertStatement {
     }
     fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.table_binding(&mut self.target);
-        for entry in &mut self.with {
-            entry.walk(visitor)?;
-        }
+        QueryCte::walk_all(&mut self.with, visitor)?;
         self.source.walk(visitor, self.columns.as_mut_slice())?;
         for conflict in &mut self.conflicts {
             conflict.walk(visitor)?;

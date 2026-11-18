@@ -426,9 +426,7 @@ impl MergeStatement {
         result
     }
     fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
-        for cte in &mut self.with {
-            cte.walk(visitor)?;
-        }
+        QueryCte::walk_all(&mut self.with, visitor)?;
         self.from.walk(visitor)?;
         self.on.walk(visitor)?;
         visitor.predicate(&self.on);

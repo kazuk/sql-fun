@@ -12,8 +12,7 @@ with `column` selects only that column; omitting `column` selects the whole
 relation. A function declaration selects all overloads of the resolved name.
 
 Project linting must be explicitly applied with the declarations and application
-schema loaded. CLI configuration transport is not yet implemented
-([#1088](https://github.com/kazuk/sql-fun/issues/1088)).
+schema loaded.
 
 ## What analysis knows and does not know
 

@@ -55,5 +55,5 @@ expectation. Repeating either report does not reset observations.
 [duplicate_lint_target](duplicate_lint_target.md) explain configuration warnings.
 See [SQL Analysis Configuration](../analysis-configuration.md) and the
 [Server API workflow](../api/check-analysis-design.md#report-current-lint-expectations).
-Client/CLI workflow integration remains tracked in
-[#1088](https://github.com/kazuk/sql-fun/issues/1088).
+See [lint expectations in `sql-fun check`](../cli/check.md#lint-expectations)
+for exit status and the override option.

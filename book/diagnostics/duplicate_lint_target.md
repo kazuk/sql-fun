@@ -13,8 +13,7 @@ identify one target. A whole-table entry and an entry for one of its columns are
 different targets.
 
 This check occurs when project linting is explicitly applied with the
-application schema and declarations loaded. CLI configuration transport is not
-yet implemented ([#1088](https://github.com/kazuk/sql-fun/issues/1088)).
+application schema and declarations loaded.
 
 ## What analysis knows and does not know
 

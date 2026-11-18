@@ -13,8 +13,7 @@ is only applicable to `table` and `view` entries, and an `enum_label` entry must
 supply an existing `label`.
 
 This check occurs when project linting is explicitly applied with the
-application schema and declarations loaded. CLI configuration transport is not
-yet implemented ([#1088](https://github.com/kazuk/sql-fun/issues/1088)). Malformed
+application schema and declarations loaded. Malformed
 TOML and file read failures are configuration-loading errors, not this diagnostic.
 
 ## What analysis knows and does not know

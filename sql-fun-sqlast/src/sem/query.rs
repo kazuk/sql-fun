@@ -806,9 +806,7 @@ impl SemanticQuery {
         visitor: &mut V,
         targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
-        for entry in &self.with {
-            entry.visit(visitor)?;
-        }
+        QueryCte::visit_all(&self.with, visitor)?;
         self.body.visit_body_assigned(visitor, targets)?;
         visitor.access_purpose(AccessKind::select_ordering());
         for order in &self.order {
@@ -961,6 +959,26 @@ impl QueryCte {
         } else {
             for entry in entries {
                 entry.walk(visitor)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn visit_all<V: SemanticVisitor>(
+        entries: &[Self],
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if visitor.cte_dependency_order()
+            && entries.iter().any(|entry| entry.resolution_order.is_some())
+        {
+            let mut ordered: Vec<_> = entries.iter().collect();
+            ordered.sort_by_key(|entry| entry.resolution_order);
+            for entry in ordered {
+                entry.visit(visitor)?;
+            }
+        } else {
+            for entry in entries {
+                entry.visit(visitor)?;
             }
         }
         Ok(())

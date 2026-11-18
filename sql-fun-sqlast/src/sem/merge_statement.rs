@@ -436,9 +436,7 @@ impl MergeStatement {
     }
     fn visit_body<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.access_purpose(AccessKind::merge_source());
-        for cte in &self.with {
-            cte.visit(visitor)?;
-        }
+        QueryCte::visit_all(&self.with, visitor)?;
         for clause in &self.clauses.0 {
             let kind = clause.action.access_action();
             if let Some(kind) = kind {

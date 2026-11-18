@@ -4,8 +4,8 @@ use crate::{
     context::ParseContext,
     names::{ColumnName, CteName, FullName},
     sem::{
-        AnalysisError, DeleteStatement, InsertStatement, MergeStatement, ResultColumnCollection,
-        SelectStatement, UpdateStatement,
+        AnalysisError, DeleteStatement, InsertStatement, MergeStatement, QueryCte,
+        ResultColumnCollection, SelectStatement, UpdateStatement,
         create_table::ColumnDefinition,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
@@ -18,6 +18,8 @@ use std::collections::HashMap;
 pub enum CteStatement {
     /// A diagnosed CTE body that could not be resolved.
     Unresolved,
+    /// Analyzed body of a CTE with invalid recursion.
+    InvalidRecursive(Box<Self>),
     /// `SELECT` statement
     Select(Box<SelectStatement>),
     /// `INSERT` statement
@@ -75,6 +77,7 @@ impl CteStatement {
     pub(crate) fn result_columns(&self) -> Option<&ResultColumnCollection> {
         match self {
             Self::Unresolved => None,
+            Self::InvalidRecursive(body) => body.result_columns(),
             Self::Select(query) => Some(query.result_columns()),
             Self::Insert(insert) => Some(insert.result_columns()),
             Self::Update(update) => Some(update.result_columns()),
@@ -114,6 +117,7 @@ impl CteStatement {
     pub(crate) fn has_column(&self, column: &ColumnName) -> bool {
         match self {
             Self::Unresolved => false,
+            Self::InvalidRecursive(body) => body.has_column(column),
             Self::Select(query) => query.has_column(column),
             Self::Insert(insert) => insert.result_columns().has_column(column),
             Self::Update(update) => update.result_columns().has_column(column),
@@ -148,6 +152,7 @@ impl CteStatement {
     ) -> Option<ColumnDefinition> {
         match self {
             Self::Unresolved => None,
+            Self::InvalidRecursive(body) => body.resolved_column(column, index, skip),
             Self::Select(query) => SelectStatement::resolved_column(column, index, skip, query),
             Self::Insert(insert) => InsertStatement::resolved_column(column, index, skip, insert),
             Self::Update(update) => UpdateStatement::resolved_column(column, index, skip, update),
@@ -166,6 +171,8 @@ pub struct WithClause {
     resolution_order: Vec<CteName>,
     #[serde(skip)]
     recursive_anchors: Vec<CteName>,
+    #[serde(skip)]
+    rejected_definitions: Vec<QueryCte>,
 }
 
 impl std::hash::Hash for WithClause {
@@ -265,6 +272,10 @@ impl CteStatement {
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Unresolved => {}
+            Self::InvalidRecursive(body) => {
+                visitor.invalid_recursive_cte();
+                body.walk(visitor)?;
+            }
             Self::Select(query) => query.walk(visitor)?,
             Self::Insert(insert) => insert.walk(visitor)?,
             Self::Update(update) => update.walk(visitor)?,
@@ -276,6 +287,7 @@ impl CteStatement {
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Unresolved => {}
+            Self::InvalidRecursive(body) => body.visit(visitor)?,
             Self::Select(query) => query.visit(visitor)?,
             Self::Insert(insert) => insert.visit(visitor)?,
             Self::Update(update) => update.visit(visitor)?,

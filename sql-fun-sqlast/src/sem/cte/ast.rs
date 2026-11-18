@@ -8,8 +8,8 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, CreateRule as SemCreateRule, CteStatement, DeleteStatement,
         EngineFeatureValidation, FromClause, InsertStatement, MergeStatement, QueryCte,
-        ResolutionFailure, RuleIdentity, ScalarAnalysisContext, SelectClauses, SelectStatement,
-        UpdateStatement, WithClause,
+        ResolutionFailure, ResultColumnCollection, RuleIdentity, ScalarAnalysisContext,
+        SelectClauses, SelectStatement, UpdateStatement, WithClause,
         problem::{QueryProblem, RuleProblem},
     },
     stack::with_stack,
@@ -37,6 +37,9 @@ impl CteStatement {
 
 impl WithClause {
     pub(crate) fn ast_local_definitions(ast: &With, mut visible: Self) -> Vec<QueryCte> {
+        if !visible.rejected_definitions.is_empty() {
+            return visible.rejected_definitions;
+        }
         let mut local = Vec::new();
         for entry in ast.entries() {
             if let Some(statement) = visible.take(entry.name()) {
@@ -104,6 +107,7 @@ impl WithClause {
             .map(ScalarAnalysisContext::inherited_ctes)
             .unwrap_or_default();
         with.clear_resolution_order();
+        with.rejected_definitions.clear();
         let dialect = context.dialect();
         let ordered = if ast.recursive() {
             match RecursiveWith::order(ast, dialect) {
@@ -115,7 +119,23 @@ impl WithClause {
                         ),
                     ))?;
                     for entry in ast.entries() {
-                        with.insert_resolved(context, entry.name(), CteStatement::unresolved());
+                        with.insert_resolved(
+                            context,
+                            entry.name(),
+                            CteStatement::recovery_binding(entry),
+                        );
+                    }
+                    for entry in ast.entries() {
+                        let body =
+                            CteStatement::from_ast_entry(entry, false, context, &with, outer)?;
+                        let body = CteStatement::InvalidRecursive(Box::new(body));
+                        with.insert_resolved(context, entry.name(), body.clone());
+                        with.rejected_definitions.push(QueryCte::new(
+                            entry.name(),
+                            entry.column_names(),
+                            entry.materialized(),
+                            body,
+                        ));
                     }
                     return Ok(with);
                 }
@@ -277,6 +297,15 @@ impl<'a> RecursiveWith<'a> {
 }
 
 impl CteStatement {
+    fn recovery_binding(entry: &Cte) -> Self {
+        Self::from_query(SelectStatement::ast_build_result(
+            ResultColumnCollection::unresolved_aliases(&entry.column_names()),
+            FromClause::default(),
+            None,
+            SelectClauses::default(),
+        ))
+    }
+
     fn from_recursive_ast(
         entry: &Cte,
         context: &mut impl ParseContext,
@@ -290,7 +319,17 @@ impl CteStatement {
                     entry.name()
                 )),
             ))?;
-            return Ok(Self::unresolved());
+            let from = FromClause::default();
+            let mut with = scope.inherited_ctes();
+            with.insert_resolved(context, entry.name(), Self::recovery_binding(entry));
+            let recovery_scope = ScalarAnalysisContext::nested(&with, &from, Some(scope));
+            let body = Self::from_ast_cte_body(
+                entry.body(),
+                context,
+                &recovery_scope,
+                &entry.column_names(),
+            )?;
+            return Ok(Self::InvalidRecursive(Box::new(body)));
         };
         let aliases = entry.column_names();
         let mut query = SelectStatement::analyze_ast_query_with(
@@ -385,6 +424,29 @@ mod test_recursive_ctes {
                 .single_type(),
             Some(PgBuiltInType::text()),
         );
+    }
+
+    #[test]
+    fn invalid_recursive_body_retains_parameters_and_star_shape() {
+        let (query, context) = resolve(
+            "WITH RECURSIVE t(n) AS (SELECT n FROM t UNION ALL SELECT $1) SELECT * FROM t",
+            Dialect::postgres(),
+            true,
+        )
+        .unwrap();
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| { problem.code() == "query_invalid_recursive_cte" })
+        );
+        assert!(context.parameter_constraints().parameter(1).is_some());
+        let [cte] = query.query_clauses().unwrap().with() else {
+            panic!("one CTE");
+        };
+        assert!(matches!(cte.statement(), CteStatement::InvalidRecursive(_)));
+        assert_eq!(query.result_columns().len(), 1);
+        assert!(!query.set_operations_valid().unwrap());
     }
 
     #[cfg(feature = "sqlite")]

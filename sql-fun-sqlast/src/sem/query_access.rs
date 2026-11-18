@@ -641,6 +641,28 @@ mod tests {
         }
     }
     #[test]
+    fn forward_cte_dependencies_preserve_filter_lineage() {
+        let (accesses, problems) = query_access::analyze_diagnosed(
+            "WITH RECURSIVE first_cte AS (SELECT id FROM later_cte), \
+             later_cte AS (SELECT id FROM public.a) \
+             SELECT 1 FROM first_cte WHERE id = 1",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+        assert!(
+            accesses.records().iter().any(|access| {
+                *access.access_kind() == AccessKind::select_filter()
+                    && access.relation().local_name() == "a"
+                    && access
+                        .column_name()
+                        .as_ref()
+                        .is_some_and(|name| name.as_str() == "id")
+            }),
+            "{:?}",
+            accesses.records()
+        );
+    }
+
+    #[test]
     fn recursive_cte_accesses_are_attributed_to_the_anchor_relation() {
         let (accesses, problems) = query_access::analyze_diagnosed(
             "WITH RECURSIVE c(id) AS (SELECT id FROM a UNION ALL SELECT id FROM c WHERE false) SELECT id FROM c",
@@ -928,6 +950,9 @@ impl<'a, C: ParseContext> AccessCollector<'a, C> {
     }
 }
 impl<C: ParseContext> SemanticVisitor for AccessCollector<'_, C> {
+    fn cte_dependency_order(&self) -> bool {
+        true
+    }
     fn enter_set_operation(&mut self) {
         self.set_operands.push(Vec::new());
     }

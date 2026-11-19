@@ -93,8 +93,8 @@ pub use self::{
     codegen_options::{BuilderSetter, CodegenOptions},
     coll::IVec,
     extensions::{
-        ExtensionConfigError, ExtensionNameVersionPair, ExtensionVersion,
-        PostgresExtensionsCollection, PostgresExtensionsParseError,
+        ExtensionConfigError, ExtensionNameVersionPair, ExtensionScript, ExtensionScriptSettings,
+        ExtensionVersion, PostgresExtensionsCollection, PostgresExtensionsParseError,
     },
     highlighter::TerminalColor,
     lookup_result::LookupResult,

@@ -1,13 +1,18 @@
+mod extension_script;
+
 #[cfg(test)]
 pub(crate) mod test_helpers;
 
 use crate::file_hash_cache::ReadToken;
 
 use crate::{cache::Cache, file_hash_cache::FileHashCache};
-use ::sql_fun_core::{Hasher, PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata};
+use ::sql_fun_core::{
+    ExtensionScript, Hasher, PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata,
+};
 use ::sql_fun_sqlast::{
     ParseDumpFileError, PostgresDialect, SqlFileSnapshot,
-    context::{BaseContext, FrozenBaseContext},
+    context::{BaseContext, FrozenBaseContext, SearchPathRead},
+    names::SchemaName,
     sem::AnalysisProblem,
 };
 use std::{
@@ -158,6 +163,8 @@ pub struct SchemaSelection {
     search_path: Vec<String>,
     roles: Option<::sql_fun_core::RoleInventory>,
     extensions: Vec<PathBuf>,
+    extension_scripts: Vec<ExtensionScript>,
+    extension_install_owner: String,
     dump: Option<PathBuf>,
     expected_hash: Option<String>,
     level: ::sql_fun_core::SchemaLevel,
@@ -239,10 +246,15 @@ impl SchemaSelection {
                 .map_err(|e| SchemaLoadError::source(&e))?,
             roles: metadata.roles().cloned(),
             extensions: extensions.to_vec(),
+            extension_scripts: Vec::new(),
+            extension_install_owner: metadata.extension_install_owner().to_owned(),
             dump: dump.map(Path::to_path_buf),
             expected_hash: expected_hash.map(str::to_owned),
             level,
         })
+    }
+    pub(crate) fn set_extension_scripts(&mut self, scripts: Vec<ExtensionScript>) {
+        self.extension_scripts = scripts;
     }
 }
 
@@ -375,12 +387,9 @@ impl SchemaCacheService {
         if !selection.level.includes_extensions() {
             return Self::prefix(layer);
         }
-        for extension in &selection.extensions {
-            layer = self
-                .load_layer(&layer, extension, None, &args, &metadata)
-                .await?;
-            Self::successful(&layer.outcome)?;
-        }
+        layer = self
+            .load_extensions(layer, selection, &args, &metadata)
+            .await?;
         if !selection.level.includes_project() {
             return Self::prefix(layer);
         }
@@ -510,6 +519,109 @@ impl SchemaCacheService {
             Err(error) => Err(CacheableSchemaError::classify(&error)?),
         };
         Ok(Arc::new(result))
+    }
+
+    async fn load_extensions(
+        &self,
+        mut layer: LoadedLayer,
+        selection: &SchemaSelection,
+        args: &SqlFunArgs,
+        metadata: &SqlFunMetadata,
+    ) -> Result<LoadedLayer, SchemaLoadError> {
+        for extension in &selection.extensions {
+            layer = self
+                .load_layer(&layer, extension, None, args, metadata)
+                .await?;
+            Self::successful(&layer.outcome)?;
+        }
+        let mut extension_schemas = HashMap::new();
+        for script in &selection.extension_scripts {
+            let default_schema = Self::successful(&layer.outcome)?.base.get_default_schema();
+            let schema = match script.settings.schema.as_deref() {
+                Some(schema) => Some(schema),
+                None => default_schema.as_ref().map(SchemaName::as_str),
+            };
+            layer = self
+                .load_extension(
+                    &layer,
+                    script,
+                    &selection.extension_install_owner,
+                    schema,
+                    &extension_schemas,
+                    (args, metadata),
+                )
+                .await?;
+            Self::successful(&layer.outcome)?;
+            if let Some(schema) = schema {
+                extension_schemas.insert(script.name.clone(), schema.to_owned());
+            }
+        }
+        Ok(layer)
+    }
+
+    async fn load_extension(
+        &self,
+        parent: &LoadedLayer,
+        script: &ExtensionScript,
+        owner: &str,
+        schema: Option<&str>,
+        required_schemas: &HashMap<String, String>,
+        (args, metadata): (&SqlFunArgs, &SqlFunMetadata),
+    ) -> Result<LoadedLayer, SchemaLoadError> {
+        let path = ::tokio::fs::canonicalize(&script.path)
+            .await
+            .map_err(|error| SchemaLoadError::source(&error))?;
+        let text = ::tokio::fs::read_to_string(&path)
+            .await
+            .map_err(|error| SchemaLoadError::source(&error))?;
+        let (sql, search_path) =
+            extension_script::prepare(&text, &script.settings, owner, schema, required_schemas)
+                .map_err(|error| {
+                    SchemaLoadError::invalid(&format!("{}: {error}", path.display()))
+                })?;
+        let snapshot = SqlFileSnapshot::from_text(&path, sql);
+        let mut hasher = Hasher::new();
+        hasher.append_str("extension");
+        hasher.append_str(snapshot.content_hash());
+        hasher.append_str(
+            &::serde_json::to_string(&search_path).expect("string array serialization"),
+        );
+        let hash = hasher.finish();
+        let key = parent.key.layer(&hash, &path)?;
+        if let Some(outcome) = self.layers.lookup(&key) {
+            return Ok(LoadedLayer {
+                key,
+                hash: Some(hash),
+                outcome,
+            });
+        }
+        let search_path: Vec<_> = search_path
+            .iter()
+            .map(|name| SchemaName::from(name))
+            .collect();
+        let parent = parent.clone();
+        let args = args.clone();
+        let metadata = metadata.clone();
+        let layers = Arc::clone(&self.layers);
+        ::tokio::task::spawn_blocking(move || {
+            let base = Self::successful(&parent.outcome)?;
+            let parsed = PostgresDialect::parse_extension_snapshot(
+                &snapshot,
+                &base.base,
+                &args,
+                &metadata,
+                &search_path,
+            );
+            let outcome = Self::outcome(parsed, &path, &base.diagnostics)?;
+            let outcome = layers.publish(&key, &outcome);
+            Ok(LoadedLayer {
+                key,
+                hash: Some(hash),
+                outcome,
+            })
+        })
+        .await
+        .expect("extension loader panicked")
     }
 
     async fn load_layer(

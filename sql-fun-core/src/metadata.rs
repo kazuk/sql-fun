@@ -402,6 +402,9 @@ pub struct SqlFunMetadata {
     /// Explicit exact-name role inventory for offline ownership analysis.
     roles: Option<RoleInventory>,
 
+    /// Assumed PostgreSQL extension installer for offline analysis.
+    extension_install_owner: Option<String>,
+
     /// Schema search path
     search_path: Option<Vec<String>>,
 
@@ -629,6 +632,14 @@ impl SqlFunMetadata {
     #[must_use]
     pub const fn roles(&self) -> Option<&RoleInventory> {
         self.roles.as_ref()
+    }
+
+    /// Assumed invoking role for PostgreSQL extension scripts.
+    #[must_use]
+    pub fn extension_install_owner(&self) -> &str {
+        self.extension_install_owner
+            .as_deref()
+            .unwrap_or("postgres")
     }
 
     /// Code generation options configured for this datasource.

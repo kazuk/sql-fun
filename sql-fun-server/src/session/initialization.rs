@@ -38,20 +38,21 @@ impl Initialization {
                 .postgres_extensions_dir(&metadata)
                 .map_err(|error| SchemaLoadError::source(&error))?;
             args.postgres_extensions(&metadata)
-                .sql_files(directory)
+                .scripts(&directory)
                 .map_err(|error| SchemaLoadError::source(&error))?
         } else {
-            ::sql_fun_core::IVec::default()
+            Vec::new()
         };
-        let selection = SchemaSelection::for_level(
+        let mut selection = SchemaSelection::for_level(
             request.datasource(),
             &args,
             &metadata,
-            &files,
+            &[],
             request.schema_dump().as_deref(),
             request.expected_hash().as_deref(),
             level,
         )?;
+        selection.set_extension_scripts(files);
         let (lint_configuration, lint_path) = if level.includes_project() {
             (
                 metadata
@@ -96,5 +97,72 @@ impl Initialization {
             .initialize(&self.selection)
             .await
             .map_err(SqlFunServerApiError::new_schema_context_initialize_failed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::session::initialization::Initialization;
+    use crate::{Api, schema_cache::test_helpers::SchemaProject};
+    use sql_fun_sqlast::{
+        context::{BaseParseContext, SearchPathRead},
+        names::{FullName, TableName},
+    };
+
+    #[tokio::test]
+    async fn extension_initialization_applies_datasource_owner_and_control_overrides() {
+        let project = SchemaProject::new();
+        let directory = project.home().join("postgres/17/extension");
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("example.control"), "schema = ignored\n").unwrap();
+        std::fs::write(
+            directory.join("example--1.0.control"),
+            "schema = 'Extension Schema'\n",
+        )
+        .unwrap();
+        std::fs::write(
+            directory.join("example--1.0.sql"),
+            "CREATE TABLE ext_table (id int4); ALTER TABLE @extschema@.ext_table OWNER TO @extowner@;",
+        ).unwrap();
+        let manifest = project.home().join("Cargo.toml");
+        let text = std::fs::read_to_string(&manifest).unwrap().replace(
+            "[package.metadata.database.products]",
+            "[package.metadata.database.products]\nroles = ['postgres', 'Install Owner']",
+        );
+        std::fs::write(&manifest, text).unwrap();
+        let mut request = project.rpc_request("-- unused");
+        request["schema_level"] = serde_json::json!("extensions");
+        request["environments"]["SQL_FUN_EXTENSIONS"] = serde_json::json!("example@1.0");
+        request["environments"]["SQL_FUN_EXTENSIONS_DIR"] = serde_json::json!(directory);
+        let request = serde_json::from_value(request).unwrap();
+        let api = Api {
+            schema_cache: std::sync::OnceLock::new(),
+        };
+        let default = Initialization::from_request(&request)
+            .unwrap()
+            .initialize(&api)
+            .await
+            .unwrap();
+
+        let text = std::fs::read_to_string(&manifest).unwrap().replace(
+            "[package.metadata.database.products]",
+            "[package.metadata.database.products]\nextension_install_owner = 'Install Owner'",
+        );
+        std::fs::write(&manifest, text).unwrap();
+        let specified = Initialization::from_request(&request)
+            .unwrap()
+            .initialize(&api)
+            .await
+            .unwrap();
+        let table = TableName::from(FullName::with_schema("Extension Schema", "ext_table"));
+        for (initialized, owner) in [(&default, "postgres"), (&specified, "Install Owner")] {
+            let base = initialized.base_context();
+            assert_eq!(base.get_default_schema().unwrap().as_str(), "public");
+            assert_eq!(
+                base.get_table(&table).unwrap().owner().unwrap().name(),
+                Some(owner)
+            );
+        }
+        assert_ne!(default.key(), specified.key());
     }
 }

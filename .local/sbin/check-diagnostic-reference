@@ -209,9 +209,6 @@ SOURCE_WITNESS = {
         "ExtensionNotFound": 2,
         "extension_not_found": 1
     },
-    "sql-fun-core/src/extensions/name_version_pair.rs": {
-        "extension_not_found": 1
-    },
     "sql-fun-sqlast/src/sem/alter_owner/ddl.rs": {
         "OwnershipLookup": 2,
         "ownership_target": 1

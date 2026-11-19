@@ -695,6 +695,39 @@ mod test_environments {
     }
 
     #[test]
+    fn extension_version_export_uses_the_installation_path() -> ::testresult::TestResult {
+        let project = TestProjectDir::new()?;
+        let fixture = write_named_postgres_metadata_project(&project, "configured");
+        let directory = project.path().join("extension");
+        std::fs::create_dir(&directory)?;
+        std::fs::write(directory.join("ext--1.sql"), "")?;
+        std::fs::write(directory.join("ext--1--2.sql"), "")?;
+        let mut builder = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_file(&fixture.metadata_file)
+                .with_schema("qa")
+                .into_map(),
+        )?;
+        builder
+            .datasource(Some("configured".to_owned()))
+            .postgres_extensions_dir(&directory)
+            .postgres_extensions("ext".to_owned())
+            .unwrap();
+        let args = builder.build()?;
+        let error = args.environments().unwrap_err();
+        assert!(
+            error.to_string().contains(
+                "Extension ext requires an explicit version (ext@version); available versions: 1, 2"
+            ),
+            "{error}"
+        );
+        std::fs::write(directory.join("ext.control"), "default_version=2")?;
+        assert_eq!(args.environments()?["SQL_FUN_EXTENSIONS"], "ext@2");
+        Ok(())
+    }
+
+    #[test]
     fn malformed_metadata_is_not_treated_as_an_absent_datasource() {
         let project = TestProjectDir::new().unwrap();
         let fixture = write_named_postgres_metadata_project(&project, "default");

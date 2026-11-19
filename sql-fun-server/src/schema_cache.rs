@@ -163,7 +163,7 @@ pub struct SchemaSelection {
     search_path: Vec<String>,
     roles: Option<::sql_fun_core::RoleInventory>,
     extensions: Vec<PathBuf>,
-    extension_scripts: Vec<ExtensionScript>,
+    extension_scripts: Vec<Vec<ExtensionScript>>,
     extension_install_owner: String,
     dump: Option<PathBuf>,
     expected_hash: Option<String>,
@@ -253,7 +253,7 @@ impl SchemaSelection {
             level,
         })
     }
-    pub(crate) fn set_extension_scripts(&mut self, scripts: Vec<ExtensionScript>) {
+    pub(crate) fn set_extension_scripts(&mut self, scripts: Vec<Vec<ExtensionScript>>) {
         self.extension_scripts = scripts;
     }
 }
@@ -535,25 +535,31 @@ impl SchemaCacheService {
             Self::successful(&layer.outcome)?;
         }
         let mut extension_schemas = HashMap::new();
-        for script in &selection.extension_scripts {
+        for scripts in &selection.extension_scripts {
+            let Some(install) = scripts.first() else {
+                continue;
+            };
             let default_schema = Self::successful(&layer.outcome)?.base.get_default_schema();
-            let schema = match script.settings().schema() {
+            // Updates keep the schema chosen by the installation step.
+            let schema = match install.settings().schema() {
                 Some(schema) => Some(schema),
                 None => default_schema.as_ref().map(SchemaName::as_str),
             };
-            layer = self
-                .load_extension(
-                    &layer,
-                    script,
-                    &selection.extension_install_owner,
-                    schema,
-                    &extension_schemas,
-                    (args, metadata),
-                )
-                .await?;
-            Self::successful(&layer.outcome)?;
+            for script in scripts {
+                layer = self
+                    .load_extension(
+                        &layer,
+                        script,
+                        &selection.extension_install_owner,
+                        schema,
+                        &extension_schemas,
+                        (args, metadata),
+                    )
+                    .await?;
+                Self::successful(&layer.outcome)?;
+            }
             if let Some(schema) = schema {
-                extension_schemas.insert(script.name().to_owned(), schema.to_owned());
+                extension_schemas.insert(install.name().to_owned(), schema.to_owned());
             }
         }
         Ok(layer)
@@ -571,6 +577,21 @@ impl SchemaCacheService {
         let path = ::tokio::fs::canonicalize(script.path())
             .await
             .map_err(|error| SchemaLoadError::source(&error))?;
+        if let Some(encoding) = script.settings().encoding() {
+            let normalized: String = encoding
+                .chars()
+                .filter(char::is_ascii_alphanumeric)
+                .collect();
+            if !["UTF8", "UNICODE", "SQLASCII"]
+                .iter()
+                .any(|supported| normalized.eq_ignore_ascii_case(supported))
+            {
+                return Err(SchemaLoadError::invalid(&format!(
+                    "{}: unsupported extension script encoding {encoding}",
+                    path.display()
+                )));
+            }
+        }
         let text = ::tokio::fs::read_to_string(&path)
             .await
             .map_err(|error| SchemaLoadError::source(&error))?;

@@ -17,6 +17,14 @@ pub enum ExtensionConfigError {
     #[error("Invalid extension control file {0}:{1}: {2}")]
     InvalidControlFile(PathBuf, usize, String),
 
+    /// No explicit version or declared default.
+    #[error("Extension {0} requires an explicit version ({0}@version); {1}")]
+    MissingDefaultVersion(String, String),
+
+    /// The requested target cannot be installed from the available scripts.
+    #[error("No installation path for extension {0}@{1} in {2}")]
+    NoInstallationPath(String, ExtensionVersion, PathBuf),
+
     /// IO error
     #[error(transparent)]
     Io(#[from] std::io::Error),

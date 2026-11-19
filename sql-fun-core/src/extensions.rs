@@ -2,6 +2,7 @@ mod config_error;
 mod control_file;
 mod extension_collection;
 mod name_version_pair;
+mod script_inventory;
 #[cfg(test)]
 mod test_helpers;
 

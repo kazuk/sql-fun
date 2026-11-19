@@ -12,7 +12,7 @@ use combine::{
 
 use crate::{ExtensionConfigError, ExtensionNameVersionPair, ExtensionScriptSettings, IVec};
 
-/// Selected installation script and effective PostgreSQL control settings.
+/// Selected installation or update script and its effective PostgreSQL control settings.
 #[derive(Debug)]
 pub struct ExtensionScript {
     name: String,
@@ -23,15 +23,16 @@ pub struct ExtensionScript {
 impl ExtensionScript {
     pub(super) fn read(
         name: &str,
-        path: &Path,
-        directory: &Path,
+        path: PathBuf,
+        destination: &str,
+        primary: &ExtensionScriptSettings,
     ) -> Result<Self, ExtensionConfigError> {
-        let mut settings = ExtensionScriptSettings::default();
-        settings.apply_file(&directory.join(format!("{name}.control")))?;
-        settings.apply_file(&path.with_extension("control"))?;
+        let mut settings = primary.clone();
+        let control = path.with_file_name(format!("{name}--{destination}.control"));
+        settings.apply_file(&control, true)?;
         Ok(Self {
             name: name.to_owned(),
-            path: path.to_path_buf(),
+            path,
             settings,
         })
     }
@@ -42,7 +43,7 @@ impl ExtensionScript {
         &self.name
     }
 
-    /// Resolved installation script.
+    /// Resolved installation or update script.
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
@@ -122,10 +123,7 @@ impl PostgresExtensionsCollection {
         Ok(result)
     }
 
-    ///
-    /// get extension SQL file paths
-    ///
-    /// guranties returned paths exists true
+    /// Resolve all SQL file paths in their load order.
     ///
     /// # Errors
     ///
@@ -137,22 +135,29 @@ impl PostgresExtensionsCollection {
     ) -> Result<IVec<PathBuf>, ExtensionConfigError> {
         let mut result = Vec::new();
         for item in &mut self.0 {
-            result.push(item.resolve_version(&base_path)?);
+            result.extend(
+                item.resolve_version(&base_path)?
+                    .into_iter()
+                    .map(|script| script.path),
+            );
         }
         Ok(IVec::from(result))
     }
 
-    /// Resolve configured scripts and read the controls used for preprocessing.
+    /// Resolve each configured extension's ordered scripts and their effective controls.
+    ///
+    /// The outer vector follows configuration order. Each inner vector starts
+    /// with the installation script, followed by updates to the target.
     ///
     /// # Errors
     /// Returns resolution or control-file errors.
     pub fn scripts(
         &mut self,
         directory: &Path,
-    ) -> Result<Vec<ExtensionScript>, ExtensionConfigError> {
+    ) -> Result<Vec<Vec<ExtensionScript>>, ExtensionConfigError> {
         self.0
             .iter_mut()
-            .map(|item| item.script(directory))
+            .map(|item| item.resolve_version(directory))
             .collect()
     }
 

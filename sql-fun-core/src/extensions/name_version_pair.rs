@@ -6,10 +6,13 @@ use combine::{
 
 use std::{
     fmt::{Display, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
-use crate::{ExtensionConfigError, ExtensionScript, ExtensionVersion, extensions::control_file};
+use crate::{
+    ExtensionConfigError, ExtensionScript, ExtensionScriptSettings, ExtensionVersion,
+    extensions::script_inventory::{ScriptInventory, script_path},
+};
 
 /// Postgres extensin name version pair.
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Default)]
@@ -119,124 +122,82 @@ mod test_try_new {
 }
 
 impl ExtensionNameVersionPair {
-    pub(super) fn script(
-        &mut self,
-        directory: &Path,
-    ) -> Result<ExtensionScript, ExtensionConfigError> {
-        let path = self.resolve_version(directory)?;
-        ExtensionScript::read(&self.name, &path, directory)
-    }
-
-    /// get extension sql path
+    /// Resolve the ordered installation and update scripts and record the target version.
     ///
     /// # Errors
-    ///
-    /// Returns [`ExtensionConfigError`] when the SQL file cannot be located or
-    /// metadata resolution fails.
+    /// Returns resolution or control-file errors.
     pub fn resolve_version<P: AsRef<Path>>(
         &mut self,
-        base_path: P,
-    ) -> Result<PathBuf, ExtensionConfigError> {
-        if let Some(version) = &self.version {
-            ExtensionVersion::installation(&version.to_string())?;
-            let path = base_path
-                .as_ref()
-                .join(PathBuf::from(format!("{}--{version}.sql", self.name)));
-            if path.is_file() {
-                Ok(path)
+        directory: P,
+    ) -> Result<Vec<ExtensionScript>, ExtensionConfigError> {
+        let directory = directory.as_ref();
+        Self::validate_name(&self.name)?;
+        let mut primary = ExtensionScriptSettings::default();
+        primary.apply_file(&directory.join(format!("{}.control", self.name)), false)?;
+        // PostgreSQL resolves a relative directory against the installation's
+        // share directory, one level above the primary control directory.
+        let script_directory = primary.directory.as_ref().map_or_else(
+            || directory.to_path_buf(),
+            |path| directory.parent().unwrap_or(directory).join(path),
+        );
+        let Some(target) = self.version.as_ref().or(primary.default_version.as_ref()) else {
+            let inventory = ScriptInventory::read(&script_directory, &self.name)?;
+            let choices = inventory
+                .available_versions()
+                .into_iter()
+                .filter(|version| version.chars().all(Self::is_version_argument_char))
+                .collect::<Vec<_>>();
+            let message = if choices.is_empty() {
+                "no usable versions found".to_owned()
             } else {
-                ExtensionConfigError::extension_sql_not_exist(&self.name, version, path)
-            }
+                format!("available versions: {}", choices.join(", "))
+            };
+            return Err(ExtensionConfigError::MissingDefaultVersion(
+                self.name.clone(),
+                message,
+            ));
+        };
+        let target = ExtensionVersion::installation(&target.to_string())?;
+        let version = target.to_string();
+        let direct = script_path(&script_directory, &self.name, &version);
+        let scripts = if direct.is_file() {
+            vec![ExtensionScript::read(
+                &self.name, direct, &version, &primary,
+            )?]
         } else {
-            self.resolve_version_from_extension_files(base_path)
-        }
-    }
-
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ExtensionConfigError`] when directory traversal fails or when
-    /// the version cannot be inferred uniquely.
-    fn resolve_version_from_extension_files<P: AsRef<Path>>(
-        &mut self,
-        base_path: P,
-    ) -> Result<PathBuf, ExtensionConfigError> {
-        let base_path = base_path.as_ref();
-        let control_path = base_path.join(format!("{}.control", self.name));
-        match std::fs::read(&control_path) {
-            Ok(contents) => {
-                if let Some(version) = control_file::default_version(&contents, &control_path)? {
-                    let version = ExtensionVersion::installation(&version)?;
-                    let path = base_path.join(format!("{}--{version}.sql", self.name));
-                    if !path.is_file() {
-                        return ExtensionConfigError::extension_sql_not_exist(
-                            &self.name, &version, &path,
-                        );
-                    }
-                    self.version = Some(version);
-                    return Ok(path);
-                }
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
-        }
-        let name_prefix = format!("{}--", self.name);
-        let dir = base_path.read_dir()?;
-        let mut version_candidates = Vec::new();
-        for entry in dir {
-            let entry = entry?;
-            if !entry.file_type()?.is_file() {
-                continue;
-            }
-            let name_path = PathBuf::from(entry.file_name());
-            let Some(ext) = name_path.extension() else {
-                continue;
+            let inventory = ScriptInventory::read(&script_directory, &self.name)?;
+            let Some(path) = inventory.installation_path(&version) else {
+                return Err(ExtensionConfigError::NoInstallationPath(
+                    self.name.clone(),
+                    target,
+                    script_directory,
+                ));
             };
-            let Some(ext) = ext.to_str() else {
-                continue;
-            };
-            let Some(stem) = name_path.file_stem() else {
-                continue;
-            };
-            let Some(stem) = stem.to_str() else {
-                continue;
-            };
-            if !ext.eq_ignore_ascii_case("sql") || !stem.starts_with(&name_prefix) {
-                continue;
-            }
-            let version = &stem[name_prefix.len()..];
-            if !version.is_empty()
-                && !version.contains("--")
-                && ExtensionVersion::installation(version).is_ok()
-            {
-                version_candidates.push((version.to_string(), entry.path()));
-            }
-        }
-
-        version_candidates.sort_by(|left, right| left.0.cmp(&right.0));
-        if version_candidates.len() == 1 {
-            let (version, path) = &version_candidates[0];
-            self.version = Some(ExtensionVersion::new(version));
-            Ok(path.clone())
-        } else if version_candidates.is_empty() {
-            ExtensionConfigError::extension_not_found(&self.name, base_path)
-        } else {
-            ExtensionConfigError::multiple_extension_version(
-                &self.name,
-                base_path,
-                &version_candidates
-                    .into_iter()
-                    .map(|(version, _)| version)
-                    .collect::<Vec<_>>(),
-            )
-        }
+            path.into_iter()
+                .scan(None, |previous, destination| {
+                    let filename_version = previous.replace(destination).map_or_else(
+                        || destination.to_owned(),
+                        |source| format!("{source}--{destination}"),
+                    );
+                    let path = script_path(&script_directory, &self.name, &filename_version);
+                    Some(ExtensionScript::read(
+                        &self.name,
+                        path,
+                        destination,
+                        &primary,
+                    ))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        self.version = Some(target);
+        Ok(scripts)
     }
 }
 
 #[cfg(test)]
 mod test_installation_resolution {
     use crate::{
-        ExtensionVersion,
+        ExtensionScript, ExtensionVersion,
         extensions::{name_version_pair::ExtensionNameVersionPair, test_helpers::ExtensionFixture},
     };
 
@@ -246,27 +207,39 @@ mod test_installation_resolution {
             ExtensionFixture::new("ext", &["1", "2", "1--2"], Some("default_version='2'"))?;
         let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
         assert_eq!(
-            pair.resolve_version(fixture.path())?,
+            pair.resolve_version(fixture.path())?[0].path(),
             fixture.script("ext", "2")
         );
         assert_eq!(pair.to_string(), "ext@2");
         let mut explicit =
             ExtensionNameVersionPair::try_new("ext", &Some(ExtensionVersion::new("1")))?;
         assert_eq!(
-            explicit.resolve_version(fixture.path())?,
+            explicit.resolve_version(fixture.path())?[0].path(),
             fixture.script("ext", "1")
         );
         Ok(())
     }
 
     #[test]
-    fn fallback_uses_only_installation_scripts() -> ::testresult::TestResult {
+    fn missing_default_reports_usable_versions() -> ::testresult::TestResult {
         for control in [None, Some("comment='no default'")] {
-            let fixture = ExtensionFixture::new("ext", &["release-2", "1--2", ""], control)?;
+            let fixture = ExtensionFixture::new("ext", &["z", "z--b", "b--a", "x--y"], control)?;
             let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
             assert_eq!(
-                pair.resolve_version(fixture.path())?,
-                fixture.script("ext", "release-2")
+                pair.resolve_version(fixture.path())
+                    .unwrap_err()
+                    .to_string(),
+                "Extension ext requires an explicit version (ext@version); available versions: a, b, z"
+            );
+            let mut explicit =
+                ExtensionNameVersionPair::try_new("ext", &Some(ExtensionVersion::new("a")))?;
+            let scripts = explicit.resolve_version(fixture.path())?;
+            assert_eq!(
+                scripts
+                    .iter()
+                    .map(ExtensionScript::path)
+                    .collect::<Vec<_>>(),
+                ["z", "z--b", "b--a"].map(|version| fixture.script("ext", version))
             );
         }
         Ok(())
@@ -301,14 +274,11 @@ mod test_installation_resolution {
     }
 
     #[test]
-    fn explicit_selection_ignores_malformed_control_but_rejects_updates() -> ::testresult::TestResult
-    {
+    fn explicit_selection_reads_control_and_rejects_update_filenames() -> ::testresult::TestResult {
         let fixture = ExtensionFixture::new("ext", &["1", "1--2"], Some("invalid"))?;
         let mut pair = ExtensionNameVersionPair::try_new("ext", &Some(ExtensionVersion::new("1")))?;
-        assert_eq!(
-            pair.resolve_version(fixture.path())?,
-            fixture.script("ext", "1")
-        );
+        assert!(pair.resolve_version(fixture.path()).is_err());
+        let fixture = ExtensionFixture::new("ext", &["1", "1--2"], None)?;
         let mut update =
             ExtensionNameVersionPair::try_new("ext", &Some(ExtensionVersion::new("1--2")))?;
         assert!(update.resolve_version(fixture.path()).is_err());
@@ -316,13 +286,59 @@ mod test_installation_resolution {
     }
 
     #[test]
-    fn ambiguity_diagnostics_sort_installation_versions() -> ::testresult::TestResult {
-        let fixture = ExtensionFixture::new("ext", &["z", "a", "a--z"], None)?;
+    fn update_path_uses_postgres_ties_and_destination_controls() -> ::testresult::TestResult {
+        let fixture = ExtensionFixture::new(
+            "ext",
+            &["1", "2", "1--x", "2--x", "2--y", "x--3", "y--3", "3--4"],
+            Some("default_version='4'\nrequires='primary'"),
+        )?;
+        std::fs::write(
+            fixture.path().join("ext--3.control"),
+            r#"requires='CuBe, "Quoted Prerequisite"'
+module_pathname='update'"#,
+        )?;
         let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
-        let error = pair.resolve_version(fixture.path()).unwrap_err();
+        let scripts = pair.resolve_version(fixture.path())?;
         assert_eq!(
-            error.to_string(),
-            "Extension ext has multiple versions [\"a\", \"z\"], please specify one of version"
+            scripts
+                .iter()
+                .map(ExtensionScript::path)
+                .collect::<Vec<_>>(),
+            ["2", "2--x", "x--3", "3--4"].map(|version| fixture.script("ext", version))
+        );
+        assert_eq!(
+            scripts[2].settings().requires(),
+            ["cube", "Quoted Prerequisite"]
+        );
+        assert_eq!(scripts[2].settings().module_pathname(), Some("update"));
+        assert_eq!(scripts[3].settings().requires(), ["primary"]);
+        assert_eq!(scripts[3].settings().module_pathname(), None);
+        assert_eq!(pair.to_string(), "ext@4");
+        Ok(())
+    }
+
+    #[test]
+    fn reads_relative_script_directory_and_rejects_auxiliary_directory() -> ::testresult::TestResult
+    {
+        let root = ::tempfile::tempdir()?;
+        let controls = root.path().join("extension");
+        let scripts = root.path().join("scripts");
+        std::fs::create_dir(&controls)?;
+        std::fs::create_dir(&scripts)?;
+        std::fs::write(
+            controls.join("ext.control"),
+            "directory='scripts'\ndefault_version='1'",
+        )?;
+        let sql = scripts.join("ext--1.sql");
+        std::fs::write(&sql, "")?;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+        assert_eq!(pair.resolve_version(&controls)?[0].path(), sql);
+        std::fs::write(scripts.join("ext--1.control"), "directory='other'")?;
+        assert!(
+            pair.resolve_version(&controls)
+                .unwrap_err()
+                .to_string()
+                .contains("primary control settings")
         );
         Ok(())
     }
@@ -336,36 +352,24 @@ mod test_installation_resolution {
         assert_eq!(pair.to_string(), "ext");
         Ok(())
     }
-}
-
-#[cfg(test)]
-mod test_resolve_version {
-    use crate::extensions::name_version_pair::ExtensionVersion as NameVersionPairExtensionVersion;
-
-    use std::fs::File;
-
-    use testresult::TestResult;
-
-    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
-
     #[test]
-    fn test_resolve_version_with_version() -> TestResult {
+    fn test_resolve_version_with_version() -> ::testresult::TestResult {
         let tmp_dir = tempfile::tempdir()?;
         let file_path = tmp_dir.path().join("ext--1.0.sql");
-        File::create(&file_path)?;
+        std::fs::File::create(&file_path)?;
 
-        let version = Some(NameVersionPairExtensionVersion::try_from("1.0")?);
+        let version = Some(ExtensionVersion::try_from("1.0")?);
         let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
         let resolved = pair.resolve_version(tmp_dir.path())?;
 
-        assert_eq!(file_path, resolved);
+        assert_eq!(file_path, resolved[0].path());
         Ok(())
     }
 
     #[test]
-    fn test_resolve_version_missing_file() -> TestResult {
+    fn test_resolve_version_missing_file() -> ::testresult::TestResult {
         let tmp_dir = tempfile::tempdir()?;
-        let version = Some(NameVersionPairExtensionVersion::try_from("1.0")?);
+        let version = Some(ExtensionVersion::try_from("1.0")?);
         let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
 
         let result = pair.resolve_version(tmp_dir.path());
@@ -374,43 +378,23 @@ mod test_resolve_version {
     }
 
     #[test]
-    fn test_resolve_version_from_extension_files_single() -> TestResult {
-        let tmp_dir = tempfile::tempdir()?;
-        let file_path = tmp_dir.path().join("ext--1.0.sql");
-        File::create(&file_path)?;
-
-        let version = None;
-        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
-        let resolved = pair.resolve_version_from_extension_files(tmp_dir.path())?;
-
-        assert_eq!(file_path, resolved);
-        assert_eq!(Some(super::ExtensionVersion::new("1.0")), pair.version);
-        Ok(())
-    }
-
-    #[test]
-    fn test_resolve_version_from_extension_files_multiple() -> TestResult {
-        let tmp_dir = tempfile::tempdir()?;
-        File::create(tmp_dir.path().join("ext--1.0.sql"))?;
-        File::create(tmp_dir.path().join("ext--2.0.sql"))?;
-
-        let version = None;
-        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
-        let result = pair.resolve_version_from_extension_files(tmp_dir.path());
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn test_resolve_version_from_extension_files_missing() -> TestResult {
-        let tmp_dir = tempfile::tempdir()?;
-
-        let version = None;
-        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
-        let result = pair.resolve_version_from_extension_files(tmp_dir.path());
-
-        assert!(result.is_err());
+    fn missing_default_requires_explicit_version_with_zero_or_one_choice()
+    -> ::testresult::TestResult {
+        let directory = tempfile::tempdir()?;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+        assert!(
+            pair.resolve_version(directory.path())
+                .unwrap_err()
+                .to_string()
+                .ends_with("no usable versions found")
+        );
+        std::fs::File::create(directory.path().join("ext--1.0.sql"))?;
+        assert!(
+            pair.resolve_version(directory.path())
+                .unwrap_err()
+                .to_string()
+                .ends_with("available versions: 1.0")
+        );
         Ok(())
     }
 }
@@ -424,12 +408,16 @@ impl ExtensionNameVersionPair {
         many1(choice((alpha_num(), char('_'), char('-'), char('.'))))
     }
 
+    const fn is_version_argument_char(character: char) -> bool {
+        character != ',' && !character.is_whitespace()
+    }
+
     fn version_parser<Input>() -> impl Parser<Input, Output = String>
     where
         Input: Stream<Token = char>,
         Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
     {
-        many1(satisfy(|c: char| c != ',' && !c.is_whitespace()))
+        many1(satisfy(Self::is_version_argument_char))
     }
 }
 

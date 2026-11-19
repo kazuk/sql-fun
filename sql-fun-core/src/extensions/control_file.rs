@@ -1,5 +1,5 @@
 use crate::{ExtensionConfigError, ExtensionVersion};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Control-file settings used to preprocess an extension installation or update script.
 #[derive(Clone, Debug, Default)]
@@ -7,8 +7,8 @@ pub struct ExtensionScriptSettings {
     schema: Option<String>,
     relocatable: bool,
     requires: Vec<String>,
-    pub(super) default_version: Option<ExtensionVersion>,
-    pub(super) directory: Option<std::path::PathBuf>,
+    default_version: Option<ExtensionVersion>,
+    directory: Option<PathBuf>,
     encoding: Option<String>,
     module_pathname: Option<String>,
 }
@@ -42,6 +42,21 @@ impl ExtensionScriptSettings {
     #[must_use]
     pub fn encoding(&self) -> Option<&str> {
         self.encoding.as_deref()
+    }
+
+    pub(super) const fn default_version(&self) -> Option<&ExtensionVersion> {
+        self.default_version.as_ref()
+    }
+
+    pub(super) fn script_directory(&self, control_directory: &Path) -> PathBuf {
+        // Relative paths are anchored in the installation's share directory.
+        match &self.directory {
+            Some(path) => control_directory
+                .parent()
+                .unwrap_or(control_directory)
+                .join(path),
+            None => control_directory.to_path_buf(),
+        }
     }
 
     pub(super) fn apply_file(
@@ -99,13 +114,12 @@ impl ExtensionScriptSettings {
             match name {
                 b"schema" => self.schema = Some(value),
                 b"requires" => {
-                    self.requires = required_extensions(&value).map_err(|reason| {
-                        ExtensionConfigError::InvalidControlFile(
-                            path.to_path_buf(),
-                            line,
-                            reason.to_owned(),
-                        )
-                    })?;
+                    self.requires = match required_extensions(&value) {
+                        Ok(names) => names,
+                        Err(reason) => {
+                            return ExtensionConfigError::invalid_control_file(path, line, reason);
+                        }
+                    };
                 }
                 b"encoding" => self.encoding = Some(value),
                 b"directory" => self.directory = Some(value.into()),
@@ -569,8 +583,6 @@ fn required_extensions(input: &str) -> Result<Vec<String>, &'static str> {
             name = rest[..end].to_ascii_lowercase();
             rest = &rest[end..];
         }
-        // PostgreSQL's standard NAMEDATALEN is 64 bytes including the NUL.
-        name.truncate(name.floor_char_boundary(63));
         names.push(name);
         rest = rest.trim_start_matches(|ch: char| ch.is_ascii_whitespace());
         if rest.is_empty() {
@@ -585,6 +597,19 @@ fn required_extensions(input: &str) -> Result<Vec<String>, &'static str> {
         }
     }
     Ok(names)
+}
+
+#[cfg(test)]
+mod test_required_extensions {
+    use crate::extensions::control_file::required_extensions;
+
+    #[test]
+    fn preserves_identifiers_longer_than_the_standard_postgresql_limit() {
+        let unquoted = "A".repeat(70);
+        let quoted = "É".repeat(40);
+        let names = required_extensions(&format!(r#"{unquoted}, "{quoted}""#)).unwrap();
+        assert_eq!(names, [unquoted.to_ascii_lowercase(), quoted]);
+    }
 }
 
 fn visit_assignments(

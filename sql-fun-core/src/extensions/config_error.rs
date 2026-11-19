@@ -43,6 +43,22 @@ pub enum ExtensionConfigError {
 }
 
 impl ExtensionConfigError {
+    pub(super) fn missing_default_version<T>(name: &str, choices: String) -> Result<T, Self> {
+        Err(Self::MissingDefaultVersion(name.to_owned(), choices))
+    }
+
+    pub(super) fn no_installation_path<T>(
+        name: &str,
+        version: ExtensionVersion,
+        directory: PathBuf,
+    ) -> Result<T, Self> {
+        Err(Self::NoInstallationPath(
+            name.to_owned(),
+            version,
+            directory,
+        ))
+    }
+
     /// Report invalid extension control syntax or default version.
     ///
     /// # Errors

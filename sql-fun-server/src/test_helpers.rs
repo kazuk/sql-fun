@@ -19,4 +19,6 @@ pub(crate) fn extension_script_with_control(control: &str) -> ::sql_fun_core::Ex
         .unwrap()
         .pop()
         .unwrap()
+        .pop()
+        .unwrap()
 }

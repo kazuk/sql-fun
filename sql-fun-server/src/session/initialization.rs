@@ -110,11 +110,15 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn extension_initialization_applies_datasource_owner_and_control_overrides() {
+    async fn extension_initialization_applies_updates_and_destination_controls() {
         let project = SchemaProject::new();
         let directory = project.home().join("postgres/17/extension");
         std::fs::create_dir_all(&directory).unwrap();
-        std::fs::write(directory.join("example.control"), "schema = ignored\n").unwrap();
+        std::fs::write(
+            directory.join("example.control"),
+            "schema = ignored\ndefault_version = 1.2\n",
+        )
+        .unwrap();
         std::fs::write(
             directory.join("example--1.0.control"),
             "schema = 'Extension Schema'\n",
@@ -122,8 +126,24 @@ mod tests {
         .unwrap();
         std::fs::write(
             directory.join("example--1.0.sql"),
-            "CREATE TABLE ext_table (id int4); ALTER TABLE @extschema@.ext_table OWNER TO @extowner@;",
-        ).unwrap();
+            "CREATE TABLE ext_table (id int4);",
+        )
+        .unwrap();
+        std::fs::write(
+            directory.join("example--1.1.control"),
+            "schema = another_schema\n",
+        )
+        .unwrap();
+        std::fs::write(
+            directory.join("example--1.0--1.1.sql"),
+            "ALTER TABLE @extschema@.ext_table RENAME TO updated_table;",
+        )
+        .unwrap();
+        std::fs::write(
+            directory.join("example--1.1--1.2.sql"),
+            "ALTER TABLE @extschema@.updated_table OWNER TO @extowner@;",
+        )
+        .unwrap();
         let manifest = project.home().join("Cargo.toml");
         let text = std::fs::read_to_string(&manifest).unwrap().replace(
             "[package.metadata.database.products]",
@@ -132,7 +152,7 @@ mod tests {
         std::fs::write(&manifest, text).unwrap();
         let mut request = project.rpc_request("-- unused");
         request["schema_level"] = serde_json::json!("extensions");
-        request["environments"]["SQL_FUN_EXTENSIONS"] = serde_json::json!("example@1.0");
+        request["environments"]["SQL_FUN_EXTENSIONS"] = serde_json::json!("example");
         request["environments"]["SQL_FUN_EXTENSIONS_DIR"] = serde_json::json!(directory);
         let request = serde_json::from_value(request).unwrap();
         let api = Api {
@@ -154,7 +174,7 @@ mod tests {
             .initialize(&api)
             .await
             .unwrap();
-        let table = TableName::from(FullName::with_schema("Extension Schema", "ext_table"));
+        let table = TableName::from(FullName::with_schema("Extension Schema", "updated_table"));
         for (initialized, owner) in [(&default, "postgres"), (&specified, "Install Owner")] {
             let base = initialized.base_context();
             assert_eq!(base.get_default_schema().unwrap().as_str(), "public");

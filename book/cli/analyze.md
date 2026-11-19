@@ -153,6 +153,15 @@ higher levels. In particular, the project dump need not exist for `builtin`,
 Datasource configuration and the installed builtin catalog are still required.
 The existing initialization API currently supports PostgreSQL schema contexts.
 
+Select a PostgreSQL extension as `name@version`, or as `name` to use its
+control file's `default_version`. If no default is declared, supply a version
+from the usable versions shown in the error. An explicit version also works
+for SQL-only extensions without a control file. Analysis uses the target's
+installation script when available, or loads an installation script followed
+by the required update scripts. The SQL files must be readable as UTF-8.
+Supported control-file `encoding` declarations are `UTF8` (also `UNICODE`)
+and `SQL_ASCII`.
+
 For PostgreSQL extension scripts, the optional datasource setting
 `extension_install_owner = "deploy_role"` supplies the assumed role for
 `@extowner@` during offline analysis. The default is `postgres`. Set it to

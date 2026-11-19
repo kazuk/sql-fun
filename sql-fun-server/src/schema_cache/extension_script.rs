@@ -35,9 +35,9 @@ pub(super) fn prepare(
         sql = sql.replace("@extschema@", &substitution_identifier(schema)?);
     }
     let mut search_path = vec![schema.to_owned()];
-    for name in required_extensions(settings.requires())? {
+    for name in settings.requires() {
         let token = format!("@extschema:{name}@");
-        if let Some(schema) = required_schemas.get(&name) {
+        if let Some(schema) = required_schemas.get(name) {
             if sql.contains(&token) {
                 sql = sql.replace(&token, &substitution_identifier(schema)?);
             }
@@ -155,58 +155,4 @@ fn substitution_identifier(name: &str) -> Result<String, SchemaLoadError> {
         }
     }
     Ok(format!("\"{name}\""))
-}
-
-fn required_extensions(input: &str) -> Result<Vec<String>, SchemaLoadError> {
-    let mut names = Vec::new();
-    let mut rest = input.trim();
-    while !rest.is_empty() {
-        let mut name = String::new();
-        if let Some(quoted) = rest.strip_prefix('"') {
-            rest = quoted;
-            loop {
-                let Some((part, tail)) = rest.split_once('"') else {
-                    return Err(SchemaLoadError::invalid(
-                        "unterminated quoted extension name in requires",
-                    ));
-                };
-                name.push_str(part);
-                if let Some(tail) = tail.strip_prefix('"') {
-                    name.push('"');
-                    rest = tail;
-                } else {
-                    rest = tail;
-                    break;
-                }
-            }
-        } else {
-            let end = rest
-                .find(|ch: char| ch == ',' || ch.is_ascii_whitespace())
-                .unwrap_or(rest.len());
-            name = rest[..end].to_ascii_lowercase();
-            rest = &rest[end..];
-        }
-        names.push(name);
-        rest = rest.trim_start();
-        if rest.is_empty() {
-            break;
-        }
-        let Some(tail) = rest.strip_prefix(',') else {
-            return Err(SchemaLoadError::invalid(
-                "expected comma in extension requires list",
-            ));
-        };
-        rest = tail.trim_start();
-        if rest.is_empty() {
-            return Err(SchemaLoadError::invalid(
-                "missing name in extension requires list",
-            ));
-        }
-    }
-    if names.iter().any(String::is_empty) {
-        return Err(SchemaLoadError::invalid(
-            "empty name in extension requires list",
-        ));
-    }
-    Ok(names)
 }

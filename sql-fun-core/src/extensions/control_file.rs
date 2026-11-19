@@ -40,17 +40,37 @@ pub(super) fn default_version(
 /// Control-file settings used to preprocess an extension installation script.
 #[derive(Debug, Default)]
 pub struct ExtensionScriptSettings {
-    /// Fixed installation schema, when declared.
-    pub schema: Option<String>,
-    /// Whether the extension permits relocation after installation.
-    pub relocatable: bool,
-    /// Required extension names as a PostgreSQL identifier list.
-    pub requires: String,
-    /// Literal replacement for `MODULE_PATHNAME`, when declared.
-    pub module_pathname: Option<String>,
+    schema: Option<String>,
+    relocatable: bool,
+    requires: String,
+    module_pathname: Option<String>,
 }
 
 impl ExtensionScriptSettings {
+    /// Fixed installation schema, when declared.
+    #[must_use]
+    pub fn schema(&self) -> Option<&str> {
+        self.schema.as_deref()
+    }
+
+    /// Whether the extension permits relocation after installation.
+    #[must_use]
+    pub const fn relocatable(&self) -> bool {
+        self.relocatable
+    }
+
+    /// Required extension names as a PostgreSQL identifier list.
+    #[must_use]
+    pub fn requires(&self) -> &str {
+        &self.requires
+    }
+
+    /// Literal replacement for `MODULE_PATHNAME`, when declared.
+    #[must_use]
+    pub fn module_pathname(&self) -> Option<&str> {
+        self.module_pathname.as_deref()
+    }
+
     pub(super) fn apply_file(&mut self, path: &Path) -> Result<(), ExtensionConfigError> {
         let contents = match std::fs::read(path) {
             Ok(contents) => contents,

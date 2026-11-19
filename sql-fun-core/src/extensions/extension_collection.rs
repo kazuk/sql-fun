@@ -15,12 +15,44 @@ use crate::{ExtensionConfigError, ExtensionNameVersionPair, ExtensionScriptSetti
 /// Selected installation script and effective PostgreSQL control settings.
 #[derive(Debug)]
 pub struct ExtensionScript {
+    name: String,
+    path: PathBuf,
+    settings: ExtensionScriptSettings,
+}
+
+impl ExtensionScript {
+    pub(super) fn read(
+        name: &str,
+        path: &Path,
+        directory: &Path,
+    ) -> Result<Self, ExtensionConfigError> {
+        let mut settings = ExtensionScriptSettings::default();
+        settings.apply_file(&directory.join(format!("{name}.control")))?;
+        settings.apply_file(&path.with_extension("control"))?;
+        Ok(Self {
+            name: name.to_owned(),
+            path: path.to_path_buf(),
+            settings,
+        })
+    }
+
     /// Configured extension name.
-    pub name: String,
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     /// Resolved installation script.
-    pub path: PathBuf,
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// Primary control settings with selected-version overrides.
-    pub settings: ExtensionScriptSettings,
+    #[must_use]
+    pub const fn settings(&self) -> &ExtensionScriptSettings {
+        &self.settings
+    }
 }
 
 /// collection for postgres extensions

@@ -134,13 +134,8 @@ impl ExtensionNameVersionPair {
         Self::validate_name(&self.name)?;
         let mut primary = ExtensionScriptSettings::default();
         primary.apply_file(&directory.join(format!("{}.control", self.name)), false)?;
-        // PostgreSQL resolves a relative directory against the installation's
-        // share directory, one level above the primary control directory.
-        let script_directory = primary.directory.as_ref().map_or_else(
-            || directory.to_path_buf(),
-            |path| directory.parent().unwrap_or(directory).join(path),
-        );
-        let Some(target) = self.version.as_ref().or(primary.default_version.as_ref()) else {
+        let script_directory = primary.script_directory(directory);
+        let Some(target) = self.version.as_ref().or(primary.default_version()) else {
             let inventory = ScriptInventory::read(&script_directory, &self.name)?;
             let choices = inventory
                 .available_versions()
@@ -152,10 +147,7 @@ impl ExtensionNameVersionPair {
             } else {
                 format!("available versions: {}", choices.join(", "))
             };
-            return Err(ExtensionConfigError::MissingDefaultVersion(
-                self.name.clone(),
-                message,
-            ));
+            return ExtensionConfigError::missing_default_version(&self.name, message);
         };
         let target = ExtensionVersion::installation(&target.to_string())?;
         let version = target.to_string();
@@ -167,11 +159,11 @@ impl ExtensionNameVersionPair {
         } else {
             let inventory = ScriptInventory::read(&script_directory, &self.name)?;
             let Some(path) = inventory.installation_path(&version) else {
-                return Err(ExtensionConfigError::NoInstallationPath(
-                    self.name.clone(),
+                return ExtensionConfigError::no_installation_path(
+                    &self.name,
                     target,
                     script_directory,
-                ));
+                );
             };
             path.into_iter()
                 .scan(None, |previous, destination| {

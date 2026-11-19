@@ -31,11 +31,11 @@ pub(super) fn prepare(
     if text.contains("@extowner@") {
         sql = sql.replace("@extowner@", &substitution_identifier(owner)?);
     }
-    if !settings.relocatable && sql.contains("@extschema@") {
+    if !settings.relocatable() && sql.contains("@extschema@") {
         sql = sql.replace("@extschema@", &substitution_identifier(schema)?);
     }
     let mut search_path = vec![schema.to_owned()];
-    for name in required_extensions(&settings.requires)? {
+    for name in required_extensions(settings.requires())? {
         let token = format!("@extschema:{name}@");
         if let Some(schema) = required_schemas.get(&name) {
             if sql.contains(&token) {
@@ -50,7 +50,7 @@ pub(super) fn prepare(
             )));
         }
     }
-    if let Some(pathname) = &settings.module_pathname {
+    if let Some(pathname) = settings.module_pathname() {
         sql = sql.replace("MODULE_PATHNAME", pathname);
     }
     search_path.push("pg_temp".to_owned());
@@ -59,24 +59,25 @@ pub(super) fn prepare(
 
 #[cfg(test)]
 mod tests {
-    use crate::schema_cache::extension_script::prepare;
+    use crate::{
+        schema_cache::extension_script::prepare, test_helpers::extension_script_with_control,
+    };
     use sql_fun_core::ExtensionScriptSettings;
     use std::collections::HashMap;
 
     #[test]
     fn replaces_script_text_in_postgres_order() {
-        let settings = ExtensionScriptSettings {
-            requires: r#"CuBe, "Other Extension""#.to_owned(),
-            module_pathname: Some("$libdir/example".to_owned()),
-            ..ExtensionScriptSettings::default()
-        };
+        let script = extension_script_with_control(
+            r#"requires = 'CuBe, "Other Extension"'
+module_pathname = '$libdir/example'"#,
+        );
         let dependencies = HashMap::from([
             ("cube".to_owned(), "Cube Schema".to_owned()),
             ("Other Extension".to_owned(), "other".to_owned()),
         ]);
         let (sql, path) = prepare(
             "\\echo guard\nSELECT '@extschema@ @extschema:cube@ @extschema:Other Extension@ @extowner@ MODULE_PATHNAME';",
-            &settings, "select", Some("public"), &dependencies,
+            script.settings(), "select", Some("public"), &dependencies,
         ).unwrap();
         assert_eq!(
             sql,
@@ -87,17 +88,38 @@ mod tests {
 
     #[test]
     fn relocatable_scripts_still_replace_dependency_schemas() {
-        let settings = ExtensionScriptSettings {
-            relocatable: true,
-            requires: "cube".to_owned(),
-            ..ExtensionScriptSettings::default()
-        };
+        let script = extension_script_with_control("relocatable = true\nrequires = cube");
         let dependencies = HashMap::from([("cube".to_owned(), "public".to_owned())]);
         let text = "SELECT '@extschema@ @extschema:cube@ @extowner@ MODULE_PATHNAME';";
-        let (sql, _) = prepare(text, &settings, "postgres", Some("public"), &dependencies).unwrap();
+        let (sql, _) = prepare(
+            text,
+            script.settings(),
+            "postgres",
+            Some("public"),
+            &dependencies,
+        )
+        .unwrap();
         assert_eq!(sql, "SELECT '@extschema@ public postgres MODULE_PATHNAME';");
-        assert!(prepare(text, &settings, "postgres", Some("public"), &HashMap::new()).is_err());
-        assert!(prepare(text, &settings, "bad$owner", Some("public"), &dependencies).is_err());
+        assert!(
+            prepare(
+                text,
+                script.settings(),
+                "postgres",
+                Some("public"),
+                &HashMap::new()
+            )
+            .is_err()
+        );
+        assert!(
+            prepare(
+                text,
+                script.settings(),
+                "bad$owner",
+                Some("public"),
+                &dependencies
+            )
+            .is_err()
+        );
         assert!(
             prepare(
                 "SELECT '@extschema@';",

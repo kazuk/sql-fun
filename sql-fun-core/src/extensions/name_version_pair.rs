@@ -9,10 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    ExtensionConfigError, ExtensionScript, ExtensionScriptSettings, ExtensionVersion,
-    extensions::control_file,
-};
+use crate::{ExtensionConfigError, ExtensionScript, ExtensionVersion, extensions::control_file};
 
 /// Postgres extensin name version pair.
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Default)]
@@ -127,14 +124,7 @@ impl ExtensionNameVersionPair {
         directory: &Path,
     ) -> Result<ExtensionScript, ExtensionConfigError> {
         let path = self.resolve_version(directory)?;
-        let mut settings = ExtensionScriptSettings::default();
-        settings.apply_file(&directory.join(format!("{}.control", self.name)))?;
-        settings.apply_file(&path.with_extension("control"))?;
-        Ok(ExtensionScript {
-            name: self.name.clone(),
-            path,
-            settings,
-        })
+        ExtensionScript::read(&self.name, &path, directory)
     }
 
     /// get extension sql path

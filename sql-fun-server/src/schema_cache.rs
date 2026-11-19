@@ -537,7 +537,7 @@ impl SchemaCacheService {
         let mut extension_schemas = HashMap::new();
         for script in &selection.extension_scripts {
             let default_schema = Self::successful(&layer.outcome)?.base.get_default_schema();
-            let schema = match script.settings.schema.as_deref() {
+            let schema = match script.settings().schema() {
                 Some(schema) => Some(schema),
                 None => default_schema.as_ref().map(SchemaName::as_str),
             };
@@ -553,7 +553,7 @@ impl SchemaCacheService {
                 .await?;
             Self::successful(&layer.outcome)?;
             if let Some(schema) = schema {
-                extension_schemas.insert(script.name.clone(), schema.to_owned());
+                extension_schemas.insert(script.name().to_owned(), schema.to_owned());
             }
         }
         Ok(layer)
@@ -568,14 +568,14 @@ impl SchemaCacheService {
         required_schemas: &HashMap<String, String>,
         (args, metadata): (&SqlFunArgs, &SqlFunMetadata),
     ) -> Result<LoadedLayer, SchemaLoadError> {
-        let path = ::tokio::fs::canonicalize(&script.path)
+        let path = ::tokio::fs::canonicalize(script.path())
             .await
             .map_err(|error| SchemaLoadError::source(&error))?;
         let text = ::tokio::fs::read_to_string(&path)
             .await
             .map_err(|error| SchemaLoadError::source(&error))?;
         let (sql, search_path) =
-            extension_script::prepare(&text, &script.settings, owner, schema, required_schemas)
+            extension_script::prepare(&text, script.settings(), owner, schema, required_schemas)
                 .map_err(|error| {
                     SchemaLoadError::invalid(&format!("{}: {error}", path.display()))
                 })?;

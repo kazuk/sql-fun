@@ -3,14 +3,104 @@ use std::path::Path;
 
 // PostgreSQL 17: guc-file.l (ParseConfigFp/DeescapeQuotedString) and
 // extension.c (parse_extension_control_file). Equals is optional; the last
-// default_version wins. Only lexical validation and default selection belong
-// here: this is not an extension installer or a general GUC/include processor.
+// default_version wins. The same assignment lexer reads script settings.
 pub(super) fn default_version(
     contents: &[u8],
     path: &Path,
 ) -> Result<Option<String>, ExtensionConfigError> {
     let mut version = None;
     let mut version_line = 0;
+    visit_assignments(contents, path, |name, value, line| {
+        if name == b"default_version" {
+            version = Some(value);
+            version_line = line;
+        }
+        Ok(())
+    })?;
+    let Some(value) = version else {
+        return Ok(None);
+    };
+    let Ok(value) = String::from_utf8(value) else {
+        return ExtensionConfigError::invalid_control_file(
+            path,
+            version_line,
+            "default_version is not valid UTF-8",
+        );
+    };
+    if ExtensionVersion::installation(&value).is_err() {
+        return ExtensionConfigError::invalid_control_file(
+            path,
+            version_line,
+            "default_version must be a nonempty installation version without path separators, --, or a leading/trailing dash",
+        );
+    }
+    Ok(Some(value))
+}
+
+/// Control-file settings used to preprocess an extension installation script.
+#[derive(Debug, Default)]
+pub struct ExtensionScriptSettings {
+    /// Fixed installation schema, when declared.
+    pub schema: Option<String>,
+    /// Whether the extension permits relocation after installation.
+    pub relocatable: bool,
+    /// Required extension names as a PostgreSQL identifier list.
+    pub requires: String,
+    /// Literal replacement for `MODULE_PATHNAME`, when declared.
+    pub module_pathname: Option<String>,
+}
+
+impl ExtensionScriptSettings {
+    pub(super) fn apply_file(&mut self, path: &Path) -> Result<(), ExtensionConfigError> {
+        let contents = match std::fs::read(path) {
+            Ok(contents) => contents,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        };
+        visit_assignments(&contents, path, |name, value, line| {
+            if !matches!(
+                name,
+                b"schema" | b"relocatable" | b"requires" | b"module_pathname"
+            ) {
+                return Ok(());
+            }
+            let Ok(value) = String::from_utf8(value) else {
+                return ExtensionConfigError::invalid_control_file(
+                    path,
+                    line,
+                    "invalid UTF-8 in script setting",
+                );
+            };
+            match name {
+                b"schema" => self.schema = Some(value),
+                b"requires" => self.requires = value,
+                b"module_pathname" => self.module_pathname = Some(value),
+                _ => {
+                    self.relocatable = match value.to_ascii_lowercase().as_str() {
+                        "1" | "t" | "tr" | "tru" | "true" | "y" | "ye" | "yes" | "on" => true,
+                        "0" | "f" | "fa" | "fal" | "fals" | "false" | "n" | "no" | "of" | "off" => {
+                            false
+                        }
+                        _ => {
+                            return ExtensionConfigError::invalid_control_file(
+                                path,
+                                line,
+                                "invalid relocatable boolean",
+                            );
+                        }
+                    };
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+fn visit_assignments(
+    contents: &[u8],
+    path: &Path,
+    mut visit: impl FnMut(&[u8], Vec<u8>, usize) -> Result<(), ExtensionConfigError>,
+) -> Result<(), ExtensionConfigError> {
     for (index, line) in contents.split(|byte| *byte == b'\n').enumerate() {
         let parsed = ControlLine::parse(line);
         let (name, value) = match parsed {
@@ -30,29 +120,9 @@ pub(super) fn default_version(
                 "control-file include directives are not supported",
             );
         }
-        if name == b"default_version" {
-            version = Some(value);
-            version_line = index + 1;
-        }
+        visit(name, value, index + 1)?;
     }
-    let Some(value) = version else {
-        return Ok(None);
-    };
-    let Ok(value) = String::from_utf8(value) else {
-        return ExtensionConfigError::invalid_control_file(
-            path,
-            version_line,
-            "default_version is not valid UTF-8",
-        );
-    };
-    if ExtensionVersion::installation(&value).is_err() {
-        return ExtensionConfigError::invalid_control_file(
-            path,
-            version_line,
-            "default_version must be a nonempty installation version without path separators, --, or a leading/trailing dash",
-        );
-    }
-    Ok(Some(value))
+    Ok(())
 }
 
 #[cfg(test)]

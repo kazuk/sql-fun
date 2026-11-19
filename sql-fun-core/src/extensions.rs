@@ -7,7 +7,10 @@ mod test_helpers;
 
 pub use self::{
     config_error::ExtensionConfigError,
-    extension_collection::{PostgresExtensionsCollection, PostgresExtensionsParseError},
+    control_file::ExtensionScriptSettings,
+    extension_collection::{
+        ExtensionScript, PostgresExtensionsCollection, PostgresExtensionsParseError,
+    },
     name_version_pair::ExtensionNameVersionPair,
 };
 

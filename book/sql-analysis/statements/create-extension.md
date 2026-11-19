@@ -24,6 +24,17 @@ installation or complete option validation. SQLite runtime extensions and
 function registration are different facilities and are not implemented by this
 statement path.
 
+## Datasource extension loading
+
+When [analyzing configured extensions](../../cli/analyze.md#schema-loading),
+the PostgreSQL 17 and 18 bundled scripts for `cube@1.2`,
+`earthdistance@1.1`, and `plpgsql@1.0` can still stop initialization during
+SQL analysis. The bundled `cube` script stops at its base-type definition, so
+with that prerequisite configured, initialization stops before loading
+`earthdistance`. The `earthdistance` operator definition and the `plpgsql`
+procedural-language declaration also fail when reached. Follow
+[issue #1150](https://github.com/kazuk/sql-fun/issues/1150) for these failures.
+
 ## Diagnostics
 
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): the

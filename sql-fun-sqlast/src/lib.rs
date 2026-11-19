@@ -48,7 +48,10 @@ pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
 use crate::{
     ast::{Dialect, Statement, StatementNode, TryFromWithTokens},
-    context::{FrozenBaseContext, GetSourcePathWithSpanOpt, ParseContext, SchemaFileContext},
+    context::{
+        FrozenBaseContext, GetSourcePathWithSpanOpt, ParseContext, SchemaFileContext,
+        SearchPathRead,
+    },
     parse_statements::split_postgres_statements,
     sem::{AnalysisError, DeprecatedObservations, SemAst},
     syn::{ListOpt, ParseResult, ScanToken},
@@ -228,12 +231,54 @@ impl PostgresDialect {
         args: &::sql_fun_core::SqlFunArgs,
         metadata: &::sql_fun_core::SqlFunMetadata,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
-        let sql_statements = snapshot.postgres_text();
-        let dump_file = snapshot.path();
+        Self::parse_schema_text(
+            snapshot.postgres_text(),
+            snapshot.path(),
+            input_context,
+            args,
+            metadata,
+            None,
+        )
+    }
 
+    /// Analyze prepared extension SQL under its installation search path.
+    /// The parent search path is restored on the resulting catalog.
+    ///
+    /// # Errors
+    /// Returns syntax or fatal semantic analysis failures.
+    pub fn parse_extension_snapshot(
+        snapshot: &SqlFileSnapshot,
+        input_context: &FrozenBaseContext,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
+        search_path: &[names::SchemaName],
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        Self::parse_schema_text(
+            snapshot.text().to_owned(),
+            snapshot.path(),
+            input_context,
+            args,
+            metadata,
+            Some(search_path),
+        )
+    }
+
+    fn parse_schema_text(
+        sql_statements: StdString,
+        dump_file: &Path,
+        input_context: &FrozenBaseContext,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
+        search_path: Option<&[names::SchemaName]>,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         let statements = split_postgres_statements(&sql_statements)?;
         let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
+        let previous_search_path = search_path.map(|path| {
+            let previous = context.get_search_path().to_vec();
+            context.set_search_path(path);
+            previous
+        });
         let mut sem_results = Vec::new();
         for statement in statements {
             context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
@@ -255,6 +300,9 @@ impl PostgresDialect {
                 SemAst::from_ast(&statement, context, &mut CacheContext::new())?;
             sem_results.push(sem);
             context = rcontext;
+        }
+        if let Some(path) = previous_search_path {
+            context.set_search_path(&path);
         }
         Ok(context.into_parsed(sem_results))
     }

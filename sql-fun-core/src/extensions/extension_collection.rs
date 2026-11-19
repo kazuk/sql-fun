@@ -10,7 +10,18 @@ use combine::{
     sep_end_by,
 };
 
-use crate::{ExtensionConfigError, ExtensionNameVersionPair, IVec};
+use crate::{ExtensionConfigError, ExtensionNameVersionPair, ExtensionScriptSettings, IVec};
+
+/// Selected installation script and effective PostgreSQL control settings.
+#[derive(Debug)]
+pub struct ExtensionScript {
+    /// Configured extension name.
+    pub name: String,
+    /// Resolved installation script.
+    pub path: PathBuf,
+    /// Primary control settings with selected-version overrides.
+    pub settings: ExtensionScriptSettings,
+}
 
 /// collection for postgres extensions
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Default)]
@@ -97,6 +108,20 @@ impl PostgresExtensionsCollection {
             result.push(item.resolve_version(&base_path)?);
         }
         Ok(IVec::from(result))
+    }
+
+    /// Resolve configured scripts and read the controls used for preprocessing.
+    ///
+    /// # Errors
+    /// Returns resolution or control-file errors.
+    pub fn scripts(
+        &mut self,
+        directory: &Path,
+    ) -> Result<Vec<ExtensionScript>, ExtensionConfigError> {
+        self.0
+            .iter_mut()
+            .map(|item| item.script(directory))
+            .collect()
     }
 
     /// resolve versions for extensions

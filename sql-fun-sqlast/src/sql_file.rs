@@ -15,14 +15,19 @@ impl SqlFileSnapshot {
     /// # Errors
     /// Returns file access or UTF-8 decoding errors.
     pub fn read(path: &Path) -> Result<Self, std::io::Error> {
-        let text = std::fs::read_to_string(path)?;
+        Ok(Self::from_text(path, std::fs::read_to_string(path)?))
+    }
+
+    /// Build a snapshot from prepared SQL while retaining its source path.
+    #[must_use]
+    pub fn from_text(path: &Path, text: String) -> Self {
         let mut hasher = ::sql_fun_core::Hasher::new();
         hasher.append_str(&text);
-        Ok(Self {
+        Self {
             path: path.to_path_buf(),
             text,
             hash: hasher.finish(),
-        })
+        }
     }
 
     /// Original-content hash, before dialect preprocessing.
@@ -36,7 +41,6 @@ impl SqlFileSnapshot {
     pub fn path(&self) -> &Path {
         &self.path
     }
-    #[cfg(feature = "sqlite")]
     pub(crate) fn text(&self) -> &str {
         &self.text
     }

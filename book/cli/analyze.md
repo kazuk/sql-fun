@@ -153,6 +153,13 @@ higher levels. In particular, the project dump need not exist for `builtin`,
 Datasource configuration and the installed builtin catalog are still required.
 The existing initialization API currently supports PostgreSQL schema contexts.
 
+For PostgreSQL extension scripts, the optional datasource setting
+`extension_install_owner = "deploy_role"` supplies the assumed role for
+`@extowner@` during offline analysis. The default is `postgres`. Set it to
+the exact role name if your extension installation uses a different caller.
+Analysis substitutes the role in the script without installing the extension
+or connecting to a database.
+
 Server connection uses the same `USER`, `SQL_FUN_SERVER`, and
 `SQL_FUN_SERVER_COMMAND` settings as [`sql-fun api`](../api/cli-api.md).
 `SQL_FUN_MAX_RESPONSE_BYTES` sets the authenticated response receive cap

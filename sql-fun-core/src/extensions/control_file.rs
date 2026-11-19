@@ -1,3 +1,9 @@
+use ::combine::{
+    Parser, attempt, between, choice, eof, many, many1,
+    parser::char::{char, string},
+    satisfy, sep_by, skip_many,
+};
+
 use crate::{ExtensionConfigError, ExtensionVersion};
 use std::path::{Path, PathBuf};
 
@@ -554,54 +560,57 @@ fn parse_default_version(
 }
 
 fn required_extensions(input: &str) -> Result<Vec<String>, &'static str> {
-    let mut names = Vec::new();
-    let mut rest = input.trim_start_matches(|ch: char| ch.is_ascii_whitespace());
-    while !rest.is_empty() {
-        let mut name = String::new();
-        if let Some(quoted) = rest.strip_prefix('"') {
-            rest = quoted;
-            loop {
-                let Some((part, tail)) = rest.split_once('"') else {
-                    return Err("unterminated quoted extension name in requires");
-                };
-                name.push_str(part);
-                if let Some(tail) = tail.strip_prefix('"') {
-                    name.push('"');
-                    rest = tail;
-                } else {
-                    rest = tail;
-                    break;
-                }
-            }
-        } else {
-            let end = rest
-                .find(|ch: char| ch == ',' || ch.is_ascii_whitespace())
-                .unwrap_or(rest.len());
-            if end == 0 {
-                return Err("empty name in extension requires list");
-            }
-            name = rest[..end].to_ascii_lowercase();
-            rest = &rest[end..];
-        }
-        names.push(name);
-        rest = rest.trim_start_matches(|ch: char| ch.is_ascii_whitespace());
-        if rest.is_empty() {
-            break;
-        }
-        let Some(tail) = rest.strip_prefix(',') else {
-            return Err("expected comma in extension requires list");
-        };
-        rest = tail.trim_start_matches(|ch: char| ch.is_ascii_whitespace());
-        if rest.is_empty() {
-            return Err("missing name in extension requires list");
-        }
-    }
-    Ok(names)
+    let whitespace = || skip_many(satisfy(|ch: char| ch.is_ascii_whitespace()));
+    let quoted = between(
+        char('"'),
+        char('"'),
+        many(choice((
+            attempt(string("\"\"")).map(|_| '"'),
+            satisfy(|ch| ch != '"'),
+        ))),
+    );
+    let unquoted =
+        many1::<String, _, _>(satisfy(|ch: char| ch != ',' && !ch.is_ascii_whitespace()))
+            .map(|name| name.to_ascii_lowercase());
+    let identifier = choice((quoted, unquoted)).skip(whitespace());
+    let separator = char(',').skip(whitespace());
+
+    whitespace()
+        .with(sep_by(identifier, separator))
+        .skip(eof())
+        .parse(input)
+        .map(|(names, _)| names)
+        .map_err(|_| "requires must be a comma-separated list of extension names")
 }
 
 #[cfg(test)]
 mod test_required_extensions {
     use crate::extensions::control_file::required_extensions;
+
+    #[test]
+    fn parses_quotes_escapes_and_whitespace() {
+        let names =
+            required_extensions(" \tCuBe, \"With space, comma and \"\"quotes\"\"\",\r\nother ")
+                .unwrap();
+        assert_eq!(
+            names,
+            ["cube", r#"With space, comma and "quotes""#, "other"]
+        );
+        assert_eq!(required_extensions(" \t").unwrap(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn rejects_malformed_identifier_lists() {
+        for input in [
+            ",cube",
+            "cube,",
+            "cube,,other",
+            "cube other",
+            r#""unterminated"#,
+        ] {
+            assert!(required_extensions(input).is_err(), "{input:?}");
+        }
+    }
 
     #[test]
     fn preserves_identifiers_longer_than_the_standard_postgresql_limit() {

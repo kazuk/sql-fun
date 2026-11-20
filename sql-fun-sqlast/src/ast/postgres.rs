@@ -1,18 +1,18 @@
 use crate::{
     StringSpan,
     ast::{
-        Access, AlterOwner, AlterRelation, AlterSequence, BooleanExpr, BooleanOperator, Call,
-        CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment, CompositeType, CreateRule,
-        CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropBehavior,
-        DropFunction, DropRule, DropTable, DropTrigger, EnumType, Expr, Extension,
-        ExtensionMembership, ForeignDataWrapper, ForeignTable, Indirection, Insert, Literal, Merge,
-        Name, NamedArgument, Notify, NullTest, ObjectArgument, ObjectKind, ObjectPrivileges,
-        ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role, RoleMembership,
-        Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption, Table,
-        TableConstraint, TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
-        TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
-        View, ViewCheckOption, Window,
-        ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
+        Access, AlterFunctionParallel, AlterOwner, AlterRelation, AlterSequence, BooleanExpr,
+        BooleanOperator, Call, CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment,
+        CompositeType, CreateRule, CreateTrigger, CurrentOf, DefaultPrivileges, Delete,
+        DomainConstraintTarget, DropBehavior, DropFunction, DropRule, DropTable, DropTrigger,
+        EnumType, Expr, Extension, ExtensionMembership, ForeignDataWrapper, ForeignTable,
+        Indirection, Insert, Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument,
+        ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter,
+        Query, Role, RoleMembership, Sequence, Slice, SqlValue, StatementNode, Subquery,
+        SubqueryKind, SyntaxOption, Table, TableConstraint, TransformTarget, TruthTest,
+        TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
+        VariableSet, VariableSetKind as AstVariableSetKind, View, ViewCheckOption, Window,
+        ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
     error::AnalysisError,
@@ -831,6 +831,11 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 &sequence, tokens,
             )?));
         }
+        if let Some(alter) = value.as_alter_function_stmt().as_inner() {
+            return Ok(Self::alter_function_parallel(
+                AlterFunctionParallel::try_from_with_tokens(&alter, tokens)?,
+            ));
+        }
         if let Some(drop) = value.as_drop_stmt().as_inner() {
             return match drop.get_remove_type().as_inner() {
                 Some(syn::ObjectType::ObjectFunction) => Ok(Self::drop_function(
@@ -1122,6 +1127,61 @@ impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
             value.get_for_identity(),
             value.get_missing_ok(),
         ))
+    }
+}
+
+impl TryFromWithTokens<&syn::AlterFunctionStmt> for AlterFunctionParallel {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::AlterFunctionStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let unsupported =
+            || AnalysisError::unexpected_input_error("unsupported ALTER FUNCTION conversion");
+        if !matches!(
+            value.get_objtype().as_inner(),
+            Some(syn::ObjectType::ObjectFunction)
+        ) {
+            return Err(unsupported());
+        }
+        let actions = value.get_actions().as_inner().unwrap_or_default();
+        let [action] = actions.as_slice() else {
+            return Err(unsupported());
+        };
+        let action = required(action.as_def_elem().as_inner(), "alter function action")?;
+        if action.get_defname() != "parallel" {
+            return Err(unsupported());
+        }
+        let target = required(value.get_func().as_inner(), "alter function target")?;
+        Ok(Self {
+            target: ObjectTarget::try_from_object_with_args(&target, tokens)?,
+            option: FunctionOption::try_from_with_tokens(&action, tokens)?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_alter_function_parallel {
+    use crate::{ast::Dialect, parse_statements};
+
+    #[rstest::rstest]
+    #[case("ALTER FUNCTION f(int) PARALLEL SAFE STRICT")]
+    #[case("ALTER FUNCTION f(int) STRICT")]
+    #[case("ALTER ROUTINE f(int) PARALLEL SAFE")]
+    fn refuses_unsupported_forms(#[case] sql: &str) {
+        let error = parse_statements(sql, Dialect::postgres())
+            .next()
+            .expect("one statement")
+            .expect_err("unsupported conversion");
+        assert!(!error.is_syntax());
+        assert!(error.is_recoverable());
+        assert!(
+            error
+                .to_string()
+                .contains("unsupported ALTER FUNCTION conversion"),
+            "{error}"
+        );
     }
 }
 

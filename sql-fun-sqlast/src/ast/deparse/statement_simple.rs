@@ -1,7 +1,7 @@
 use crate::ast::{
-    AlterOwner, AlterSequence, Comment, Dialect, DropTable, EnumType, Expr, Extension, Literal,
-    Name, ObjectArgument, ObjectTarget, Role, Sequence, SyntaxOption, SyntaxValue, VariableSet,
-    VariableSetKind, View, ViewCheckOption,
+    AlterOwner, AlterSequence, Comment, Dialect, DropBehavior, DropFunction, DropTable, EnumType,
+    Expr, Extension, Literal, Name, ObjectArgument, ObjectTarget, Role, Sequence, SyntaxOption,
+    SyntaxValue, VariableSet, VariableSetKind, View, ViewCheckOption,
     deparse::{DeparseError, SqlEmit, SqlWriter},
 };
 
@@ -743,6 +743,58 @@ impl SqlEmit for ObjectArgument {
             writer.sql(" ");
         }
         type_name.emit(writer)
+    }
+}
+
+impl SqlEmit for DropFunction {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("DROP FUNCTION")?;
+        writer.sql("DROP FUNCTION");
+        if self.if_exists {
+            writer.sql(" IF EXISTS");
+        }
+        let mut separator = " ";
+        for target in &self.targets {
+            writer.sql(separator);
+            target.emit_named_target(writer)?;
+            separator = ", ";
+        }
+        if self.behavior == DropBehavior::Cascade {
+            writer.sql(" CASCADE");
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_drop_function_emit {
+    use crate::{
+        ast::{Dialect, StatementKind},
+        parse_statements,
+    };
+
+    #[test]
+    fn renders_function_signatures() -> testresult::TestResult {
+        let dialect = Dialect::postgres();
+        let sql = r#"DROP FUNCTION IF EXISTS "My.Schema".f, "My.Schema".f(), "My.Schema".f(IN "Arg" app.amount, OUT flag app.flag, INOUT n app.amount, VARIADIC rest app.amount[]) CASCADE"#;
+        let statement = parse_statements(sql, dialect)
+            .next()
+            .expect("DROP FUNCTION")?;
+        let rendered = statement.deparse_sql(dialect)?;
+        assert_eq!(
+            rendered,
+            concat!(
+                r#"DROP FUNCTION IF EXISTS "My.Schema"."f", "My.Schema"."f"(), "#,
+                r#""My.Schema"."f"(IN "Arg" "app"."amount", OUT "flag" "app"."flag", "#,
+                r#"INOUT "n" "app"."amount", VARIADIC "rest" "app"."amount"[]) CASCADE"#
+            )
+        );
+        let reparsed = parse_statements(&rendered, dialect)
+            .next()
+            .expect("DROP FUNCTION")?;
+        assert_eq!(reparsed.kind(), StatementKind::DropFunction);
+        assert_eq!(reparsed.deparse_sql(dialect)?, rendered);
+        Ok(())
     }
 }
 

@@ -22,6 +22,7 @@ impl SqlEmit for StatementNode {
             Self::DropTrigger(_) => writer.unsupported("DROP TRIGGER"),
             Self::CreateTrigger(_) => writer.unsupported("CREATE TRIGGER"),
             Self::CreateRule(_) => writer.unsupported("CREATE RULE"),
+            Self::DropFunction(v) => v.emit(writer),
             Self::DropRule(_) => writer.unsupported("DROP RULE"),
             Self::Extension(v) => v.emit(writer),
             Self::VariableSet(v) => v.emit(writer),

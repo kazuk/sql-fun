@@ -70,6 +70,27 @@ impl TryFrom<&syn::Node> for AccessMethodObject {
     }
 }
 
+#[cfg(test)]
+mod test_access_method_object {
+    use crate::{
+        ast::extension_membership::AccessMethodObject, syn::Opt, test_helpers::postgres_node,
+    };
+
+    #[rstest::rstest]
+    #[case::class(r#"ALTER EXTENSION ext ADD OPERATOR CLASS "App"."Ops" USING "Some Method";"#)]
+    #[case::family(r#"ALTER EXTENSION ext ADD OPERATOR FAMILY "App"."Ops" USING "Some Method";"#)]
+    fn retains_qualified_name_and_access_method(#[case] sql: &str) {
+        let object = postgres_node(sql)
+            .as_alter_extension_contents_stmt()
+            .get_object()
+            .as_inner()
+            .unwrap();
+        let target = AccessMethodObject::try_from(&object).unwrap();
+        assert_eq!(target.name.0, ["App", "Ops"]);
+        assert_eq!(target.method, "Some Method");
+    }
+}
+
 impl ExtensionMember {
     fn try_from_node(
         kind: ObjectType,
@@ -300,11 +321,10 @@ mod tests {
     }
 
     #[test]
-    fn retains_composite_identities() {
+    fn retains_cast_and_transform_identities() {
         let sql = r#"
             ALTER EXTENSION ext ADD CAST ("App"."Source" AS "App"."Target");
             ALTER EXTENSION ext DROP TRANSFORM FOR "App"."T" LANGUAGE "Some Language";
-            ALTER EXTENSION ext ADD OPERATOR FAMILY "App"."Ops" USING "Some Method";
         "#;
         let mut statements = parse_statements(sql, Dialect::postgres());
         let StatementNode::ExtensionMembership(cast) =
@@ -330,16 +350,5 @@ mod tests {
         let transform = transform.transform.unwrap();
         assert_eq!(transform.type_name.name.0, ["App", "T"]);
         assert_eq!(transform.language, "Some Language");
-
-        let StatementNode::ExtensionMembership(family) =
-            statements.next().unwrap().unwrap().into_test_node()
-        else {
-            panic!("expected operator family membership");
-        };
-        let MemberTarget::AccessMethodObject(family) = family.member.target else {
-            panic!("expected an access method and object name");
-        };
-        assert_eq!(family.name.0, ["App", "Ops"]);
-        assert_eq!(family.method, "Some Method");
     }
 }

@@ -101,9 +101,16 @@ be rendered back to SQL. Analysis stops at function-drop interpretation,
 including when an extension script reaches the statement. See the
 [function-drop analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1165).
 
+PostgreSQL `ALTER EXTENSION ... ADD` and `ALTER EXTENSION ... DROP` membership
+syntax is recognized. When analysis reaches one of these statements in an
+extension script, it stops before resolving the target or applying the
+membership change. SQL rendering is also unimplemented. See the
+[extension membership analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1168).
+
+PostgreSQL `DROP VIEW` stops during syntax conversion, including in
+`pg_stat_statements` update scripts
+([#1169](https://github.com/kazuk/sql-fun/issues/1169)).
 Bundled extension scripts can also stop during syntax conversion on
-[extension membership changes](https://github.com/kazuk/sql-fun/issues/1161),
-such as `ALTER EXTENSION ... DROP FUNCTION`, or on
 [`ALTER FUNCTION ... PARALLEL`](https://github.com/kazuk/sql-fun/issues/1166),
 including during a `pageinspect` update. See the
 [bundled extension audit][audit-1150] for affected versions.

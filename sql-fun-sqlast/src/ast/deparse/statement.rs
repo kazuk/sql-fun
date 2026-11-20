@@ -24,6 +24,7 @@ impl SqlEmit for StatementNode {
             Self::CreateRule(_) => writer.unsupported("CREATE RULE"),
             Self::DropFunction(v) => v.emit(writer),
             Self::DropRule(_) => writer.unsupported("DROP RULE"),
+            Self::ExtensionMembership(_) => writer.unsupported("ALTER EXTENSION"),
             Self::Extension(v) => v.emit(writer),
             Self::VariableSet(v) => v.emit(writer),
             Self::EnumType(v) => v.emit(writer),

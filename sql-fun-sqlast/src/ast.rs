@@ -14,6 +14,7 @@ mod default_privileges;
 pub(crate) mod deparse;
 pub(crate) mod document;
 mod drop_behavior;
+mod extension_membership;
 mod foreign_data_wrapper;
 mod foreign_table;
 mod mutation;
@@ -46,6 +47,7 @@ pub(crate) use self::{
         MergeMatchKind, MergeWhen, MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp,
         XmlOptionType, XmlSerialize, XmlTable,
     },
+    extension_membership::ExtensionMembership,
     notify::Notify,
     privileges::{ObjectPrivileges, RoleMembership},
 };
@@ -287,6 +289,7 @@ pub(crate) enum StatementNode {
     CreateRule(CreateRule),
     DropTrigger(DropTrigger),
     Extension(Extension),
+    ExtensionMembership(ExtensionMembership),
     VariableSet(VariableSet),
     EnumType(EnumType),
     Sequence(Sequence),
@@ -362,6 +365,10 @@ impl StatementNode {
 
     const fn drop_trigger(value: DropTrigger) -> Self {
         Self::DropTrigger(value)
+    }
+
+    const fn extension_membership(value: ExtensionMembership) -> Self {
+        Self::ExtensionMembership(value)
     }
 
     const fn drop_function(value: DropFunction) -> Self {

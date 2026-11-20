@@ -117,6 +117,8 @@ pub enum StatementKind {
     DropRule,
     /// A PostgreSQL DROP FUNCTION statement.
     DropFunction,
+    /// A PostgreSQL extension membership change.
+    AlterExtensionMembership,
     /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
     CreateTrigger,
     /// A PostgreSQL CREATE RULE definition; analysis resolves its statement-specific semantics.
@@ -185,6 +187,7 @@ impl std::fmt::Display for StatementKind {
             Self::Revoke => "REVOKE",
             Self::DropRule => "DROP RULE",
             Self::DropFunction => "DROP FUNCTION",
+            Self::AlterExtensionMembership => "ALTER EXTENSION",
             Self::CreateTrigger => "CREATE TRIGGER",
             Self::CreateRule => "CREATE RULE",
             Self::DropTrigger => "DROP TRIGGER",
@@ -392,6 +395,7 @@ impl StatementNode {
             Self::CreateRule(_) => StatementKind::create_rule(),
             Self::DropTrigger(_) => StatementKind::drop_trigger(),
             Self::DropFunction(_) => StatementKind::DropFunction,
+            Self::ExtensionMembership(_) => StatementKind::AlterExtensionMembership,
             Self::DropRule(_) => StatementKind::drop_rule(),
             Self::Extension(_) => StatementKind::extension(),
             Self::VariableSet(_) => StatementKind::variable_set(),

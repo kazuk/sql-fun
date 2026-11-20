@@ -97,10 +97,9 @@ validate the definition, or add the wrapper to the analysis catalog
 ([#1163](https://github.com/kazuk/sql-fun/issues/1163)).
 
 Bundled extension scripts also contain other unsupported statements such as
-`ALTER EXTENSION ... DROP FUNCTION` and `DROP FUNCTION`. These statements stop extension initialization during
-syntax conversion when reached. See the
-[bundled extension audit](https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7035507185)
-for affected extensions and versions.
+`ALTER EXTENSION ... DROP FUNCTION` and `DROP FUNCTION`. When reached, these
+statements stop extension initialization during syntax conversion. See the
+[bundled extension audit][audit-1150] for affected extensions and versions.
 
 `ALTER DEFAULT PRIVILEGES` and `CREATE FOREIGN TABLE` support syntax recognition
 and SQL text generation, including PostgreSQL 18's `ON LARGE OBJECTS` and
@@ -123,3 +122,5 @@ syntax conversion, but semantic analysis is unimplemented and can terminate
 analysis ([#1098](https://github.com/kazuk/sql-fun/issues/1098)). Notification
 delivery and SQL rendering are not supported. For NOTIFY within a rule, see
 [CREATE RULE](statements/rules.md).
+
+[audit-1150]: https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7035507185

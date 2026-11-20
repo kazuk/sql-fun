@@ -26,7 +26,7 @@ impl FdwOption {
     pub fn value(&self) -> &str {
         &self.value
     }
-    fn collect(nodes: syn::NodeListOpt) -> Result<Vec<Self>, AnalysisError> {
+    pub(super) fn collect(nodes: syn::NodeListOpt) -> Result<Vec<Self>, AnalysisError> {
         let mut options = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             options.push(Self::try_from(&required(

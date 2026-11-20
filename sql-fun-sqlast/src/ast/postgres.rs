@@ -4,13 +4,13 @@ use crate::{
         Access, AlterOwner, AlterRelation, AlterSequence, BooleanExpr, BooleanOperator, Call,
         CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment, CompositeType, CreateRule,
         CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropRule,
-        DropTable, DropTrigger, EnumType, Expr, Extension, ForeignTable, Indirection, Insert,
-        Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument, ObjectKind,
-        ObjectPrivileges, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role,
-        RoleMembership, Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind,
-        SyntaxOption, Table, TableConstraint, TransformTarget, TruthTest, TryCollectFromWithTokens,
-        TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, VariableSet,
-        VariableSetKind as AstVariableSetKind, View, ViewCheckOption, Window,
+        DropTable, DropTrigger, EnumType, Expr, Extension, ForeignDataWrapper, ForeignTable,
+        Indirection, Insert, Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument,
+        ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter,
+        Query, Role, RoleMembership, Sequence, Slice, SqlValue, StatementNode, Subquery,
+        SubqueryKind, SyntaxOption, Table, TableConstraint, TransformTarget, TruthTest,
+        TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
+        VariableSet, VariableSetKind as AstVariableSetKind, View, ViewCheckOption, Window,
         ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
@@ -741,6 +741,11 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(value) = value.as_alter_default_privileges_stmt().as_inner() {
             let value = DefaultPrivileges::try_from_with_tokens(&value, tokens)?;
             return Ok(Self::default_privileges(value));
+        }
+        if let Some(value) = value.as_create_fdw_stmt().as_inner() {
+            return Ok(Self::ForeignDataWrapper(ForeignDataWrapper::try_from(
+                &value,
+            )?));
         }
         if let Some(value) = value.as_create_foreign_table_stmt().as_inner() {
             let value = ForeignTable::try_from_with_tokens(&value, tokens)?;

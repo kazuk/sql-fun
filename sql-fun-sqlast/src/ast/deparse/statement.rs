@@ -39,6 +39,7 @@ impl SqlEmit for StatementNode {
             Self::TableAs(v) => v.emit(writer),
             Self::Table(v) => v.emit(writer),
             Self::DefaultPrivileges(v) => v.emit(writer),
+            Self::ForeignDataWrapper(_) => writer.unsupported("CREATE FOREIGN DATA WRAPPER"),
             Self::ForeignTable(v) => v.emit(writer),
             Self::AlterRelation(v) => v.emit(writer),
         })

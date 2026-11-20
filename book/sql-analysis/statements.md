@@ -89,10 +89,16 @@ initialization. When the server terminates at this step, the CLI can report
 `EOF with missing responses`. SQL rendering is also unimplemented.
 See the [privilege analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1158).
 
-Bundled extension scripts also contain unsupported statements such as
-`CREATE FOREIGN DATA WRAPPER`, `ALTER EXTENSION ... DROP FUNCTION`, and
-`DROP FUNCTION`. These statements stop extension initialization during syntax
-conversion when reached. See the
+PostgreSQL `CREATE FOREIGN DATA WRAPPER` syntax is recognized, including
+`HANDLER`, `VALIDATOR`, their explicit `NO` forms, and `OPTIONS`.
+Analysis can terminate when it encounters this statement, including in an
+extension script. sql-fun does not yet resolve the specified routines,
+validate the definition, or add the wrapper to the analysis catalog
+([#1163](https://github.com/kazuk/sql-fun/issues/1163)).
+
+Bundled extension scripts also contain other unsupported statements such as
+`ALTER EXTENSION ... DROP FUNCTION` and `DROP FUNCTION`. These statements stop extension initialization during
+syntax conversion when reached. See the
 [bundled extension audit](https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7035507185)
 for affected extensions and versions.
 

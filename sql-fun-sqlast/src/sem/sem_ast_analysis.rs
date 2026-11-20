@@ -24,6 +24,9 @@ impl SemAst {
             return Ok(Self::unresolved_statement());
         }
         match ast {
+            AstStatementNode::ObjectPrivileges(_) | AstStatementNode::RoleMembership(_) => {
+                Ok(Self::unresolved_statement())
+            }
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
             }

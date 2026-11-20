@@ -19,6 +19,7 @@ mod mutation;
 mod notify;
 mod options;
 pub(crate) mod postgres;
+mod privileges;
 pub(crate) mod projection;
 mod public;
 mod query_construction;
@@ -45,6 +46,7 @@ pub(crate) use self::{
         XmlOptionType, XmlSerialize, XmlTable,
     },
     notify::Notify,
+    privileges::{ObjectPrivileges, RoleMembership},
 };
 pub use self::{
     default_privileges::{
@@ -297,6 +299,8 @@ pub(crate) enum StatementNode {
     TableAs(TableAs),
     Table(Table),
     DefaultPrivileges(DefaultPrivileges),
+    ObjectPrivileges(ObjectPrivileges),
+    RoleMembership(RoleMembership),
     ForeignTable(ForeignTable),
     AlterRelation(AlterRelation),
 }
@@ -304,6 +308,14 @@ pub(crate) enum StatementNode {
 impl StatementNode {
     const fn notify(value: Notify) -> Self {
         Self::Notify(value)
+    }
+
+    const fn object_privileges(value: ObjectPrivileges) -> Self {
+        Self::ObjectPrivileges(value)
+    }
+
+    const fn role_membership(value: RoleMembership) -> Self {
+        Self::RoleMembership(value)
     }
 
     const fn default_privileges(value: DefaultPrivileges) -> Self {

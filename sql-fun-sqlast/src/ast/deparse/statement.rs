@@ -11,6 +11,8 @@ impl SqlEmit for StatementNode {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         with_stack(|| match self {
             Self::Notify(_) => writer.unsupported("NOTIFY"),
+            Self::ObjectPrivileges(value) => writer.unsupported(value.command()),
+            Self::RoleMembership(value) => writer.unsupported(value.command()),
             Self::Query(v) => v.emit(writer),
             Self::Insert(v) => v.emit(writer),
             Self::Update(v) => v.emit(writer),

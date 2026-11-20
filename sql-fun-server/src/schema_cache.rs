@@ -7,7 +7,8 @@ use crate::file_hash_cache::ReadToken;
 
 use crate::{cache::Cache, file_hash_cache::FileHashCache};
 use ::sql_fun_core::{
-    ExtensionScript, Hasher, PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata,
+    ExtensionScript, Hasher, PostgresEngineVersion, ScheduledExtensionScript, SqlDialect,
+    SqlFunArgs, SqlFunMetadata,
 };
 use ::sql_fun_sqlast::{
     ParseDumpFileError, PostgresDialect, SqlFileSnapshot,
@@ -163,7 +164,7 @@ pub struct SchemaSelection {
     search_path: Vec<String>,
     roles: Option<::sql_fun_core::RoleInventory>,
     extensions: Vec<PathBuf>,
-    extension_scripts: Vec<Vec<ExtensionScript>>,
+    extension_scripts: Vec<ScheduledExtensionScript>,
     extension_install_owner: String,
     dump: Option<PathBuf>,
     expected_hash: Option<String>,
@@ -253,7 +254,7 @@ impl SchemaSelection {
             level,
         })
     }
-    pub(crate) fn set_extension_scripts(&mut self, scripts: Vec<Vec<ExtensionScript>>) {
+    pub(crate) fn set_extension_scripts(&mut self, scripts: Vec<ScheduledExtensionScript>) {
         self.extension_scripts = scripts;
     }
 }
@@ -535,31 +536,32 @@ impl SchemaCacheService {
             Self::successful(&layer.outcome)?;
         }
         let mut extension_schemas = HashMap::new();
-        for scripts in &selection.extension_scripts {
-            let Some(install) = scripts.first() else {
-                continue;
-            };
+        for step in &selection.extension_scripts {
+            let script = step.script();
             let default_schema = Self::successful(&layer.outcome)?.base.get_default_schema();
-            // Updates keep the schema chosen by the installation step.
-            let schema = match install.settings().schema() {
-                Some(schema) => Some(schema),
-                None => default_schema.as_ref().map(SchemaName::as_str),
+            let schema = if step.is_installation() {
+                match script.settings().schema() {
+                    Some(schema) => Some(schema),
+                    None => default_schema.as_ref().map(SchemaName::as_str),
+                }
+            } else {
+                extension_schemas.get(script.name()).map(String::as_str)
             };
-            for script in scripts {
-                layer = self
-                    .load_extension(
-                        &layer,
-                        script,
-                        &selection.extension_install_owner,
-                        schema,
-                        &extension_schemas,
-                        (args, metadata),
-                    )
-                    .await?;
-                Self::successful(&layer.outcome)?;
-            }
-            if let Some(schema) = schema {
-                extension_schemas.insert(install.name().to_owned(), schema.to_owned());
+            layer = self
+                .load_extension(
+                    &layer,
+                    script,
+                    &selection.extension_install_owner,
+                    schema,
+                    &extension_schemas,
+                    (args, metadata),
+                )
+                .await?;
+            Self::successful(&layer.outcome)?;
+            if step.is_installation()
+                && let Some(schema) = schema
+            {
+                extension_schemas.insert(script.name().to_owned(), schema.to_owned());
             }
         }
         Ok(layer)

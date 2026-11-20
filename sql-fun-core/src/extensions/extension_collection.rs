@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt::{Display, Write},
     path::{Path, PathBuf},
     str::FromStr,
@@ -10,10 +11,13 @@ use combine::{
     sep_end_by,
 };
 
-use crate::{ExtensionConfigError, ExtensionNameVersionPair, ExtensionScriptSettings, IVec};
+use crate::{
+    ExtensionConfigError, ExtensionNameVersionPair, ExtensionScriptSettings, IVec,
+    ScheduledExtensionScript, extensions::dependency_schedule::schedule,
+};
 
 /// Selected installation or update script and its effective PostgreSQL control settings.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExtensionScript {
     name: String,
     path: PathBuf,
@@ -161,6 +165,40 @@ impl PostgresExtensionsCollection {
             .collect()
     }
 
+    /// Resolve selected extensions and schedule their scripts with all prerequisites.
+    ///
+    /// # Errors
+    /// Returns resolution, version conflict, or dependency cycle errors.
+    pub fn scheduled_scripts(
+        &self,
+        directory: &Path,
+    ) -> Result<Vec<ScheduledExtensionScript>, ExtensionConfigError> {
+        schedule(&self.unique_selections()?, directory)
+    }
+
+    fn unique_selections(&self) -> Result<Vec<ExtensionNameVersionPair>, ExtensionConfigError> {
+        let mut indices = HashMap::new();
+        let mut selections: Vec<ExtensionNameVersionPair> = Vec::new();
+        for selection in &self.0 {
+            let index = *indices.entry(selection.name()).or_insert(selections.len());
+            let Some(previous) = selections.get_mut(index) else {
+                selections.push(selection.clone());
+                continue;
+            };
+            match (previous.version(), selection.version()) {
+                (None, Some(_)) => *previous = selection.clone(),
+                (Some(left), Some(right)) if left != right => {
+                    return Err(ExtensionConfigError::ConflictingSelections(
+                        previous.to_string(),
+                        selection.to_string(),
+                    ));
+                }
+                _ => {}
+            }
+        }
+        Ok(selections)
+    }
+
     /// resolve versions for extensions
     ///
     /// # Errors
@@ -171,9 +209,11 @@ impl PostgresExtensionsCollection {
         &mut self,
         base_path: P,
     ) -> Result<(), ExtensionConfigError> {
-        for item in &mut self.0 {
+        let mut selections = self.unique_selections()?;
+        for item in &mut selections {
             item.resolve_version(&base_path)?;
         }
+        self.0 = IVec::from(selections);
         Ok(())
     }
 

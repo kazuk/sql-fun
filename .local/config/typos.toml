@@ -18,5 +18,9 @@ deferred="deferred"
 [type.rust]
 extend-ignore-re = ['"tru"', '"fals"']
 
+# PostgreSQL pageinspect function used in conversion tests.
+[type.rust.extend-identifiers]
+brin_page_items = "brin_page_items"
+
 [type.json]
 extend-ignore-re = ["'tru'", "'fals'", "'  TrUe  '"]

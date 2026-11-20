@@ -170,7 +170,7 @@ mod object_privilege_conversion_tests {
     use crate::{
         ast::{
             Dialect, DropBehavior, StatementNode,
-            privileges::{PrivilegeAction, PrivilegeTarget, PrivilegeTargetKind, PrivilegeTargets},
+            privileges::{PrivilegeTarget, PrivilegeTargetKind, PrivilegeTargets},
         },
         parse_statements,
     };
@@ -268,13 +268,8 @@ mod object_privilege_conversion_tests {
             panic!("expected schema-wide targets");
         };
         assert_eq!(names, &["App", "public"]);
-        assert!(matches!(
-            value.action,
-            PrivilegeAction::Revoke {
-                grant_option_only: true,
-                behavior: DropBehavior::Cascade,
-            }
-        ));
+        assert!(value.action.revokes_grant_option_only());
+        assert_eq!(value.action.revoke_behavior(), Some(DropBehavior::Cascade));
         assert!(value.privileges.is_empty());
         assert_eq!(value.grantees[0].name(), Some("Public"));
         assert_eq!(value.grantees[1].keyword(), Some("PUBLIC"));
@@ -296,10 +291,7 @@ mod object_privilege_conversion_tests {
         let StatementNode::ObjectPrivileges(value) = statement.node() else {
             panic!("expected object privileges");
         };
-        assert!(matches!(
-            value.action,
-            PrivilegeAction::Grant { grant_option: true }
-        ));
+        assert!(value.action.grants_with_grant_option());
         assert_eq!(value.privileges[0].name(), "");
         assert_eq!(value.privileges[0].columns(), ["a", "b"]);
 
@@ -340,33 +332,71 @@ mod object_privilege_conversion_tests {
 
 #[derive(Clone, Debug)]
 enum PrivilegeAction {
-    Grant {
-        grant_option: bool,
-    },
-    Revoke {
-        grant_option_only: bool,
-        behavior: DropBehavior,
-    },
+    Grant(GrantPrivilegeAction),
+    Revoke(RevokePrivilegeAction),
+}
+
+#[derive(Clone, Debug)]
+struct GrantPrivilegeAction {
+    grant_option: bool,
+}
+
+#[derive(Clone, Debug)]
+struct RevokePrivilegeAction {
+    grant_option_only: bool,
+    behavior: DropBehavior,
 }
 
 impl PrivilegeAction {
+    const fn grant(grant_option: bool) -> Self {
+        Self::Grant(GrantPrivilegeAction { grant_option })
+    }
+
+    const fn revoke(grant_option_only: bool, behavior: DropBehavior) -> Self {
+        Self::Revoke(RevokePrivilegeAction {
+            grant_option_only,
+            behavior,
+        })
+    }
+
     fn try_from_parts(
         is_grant: bool,
         grant_option: bool,
         behavior: Option<syn::DropBehavior>,
     ) -> Result<Self, AnalysisError> {
         if is_grant {
-            Ok(Self::Grant { grant_option })
+            Ok(Self::grant(grant_option))
         } else {
-            Ok(Self::Revoke {
-                grant_option_only: grant_option,
-                behavior: DropBehavior::try_from(behavior)?,
-            })
+            Ok(Self::revoke(
+                grant_option,
+                DropBehavior::try_from(behavior)?,
+            ))
         }
     }
 
     const fn is_grant(&self) -> bool {
-        matches!(self, Self::Grant { .. })
+        matches!(self, Self::Grant(_))
+    }
+
+    const fn grants_with_grant_option(&self) -> bool {
+        match self {
+            Self::Grant(grant) => grant.grant_option,
+            Self::Revoke(_) => false,
+        }
+    }
+
+    const fn revokes_grant_option_only(&self) -> bool {
+        match self {
+            Self::Grant(_) => false,
+            Self::Revoke(revoke) => revoke.grant_option_only,
+        }
+    }
+
+    const fn revoke_behavior(&self) -> Option<DropBehavior> {
+        match self {
+            Self::Grant(_) => None,
+            Self::Revoke(revoke) => Some(revoke.behavior),
+        }
     }
 
     const fn command(&self) -> &'static str {
@@ -434,12 +464,8 @@ impl TryFrom<&syn::GrantRoleStmt> for RoleMembership {
 #[cfg(test)]
 mod membership_conversion_tests {
     use crate::{
-        ast::{
-            DropBehavior,
-            privileges::{PrivilegeAction, RoleMembership},
-        },
-        syn::Opt,
-        test_helpers::postgres_node,
+        ast::{Dialect, DropBehavior, StatementNode},
+        parse_statements,
     };
 
     #[rstest::rstest]
@@ -452,14 +478,22 @@ mod membership_conversion_tests {
         false
     )]
     fn retains_role_membership_options(#[case] sql: &str, #[case] grant: bool) {
-        let node = postgres_node(sql).as_grant_role_stmt().as_inner().unwrap();
-        let value = RoleMembership::try_from(&node).unwrap();
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let StatementNode::RoleMembership(value) = statement.node() else {
+            panic!("expected role membership");
+        };
         assert_eq!(value.is_grant(), grant);
         assert_eq!(value.roles[0].name(), "readers");
         assert_eq!(value.roles[1].name(), "writers");
         assert_eq!(value.members[0].keyword(), Some("CURRENT_ROLE"));
         assert_eq!(value.members[1].keyword(), Some("SESSION_USER"));
-        assert_eq!(value.grantor.unwrap().keyword(), Some("CURRENT_USER"));
+        assert_eq!(
+            value.grantor.as_ref().unwrap().keyword(),
+            Some("CURRENT_USER")
+        );
         let options: Vec<_> = value
             .options
             .iter()
@@ -472,13 +506,7 @@ mod membership_conversion_tests {
             );
         } else {
             assert_eq!(options, [("set", false)]);
-            assert!(matches!(
-                value.action,
-                PrivilegeAction::Revoke {
-                    behavior: DropBehavior::Cascade,
-                    ..
-                }
-            ));
+            assert_eq!(value.action.revoke_behavior(), Some(DropBehavior::Cascade));
         }
     }
 }

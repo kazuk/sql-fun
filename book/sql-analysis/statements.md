@@ -84,16 +84,15 @@ additional [PRAGMA-state limitation](statements/alter-table.md#rename-table).
 
 PostgreSQL `GRANT` and `REVOKE` statements for object privileges and role
 membership are accepted during syntax conversion, including in extension
-scripts. Analysis currently leaves these statements unresolved. It returns no
-result columns or privilege diagnostics for them and applies no changes to roles
-or privileges in the analysis catalog. Commands that render the statements
-report [query_deparse](../diagnostics/query_deparse.md).
+scripts. Analysis stops at privilege interpretation, including during extension
+initialization. When the server terminates at this step, the CLI can report
+`EOF with missing responses`. SQL rendering is also unimplemented.
 See the [privilege analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1158).
 
-Extension initialization stops when a script reaches unsupported PostgreSQL
-syntax. The bundled scripts can still stop at `CREATE FOREIGN DATA WRAPPER`,
-`ALTER EXTENSION ... DROP FUNCTION`, or `DROP FUNCTION` during syntax
-conversion. See the
+Bundled extension scripts also contain unsupported statements such as
+`CREATE FOREIGN DATA WRAPPER`, `ALTER EXTENSION ... DROP FUNCTION`, and
+`DROP FUNCTION`. These statements stop extension initialization during syntax
+conversion when reached. See the
 [bundled extension audit](https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7035507185)
 for affected extensions and versions.
 

@@ -25,7 +25,7 @@ impl SemAst {
         }
         match ast {
             AstStatementNode::ObjectPrivileges(_) | AstStatementNode::RoleMembership(_) => {
-                Ok(Self::unresolved_statement())
+                todo!("GRANT and REVOKE interpretation (#1158)")
             }
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")

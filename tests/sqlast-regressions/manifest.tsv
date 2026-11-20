@@ -91,4 +91,3 @@ deprecated-references	project	deprecated-references.sql	3	17,18
 postgres18-dump-constraints	project	postgres18-dump-constraints.sql	10	18
 alter-constraint	project	alter-constraint.sql	12	17,18
 alter-constraint-18	project	postgres18-dump-constraints.sql	6	18
-privilege-statements	builtin	-	7	17,18

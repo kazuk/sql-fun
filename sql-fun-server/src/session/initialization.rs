@@ -103,7 +103,10 @@ impl Initialization {
 #[cfg(test)]
 mod tests {
     use crate::session::initialization::Initialization;
-    use crate::{Api, schema_cache::test_helpers::SchemaProject};
+    use crate::{
+        Api, schema_cache::test_helpers::SchemaProject,
+        test_helpers::extension_initialization_request,
+    };
     use sql_fun_sqlast::{
         context::{BaseParseContext, SearchPathRead},
         names::{FullName, TableName},
@@ -188,36 +191,31 @@ mod tests {
     #[tokio::test]
     async fn extension_initialization_interleaves_updates_and_prerequisites() {
         let project = SchemaProject::new();
-        let directory = project.home().join("postgres/17/extension");
-        std::fs::create_dir_all(&directory).unwrap();
-        for (file, text) in [
-            ("a.control", "default_version = 3\nschema = 'A Schema'"),
-            ("a--1.sql", "CREATE TABLE installed (id int4 PRIMARY KEY);"),
-            ("a--2.control", "requires = 'b'"),
-            (
-                "a--1--2.sql",
-                "ALTER TABLE @extschema:b@.dependent RENAME TO updated;",
-            ),
-            (
-                "a--2--3.sql",
-                "ALTER TABLE @extschema@.installed RENAME TO finished;",
-            ),
-            (
-                "b.control",
-                "default_version = 1\nschema = 'B Schema'\nrequires = 'a'",
-            ),
-            (
-                "b--1.sql",
-                "CREATE TABLE dependent (id int4 REFERENCES @extschema:a@.installed (id));",
-            ),
-        ] {
-            std::fs::write(directory.join(file), text).unwrap();
-        }
-        let mut request = project.rpc_request("-- unused");
-        request["schema_level"] = serde_json::json!("extensions");
-        request["environments"]["SQL_FUN_EXTENSIONS"] = serde_json::json!("a");
-        request["environments"]["SQL_FUN_EXTENSIONS_DIR"] = serde_json::json!(directory);
-        let request = serde_json::from_value(request).unwrap();
+        let request = extension_initialization_request(
+            &project,
+            "a",
+            &[
+                ("a.control", "default_version = 3\nschema = 'A Schema'"),
+                ("a--1.sql", "CREATE TABLE installed (id int4 PRIMARY KEY);"),
+                ("a--2.control", "requires = 'b'"),
+                (
+                    "a--1--2.sql",
+                    "ALTER TABLE @extschema:b@.dependent RENAME TO updated;",
+                ),
+                (
+                    "a--2--3.sql",
+                    "ALTER TABLE @extschema@.installed RENAME TO finished;",
+                ),
+                (
+                    "b.control",
+                    "default_version = 1\nschema = 'B Schema'\nrequires = 'a'",
+                ),
+                (
+                    "b--1.sql",
+                    "CREATE TABLE dependent (id int4 REFERENCES @extschema:a@.installed (id));",
+                ),
+            ],
+        );
         let api = Api {
             schema_cache: std::sync::OnceLock::new(),
         };
@@ -245,33 +243,28 @@ mod tests {
     #[tokio::test]
     async fn earthdistance_uses_implicit_cubes_installation_schema() {
         let project = SchemaProject::new();
-        let directory = project.home().join("postgres/17/extension");
-        std::fs::create_dir_all(&directory).unwrap();
-        for (file, text) in [
-            (
-                "cube.control",
-                "default_version = 1\nschema = 'Cube Schema'",
-            ),
-            (
-                "cube--1.sql",
-                "CREATE TABLE cube_definition (id int4 PRIMARY KEY);",
-            ),
-            (
-                "earthdistance.control",
-                "default_version = 1\nrequires = 'cube'",
-            ),
-            (
-                "earthdistance--1.sql",
-                "CREATE TABLE earth_definition (id int4 REFERENCES @extschema:cube@.cube_definition (id));",
-            ),
-        ] {
-            std::fs::write(directory.join(file), text).unwrap();
-        }
-        let mut request = project.rpc_request("-- unused");
-        request["schema_level"] = serde_json::json!("extensions");
-        request["environments"]["SQL_FUN_EXTENSIONS"] = serde_json::json!("earthdistance");
-        request["environments"]["SQL_FUN_EXTENSIONS_DIR"] = serde_json::json!(directory);
-        let request = serde_json::from_value(request).unwrap();
+        let request = extension_initialization_request(
+            &project,
+            "earthdistance",
+            &[
+                (
+                    "cube.control",
+                    "default_version = 1\nschema = 'Cube Schema'",
+                ),
+                (
+                    "cube--1.sql",
+                    "CREATE TABLE cube_definition (id int4 PRIMARY KEY);",
+                ),
+                (
+                    "earthdistance.control",
+                    "default_version = 1\nrequires = 'cube'",
+                ),
+                (
+                    "earthdistance--1.sql",
+                    "CREATE TABLE earth_definition (id int4 REFERENCES @extschema:cube@.cube_definition (id));",
+                ),
+            ],
+        );
         let api = Api {
             schema_cache: std::sync::OnceLock::new(),
         };

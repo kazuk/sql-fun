@@ -229,6 +229,10 @@ impl StatementKind {
     pub const fn default_privileges() -> Self {
         Self::DefaultPrivileges
     }
+    /// The CREATE FOREIGN DATA WRAPPER category.
+    pub const fn foreign_data_wrapper() -> Self {
+        Self::ForeignDataWrapper
+    }
     /// The CREATE FOREIGN TABLE category.
     pub const fn foreign_table() -> Self {
         Self::ForeignTable
@@ -401,7 +405,7 @@ impl StatementNode {
             Self::TableAs(_) => StatementKind::table_as(),
             Self::Table(_) => StatementKind::table(),
             Self::DefaultPrivileges(_) => StatementKind::default_privileges(),
-            Self::ForeignDataWrapper(_) => StatementKind::ForeignDataWrapper,
+            Self::ForeignDataWrapper(_) => StatementKind::foreign_data_wrapper(),
             Self::ForeignTable(_) => StatementKind::foreign_table(),
             Self::AlterRelation(_) => StatementKind::alter_relation(),
         }
@@ -755,6 +759,14 @@ impl StatementNode {
             None
         }
     }
+    /// Inspect a foreign-data wrapper definition before semantic analysis.
+    const fn foreign_data_wrapper_node(&self) -> Option<&ForeignDataWrapper> {
+        if let Self::ForeignDataWrapper(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
     /// Inspect a foreign-table definition without analysis or LIKE expansion.
     const fn foreign_table_node(&self) -> Option<&ForeignTable> {
         if let Self::ForeignTable(value) = self {
@@ -784,11 +796,7 @@ impl Statement {
     }
     /// Inspect a foreign-data wrapper definition before semantic analysis.
     pub const fn foreign_data_wrapper(&self) -> Option<&ForeignDataWrapper> {
-        if let StatementNode::ForeignDataWrapper(value) = &self.node {
-            Some(value)
-        } else {
-            None
-        }
+        self.node.foreign_data_wrapper_node()
     }
     /// Inspect a foreign-table definition without analysis or LIKE expansion.
     pub const fn foreign_table(&self) -> Option<&ForeignTable> {

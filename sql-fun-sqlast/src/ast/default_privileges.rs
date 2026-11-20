@@ -134,6 +134,17 @@ pub struct PrivilegeSpecification {
     columns: Vec<String>,
 }
 impl PrivilegeSpecification {
+    pub(super) fn collect(nodes: syn::NodeListOpt) -> Result<Vec<Self>, AnalysisError> {
+        let mut privileges = Vec::new();
+        for node in nodes.as_inner().unwrap_or_default() {
+            privileges.push(Self::try_from(&required(
+                node.as_access_priv().as_inner(),
+                "privilege specification",
+            )?)?);
+        }
+        Ok(privileges)
+    }
+
     /// Privilege spelling normalized by the PostgreSQL parser.
     /// Empty denotes column-qualified ALL, whose columns are retained separately.
     pub fn name(&self) -> &str {
@@ -160,7 +171,7 @@ pub struct PrivilegeGrantee {
     role: Role,
 }
 impl PrivilegeGrantee {
-    fn collect(nodes: syn::NodeListOpt) -> Result<Vec<Self>, AnalysisError> {
+    pub(super) fn collect(nodes: syn::NodeListOpt) -> Result<Vec<Self>, AnalysisError> {
         let mut values = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             values.push(Self::try_from(&required(
@@ -266,13 +277,7 @@ impl TryFromWithTokens<&syn::AlterDefaultPrivilegesStmt> for DefaultPrivileges {
             )?)?);
         }
         let action = required(value.get_action().as_inner(), "default privilege action")?;
-        let mut privileges = Vec::new();
-        for node in action.get_privileges().as_inner().unwrap_or_default() {
-            privileges.push(PrivilegeSpecification::try_from(&required(
-                node.as_access_priv().as_inner(),
-                "privilege specification",
-            )?)?);
-        }
+        let privileges = PrivilegeSpecification::collect(action.get_privileges())?;
         let grantees = PrivilegeGrantee::collect(action.get_grantees())?;
         Ok(Self {
             options,

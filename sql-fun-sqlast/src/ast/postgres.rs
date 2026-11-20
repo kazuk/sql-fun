@@ -6,11 +6,11 @@ use crate::{
         CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropRule,
         DropTable, DropTrigger, EnumType, Expr, Extension, ForeignTable, Indirection, Insert,
         Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument, ObjectKind,
-        ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice,
-        SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
-        TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
-        TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
-        View, ViewCheckOption, Window,
+        ObjectPrivileges, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role,
+        RoleMembership, Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind,
+        SyntaxOption, Table, TableConstraint, TransformTarget, TruthTest, TryCollectFromWithTokens,
+        TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, VariableSet,
+        VariableSetKind as AstVariableSetKind, View, ViewCheckOption, Window,
         ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
@@ -229,7 +229,10 @@ mod sql_name_conversion_tests {
 }
 
 impl ObjectTarget {
-    fn try_from_node(object: &syn::Node, tokens: &IVec<ScanToken>) -> Result<Self, AnalysisError> {
+    pub(super) fn try_from_node(
+        object: &syn::Node,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, AnalysisError> {
         if let Some(object) = object.as_object_with_args().as_inner() {
             let name = Name::try_from(object.get_objname())?.0;
             let argument_types = if object.get_args_unspecified() {
@@ -728,6 +731,13 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         value: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
+        if let Some(grant) = value.as_grant_stmt().as_inner() {
+            let privileges = ObjectPrivileges::try_from_with_tokens(&grant, tokens)?;
+            return Ok(Self::object_privileges(privileges));
+        }
+        if let Some(grant) = value.as_grant_role_stmt().as_inner() {
+            return Ok(Self::role_membership(RoleMembership::try_from(&grant)?));
+        }
         if let Some(value) = value.as_alter_default_privileges_stmt().as_inner() {
             let value = DefaultPrivileges::try_from_with_tokens(&value, tokens)?;
             return Ok(Self::default_privileges(value));

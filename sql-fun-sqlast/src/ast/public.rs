@@ -108,6 +108,10 @@ impl Statement {
 pub enum StatementKind {
     /// Unresolved PostgreSQL NOTIFY syntax; semantic analysis is separate.
     Notify,
+    /// A PostgreSQL grant of object privileges or role membership.
+    Grant,
+    /// A PostgreSQL revocation of object privileges or role membership.
+    Revoke,
     /// An unresolved PostgreSQL DROP RULE statement. Analysis awaits #605.
     DropRule,
     /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
@@ -172,6 +176,8 @@ impl std::fmt::Display for StatementKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Notify => "NOTIFY",
+            Self::Grant => "GRANT",
+            Self::Revoke => "REVOKE",
             Self::DropRule => "DROP RULE",
             Self::CreateTrigger => "CREATE TRIGGER",
             Self::CreateRule => "CREATE RULE",
@@ -206,6 +212,10 @@ impl std::fmt::Display for StatementKind {
 }
 
 impl StatementKind {
+    const fn privilege_action(is_grant: bool) -> Self {
+        if is_grant { Self::Grant } else { Self::Revoke }
+    }
+
     /// The PostgreSQL NOTIFY category.
     pub const fn notify() -> Self {
         Self::Notify
@@ -359,6 +369,8 @@ impl StatementNode {
     pub(super) const fn kind(&self) -> StatementKind {
         match self {
             Self::Notify(_) => StatementKind::notify(),
+            Self::ObjectPrivileges(value) => StatementKind::privilege_action(value.is_grant()),
+            Self::RoleMembership(value) => StatementKind::privilege_action(value.is_grant()),
             Self::Query(_) => StatementKind::query(),
             Self::Insert(_) => StatementKind::insert(),
             Self::Update(_) => StatementKind::update(),

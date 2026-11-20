@@ -82,6 +82,21 @@ additional [PRAGMA-state limitation](statements/alter-table.md#rename-table).
 
 ## Other PostgreSQL utility statements
 
+PostgreSQL `GRANT` and `REVOKE` statements for object privileges and role
+membership are accepted during syntax conversion, including in extension
+scripts. Analysis currently leaves these statements unresolved. It returns no
+result columns or privilege diagnostics for them and applies no changes to roles
+or privileges in the analysis catalog. Commands that render the statements
+report [query_deparse](../diagnostics/query_deparse.md).
+See the [privilege analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1158).
+
+Extension initialization stops when a script reaches unsupported PostgreSQL
+syntax. The bundled scripts can still stop at `CREATE FOREIGN DATA WRAPPER`,
+`ALTER EXTENSION ... DROP FUNCTION`, or `DROP FUNCTION` during syntax
+conversion. See the
+[bundled extension audit](https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7035507185)
+for affected extensions and versions.
+
 `ALTER DEFAULT PRIVILEGES` and `CREATE FOREIGN TABLE` support syntax recognition
 and SQL text generation, including PostgreSQL 18's `ON LARGE OBJECTS` and
 foreign-table `LIKE` forms. With an explicitly configured PostgreSQL 17 target,

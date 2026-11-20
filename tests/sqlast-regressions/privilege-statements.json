@@ -1,0 +1,72 @@
+[
+  {
+    "name": "extension-amcheck",
+    "sql": "REVOKE ALL ON FUNCTION bt_index_check(regclass) FROM PUBLIC",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "extension-dblink",
+    "sql": "REVOKE ALL ON FUNCTION dblink_connect_u(text) FROM PUBLIC",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "extension-pg-stat-statements",
+    "sql": "GRANT SELECT ON pg_stat_statements TO PUBLIC",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "membership-options",
+    "sql": "GRANT readers TO CURRENT_USER WITH ADMIN OPTION, INHERIT FALSE",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "membership-revoke-option",
+    "sql": "REVOKE SET OPTION FOR readers FROM SESSION_USER CASCADE",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "column-grant",
+    "sql": "GRANT SELECT (a), UPDATE (b) ON app.t TO reader WITH GRANT OPTION",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "schema-wide-revoke",
+    "sql": "REVOKE GRANT OPTION FOR EXECUTE ON ALL ROUTINES IN SCHEMA app FROM reader GRANTED BY CURRENT_USER CASCADE",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  }
+]

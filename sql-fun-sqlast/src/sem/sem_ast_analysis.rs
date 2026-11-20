@@ -33,6 +33,9 @@ impl SemAst {
             AstStatementNode::DefaultPrivileges(_) => {
                 todo!("ALTER DEFAULT PRIVILEGES interpretation (#955)")
             }
+            AstStatementNode::ForeignDataWrapper(_) => {
+                todo!("CREATE FOREIGN DATA WRAPPER interpretation (#1163)")
+            }
             AstStatementNode::ForeignTable(_) => {
                 todo!("CREATE FOREIGN TABLE interpretation (#956)")
             }

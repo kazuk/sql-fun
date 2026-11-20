@@ -14,6 +14,7 @@ mod default_privileges;
 pub(crate) mod deparse;
 pub(crate) mod document;
 mod drop_behavior;
+mod foreign_data_wrapper;
 mod foreign_table;
 mod mutation;
 mod notify;
@@ -54,6 +55,7 @@ pub use self::{
         PrivilegeSpecification,
     },
     deparse::DeparseError,
+    foreign_data_wrapper::{FdwRoutineClause, ForeignDataWrapper},
     foreign_table::{
         FdwOption, ForeignTable, ForeignTableElement, ForeignTableElementKind, TableLike,
     },
@@ -301,6 +303,7 @@ pub(crate) enum StatementNode {
     DefaultPrivileges(DefaultPrivileges),
     ObjectPrivileges(ObjectPrivileges),
     RoleMembership(RoleMembership),
+    ForeignDataWrapper(ForeignDataWrapper),
     ForeignTable(ForeignTable),
     AlterRelation(AlterRelation),
 }

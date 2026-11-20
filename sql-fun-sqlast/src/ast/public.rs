@@ -7,7 +7,8 @@ mod wildcard;
 use crate::{
     StringSpan,
     ast::{
-        Cte, CteBody, DefaultPrivileges, Dialect, ForeignTable, StatementNode, With,
+        Cte, CteBody, DefaultPrivileges, Dialect, ForeignDataWrapper, ForeignTable, StatementNode,
+        With,
         deparse::{DeparseError, FailureKind, SqlEmit, SqlWriter},
         mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut},
         projection::ScopedSourceEdit,
@@ -166,6 +167,8 @@ pub enum StatementKind {
     Table,
     /// ALTER DEFAULT PRIVILEGES syntax; interpretation is separate.
     DefaultPrivileges,
+    /// CREATE FOREIGN DATA WRAPPER syntax.
+    ForeignDataWrapper,
     /// CREATE FOREIGN TABLE syntax; interpretation is separate.
     ForeignTable,
     /// ALTER TABLE or a related relation change.
@@ -205,6 +208,7 @@ impl std::fmt::Display for StatementKind {
             Self::TableAs => "query-backed relation definition",
             Self::Table => "CREATE TABLE",
             Self::DefaultPrivileges => "ALTER DEFAULT PRIVILEGES",
+            Self::ForeignDataWrapper => "CREATE FOREIGN DATA WRAPPER",
             Self::ForeignTable => "CREATE FOREIGN TABLE",
             Self::AlterRelation => "relation alteration",
         })
@@ -397,6 +401,7 @@ impl StatementNode {
             Self::TableAs(_) => StatementKind::table_as(),
             Self::Table(_) => StatementKind::table(),
             Self::DefaultPrivileges(_) => StatementKind::default_privileges(),
+            Self::ForeignDataWrapper(_) => StatementKind::ForeignDataWrapper,
             Self::ForeignTable(_) => StatementKind::foreign_table(),
             Self::AlterRelation(_) => StatementKind::alter_relation(),
         }
@@ -776,6 +781,14 @@ impl Statement {
     /// Edit ALTER DEFAULT PRIVILEGES syntax; successful edits apply immediately.
     pub const fn default_privileges_mut(&mut self) -> Option<&mut DefaultPrivileges> {
         self.node.default_privileges_mut()
+    }
+    /// Inspect a foreign-data wrapper definition before semantic analysis.
+    pub const fn foreign_data_wrapper(&self) -> Option<&ForeignDataWrapper> {
+        if let StatementNode::ForeignDataWrapper(value) = &self.node {
+            Some(value)
+        } else {
+            None
+        }
     }
     /// Inspect a foreign-table definition without analysis or LIKE expansion.
     pub const fn foreign_table(&self) -> Option<&ForeignTable> {

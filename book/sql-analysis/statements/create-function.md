@@ -67,3 +67,15 @@ Defaults use shared expression diagnostics. A missing set-returning result type
 terminates analysis; it is not currently a
 successful declaration or an emitted function-lookup diagnostic. Declaration
 analysis is not a complete body validator.
+
+## ALTER FUNCTION PARALLEL
+
+sql-fun can convert and render PostgreSQL `ALTER FUNCTION` statements with a
+single `PARALLEL SAFE`, `PARALLEL RESTRICTED`, or `PARALLEL UNSAFE` action. It
+preserves the function name and signature, including the distinction between
+an omitted signature and explicit empty parentheses. Statements that combine
+`PARALLEL` with other actions are unsupported in this conversion.
+
+Schema and extension analysis stops when it reaches one of these converted
+statements. Semantic interpretation is tracked in
+[#1172](https://github.com/kazuk/sql-fun/issues/1172).

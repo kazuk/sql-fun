@@ -17,7 +17,8 @@ SQL parser can be analyzed or executed.
   [CREATE/DROP TRIGGER](statements/triggers.md).
 - Types and routines: [CREATE TYPE](statements/create-type.md),
   [CREATE DOMAIN](statements/create-domain.md), and
-  [CREATE FUNCTION](statements/create-function.md).
+  [CREATE FUNCTION](statements/create-function.md) and
+  [ALTER FUNCTION PARALLEL](statements/create-function.md#alter-function-parallel).
 - Other schema statements: [sequences](statements/sequences.md),
   [CREATE SCHEMA](statements/create-schema.md),
   [ALTER ... OWNER TO](statements/alter-owner.md),
@@ -110,8 +111,8 @@ membership change. SQL rendering is also unimplemented. See the
 PostgreSQL `DROP VIEW` stops during syntax conversion, including in
 `pg_stat_statements` update scripts
 ([#1169](https://github.com/kazuk/sql-fun/issues/1169)).
-Bundled extension scripts can also stop during syntax conversion on
-[`ALTER FUNCTION ... PARALLEL`](https://github.com/kazuk/sql-fun/issues/1166),
+Bundled extension scripts can also stop during semantic interpretation of
+[ALTER FUNCTION PARALLEL](statements/create-function.md#alter-function-parallel),
 including during a `pageinspect` update. See the
 [bundled extension audit][audit-1150] for affected versions.
 

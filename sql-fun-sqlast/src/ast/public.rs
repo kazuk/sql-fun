@@ -115,6 +115,8 @@ pub enum StatementKind {
     Revoke,
     /// An unresolved PostgreSQL DROP RULE statement. Analysis awaits #605.
     DropRule,
+    /// PostgreSQL ALTER FUNCTION with a PARALLEL action.
+    AlterFunctionParallel,
     /// A PostgreSQL DROP FUNCTION statement.
     DropFunction,
     /// A PostgreSQL extension membership change.
@@ -186,6 +188,7 @@ impl std::fmt::Display for StatementKind {
             Self::Grant => "GRANT",
             Self::Revoke => "REVOKE",
             Self::DropRule => "DROP RULE",
+            Self::AlterFunctionParallel => "ALTER FUNCTION",
             Self::DropFunction => "DROP FUNCTION",
             Self::AlterExtensionMembership => "ALTER EXTENSION",
             Self::CreateTrigger => "CREATE TRIGGER",
@@ -394,6 +397,7 @@ impl StatementNode {
             Self::CreateTrigger(_) => StatementKind::create_trigger(),
             Self::CreateRule(_) => StatementKind::create_rule(),
             Self::DropTrigger(_) => StatementKind::drop_trigger(),
+            Self::AlterFunctionParallel(_) => StatementKind::AlterFunctionParallel,
             Self::DropFunction(_) => StatementKind::DropFunction,
             Self::ExtensionMembership(_) => StatementKind::AlterExtensionMembership,
             Self::DropRule(_) => StatementKind::drop_rule(),

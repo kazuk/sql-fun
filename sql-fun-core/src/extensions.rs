@@ -1,5 +1,6 @@
 mod config_error;
 mod control_file;
+mod dependency_schedule;
 mod extension_collection;
 mod name_version_pair;
 mod script_inventory;
@@ -9,6 +10,7 @@ mod test_helpers;
 pub use self::{
     config_error::ExtensionConfigError,
     control_file::ExtensionScriptSettings,
+    dependency_schedule::ScheduledExtensionScript,
     extension_collection::{
         ExtensionScript, PostgresExtensionsCollection, PostgresExtensionsParseError,
     },

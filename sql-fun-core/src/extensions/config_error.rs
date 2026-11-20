@@ -25,6 +25,23 @@ pub enum ExtensionConfigError {
     #[error("No installation path for extension {0}@{1} in {2}")]
     NoInstallationPath(String, ExtensionVersion, PathBuf),
 
+    /// Different explicit versions were selected for the same extension.
+    #[error("Conflicting extension selections: {0} and {1}")]
+    ConflictingSelections(String, String),
+
+    /// A required extension could not be resolved.
+    #[error("Cannot resolve required extension ({chain}): {source}")]
+    RequiredExtension {
+        /// Chain of requiring script paths ending with the prerequisite name.
+        chain: String,
+        /// Underlying path or control resolution error.
+        source: Box<Self>,
+    },
+
+    /// The script dependencies have no valid execution order.
+    #[error("Cyclic extension script dependency: {0}")]
+    CyclicDependency(String),
+
     /// IO error
     #[error(transparent)]
     Io(#[from] std::io::Error),

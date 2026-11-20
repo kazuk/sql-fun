@@ -144,7 +144,7 @@ Both `analyze` and `test` accept `--schema-level`:
 | --- | --- |
 | `builtin` | Builtin catalog/type/function/operator definitions only |
 | `default` | Builtins plus the server's bundled `schema.sql` |
-| `extensions` | Default SQL plus configured extension SQL, in configured order |
+| `extensions` | Default SQL plus selected extensions and their prerequisites |
 | `project` | Extensions plus the selected project schema dump |
 
 The default is `project`. Lower levels do not require or access SQL files from
@@ -161,6 +161,13 @@ installation script when available, or loads an installation script followed
 by the required update scripts. The SQL files must be readable as UTF-8.
 Supported control-file `encoding` declarations are `UTF8` (also `UNICODE`)
 and `SQL_ASCII`.
+
+Selecting an extension also loads the prerequisites declared by its PostgreSQL
+control files. A prerequisite's installation script is loaded before any script
+that needs it. Updates can run between scripts from other extensions. An
+explicitly selected prerequisite keeps its selected version. Initialization
+reports the dependency chain if a prerequisite cannot be resolved or the scripts
+have a dependency cycle.
 
 For PostgreSQL extension scripts, the optional datasource setting
 `extension_install_owner = "deploy_role"` supplies the assumed role for

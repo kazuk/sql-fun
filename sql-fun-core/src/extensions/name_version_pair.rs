@@ -122,6 +122,14 @@ mod test_try_new {
 }
 
 impl ExtensionNameVersionPair {
+    pub(super) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(super) const fn version(&self) -> Option<&ExtensionVersion> {
+        self.version.as_ref()
+    }
+
     /// Resolve the ordered installation and update scripts and record the target version.
     ///
     /// # Errors

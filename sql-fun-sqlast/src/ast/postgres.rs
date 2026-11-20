@@ -5,11 +5,11 @@ use crate::{
         CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment, CompositeType, CreateRule,
         CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropBehavior,
         DropFunction, DropRule, DropTable, DropTrigger, EnumType, Expr, Extension,
-        ForeignDataWrapper, ForeignTable, Indirection, Insert, Literal, Merge, Name, NamedArgument,
-        Notify, NullTest, ObjectArgument, ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr,
-        OperatorKind, Order, Parameter, Query, Role, RoleMembership, Sequence, Slice, SqlValue,
-        StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
-        TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
+        ExtensionMembership, ForeignDataWrapper, ForeignTable, Indirection, Insert, Literal, Merge,
+        Name, NamedArgument, Notify, NullTest, ObjectArgument, ObjectKind, ObjectPrivileges,
+        ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role, RoleMembership,
+        Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption, Table,
+        TableConstraint, TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
         ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
@@ -57,8 +57,14 @@ impl TryFrom<syn::NodeListOpt> for Name {
     type Error = AnalysisError;
 
     fn try_from(nodes: syn::NodeListOpt) -> Result<Self, Self::Error> {
+        Self::try_from_node_parts(&nodes.as_inner().unwrap_or_default())
+    }
+}
+
+impl Name {
+    pub(super) fn try_from_node_parts(nodes: &[syn::Node]) -> Result<Self, AnalysisError> {
         let mut parts = Vec::new();
-        for node in nodes.as_inner().unwrap_or_default() {
+        for node in nodes {
             parts.push(required(node.as_string().get_sval(), "name component")?);
         }
         Ok(Self::from_parts(&parts))
@@ -325,7 +331,7 @@ mod test_object_target {
 }
 
 impl ObjectTarget {
-    fn try_from_cast_node(
+    pub(super) fn try_from_cast_node(
         object: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -345,7 +351,7 @@ impl ObjectTarget {
 }
 
 impl ObjectTarget {
-    fn try_from_transform_node(
+    pub(super) fn try_from_transform_node(
         object: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -801,6 +807,11 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(view) = value.as_view_stmt().as_inner() {
             return Ok(Self::view(View::try_from_with_tokens(&view, tokens)?));
         }
+        if let Some(membership) = value.as_alter_extension_contents_stmt().as_inner() {
+            return Ok(Self::extension_membership(
+                ExtensionMembership::try_from_with_tokens(&membership, tokens)?,
+            ));
+        }
         if let Some(extension) = value.as_create_extension_stmt().as_inner() {
             return Ok(Self::extension(Extension::try_from_with_tokens(
                 &extension, tokens,
@@ -916,6 +927,24 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+#[cfg(test)]
+mod test_extension_membership_dispatch {
+    use crate::{ast::Dialect, parse_statements};
+
+    #[rstest::rstest]
+    #[case::update("ALTER EXTENSION ext UPDATE TO '2';")]
+    #[case::set_schema("ALTER EXTENSION ext SET SCHEMA app;")]
+    #[should_panic(expected = "unexpected input top-level PostgreSQL statement")]
+    fn excludes_other_alter_extension_forms(#[case] sql: &str) {
+        assert!(
+            parse_statements(sql, Dialect::postgres())
+                .next()
+                .unwrap()
+                .is_err()
+        );
     }
 }
 

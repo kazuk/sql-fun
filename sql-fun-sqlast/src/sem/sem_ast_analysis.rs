@@ -27,6 +27,9 @@ impl SemAst {
             AstStatementNode::ObjectPrivileges(_) | AstStatementNode::RoleMembership(_) => {
                 todo!("GRANT and REVOKE interpretation (#1158)")
             }
+            AstStatementNode::ExtensionMembership(_) => {
+                todo!("ALTER EXTENSION membership interpretation (#1168)")
+            }
             AstStatementNode::DropFunction(_) => todo!("DROP FUNCTION interpretation (#1165)"),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")

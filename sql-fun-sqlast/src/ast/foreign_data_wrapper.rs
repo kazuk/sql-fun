@@ -87,9 +87,12 @@ impl TryFrom<&syn::CreateFdwStmt> for ForeignDataWrapper {
 
 #[cfg(test)]
 mod tests {
-    use super::FdwRoutineClause::{Handler, Validator};
     use crate::{
-        ast::{Dialect, StatementKind},
+        ast::{
+            Dialect,
+            FdwRoutineClause::{self, Handler, Validator},
+            StatementKind,
+        },
         parse_statements::parse_statements,
     };
 
@@ -124,7 +127,7 @@ mod tests {
     fn retains_wrapper_definition(
         #[case] definition: &str,
         #[case] name: &str,
-        #[case] routines: &[super::FdwRoutineClause],
+        #[case] routines: &[FdwRoutineClause],
         #[case] options: &[(&str, &str)],
     ) {
         let sql = format!("CREATE FOREIGN DATA WRAPPER {definition};");

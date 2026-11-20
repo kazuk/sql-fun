@@ -230,6 +230,17 @@ mod sql_name_conversion_tests {
 }
 
 impl ObjectTarget {
+    fn try_from_drop_function_target(
+        object: &syn::Node,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let signature = required(
+            object.as_object_with_args().as_inner(),
+            "drop function target",
+        )?;
+        Self::try_from_object_with_args(&signature, tokens)
+    }
+
     fn try_from_object_with_args(
         object: &syn::ObjectWithArgs,
         tokens: &IVec<ScanToken>,
@@ -1095,13 +1106,7 @@ impl TryFromWithTokens<&syn::DropStmt> for DropFunction {
         let objects = required(value.get_objects().as_inner(), "drop_stmt.objects")?;
         let targets = objects
             .iter()
-            .map(|object| {
-                let signature = required(
-                    object.as_object_with_args().as_inner(),
-                    "drop function target",
-                )?;
-                ObjectTarget::try_from_object_with_args(&signature, tokens)
-            })
+            .map(|object| ObjectTarget::try_from_drop_function_target(object, tokens))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
             targets,

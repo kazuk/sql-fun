@@ -15,6 +15,18 @@ pub enum FdwRoutineClause {
     Validator(Option<Vec<String>>),
 }
 
+impl FdwRoutineClause {
+    /// Create a handler clause. Pass no name for `NO HANDLER`.
+    pub const fn handler(name: Option<Vec<String>>) -> Self {
+        Self::Handler(name)
+    }
+
+    /// Create a validator clause. Pass no name for `NO VALIDATOR`.
+    pub const fn validator(name: Option<Vec<String>>) -> Self {
+        Self::Validator(name)
+    }
+}
+
 /// A PostgreSQL foreign-data wrapper definition before semantic analysis.
 #[derive(Clone, Debug)]
 pub struct ForeignDataWrapper {
@@ -54,8 +66,8 @@ impl TryFrom<&syn::DefElem> for FdwRoutineClause {
             })
             .transpose()?;
         match value.get_defname().as_str() {
-            "handler" => Ok(Self::Handler(name)),
-            "validator" => Ok(Self::Validator(name)),
+            "handler" => Ok(Self::handler(name)),
+            "validator" => Ok(Self::validator(name)),
             _ => AnalysisError::raise_unexpected_input("FDW routine clause"),
         }
     }
@@ -88,11 +100,7 @@ impl TryFrom<&syn::CreateFdwStmt> for ForeignDataWrapper {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{
-            Dialect,
-            FdwRoutineClause::{self, Handler, Validator},
-            StatementKind,
-        },
+        ast::{Dialect, FdwRoutineClause, StatementKind},
         parse_statements::parse_statements,
     };
 
@@ -100,28 +108,28 @@ mod tests {
     #[case::dblink(
         "dblink_fdw VALIDATOR dblink_fdw_validator",
         "dblink_fdw",
-        &[Validator(Some(vec!["dblink_fdw_validator".to_owned()]))],
+        &[FdwRoutineClause::validator(Some(vec!["dblink_fdw_validator".to_owned()]))],
         &[],
     )]
     #[case::omitted("bare", "bare", &[], &[])]
-    #[case::no_validator("bare NO VALIDATOR", "bare", &[Validator(None)], &[])]
-    #[case::no_handler("bare NO HANDLER", "bare", &[Handler(None)], &[])]
+    #[case::no_validator("bare NO VALIDATOR", "bare", &[FdwRoutineClause::validator(None)], &[])]
+    #[case::no_handler("bare NO HANDLER", "bare", &[FdwRoutineClause::handler(None)], &[])]
     #[case::handler_only(
         "bare HANDLER handler_fn",
         "bare",
-        &[Handler(Some(vec!["handler_fn".to_owned()]))],
+        &[FdwRoutineClause::handler(Some(vec!["handler_fn".to_owned()]))],
         &[],
     )]
     #[case::named_and_explicit(
         r#""My Wrapper" VALIDATOR "My Schema"."My Validator" NO HANDLER OPTIONS ("select" 'a''b', empty '')"#,
         "My Wrapper",
-        &[Validator(Some(vec!["My Schema".to_owned(), "My Validator".to_owned()])), Handler(None)],
+        &[FdwRoutineClause::validator(Some(vec!["My Schema".to_owned(), "My Validator".to_owned()])), FdwRoutineClause::handler(None)],
         &[("select", "a'b"), ("empty", "")],
     )]
     #[case::handler_and_no_validator(
         "bare HANDLER public.handler_fn NO VALIDATOR",
         "bare",
-        &[Handler(Some(vec!["public".to_owned(), "handler_fn".to_owned()])), Validator(None)],
+        &[FdwRoutineClause::handler(Some(vec!["public".to_owned(), "handler_fn".to_owned()])), FdwRoutineClause::validator(None)],
         &[],
     )]
     fn retains_wrapper_definition(
@@ -135,7 +143,7 @@ mod tests {
             .next()
             .unwrap()
             .unwrap();
-        assert_eq!(statement.kind(), StatementKind::ForeignDataWrapper);
+        assert_eq!(statement.kind(), StatementKind::foreign_data_wrapper());
         let wrapper = statement.foreign_data_wrapper().unwrap();
         assert_eq!(wrapper.name(), name);
         assert_eq!(wrapper.routines(), routines);

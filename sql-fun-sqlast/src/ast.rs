@@ -324,6 +324,9 @@ impl StatementNode {
     const fn default_privileges(value: DefaultPrivileges) -> Self {
         Self::DefaultPrivileges(value)
     }
+    const fn foreign_data_wrapper(value: ForeignDataWrapper) -> Self {
+        Self::ForeignDataWrapper(value)
+    }
     const fn foreign_table(value: ForeignTable) -> Self {
         Self::ForeignTable(value)
     }

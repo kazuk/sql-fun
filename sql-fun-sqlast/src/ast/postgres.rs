@@ -743,9 +743,8 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             return Ok(Self::default_privileges(value));
         }
         if let Some(value) = value.as_create_fdw_stmt().as_inner() {
-            return Ok(Self::ForeignDataWrapper(ForeignDataWrapper::try_from(
-                &value,
-            )?));
+            let wrapper = ForeignDataWrapper::try_from(&value)?;
+            return Ok(Self::foreign_data_wrapper(wrapper));
         }
         if let Some(value) = value.as_create_foreign_table_stmt().as_inner() {
             let value = ForeignTable::try_from_with_tokens(&value, tokens)?;

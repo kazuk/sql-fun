@@ -1,3 +1,6 @@
+use crate::schema_cache::test_helpers::SchemaProject;
+use ::sql_fun_server_api::payloads::InitializeSchemaArgs;
+
 pub(crate) mod heavy;
 pub(crate) mod lint_expectations;
 pub(crate) mod pid_file;
@@ -21,4 +24,23 @@ pub(crate) fn extension_script_with_control(control: &str) -> ::sql_fun_core::Ex
         .unwrap()
         .pop()
         .unwrap()
+}
+
+/// Prepare datasource initialization for the selected PostgreSQL extensions.
+pub(crate) fn extension_initialization_request(
+    project: &SchemaProject,
+    selected: &str,
+    files: &[(&str, &str)],
+) -> InitializeSchemaArgs {
+    let directory = project.home().join("postgres/17/extension");
+    std::fs::create_dir_all(&directory).unwrap();
+    for (file, text) in files {
+        std::fs::write(directory.join(file), text).unwrap();
+    }
+
+    let mut request = project.rpc_request("-- unused");
+    request["schema_level"] = ::serde_json::json!("extensions");
+    request["environments"]["SQL_FUN_EXTENSIONS"] = ::serde_json::json!(selected);
+    request["environments"]["SQL_FUN_EXTENSIONS_DIR"] = ::serde_json::json!(directory);
+    ::serde_json::from_value(request).unwrap()
 }

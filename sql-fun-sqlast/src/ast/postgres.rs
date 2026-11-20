@@ -3,14 +3,15 @@ use crate::{
     ast::{
         Access, AlterOwner, AlterRelation, AlterSequence, BooleanExpr, BooleanOperator, Call,
         CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment, CompositeType, CreateRule,
-        CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropRule,
-        DropTable, DropTrigger, EnumType, Expr, Extension, ForeignDataWrapper, ForeignTable,
-        Indirection, Insert, Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument,
-        ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter,
-        Query, Role, RoleMembership, Sequence, Slice, SqlValue, StatementNode, Subquery,
-        SubqueryKind, SyntaxOption, Table, TableConstraint, TransformTarget, TruthTest,
-        TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
-        VariableSet, VariableSetKind as AstVariableSetKind, View, ViewCheckOption, Window,
+        CreateTrigger, CurrentOf, DefaultPrivileges, Delete, DomainConstraintTarget, DropBehavior,
+        DropFunction, DropRule, DropTable, DropTrigger, EnumType, Expr, Extension,
+        ForeignDataWrapper, ForeignTable, Indirection, Insert, Literal, Merge, Name, NamedArgument,
+        Notify, NullTest, ObjectArgument, ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr,
+        OperatorKind, Order, Parameter, Query, Role, RoleMembership, Sequence, Slice, SqlValue,
+        StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
+        TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
+        TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
+        View, ViewCheckOption, Window,
         ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
@@ -229,35 +230,42 @@ mod sql_name_conversion_tests {
 }
 
 impl ObjectTarget {
+    fn try_from_object_with_args(
+        object: &syn::ObjectWithArgs,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let name = Name::try_from(object.get_objname())?.0;
+        let argument_types = if object.get_args_unspecified() {
+            None
+        } else {
+            let function_arguments = object.get_objfuncargs().as_inner().unwrap_or_default();
+            let mut types = Vec::new();
+            if function_arguments.is_empty() {
+                for argument in object.get_objargs().as_inner().unwrap_or_default() {
+                    types.push(ObjectArgument::try_from_node(&argument, tokens)?);
+                }
+            } else {
+                for argument in function_arguments {
+                    let argument = required(
+                        argument.as_function_parameter().as_inner(),
+                        "object_with_args.objfuncargs.function_parameter",
+                    )?;
+                    types.push(ObjectArgument::try_from_function_parameter(
+                        &argument, tokens,
+                    )?);
+                }
+            }
+            Some(types)
+        };
+        Ok(Self::new(&name, argument_types.as_deref()))
+    }
+
     pub(super) fn try_from_node(
         object: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         if let Some(object) = object.as_object_with_args().as_inner() {
-            let name = Name::try_from(object.get_objname())?.0;
-            let argument_types = if object.get_args_unspecified() {
-                None
-            } else {
-                let function_arguments = object.get_objfuncargs().as_inner().unwrap_or_default();
-                let mut types = Vec::new();
-                if function_arguments.is_empty() {
-                    for argument in object.get_objargs().as_inner().unwrap_or_default() {
-                        types.push(ObjectArgument::try_from_node(&argument, tokens)?);
-                    }
-                } else {
-                    for argument in function_arguments {
-                        let argument = required(
-                            argument.as_function_parameter().as_inner(),
-                            "object_with_args.objfuncargs.function_parameter",
-                        )?;
-                        types.push(ObjectArgument::try_from_function_parameter(
-                            &argument, tokens,
-                        )?);
-                    }
-                }
-                Some(types)
-            };
-            Ok(Self::new(&name, argument_types.as_deref()))
+            Self::try_from_object_with_args(&object, tokens)
         } else if let Some(items) = object.as_list().get_items().map(|items| items.as_string()) {
             let name: Vec<_> = items.iter().map(SynString::get_sval).collect();
             Ok(Self::new(&name, None))
@@ -801,20 +809,19 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 &sequence, tokens,
             )?));
         }
-        if let Some(drop_table) = value.as_drop_stmt().as_inner() {
-            if matches!(
-                drop_table.get_remove_type().as_inner(),
-                Some(syn::ObjectType::ObjectTrigger)
-            ) {
-                return Ok(Self::drop_trigger(DropTrigger::try_from(&drop_table)?));
-            }
-            if matches!(
-                drop_table.get_remove_type().as_inner(),
-                Some(syn::ObjectType::ObjectRule)
-            ) {
-                return Ok(Self::drop_rule(DropRule::try_from(&drop_table)?));
-            }
-            return Ok(Self::drop_table(DropTable::try_from(&drop_table)?));
+        if let Some(drop) = value.as_drop_stmt().as_inner() {
+            return match drop.get_remove_type().as_inner() {
+                Some(syn::ObjectType::ObjectFunction) => Ok(Self::drop_function(
+                    DropFunction::try_from_with_tokens(&drop, tokens)?,
+                )),
+                Some(syn::ObjectType::ObjectTrigger) => {
+                    Ok(Self::drop_trigger(DropTrigger::try_from(&drop)?))
+                }
+                Some(syn::ObjectType::ObjectRule) => {
+                    Ok(Self::drop_rule(DropRule::try_from(&drop)?))
+                }
+                _ => Ok(Self::drop_table(DropTable::try_from(&drop)?)),
+            };
         }
         if let Some(alter_sequence) = value.as_alter_seq_stmt().as_inner() {
             return Ok(Self::alter_sequence(AlterSequence::try_from_with_tokens(
@@ -1075,6 +1082,117 @@ impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
             value.get_for_identity(),
             value.get_missing_ok(),
         ))
+    }
+}
+
+impl TryFromWithTokens<&syn::DropStmt> for DropFunction {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::DropStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let objects = required(value.get_objects().as_inner(), "drop_stmt.objects")?;
+        let targets = objects
+            .iter()
+            .map(|object| {
+                let signature = required(
+                    object.as_object_with_args().as_inner(),
+                    "drop function target",
+                )?;
+                ObjectTarget::try_from_object_with_args(&signature, tokens)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            targets,
+            if_exists: value.get_missing_ok(),
+            behavior: DropBehavior::try_from(value.get_behavior().as_inner())?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_drop_function {
+    use crate::{
+        ast::{Dialect, DropBehavior, StatementKind, StatementNode},
+        parse_statements,
+    };
+
+    #[rstest::rstest]
+    #[case::walinspect("pg_get_wal_records_info_till_end_of_wal(pg_lsn)", "pg_get_wal_records_info_till_end_of_wal", &["pg_lsn"])]
+    #[case::buffercache("pg_buffercache_evict(integer)", "pg_buffercache_evict", &["int4"])]
+    #[case::pageinspect_modes("brin_page_items(IN page bytea, IN index_oid regclass)", "brin_page_items", &["bytea", "regclass"])]
+    #[case::pageinspect_short("get_raw_page(text, int4)", "get_raw_page", &["text", "int4"])]
+    #[case::pageinspect_long("get_raw_page(text, text, int4)", "get_raw_page", &["text", "text", "int4"])]
+    fn retains_bundled_targets(
+        #[case] signature: &str,
+        #[case] name: &str,
+        #[case] types: &[&str],
+    ) -> testresult::TestResult {
+        let sql = format!("DROP FUNCTION {signature}");
+        let statement = parse_statements(&sql, Dialect::postgres())
+            .next()
+            .expect("DROP FUNCTION")?;
+        assert_eq!(statement.kind(), StatementKind::DropFunction);
+        let StatementNode::DropFunction(drop) = statement.into_test_node() else {
+            panic!("DROP FUNCTION");
+        };
+        let [target] = drop.targets.as_slice() else {
+            panic!("one function target");
+        };
+        assert_eq!(target.name, [name]);
+        let argument_types = target.argument_types.as_ref().expect("explicit signature");
+        assert_eq!(argument_types.len(), types.len());
+        for (argument, expected) in argument_types.iter().zip(types) {
+            let ty = argument.type_name.as_ref().expect("argument type");
+            assert_eq!(ty.name.0.last().map(String::as_str), Some(*expected));
+        }
+        assert!(!drop.if_exists);
+        assert_eq!(drop.behavior, DropBehavior::Restrict);
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::cascade(" CASCADE", DropBehavior::Cascade)]
+    #[case::restrict(" RESTRICT", DropBehavior::Restrict)]
+    fn retains_mixed_signatures(
+        #[case] suffix: &str,
+        #[case] behavior: DropBehavior,
+    ) -> testresult::TestResult {
+        let sql = format!(
+            r#"DROP FUNCTION IF EXISTS "My.Schema".f, "My.Schema".f(), "My.Schema".f(IN "Arg" app.amount, OUT flag bool, INOUT n int, VARIADIC rest app.amount[]){suffix}"#
+        );
+        let statement = parse_statements(&sql, Dialect::postgres())
+            .next()
+            .expect("DROP FUNCTION")?;
+        let StatementNode::DropFunction(drop) = statement.into_test_node() else {
+            panic!("DROP FUNCTION");
+        };
+        assert!(drop.if_exists);
+        assert_eq!(drop.behavior, behavior);
+        let [bare, empty, typed] = drop.targets.as_slice() else {
+            panic!("three function targets");
+        };
+        for target in [bare, empty, typed] {
+            assert_eq!(target.name, ["My.Schema", "f"]);
+        }
+        assert!(bare.argument_types.is_none());
+        assert_eq!(empty.argument_types.as_deref().map(<[_]>::len), Some(0));
+        let args = typed.argument_types.as_deref().expect("explicit signature");
+        assert_eq!(args.len(), 4);
+        for (argument, (mode, name)) in args.iter().zip([
+            ("IN", "Arg"),
+            ("OUT", "flag"),
+            ("INOUT", "n"),
+            ("VARIADIC", "rest"),
+        ]) {
+            assert_eq!(argument.mode.as_deref(), Some(mode));
+            assert_eq!(argument.name.as_deref(), Some(name));
+        }
+        let variadic_type = args[3].type_name.as_ref().expect("array type");
+        assert_eq!(variadic_type.name.0, ["app", "amount"]);
+        assert_eq!(variadic_type.array_bounds, [None]);
+        Ok(())
     }
 }
 

@@ -280,6 +280,7 @@ impl RetainSqliteTypes for StatementNode {
             Self::Notify(_)
             | Self::ObjectPrivileges(_)
             | Self::RoleMembership(_)
+            | Self::DropFunction(_)
             | Self::DefaultPrivileges(_)
             | Self::ForeignDataWrapper(_)
             | Self::ForeignTable(_)

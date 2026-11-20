@@ -96,10 +96,17 @@ extension script. sql-fun does not yet resolve the specified routines,
 validate the definition, or add the wrapper to the analysis catalog
 ([#1163](https://github.com/kazuk/sql-fun/issues/1163)).
 
-Bundled extension scripts also contain other unsupported statements such as
-`ALTER EXTENSION ... DROP FUNCTION` and `DROP FUNCTION`. When reached, these
-statements stop extension initialization during syntax conversion. See the
-[bundled extension audit][audit-1150] for affected extensions and versions.
+PostgreSQL `DROP FUNCTION` syntax is accepted during syntax conversion and can
+be rendered back to SQL. Analysis stops at function-drop interpretation,
+including when an extension script reaches the statement. See the
+[function-drop analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1165).
+
+Bundled extension scripts can also stop during syntax conversion on
+[extension membership changes](https://github.com/kazuk/sql-fun/issues/1161),
+such as `ALTER EXTENSION ... DROP FUNCTION`, or on
+[`ALTER FUNCTION ... PARALLEL`](https://github.com/kazuk/sql-fun/issues/1166),
+including during a `pageinspect` update. See the
+[bundled extension audit][audit-1150] for affected versions.
 
 `ALTER DEFAULT PRIVILEGES` and `CREATE FOREIGN TABLE` support syntax recognition
 and SQL text generation, including PostgreSQL 18's `ON LARGE OBJECTS` and

@@ -282,6 +282,7 @@ pub(crate) enum StatementNode {
     Merge(Merge),
     View(View),
     DropRule(DropRule),
+    DropFunction(DropFunction),
     CreateTrigger(CreateTrigger),
     CreateRule(CreateRule),
     DropTrigger(DropTrigger),
@@ -361,6 +362,10 @@ impl StatementNode {
 
     const fn drop_trigger(value: DropTrigger) -> Self {
         Self::DropTrigger(value)
+    }
+
+    const fn drop_function(value: DropFunction) -> Self {
+        Self::DropFunction(value)
     }
 
     const fn drop_rule(value: DropRule) -> Self {
@@ -1814,6 +1819,13 @@ pub(crate) enum RuleEvent {
     Insert,
     Update,
     Delete,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DropFunction {
+    targets: Vec<ObjectTarget>,
+    if_exists: bool,
+    behavior: DropBehavior,
 }
 
 // Unresolved PostgreSQL DROP RULE syntax; the ON relation is always explicit.

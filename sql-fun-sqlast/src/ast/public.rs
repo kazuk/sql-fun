@@ -233,6 +233,12 @@ impl StatementKind {
         Self::AlterFunctionParallel
     }
 
+    /// The category for a PostgreSQL DROP VIEW statement.
+    #[must_use]
+    pub const fn drop_view() -> Self {
+        Self::DropView
+    }
+
     const fn privilege_action(is_grant: bool) -> Self {
         if is_grant { Self::Grant } else { Self::Revoke }
     }
@@ -407,7 +413,7 @@ impl StatementNode {
             Self::DropTrigger(_) => StatementKind::drop_trigger(),
             Self::AlterFunctionParallel(_) => StatementKind::alter_function_parallel(),
             Self::DropFunction(_) => StatementKind::DropFunction,
-            Self::DropView(_) => StatementKind::DropView,
+            Self::DropView(_) => StatementKind::drop_view(),
             Self::ExtensionMembership(_) => StatementKind::AlterExtensionMembership,
             Self::DropRule(_) => StatementKind::drop_rule(),
             Self::Extension(_) => StatementKind::extension(),

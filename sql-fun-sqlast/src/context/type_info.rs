@@ -41,6 +41,9 @@ where
     /// insert create domain statement
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain);
 
+    /// Publish a PostgreSQL shell or its completed base definition.
+    fn insert_shell_or_base_type(&mut self, name: &FullName, definition: &TypeDefinition);
+
     /// register enum type
     fn insert_create_enum(&mut self, name: &FullName, create_enum_type: &CreateEnum);
 }

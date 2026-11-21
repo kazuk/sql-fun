@@ -101,6 +101,12 @@ pub trait BaseParseContext:
 
     /// get type by name
     fn get_type(&self, key: &FullName) -> Option<&TypeDefinition> {
+        self.get_declared_type(key)
+            .filter(|definition| !definition.is_shell())
+    }
+
+    /// Look up a declared type, including an incomplete PostgreSQL shell.
+    fn get_declared_type(&self, key: &FullName) -> Option<&TypeDefinition> {
         expand_type_search_path(self, key, |k| self.get_type_impl(k))
     }
 
@@ -113,9 +119,10 @@ pub trait BaseParseContext:
     /// Resolve a type to the exact qualified catalog key selected by the search path.
     fn resolve_type_name(&self, name: &FullName) -> Option<FullName> {
         expand_type_search_path(self, name, |key| {
-            self.get_type_impl(key)?;
-            Some(key.clone())
+            Some((key.clone(), self.get_type_impl(key)?))
         })
+        .filter(|(_, definition)| !definition.is_shell())
+        .map(|(key, _)| key)
     }
 
     /// get `CREATE TABLE` statement by table name

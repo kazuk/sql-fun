@@ -1,0 +1,29 @@
+[
+  {
+    "name": "completed_shell_type_and_array_are_visible",
+    "sql": "SELECT item, items FROM public.base_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "item",
+          "type": {
+            "schema_name": "public",
+            "local_name": "base_value",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "items",
+          "type": {
+            "schema_name": "public",
+            "local_name": "base_value",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

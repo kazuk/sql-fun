@@ -31,6 +31,10 @@ pub enum TypeDefinition {
     Domain(CreateDomain),
     /// a builtin type
     Builtin(BuiltinTypeDefinition),
+    /// A declared PostgreSQL type awaiting its full definition.
+    Shell(TypeReference),
+    /// A PostgreSQL base type defined by schema DDL.
+    Base(BuiltinTypeDefinition),
     /// table
     TableRef(TableName, TypeReference),
     /// implicit composite type
@@ -226,7 +230,8 @@ impl TypeDefinition {
     pub(crate) fn intrinsic_category(&self) -> Option<TypeCategory> {
         match self {
             Self::Array(_) => TypeCategory::try_from('A').ok(),
-            Self::Builtin(definition) => definition.category,
+            Self::Builtin(definition) | Self::Base(definition) => definition.category,
+            Self::Shell(_) => None,
             Self::Enum(_) => TypeCategory::try_from('E').ok(),
             Self::CompositeType(_) | Self::TableRef(_, _) | Self::ImplicitComposite(_) => {
                 TypeCategory::try_from('C').ok()
@@ -243,7 +248,8 @@ impl TypeDefinition {
         visited: &mut HashSet<FullName>,
     ) -> Option<bool> {
         match self {
-            Self::Builtin(definition) => definition.collatable,
+            Self::Builtin(definition) | Self::Base(definition) => definition.collatable,
+            Self::Shell(_) => None,
             Self::Array(array) => array.element().collation_capability_in(context, visited),
             Self::Domain(domain) => domain
                 .base_type()?
@@ -298,7 +304,7 @@ impl TypeDefinition {
                 ty.rename_relation(old, new);
             }
             Self::ImplicitComposite(columns) => columns.rename_relation(old, new),
-            Self::Enum(_) | Self::Builtin(_) => {}
+            Self::Enum(_) | Self::Builtin(_) | Self::Shell(_) | Self::Base(_) => {}
         }
     }
 
@@ -369,6 +375,19 @@ impl TypeDefinition {
         })
     }
 
+    pub(crate) const fn is_shell(&self) -> bool {
+        matches!(self, Self::Shell(_))
+    }
+
+    pub(crate) fn base(name: &FullName, category: TypeCategory, collatable: bool) -> Self {
+        Self::Base(BuiltinTypeDefinition {
+            reference: TypeReference::concrete_type_ref(name, false),
+            category: Some(category),
+            collatable: Some(collatable),
+            privilege_declarations: Vec::new(),
+        })
+    }
+
     pub(crate) const fn is_builtin(&self) -> bool {
         matches!(self, Self::Builtin(_))
     }
@@ -421,10 +440,10 @@ impl TypeDefinition {
     pub fn is_array(&self) -> Option<bool> {
         match self {
             Self::Array(_) => Some(true),
-            Self::Enum(_) => Some(false),
+            Self::Enum(_) | Self::Shell(_) => Some(false),
             Self::CompositeType(_) => Some(false),
             Self::Domain(create_domain) => create_domain.type_ref().is_array(),
-            Self::Builtin(definition) => definition.reference.is_array(),
+            Self::Builtin(definition) | Self::Base(definition) => definition.reference.is_array(),
             Self::TableRef(_, type_reference) => type_reference.is_array(),
             Self::ImplicitComposite(_) => Some(false),
         }
@@ -443,10 +462,10 @@ impl TypeDefinition {
         match self {
             Self::Array(_) => None,
             Self::Enum(definition) => Some(definition.type_ref()),
-            Self::Builtin(definition) => Some(&definition.reference),
+            Self::Builtin(definition) | Self::Base(definition) => Some(&definition.reference),
             Self::Domain(ct) => Some(ct.type_ref()),
             Self::CompositeType(ct) => ct.type_ref().as_ref(),
-            Self::TableRef(_, tr) => Some(tr),
+            Self::TableRef(_, tr) | Self::Shell(tr) => Some(tr),
             Self::ImplicitComposite(_) => None,
         }
     }
@@ -459,8 +478,9 @@ impl TypeDefinition {
             Self::Enum(create_enum) => Some(create_enum.name()),
             Self::CompositeType(create_composite_type) => create_composite_type.name(),
             Self::Domain(create_domain) => Some(create_domain.name()),
-            Self::Builtin(definition) => definition.reference.full_name(),
+            Self::Builtin(definition) | Self::Base(definition) => definition.reference.full_name(),
             Self::TableRef(t, _) => Some(t.full_name()),
+            Self::Shell(reference) => reference.full_name(),
             Self::ImplicitComposite(_) => None,
         }
     }
@@ -821,7 +841,7 @@ impl TypeDefinition {
     #[must_use]
     pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
         match self {
-            Self::Builtin(value) => &value.privilege_declarations,
+            Self::Builtin(value) | Self::Base(value) => &value.privilege_declarations,
             Self::Domain(value) => value.privilege_declarations(),
             Self::CompositeType(value) => value.privilege_declarations(),
             Self::Enum(value) => value.privilege_declarations(),
@@ -831,7 +851,9 @@ impl TypeDefinition {
 
     pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) -> bool {
         match self {
-            Self::Builtin(value) => value.privilege_declarations.push(declaration.clone()),
+            Self::Builtin(value) | Self::Base(value) => {
+                value.privilege_declarations.push(declaration.clone())
+            }
             Self::Domain(value) => value.append_privilege(declaration),
             Self::CompositeType(value) => value.append_privilege(declaration),
             Self::Enum(value) => value.append_privilege(declaration),

@@ -2,7 +2,10 @@
 
 use crate::{
     AstAndContextPair,
-    ast::ddl::{Function as AstFunction, FunctionOption as AstFunctionOption},
+    ast::{
+        Dialect,
+        ddl::{Function as AstFunction, FunctionOption as AstFunctionOption},
+    },
     context::ParseContext,
     names::{ColumnName, FullName},
     sem::{
@@ -107,7 +110,7 @@ impl CreateFunction {
         let ret_type = if let Some(ty) = context.get_declared_type(&ret_name) {
             ty.type_reference().cloned()
         } else {
-            if context.dialect() == crate::ast::Dialect::postgres()
+            if context.dialect() == Dialect::postgres()
                 && result_type.array_bounds().is_empty()
                 && ast.options().iter().any(|option| {
                     matches!(option, AstFunctionOption::Language(language) if language.eq_ignore_ascii_case("c"))

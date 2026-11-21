@@ -118,10 +118,15 @@ pub trait BaseParseContext:
 
     /// Resolve a type to the exact qualified catalog key selected by the search path.
     fn resolve_type_name(&self, name: &FullName) -> Option<FullName> {
+        self.resolve_declared_type_name(name, false)
+    }
+
+    /// Resolve a function signature's type, allowing a scalar shell when requested.
+    fn resolve_declared_type_name(&self, name: &FullName, allow_shell: bool) -> Option<FullName> {
         expand_type_search_path(self, name, |key| {
             Some((key.clone(), self.get_type_impl(key)?))
         })
-        .filter(|(_, definition)| !definition.is_shell())
+        .filter(|(_, definition)| allow_shell || !definition.is_shell())
         .map(|(key, _)| key)
     }
 

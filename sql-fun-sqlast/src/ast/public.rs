@@ -225,6 +225,11 @@ impl std::fmt::Display for StatementKind {
 }
 
 impl StatementKind {
+    /// The PostgreSQL ALTER FUNCTION PARALLEL category.
+    pub const fn alter_function_parallel() -> Self {
+        Self::AlterFunctionParallel
+    }
+
     const fn privilege_action(is_grant: bool) -> Self {
         if is_grant { Self::Grant } else { Self::Revoke }
     }
@@ -397,7 +402,7 @@ impl StatementNode {
             Self::CreateTrigger(_) => StatementKind::create_trigger(),
             Self::CreateRule(_) => StatementKind::create_rule(),
             Self::DropTrigger(_) => StatementKind::drop_trigger(),
-            Self::AlterFunctionParallel(_) => StatementKind::AlterFunctionParallel,
+            Self::AlterFunctionParallel(_) => StatementKind::alter_function_parallel(),
             Self::DropFunction(_) => StatementKind::DropFunction,
             Self::ExtensionMembership(_) => StatementKind::AlterExtensionMembership,
             Self::DropRule(_) => StatementKind::drop_rule(),

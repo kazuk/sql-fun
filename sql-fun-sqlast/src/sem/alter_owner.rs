@@ -61,10 +61,10 @@ impl OwnershipLookup {
                 PrivilegeProblem::AmbiguousTarget(identities.iter().map(Into::into).collect())
             }
             Self::InvalidKind(identity) => PrivilegeProblem::InvalidTargetKind(identity.into()),
-            Self::ArgumentTypeNotFound(failure) => PrivilegeProblem::MissingArgumentTypes {
-                target: (&failure.identity).into(),
-                types: failure.names.iter().map(Into::into).collect(),
-            },
+            Self::ArgumentTypeNotFound(failure) => PrivilegeProblem::missing_argument_types(
+                &(&failure.identity).into(),
+                &failure.names.iter().map(Into::into).collect::<Vec<_>>(),
+            ),
         })
     }
 

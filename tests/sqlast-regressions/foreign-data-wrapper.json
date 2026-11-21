@@ -1,0 +1,162 @@
+[
+  {
+    "name": "omitted",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "explicit-absence",
+    "sql": "CREATE FOREIGN DATA WRAPPER \"My Wrapper\" NO HANDLER NO VALIDATOR OPTIONS (empty '', \"Mode\" 'read')",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "qualified-validator",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper VALIDATOR pg_catalog.postgresql_fdw_validator OPTIONS (extension_option 'opaque')",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "visible-exact-validator",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper VALIDATOR validator",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-qualified-signature",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper VALIDATOR pg_catalog.validator",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "procedure-as-validator",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper VALIDATOR public.proc_validator",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-validator",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper VALIDATOR missing_validator",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-handler-return",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper HANDLER pg_catalog.version",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-handler-signature",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper HANDLER pg_catalog.fdw_handler_in",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-wrapper",
+    "sql": "CREATE FOREIGN DATA WRAPPER existing_wrapper",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "conflicting-handler",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper NO HANDLER NO HANDLER",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "conflicting-validator",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper NO VALIDATOR VALIDATOR pg_catalog.postgresql_fdw_validator",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-option",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper OPTIONS (a 'first', \"a\" 'second')",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "valid-handler",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper HANDLER callbacks.wrapper_handler",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "exact-procedure-shadows-function",
+    "sql": "CREATE FOREIGN DATA WRAPPER wrapper VALIDATOR validator_shadow",
+    "expected": {
+      "diagnostics": [
+        "foreign_data_wrapper_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  }
+]

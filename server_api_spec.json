@@ -763,6 +763,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid foreign-data wrapper declaration.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignDataWrapper": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ForeignDataWrapper"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -5762,6 +5775,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid foreign-data wrapper declaration.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignDataWrapper": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ForeignDataWrapper"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -10649,6 +10675,19 @@
                   },
                   "required": [
                     "Rule"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid foreign-data wrapper declaration.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignDataWrapper": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ForeignDataWrapper"
                   ],
                   "additionalProperties": false
                 },

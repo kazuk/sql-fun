@@ -108,12 +108,31 @@ tablespaces. Schema privileges require a retained schema definition. A
 declaration targeting a missing definition produces a diagnostic. See
 [#1178](https://github.com/kazuk/sql-fun/issues/1178).
 
-PostgreSQL `CREATE FOREIGN DATA WRAPPER` syntax is recognized, including
-`HANDLER`, `VALIDATOR`, their explicit `NO` forms, and `OPTIONS`.
-Analysis can terminate when it encounters this statement, including in an
-extension script. sql-fun does not yet resolve the specified routines,
-validate the definition, or add the wrapper to the analysis catalog
-([#1163](https://github.com/kazuk/sql-fun/issues/1163)).
+PostgreSQL `CREATE FOREIGN DATA WRAPPER` is analyzed in project schema
+and extension scripts. Wrapper names are database-wide. sql-fun resolves a
+named handler with no input arguments and return type `fdw_handler`, and a
+named validator with input arguments `text[], oid`. Unqualified routine names
+use the active search path. Schema-qualified names select a specific schema.
+The `NO HANDLER` and `NO VALIDATOR` clauses explicitly leave the corresponding
+routine unset.
+
+Duplicate wrapper names, repeated routine clauses, duplicate options, and
+invalid routine references produce
+[`foreign_data_wrapper_invalid_definition`][fdw-diagnostic].
+A definition that passes these checks becomes visible to subsequent
+statements in the analysis catalog, including ownership changes and privilege
+declarations.
+PostgreSQL checks the creator's superuser status and runs any specified
+validator at execution time. Offline analysis retains the option values for
+the wrapper and leaves their runtime acceptance to PostgreSQL.
+
+The CLI analysis server currently lacks the configured `database-name` when
+resolving database-qualified routine names. Use a schema-qualified routine name
+in project and extension SQL. See [#1181](https://github.com/kazuk/sql-fun/issues/1181).
+
+Direct `analyze` and `test` inputs can report the semantic outcome and also
+emit `query_deparse` because executable SQL rendering for this statement
+is pending. See [#1182](https://github.com/kazuk/sql-fun/issues/1182).
 
 PostgreSQL `DROP FUNCTION` syntax is accepted during syntax conversion and can
 be rendered back to SQL. Analysis stops at function-drop interpretation,
@@ -157,3 +176,5 @@ delivery and SQL rendering are not supported. For NOTIFY within a rule, see
 [CREATE RULE](statements/rules.md).
 
 [audit-1150]: https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7035507185
+
+[fdw-diagnostic]: ../diagnostics/foreign_data_wrapper_invalid_definition.md

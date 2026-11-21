@@ -43,12 +43,12 @@ use crate::{
     sem::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisProblem, AnalysisState, CastDefinition,
         CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
-        CreateIndex, CreateRule, CreateSchema, CreateTrigger, CursorInfo, DatabaseCollation,
-        ImplicitChange, InsertConflict, Kind, ObjectPrivilegeChange, OperatorClassDefinition,
-        OperatorDefinition, OverloadVariant as SemOverloadVariant, OwnedObjectDefinition,
-        ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr,
-        SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport,
-        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
+        CreateForeignDataWrapper, CreateIndex, CreateRule, CreateSchema, CreateTrigger, CursorInfo,
+        DatabaseCollation, ImplicitChange, InsertConflict, Kind, ObjectPrivilegeChange,
+        OperatorClassDefinition, OperatorDefinition, OverloadVariant as SemOverloadVariant,
+        OwnedObjectDefinition, ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity,
+        SemAst, SemScalarExpr, SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet,
+        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -88,6 +88,7 @@ pub(super) struct SchemaCatalog {
     renamed_types: std::collections::HashSet<FullName>,
     rules: std::collections::HashMap<RuleIdentity, Option<CreateRule>>,
     ownership: OwnershipCatalog,
+    foreign_data_wrappers: std::collections::HashMap<String, CreateForeignDataWrapper>,
     configured_roles: ConfiguredRoles,
     base: FrozenBaseContext,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
@@ -156,6 +157,7 @@ impl SchemaFileContext {
                 renamed_types: std::collections::HashSet::new(),
                 rules: std::collections::HashMap::new(),
                 ownership: Default::default(),
+                foreign_data_wrappers: Default::default(),
                 configured_roles: metadata.into(),
                 base: base.clone(),
                 triggers: std::collections::HashMap::new(),
@@ -615,6 +617,25 @@ impl crate::context::RuleInfoWrite for SchemaFileContext {
     }
     fn store_rule_view(&mut self, target: &FullName, view: &ViewLike) {
         self.catalog.views.insert(target, view);
+    }
+}
+
+impl crate::context::ForeignDataWrapperInfoRead for SchemaCatalog {
+    fn foreign_data_wrapper(&self, name: &str) -> Option<&CreateForeignDataWrapper> {
+        if let Some(definition) = self.foreign_data_wrappers.get(name) {
+            Some(definition)
+        } else {
+            self.base.foreign_data_wrapper(name)
+        }
+    }
+}
+
+impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
+    fn register_foreign_data_wrapper(mut self, definition: &CreateForeignDataWrapper) -> Self {
+        self.catalog
+            .foreign_data_wrappers
+            .insert(definition.name().to_owned(), definition.clone());
+        self
     }
 }
 

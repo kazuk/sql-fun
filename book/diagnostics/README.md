@@ -125,6 +125,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [duplicate_def_elem_key](duplicate_def_elem_key.md)
 - [explicit_cast_not_defined](explicit_cast_not_defined.md)
 - [expression_type_not_known](expression_type_not_known.md)
+- [foreign_data_wrapper_invalid_definition](foreign_data_wrapper_invalid_definition.md)
 - [foreign_key_referenced_primary_key_missing](foreign_key_referenced_primary_key_missing.md)
 - [foreign_key_period_mismatch](foreign_key_period_mismatch.md)
 - [foreign_key_temporal_action](foreign_key_temporal_action.md)

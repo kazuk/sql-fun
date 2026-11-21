@@ -583,10 +583,12 @@ impl AlterSequence {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, derive_getters::Getters)]
 pub(crate) struct DropView {
     targets: Vec<Name>,
+    #[getter(copy)]
     if_exists: bool,
+    #[getter(copy)]
     behavior: DropBehavior,
 }
 

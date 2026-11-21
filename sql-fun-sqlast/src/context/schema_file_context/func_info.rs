@@ -269,12 +269,13 @@ impl FunctionInfoWrite for SchemaFileContext {
                     "DROP FUNCTION dependent view missing from catalog",
                 );
             };
-            views.push((name.clone(), ViewTombstone::new(definition, &cause)));
+            views.push((
+                name.clone(),
+                ViewTombstone::for_function_drop(definition, &cause),
+            ));
         }
         for (name, tombstone) in views {
-            // The relation's composite row type disappears with the view.
-            self.catalog.renamed_types.insert(name.clone());
-            self.catalog.view_tombstones.insert(name, tombstone);
+            self.catalog.mask_view(name, tombstone);
         }
         self.catalog.function_tombstones.extend(removals);
         Ok(self)
@@ -490,7 +491,7 @@ mod test_drop_function {
         ast::ObjectKind,
         context::{FunctionInfoRead, MutSourcePathWithSpan, ParseContext, ViewInfoRead},
         names::FullName,
-        sem::{OwnershipIdentity, PgBuiltInType, SemAst, SourcePathWithSpan},
+        sem::{OwnershipIdentity, PgBuiltInType, SemAst, SourcePathWithSpan, ViewDropCause},
         test_helpers::{
             ownership::{apply_ownership_sql, ownership_context},
             schema_layer, source_span,
@@ -548,10 +549,10 @@ mod test_drop_function {
             function_tombstone.cause().source().unwrap().source_path(),
             cascade_path
         );
-        assert!(std::ptr::eq(
-            function_tombstone.cause(),
-            view_tombstone.cause()
-        ));
+        let ViewDropCause::Function(cause) = view_tombstone.cause() else {
+            panic!("expected DROP FUNCTION provenance");
+        };
+        assert!(std::ptr::eq(function_tombstone.cause(), cause.as_ref()));
         assert!(child.get_view_impl(&view).is_none());
         assert!(parent.get_view_impl(&view).is_some());
         assert!(parent.function_tombstone(&identity).is_none());

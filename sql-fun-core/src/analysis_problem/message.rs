@@ -270,6 +270,25 @@ impl DiagnosticMessage for ViewProblem {
                 view.into(),
                 " is missing; reload the complete schema declarations".into(),
             ],
+            Self::DropDependency(name) => vec![
+                "cannot drop view because ".into(),
+                name.into(),
+                " depends on it".into(),
+            ],
+            Self::DropWrongKind(name, kind) => vec![
+                format!("cannot drop {kind} ").into(),
+                name.into(),
+                " with DROP VIEW".into(),
+            ],
+            Self::DropExtensionMember(name) => vec![
+                "cannot drop view ".into(),
+                name.into(),
+                " because an extension requires it".into(),
+            ],
+            Self::DropCrossDatabase(name) => vec![
+                "cross-database DROP VIEW target is unsupported: ".into(),
+                name.into(),
+            ],
             Self::InvalidAlter => {
                 vec!["PostgreSQL does not permit ALTER trigger/rule state on views".into()]
             }

@@ -1,4 +1,4 @@
-use crate::analysis_problem::{DiagnosticMetadata, FullName};
+use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata, FullName, Kind};
 
 /// A view declaration or capability cannot be analyzed as requested.
 #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
@@ -12,6 +12,14 @@ pub enum ViewProblem {
     MissingMetadata(FullName),
     /// `PostgreSQL` does not allow this ALTER operation on a view.
     InvalidAlter,
+    /// A dependent view prevents DROP VIEW.
+    DropDependency(FullName),
+    /// A DROP VIEW name resolves to a different kind of relation.
+    DropWrongKind(FullName, Kind),
+    /// An extension owns a view selected for deletion.
+    DropExtensionMember(FullName),
+    /// DROP VIEW referenced another database.
+    DropCrossDatabase(FullName),
 }
 impl ViewProblem {
     /// Exact catalog identity whose required semantic definition is absent.
@@ -45,6 +53,30 @@ impl ViewProblem {
     pub fn missing_metadata(view: impl Into<FullName>) -> Self {
         Self::MissingMetadata(view.into())
     }
+    /// Diagnostic for a dependent view that blocks DROP VIEW.
+    #[must_use]
+    pub fn drop_dependency(name: impl Into<FullName>) -> Self {
+        Self::DropDependency(name.into())
+    }
+
+    /// Diagnostic for a DROP VIEW target of an incompatible kind.
+    #[must_use]
+    pub fn drop_wrong_kind(name: impl Into<FullName>, kind: impl Into<Kind>) -> Self {
+        Self::DropWrongKind(name.into(), kind.into())
+    }
+
+    /// Diagnostic for a DROP VIEW target required by its owning extension.
+    #[must_use]
+    pub fn drop_extension_member(name: impl Into<FullName>) -> Self {
+        Self::DropExtensionMember(name.into())
+    }
+
+    /// Diagnostic for a DROP VIEW target outside the current database.
+    #[must_use]
+    pub fn drop_cross_database(name: impl Into<FullName>) -> Self {
+        Self::DropCrossDatabase(name.into())
+    }
+
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
@@ -52,24 +84,14 @@ impl ViewProblem {
             Self::UnknownDefaultColumn(..) => "view_unknown_default_column",
             Self::MissingMetadata(_) => "view_missing_write_metadata",
             Self::InvalidAlter => "view_invalid_alter",
+            Self::DropDependency(_) => "drop_view_dependency",
+            Self::DropWrongKind(..) => "drop_view_wrong_kind",
+            Self::DropExtensionMember(_) => "drop_view_extension_member",
+            Self::DropCrossDatabase(_) => "cross_database_drop_view",
         }
     }
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
-        let message = match self {
-            Self::InvalidTarget(view) => {
-                format!("declaration target {view} is not an ordinary view")
-            }
-            Self::UnknownDefaultColumn(view, column) => {
-                format!("default column {column} does not exist on {view}")
-            }
-            Self::MissingMetadata(view) => format!(
-                "the semantic definition required for {view} is missing; reload the complete schema declarations"
-            ),
-            Self::InvalidAlter => {
-                "PostgreSQL does not permit ALTER trigger/rule state on views".to_owned()
-            }
-        };
-        DiagnosticMetadata::from(message)
+        DiagnosticMetadata::from(self.diagnostic_message())
     }
 }

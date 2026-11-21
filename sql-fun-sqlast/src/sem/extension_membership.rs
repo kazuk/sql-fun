@@ -284,6 +284,17 @@ impl ExtensionMembershipChange {
         })
     }
 
+    pub(crate) fn removed(
+        extension: &str,
+        member: &OwnershipIdentity,
+        source: Option<&SourcePathWithSpan>,
+    ) -> Self {
+        Self {
+            add: false,
+            ..Self::created(extension, member, source)
+        }
+    }
+
     pub(crate) fn created(
         extension: &str,
         member: &OwnershipIdentity,

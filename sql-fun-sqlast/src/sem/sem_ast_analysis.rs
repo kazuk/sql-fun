@@ -9,7 +9,7 @@ use crate::{
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateForeignDataWrapper,
         CreateFunction, CreateIndex, CreateRule, CreateSchema, CreateSequence, CreateTable,
         CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropFunction, DropRule,
-        DropTable, DropTrigger, EngineFeatureValidation, ExtensionMembershipChange,
+        DropTable, DropTrigger, DropView, EngineFeatureValidation, ExtensionMembershipChange,
         InsertStatement, MergeStatement, ObjectPrivilegeChange, ParameterConstraints,
         RelationAlteration, RoleMembershipDeclaration, SelectStatement, SemAst, UpdateStatement,
         VariableSet,
@@ -44,7 +44,7 @@ impl SemAst {
             AstStatementNode::DropFunction(ast) => {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
-            AstStatementNode::DropView(_) => todo!("PostgreSQL DROP VIEW interpretation"),
+            AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
             }
@@ -222,6 +222,11 @@ impl SemAst {
                     Self::DropFunction(statement),
                     context,
                 ))
+            }
+            AstStatementNode::DropView(ast) => {
+                let statement = DropView::analyze(ast, &mut context)?;
+                let context = context.apply_drop_view(&statement)?;
+                Ok(AstAndContextPair::new(Self::DropView(statement), context))
             }
             AstStatementNode::DropTable(drop_table) => {
                 DropTable::from_ast_and_apply(drop_table, context)

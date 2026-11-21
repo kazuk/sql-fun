@@ -55,9 +55,29 @@ pages.
 
 ## PostgreSQL view removal
 
-The parser recognizes PostgreSQL `DROP VIEW`. Schema analysis stops when it
-reaches the statement. View removal during schema analysis is tracked in
-[#1175](https://github.com/kazuk/sql-fun/issues/1175).
+PostgreSQL schema analysis resolves `DROP VIEW` targets by qualification
+and the search path. `IF EXISTS` skips missing targets. A visible table,
+sequence, or materialized view under a requested name still causes an error.
+
+`RESTRICT` is the default. It blocks the drop if a dependent view or
+materialized view would remain. You can include dependent ordinary views
+in the same `DROP VIEW` statement. `CASCADE` also removes transitively
+dependent views and materialized views. Rules and triggers owned by a
+removed view disappear with it. A rejected statement leaves every target
+available. Subsequent statements see removed names as absent and can
+recreate them.
+
+An extension script can drop its own member views. A direct drop outside
+that script is rejected while the extension still owns the view.
+
+Analysis stops when a drop encounters a tracked routine, type, table, or
+index dependency, a rule or trigger on a surviving relation, or a cascade
+that would remove an indexed materialized view or an extension. Analysis
+also stops if the catalog contains a routine declared with a SQL-standard
+body whose dependencies are unavailable.
+Further dependency coverage is tracked in
+[#1197](https://github.com/kazuk/sql-fun/issues/1197). Commands requiring
+standalone SQL rendering still report `query_deparse` for `DROP VIEW`.
 
 ## Unimplemented SQLite and Turso statement analysis
 
@@ -168,9 +188,7 @@ Commands that render the submitted SQL report `query_deparse` for standalone
 membership statements. Schema-file analysis can apply supported forms
 ([#1190](https://github.com/kazuk/sql-fun/issues/1190)).
 
-PostgreSQL `DROP VIEW` stops during semantic analysis before removing the
-view, including in `pg_stat_statements` update scripts
-([#1175](https://github.com/kazuk/sql-fun/issues/1175)).
+See [PostgreSQL view removal](#postgresql-view-removal) for `DROP VIEW` behavior.
 
 `ALTER DEFAULT PRIVILEGES` and `CREATE FOREIGN TABLE` support syntax recognition
 and SQL text generation, including PostgreSQL 18's `ON LARGE OBJECTS` and

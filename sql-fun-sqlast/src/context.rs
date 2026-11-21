@@ -105,6 +105,11 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Extension whose installation or update script is being analyzed, if any.
+    fn active_extension(&self) -> Option<&str> {
+        None
+    }
+
     /// Immutable project lint declarations supplied for this analysis.
     fn lint_configuration(&self) -> &::sql_fun_core::LintConfigurations;
 

@@ -168,9 +168,9 @@ Commands that render the submitted SQL report `query_deparse` for standalone
 membership statements. Schema-file analysis can apply supported forms
 ([#1190](https://github.com/kazuk/sql-fun/issues/1190)).
 
-PostgreSQL `DROP VIEW` stops during syntax conversion, including in
-`pg_stat_statements` update scripts
-([#1169](https://github.com/kazuk/sql-fun/issues/1169)).
+PostgreSQL `DROP VIEW` stops during semantic analysis before removing the
+view, including in `pg_stat_statements` update scripts
+([#1175](https://github.com/kazuk/sql-fun/issues/1175)).
 Bundled extension scripts can also stop during semantic interpretation of
 [ALTER FUNCTION PARALLEL](statements/create-function.md#alter-function-parallel),
 including during a `pageinspect` update. See the

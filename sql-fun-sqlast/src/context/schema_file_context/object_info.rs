@@ -133,8 +133,26 @@ impl SchemaFileContext {
 }
 
 impl SchemaCatalog {
+    pub(super) fn rename_extension_member(
+        &mut self,
+        kind: ObjectKind,
+        from: &FullName,
+        to: &FullName,
+    ) {
+        let from = OwnershipIdentity::named(kind, from);
+        let to = OwnershipIdentity::named(kind, to);
+        let history = self.extension_membership_history(&from).to_vec();
+        if !history.is_empty() || !self.extension_membership_history(&to).is_empty() {
+            // An empty local history masks the parent entry at the retired identity.
+            self.extension_memberships.insert(from, Vec::new());
+            self.extension_memberships.insert(to, history);
+        }
+    }
+
     pub(super) fn apply_extension_membership(&mut self, change: &ExtensionMembershipChange) {
-        let member = change.member();
+        let Some(member) = change.member().filter(|_| change.applicable()) else {
+            return;
+        };
         self.extension_memberships
             .entry(member.clone())
             .or_insert_with(|| self.base.extension_membership_history(member).to_vec())
@@ -247,6 +265,62 @@ mod test_extension_membership_history {
         );
         assert_eq!(child.extension_membership_history(&member).len(), 3);
         assert_eq!(update.extension_membership(&member), None);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_renamed_extension_membership {
+    use std::path::Path;
+
+    use crate::{
+        ast::ObjectKind,
+        context::{ExtensionInfoRead, MutSourcePathWithSpan, ParseContext},
+        names::FullName,
+        sem::{OwnershipIdentity, SemAst},
+        test_helpers::{
+            ownership::{apply_ownership_sql, ownership_context},
+            schema_layer, source_span,
+        },
+    };
+
+    #[test]
+    fn rename_moves_inherited_membership_and_preserves_history() -> testresult::TestResult {
+        let mut context = ownership_context();
+        for sql in [
+            "CREATE EXTENSION ext",
+            "CREATE TABLE public.t (id integer)",
+            "ALTER EXTENSION ext ADD TABLE public.t",
+        ] {
+            context = apply_ownership_sql(context, sql)?.into_context();
+        }
+        let parent = context.freeze();
+        let old =
+            OwnershipIdentity::named(ObjectKind::TABLE, &FullName::with_schema("public", "t"));
+        let new =
+            OwnershipIdentity::named(ObjectKind::TABLE, &FullName::with_schema("public", "u"));
+        let mut child = schema_layer(Path::new("rename.sql"), &parent);
+        child.set_source_path_with_span(&source_span());
+        let renamed =
+            apply_ownership_sql(child, "ALTER TABLE public.t RENAME TO u")?.into_context();
+        assert_eq!(renamed.extension_membership(&old), None);
+        assert_eq!(renamed.extension_membership(&new), Some("ext"));
+        assert_eq!(parent.extension_membership(&old), Some("ext"));
+        assert_eq!(parent.extension_membership(&new), None);
+        assert_eq!(
+            renamed.extension_membership_history(&new)[0].member(),
+            Some(&old)
+        );
+        let detached = apply_ownership_sql(renamed, "ALTER EXTENSION ext DROP TABLE public.u")?;
+        let SemAst::ExtensionMembership(change) = detached.ast() else {
+            panic!("expected analyzed membership");
+        };
+        assert!(change.applicable());
+        assert_eq!(detached.context().extension_membership(&new), None);
+        assert_eq!(
+            detached.context().extension_membership_history(&new).len(),
+            2
+        );
         Ok(())
     }
 }

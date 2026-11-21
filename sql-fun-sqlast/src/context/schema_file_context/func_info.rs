@@ -226,6 +226,7 @@ impl FunctionInfoWrite for SchemaFileContext {
                     ))?;
                     return Ok(self);
                 }
+                candidate.retain_privilege_declarations(previous);
                 if let Some(owner) = previous.owner() {
                     candidate.change_owner(owner);
                 }
@@ -236,5 +237,41 @@ impl FunctionInfoWrite for SchemaFileContext {
             self.catalog.functions.insert(name, &candidate);
         }
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod test_replacement_preserves_routine_privileges {
+    use crate::{
+        context::OwnershipInfoRead,
+        names::FullName,
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[test]
+    fn replacement_preserves_privilege_history() -> testresult::TestResult {
+        let context = apply_ownership_sql(
+            ownership_context(),
+            "CREATE FUNCTION public.v(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+        )?
+        .into_context();
+        let context = apply_ownership_sql(
+            context,
+            "GRANT EXECUTE ON FUNCTION public.v(integer) TO PUBLIC",
+        )?
+        .into_context();
+        let result = apply_ownership_sql(
+            context,
+            "CREATE OR REPLACE FUNCTION public.v(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1 + 1'",
+        )?;
+        assert!(result.context().problems().is_empty());
+        let name = FullName::with_schema("public", "v");
+        assert_eq!(
+            result.context().routine_definitions(&name)[0]
+                .privilege_declarations()
+                .len(),
+            1
+        );
+        Ok(())
     }
 }

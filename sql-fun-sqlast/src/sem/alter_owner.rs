@@ -7,6 +7,7 @@ use crate::{
         traversal::SemanticVisitor,
     },
 };
+use ::sql_fun_core::analysis_problem::PrivilegeProblem;
 
 /// Completed target lookup for an ALTER OWNER statement.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -52,6 +53,21 @@ impl OwnershipLookup {
             &[]
         }
     }
+    pub(crate) fn privilege_problem(&self) -> Option<PrivilegeProblem> {
+        Some(match self {
+            Self::Resolved(_) => return None,
+            Self::NotFound(identity) => PrivilegeProblem::MissingTarget(identity.into()),
+            Self::Ambiguous(identities) => {
+                PrivilegeProblem::AmbiguousTarget(identities.iter().map(Into::into).collect())
+            }
+            Self::InvalidKind(identity) => PrivilegeProblem::InvalidTargetKind(identity.into()),
+            Self::ArgumentTypeNotFound(failure) => PrivilegeProblem::MissingArgumentTypes {
+                target: (&failure.identity).into(),
+                types: failure.names.iter().map(Into::into).collect(),
+            },
+        })
+    }
+
     pub(crate) fn diagnostic_message(&self) -> String {
         match self {
             Self::Resolved(identity) => format!("resolved ownership target: {identity}"),

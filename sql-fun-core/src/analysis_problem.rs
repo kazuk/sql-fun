@@ -107,6 +107,108 @@ impl AlterConstraintReason {
     }
 }
 
+/// A failed privilege lookup or applicability check.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub enum PrivilegeProblem {
+    /// Named role absent from the catalog.
+    MissingRole(String),
+    /// PUBLIC used where a regular role is required.
+    PublicNotAllowed,
+    /// A role membership target has a column list.
+    GrantedRoleColumns(String),
+    /// A relation is absent.
+    MissingRelation(FullName),
+    /// A schema selector is absent.
+    MissingSchema(String),
+    /// No catalog definition is available for this class of targets.
+    UnsupportedTargets {
+        /// Requested target class.
+        target_kind: String,
+        /// Requested configuration parameter names or large-object identifiers.
+        targets: Vec<String>,
+    },
+    /// No catalog target matches the identity and signature.
+    MissingTarget(OwnershipIdentity),
+    /// Multiple catalog targets match an omitted signature.
+    AmbiguousTarget(Vec<OwnershipIdentity>),
+    /// The target exists under an incompatible object kind.
+    InvalidTargetKind(OwnershipIdentity),
+    /// A routine signature contains unresolved argument types.
+    MissingArgumentTypes {
+        /// Requested routine.
+        target: OwnershipIdentity,
+        /// Unresolved type names.
+        types: Vec<FullName>,
+    },
+    /// Privilege incompatible with a target class.
+    InvalidPrivilege {
+        /// Written privilege.
+        privilege: String,
+        /// Requested object class.
+        target_kind: String,
+    },
+    /// Array types do not have independent privileges.
+    ArrayTarget(OwnershipIdentity),
+    /// Column absent from the exact target relation.
+    MissingColumn {
+        /// Resolved target identity.
+        target: OwnershipIdentity,
+        /// Written column name.
+        column: ColumnName,
+    },
+    /// Unavailable or repeated membership option.
+    MembershipOption(String),
+}
+
+impl DiagnosticMessage for PrivilegeProblem {
+    fn diagnostic_message(&self) -> String {
+        match self {
+            Self::MissingRole(name) => format!("role does not exist: {name}"),
+            Self::PublicNotAllowed => "PUBLIC is not allowed in this role position".to_owned(),
+            Self::GrantedRoleColumns(name) => format!("invalid granted role: {name}"),
+            Self::MissingRelation(name) => format!("relation does not exist: {name}"),
+            Self::MissingSchema(name) => format!("schema does not exist: {name}"),
+            Self::UnsupportedTargets { target_kind, .. } => {
+                format!("analysis catalog does not contain {target_kind} privilege targets")
+            }
+            Self::MissingTarget(target) => format!("privilege target does not exist: {target}"),
+            Self::AmbiguousTarget(targets) => {
+                let candidates = targets
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!(
+                    "privilege target is ambiguous; specify an argument signature; candidates: {candidates}"
+                )
+            }
+            Self::InvalidTargetKind(target) => {
+                format!("privilege target is not an object of the requested kind: {target}")
+            }
+            Self::MissingArgumentTypes { target, types } => {
+                let names = types
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("argument type not found for privilege target {target}: {names}")
+            }
+            Self::InvalidPrivilege {
+                privilege,
+                target_kind,
+            } => format!("privilege {privilege} is invalid for {target_kind}"),
+            Self::ArrayTarget(target) => {
+                format!("cannot declare privileges on array target {target}")
+            }
+            Self::MissingColumn { target, column } => {
+                format!("column {column} does not exist on {target}")
+            }
+            Self::MembershipOption(name) => format!("invalid role membership option: {name}"),
+        }
+    }
+}
+
 /// Semantic analysis problems
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -164,7 +266,7 @@ pub enum AnalysisProblem {
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
-    Privilege(String),
+    Privilege(PrivilegeProblem),
     /// Invalid trigger semantics.
     Trigger(TriggerProblem),
     /// A view declaration or catalog capability violation.
@@ -664,7 +766,7 @@ impl AnalysisProblem {
             Self::Serial(problem) => problem.render_metadata(),
             Self::Creation(problem) => problem.render_metadata(),
             Self::Ownership(problem) => problem.render_metadata(),
-            Self::Privilege(message) => DiagnosticMetadata::from(message.clone()),
+            Self::Privilege(problem) => DiagnosticMetadata::from(problem.diagnostic_message()),
             Self::Rule(problem) => problem.render_metadata(),
             Self::Trigger(problem) => problem.render_metadata(),
             Self::View(problem) => problem.render_metadata(),
@@ -720,7 +822,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::Creation(problem) => problem.diagnostic_message(),
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),
-            Self::Privilege(message) => message.clone(),
+            Self::Privilege(problem) => problem.diagnostic_message(),
             Self::Trigger(problem) => problem.diagnostic_message(),
             Self::View(problem) => problem.diagnostic_message(),
             Self::Insert(problem) => problem.diagnostic_message(),

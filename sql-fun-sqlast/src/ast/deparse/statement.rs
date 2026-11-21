@@ -31,6 +31,7 @@ impl SqlEmit for StatementNode {
             Self::EnumType(v) => v.emit(writer),
             Self::Sequence(v) => v.emit(writer),
             Self::DropTable(v) => v.emit(writer),
+            Self::DropView(_) => writer.unsupported("DROP VIEW"),
             Self::AlterSequence(v) => v.emit(writer),
             Self::Comment(v) => v.emit(writer),
             Self::AlterOwner(v) => v.emit(writer),

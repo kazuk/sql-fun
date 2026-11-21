@@ -295,6 +295,7 @@ pub(crate) enum StatementNode {
     EnumType(EnumType),
     Sequence(Sequence),
     DropTable(DropTable),
+    DropView(DropView),
     AlterSequence(AlterSequence),
     Comment(Comment),
     AlterOwner(AlterOwner),
@@ -406,6 +407,10 @@ impl StatementNode {
 
     const fn drop_table(value: DropTable) -> Self {
         Self::DropTable(value)
+    }
+
+    const fn drop_view(value: DropView) -> Self {
+        Self::DropView(value)
     }
 
     const fn alter_sequence(value: AlterSequence) -> Self {
@@ -576,6 +581,13 @@ impl AlterSequence {
             missing_ok,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DropView {
+    targets: Vec<Name>,
+    if_exists: bool,
+    behavior: DropBehavior,
 }
 
 #[derive(Clone, Debug, derive_getters::Getters)]

@@ -5,7 +5,7 @@ use ::sql_fun_sqlast::parse_statements;
 
 #[rstest::rstest]
 #[case::unsupported_statement("VACUUM items")]
-#[case::unsupported_conversion("DROP VIEW items")]
+#[case::unsupported_conversion("DROP INDEX items")]
 fn continues_after_statement_conversion_errors(#[case] unsupported: &str) {
     let sql = format!("SELECT 1; {unsupported}; SELECT 2;");
     let mut statements = parse_statements(&sql, Dialect::postgres());

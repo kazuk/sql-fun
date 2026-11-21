@@ -75,7 +75,7 @@ impl DropFunction {
         }
         let cascade = ast.behavior() == ast::DropBehavior::Cascade;
         let dependent_views = if applicable && !targets.is_empty() {
-            dependent_views(context, &targets, &[])?
+            dependent_views(context, &targets)?
         } else {
             Vec::new()
         };
@@ -187,17 +187,13 @@ impl ViewTombstone {
     }
 }
 
-pub(crate) fn dependent_views(
+fn dependent_views(
     context: &impl ParseContext,
     targets: &[OwnershipIdentity],
-    initial_views: &[FullName],
 ) -> Result<Vec<FullName>, AnalysisError> {
     // TODO(#1185): Extend dependency traversal and removal to non-view objects.
     let names = context.relation_names();
-    let mut removed = initial_views
-        .iter()
-        .cloned()
-        .collect::<std::collections::HashSet<_>>();
+    let mut removed = std::collections::HashSet::new();
     let mut views = Vec::new();
     loop {
         let previous_count = removed.len();

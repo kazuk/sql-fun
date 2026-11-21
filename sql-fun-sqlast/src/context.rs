@@ -54,8 +54,8 @@ pub use self::{
     type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite},
     type_info::{TypeInfoRead, TypeInfoWrite},
     view_info::{
-        ViewDeleteInfoRead, ViewInfoRead, ViewInfoWrite, ViewInsertInfoRead, ViewMergeInfoRead,
-        ViewUpdateInfoRead,
+        ViewDeleteInfoRead, ViewDependents, ViewInfoRead, ViewInfoWrite, ViewInsertInfoRead,
+        ViewMergeInfoRead, ViewUpdateInfoRead,
     },
 };
 pub(crate) use self::{

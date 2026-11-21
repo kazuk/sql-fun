@@ -16,7 +16,9 @@ The diagnostic names the dependent relation. All targets remain available.
 ## How to address it
 
 Specify `CASCADE` if the dependent relations should also disappear. For ordinary
-views, you can also list the related views in the same statement.
+views, you can also list the related views in the same statement. If only a
+column default depends on the view, remove the default before dropping its
+dependency.
 
 ## Example
 

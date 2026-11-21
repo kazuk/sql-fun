@@ -4,8 +4,7 @@ use crate::{
     names::{FullName, TableName, ViewName},
     sem::{
         AnalysisError, AnalysisProblem, DropDependencyBehavior, Kind, OwnershipIdentity,
-        SourcePathWithSpan, TypeDefinition, TypeReference, drop_function::dependent_views,
-        problem::ViewProblem, search_path::expand_relation_search_path, traversal::SemanticVisitor,
+        SourcePathWithSpan, problem::ViewProblem, search_path::expand_relation_search_path,
     },
 };
 
@@ -136,7 +135,30 @@ impl DropView {
         &mut self,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        self.dependent_views = dependent_views(context, &[], &self.removals)?;
+        let mut visited = self.removals.clone();
+        let mut default_owners = Vec::new();
+        let mut index = 0;
+        while let Some(name) = visited.get(index) {
+            let dependents = context.view_dependents(name);
+            default_owners.extend(dependents.defaults);
+            for view in dependents.queries {
+                if !visited.contains(&view) {
+                    visited.push(view);
+                }
+            }
+            index += 1;
+        }
+        self.dependent_views = visited[self.removals.len()..].to_vec();
+        if !self.behavior.is_cascade() {
+            for owner in default_owners
+                .iter()
+                .filter(|owner| !visited.contains(owner))
+            {
+                if !self.dependent_views.contains(owner) {
+                    self.dependent_views.push(owner.clone());
+                }
+            }
+        }
         if self.behavior.is_cascade() {
             self.removals.extend(self.dependent_views.iter().cloned());
         } else {
@@ -171,121 +193,26 @@ impl DropView {
                 &ViewProblem::drop_extension_member(name),
             ))?;
         }
+        if self.applicable
+            && self.behavior.is_cascade()
+            && default_owners
+                .iter()
+                .any(|owner| !self.removals.contains(owner))
+        {
+            todo!("DROP VIEW CASCADE removal of a surviving view's column default (#1197)");
+        }
         if self.applicable {
-            self.check_other_dependents(context)?;
-        }
-        Ok(())
-    }
-
-    fn check_other_dependents(&self, context: &impl ParseContext) -> Result<(), AnalysisError> {
-        let mut probe = DroppedViewReference {
-            names: &self.removals,
-            found: false,
-        };
-        for name in context.declared_routine_names() {
-            for routine in context.routine_definitions(&name) {
-                if routine.has_sql_body() {
-                    todo!("DROP VIEW with unresolved SQL routine body dependencies (#1197)");
-                }
-                routine.visit_references(&mut probe)?;
-                if probe.found {
-                    todo!("DROP VIEW with a dependent routine (#1197)");
+            for name in &self.removals {
+                if context.object_kind(name) == Some(Kind::MaterializedView)
+                    && !context
+                        .indexes_for_table(&TableName::from(name.clone()))
+                        .is_empty()
+                {
+                    todo!(
+                        "DROP VIEW CASCADE removal of an index on a dependent materialized view (#1197)"
+                    );
                 }
             }
-        }
-        for reference in context.type_references() {
-            let Some(name) = reference.full_name() else {
-                continue;
-            };
-            if self.removals.contains(name) {
-                continue;
-            }
-            match context.get_type_impl(name) {
-                Some(TypeDefinition::CompositeType(composite)) => {
-                    composite
-                        .get_column_collection()
-                        .visit_references(&mut probe)?;
-                }
-                Some(TypeDefinition::Domain(domain)) => {
-                    if let Some(base) = domain.base_type() {
-                        probe.schema_type(base)?;
-                    }
-                }
-                _ => {}
-            }
-            if probe.found {
-                todo!("DROP VIEW with a dependent type (#1197)");
-            }
-        }
-        for name in context.relation_names() {
-            let indexes = context.indexes_for_table(&TableName::from(name.clone()));
-            if self.removals.contains(&name) {
-                if !indexes.is_empty() {
-                    todo!("DROP VIEW cascade with an indexed materialized view (#1197)");
-                }
-                continue;
-            }
-            for index in indexes {
-                index.visit_references(&mut probe)?;
-                if probe.found {
-                    todo!("DROP VIEW with a dependent index definition (#1197)");
-                }
-            }
-            let (rules, triggers) = if let Some(table) = context.get_table_impl(&name) {
-                table.visit_references(&mut probe)?;
-                if probe.found {
-                    todo!("DROP VIEW with a dependent table definition (#1197)");
-                }
-                (Some(table.rules()), Some(table.triggers()))
-            } else if let Some(view) = context.get_view_impl(&name) {
-                (view.rules(), view.triggers())
-            } else {
-                continue;
-            };
-            if let Some(rules) = rules {
-                for rule in rules.resolve(context) {
-                    let dependencies = rule.dependencies();
-                    if dependencies
-                        .relations()
-                        .iter()
-                        .chain(dependencies.types())
-                        .any(|name| self.removals.contains(name))
-                    {
-                        todo!("DROP VIEW with a rule owned by another relation (#1197)");
-                    }
-                }
-            }
-            if let Some(triggers) = triggers {
-                for trigger in triggers.resolve(context, &name) {
-                    let dependencies = trigger.dependencies();
-                    if dependencies
-                        .relations()
-                        .iter()
-                        .chain(dependencies.types())
-                        .any(|name| self.removals.contains(name))
-                    {
-                        todo!("DROP VIEW with a trigger owned by another relation (#1197)");
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-struct DroppedViewReference<'a> {
-    names: &'a [FullName],
-    found: bool,
-}
-
-impl SemanticVisitor for DroppedViewReference<'_> {
-    fn relation_identity(&mut self, name: &FullName) {
-        self.found |= self.names.contains(name);
-    }
-
-    fn schema_type(&mut self, reference: &TypeReference) -> Result<(), AnalysisError> {
-        if let Some(name) = reference.full_name() {
-            self.relation_identity(name);
         }
         Ok(())
     }

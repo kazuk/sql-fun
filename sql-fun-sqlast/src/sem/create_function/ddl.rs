@@ -17,10 +17,7 @@ impl CreateFunction {
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = Self::from_ast_inner(ast, context).map(|mut routine| {
-            routine.has_sql_body = ast.body().is_some();
-            routine
-        });
+        let result = Self::from_ast_inner(ast, context);
         context.finish_analysis(result)
     }
 }

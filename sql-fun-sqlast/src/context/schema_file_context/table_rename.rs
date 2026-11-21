@@ -1,5 +1,7 @@
 //! Stage dependent metadata before committing one catalog identity transition.
 
+use crate::context::schema_file_context::view_info::ViewDependencies;
+
 use crate::{
     ast::{Dialect, ObjectKind},
     context::{
@@ -53,7 +55,7 @@ impl SchemaFileContext {
 #[derive(Default)]
 pub(super) struct RenameUpdates {
     tables: Vec<(FullName, CreateTable)>,
-    views: Vec<(FullName, ViewLike)>,
+    views: Vec<(FullName, ViewLike, ViewDependencies)>,
     triggers: Vec<(TriggerIdentity, CreateTrigger)>,
     rules: Vec<(RuleIdentity, CreateRule)>,
     types: Vec<(FullName, TypeDefinition)>,
@@ -121,7 +123,12 @@ impl RenameUpdates {
                 }
                 let mut view = view.clone();
                 change.view(context, &mut view)?;
-                self.views.push((name, view));
+                let dependencies = if context.dialect() == Dialect::postgres() {
+                    ViewDependencies::collect(&view)?
+                } else {
+                    ViewDependencies::default()
+                };
+                self.views.push((name, view, dependencies));
             }
         }
         Ok(())
@@ -210,8 +217,8 @@ impl RenameUpdates {
         for (name, table) in self.tables {
             catalog.store_table(&name, &table);
         }
-        for (name, view) in self.views {
-            catalog.views.insert(&name, &view);
+        for (name, view, dependencies) in self.views {
+            catalog.views.register(&name, &view, dependencies);
         }
         for index in self.indexes {
             catalog.store_index(&index);

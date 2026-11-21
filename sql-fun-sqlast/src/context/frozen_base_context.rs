@@ -442,6 +442,13 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::ViewInfoRead for $context {
+            fn view_dependents(
+                &self,
+                name: &$crate::names::FullName,
+            ) -> $crate::context::ViewDependents {
+                self.$catalog().view_dependents(name)
+            }
+
             fn view_tombstone(
                 &self,
                 name: &$crate::names::FullName,

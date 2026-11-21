@@ -1,3 +1,5 @@
+use crate::context::schema_file_context::view_info::ViewDependencies;
+
 use crate::{
     StringSpan,
     ast::{Dialect, ObjectKind},
@@ -88,6 +90,11 @@ impl SchemaCatalog {
         definition: &ViewLike,
     ) -> Result<(), AnalysisError> {
         let name = self.relation_identity(name);
+        let dependencies = if Dialect::from(self.metadata()) == Dialect::postgres() {
+            ViewDependencies::collect(definition)?
+        } else {
+            ViewDependencies::default()
+        };
         let row_type = if Dialect::from(self.metadata()) == Dialect::postgres() {
             Some(CreateCompositeType::new(
                 &name,
@@ -99,7 +106,7 @@ impl SchemaCatalog {
         self.renamed_relations.remove(&name);
         self.renamed_types.remove(&name);
         self.view_tombstones.remove(&name);
-        self.views.insert(&name, definition);
+        self.views.register(&name, definition, dependencies);
         if let Some(row_type) = row_type {
             self.types.insert_create_composite_type(&name, &row_type);
         }

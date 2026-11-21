@@ -142,7 +142,8 @@ diagnostic.
 
 The default `RESTRICT` rejects removal when a view or materialized view
 depends on the function. `CASCADE` removes those dependent views, including
-views depending on them. Analysis does not yet check or remove other
+views that query them or reference their composite row types. Analysis does
+not yet check or remove other
 dependents, such as triggers, rules and expression indexes. See
 [#1185](https://github.com/kazuk/sql-fun/issues/1185).
 

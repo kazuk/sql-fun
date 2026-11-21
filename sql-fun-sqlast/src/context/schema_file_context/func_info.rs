@@ -2,14 +2,14 @@ use crate::{
     TrieMap,
     ast::ObjectKind,
     context::{
-        FunctionInfoRead, FunctionInfoWrite, OwnershipInfoRead, ParseContext,
+        FunctionInfoRead, FunctionInfoWrite, OwnershipInfoRead, ParseContext, ViewInfoRead,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, CreateFunction, DropFunction, FunctionOverloadCollection,
         FunctionTombstone, OverloadVariant, OwnershipIdentity, ViewTombstone,
-        drop_function::dependent_views, problem::CreationProblem,
+        problem::CreationProblem,
     },
 };
 
@@ -253,19 +253,19 @@ impl FunctionInfoWrite for SchemaFileContext {
             };
             removals.push((identity.clone(), FunctionTombstone::new(definition, &cause)));
         }
-        let dependent_views = dependent_views(&self, statement.targets())?;
-        if !statement.cascade()
-            && let Some((name, _)) = dependent_views.first()
-        {
-            self.report_analysis_problem(AnalysisProblem::DropFunctionDependency(name.into()))?;
-            return Ok(self);
+        let mut views = Vec::new();
+        for name in statement.dependent_views() {
+            let Some(definition) = self.get_view_impl(name).cloned() else {
+                return AnalysisError::raise_unexpected_input(
+                    "DROP FUNCTION dependent view missing from catalog",
+                );
+            };
+            views.push((name.clone(), ViewTombstone::new(definition, &cause)));
         }
-        for (name, definition) in dependent_views {
+        for (name, tombstone) in views {
             // The relation's composite row type disappears with the view.
             self.catalog.renamed_types.insert(name.clone());
-            self.catalog
-                .view_tombstones
-                .insert(name, ViewTombstone::new(definition, &cause));
+            self.catalog.view_tombstones.insert(name, tombstone);
         }
         self.catalog.function_tombstones.extend(removals);
         Ok(self)
@@ -330,7 +330,7 @@ mod test_drop_function {
         ast::ObjectKind,
         context::{FunctionInfoRead, MutSourcePathWithSpan, ParseContext, ViewInfoRead},
         names::FullName,
-        sem::{OwnershipIdentity, PgBuiltInType, SourcePathWithSpan},
+        sem::{OwnershipIdentity, PgBuiltInType, SemAst, SourcePathWithSpan},
         test_helpers::{
             ownership::{apply_ownership_sql, ownership_context},
             schema_layer, source_span,
@@ -366,6 +366,11 @@ mod test_drop_function {
             "DROP FUNCTION public.f(integer) RESTRICT",
         )?;
         assert!(!restricted.context().problems().is_empty());
+        let SemAst::DropFunction(statement) = restricted.ast() else {
+            panic!("expected analyzed DROP FUNCTION");
+        };
+        assert!(!statement.applicable());
+        assert_eq!(statement.dependent_views(), std::slice::from_ref(&view));
         assert!(restricted.context().function_tombstone(&identity).is_none());
         assert!(restricted.context().get_view_impl(&view).is_some());
 

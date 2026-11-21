@@ -110,5 +110,25 @@
         }
       ]
     }
+  },
+  {
+    "name": "cascade_removes_view_using_deleted_row_type",
+    "sql": "SELECT 1 AS value FROM public.drop_probe_row",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
   }
 ]

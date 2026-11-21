@@ -14,7 +14,7 @@ mod default_privileges;
 pub(crate) mod deparse;
 pub(crate) mod document;
 mod drop_behavior;
-mod extension_membership;
+pub(crate) mod extension_membership;
 mod foreign_data_wrapper;
 mod foreign_table;
 mod mutation;
@@ -705,6 +705,20 @@ pub(crate) struct Extension {
 }
 
 impl Extension {
+    pub(crate) fn schema(&self) -> Option<&str> {
+        self.options.iter().find_map(|option| {
+            if option.namespace.is_none()
+                && option.name == "schema"
+                && let Some(SyntaxValue::Expression(Expr::Literal(Literal::String(name)))) =
+                    &option.value
+            {
+                Some(name.as_str())
+            } else {
+                None
+            }
+        })
+    }
+
     fn new(name: &str) -> Self {
         Self {
             if_not_exists: false,

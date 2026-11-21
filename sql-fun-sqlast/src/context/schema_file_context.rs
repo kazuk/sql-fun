@@ -44,8 +44,8 @@ use crate::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisProblem, AnalysisState, CastDefinition,
         CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
         CreateForeignDataWrapper, CreateIndex, CreateRule, CreateSchema, CreateTrigger, CursorInfo,
-        DatabaseCollation, FunctionTombstone, ImplicitChange, InsertConflict, Kind,
-        ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition,
+        DatabaseCollation, ExtensionMembershipChange, FunctionTombstone, ImplicitChange,
+        InsertConflict, Kind, ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition,
         OverloadVariant as SemOverloadVariant, OwnedObjectDefinition, OwnershipIdentity,
         ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr,
         SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport,
@@ -70,6 +70,7 @@ use std::path::{Path, PathBuf};
 pub struct SchemaFileContext {
     lint_configuration: ::sql_fun_core::LintConfigurations,
     catalog: SchemaCatalog,
+    active_extension: Option<String>,
     statement_span: StringSpan,
     source_access_service: Option<Box<dyn SourceAccessService>>,
     diagnostic_source: Option<String>,
@@ -103,6 +104,9 @@ pub(super) struct SchemaCatalog {
     functions: FunctionDefinitionCollection,
     function_view_rows: std::collections::HashMap<(FullName, SemOverloadVariant), bool>,
     extensions: TrieMap<CreateExtension>,
+    installed_extensions: std::collections::HashMap<String, Option<String>>,
+    extension_memberships:
+        std::collections::HashMap<OwnershipIdentity, Vec<ExtensionMembershipChange>>,
     variables: TrieMap<SemScalarExpr>,
     schemas: TrieMap<CreateSchema>,
     sequences: SequenceInfoCollection,
@@ -175,6 +179,8 @@ impl SchemaFileContext {
                 functions: FunctionDefinitionCollection::default(),
                 function_view_rows: std::collections::HashMap::default(),
                 extensions: TrieMap::default(),
+                installed_extensions: std::collections::HashMap::new(),
+                extension_memberships: std::collections::HashMap::new(),
                 variables: TrieMap::default(),
                 schemas: TrieMap::default(),
                 sequences: SequenceInfoCollection::default(),
@@ -190,6 +196,7 @@ impl SchemaFileContext {
             },
             lint_configuration: Default::default(),
             statement_span: StringSpan::default(),
+            active_extension: None,
             source_access_service: None,
             diagnostic_source: None,
             presentations: Vec::new(),
@@ -640,6 +647,10 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
         self.catalog
             .foreign_data_wrappers
             .insert(definition.name().to_owned(), definition.clone());
+        self.record_named_extension_member(
+            ObjectKind::FOREIGN_DATA_WRAPPER,
+            &FullName::from_local_name(definition.name()),
+        );
         self
     }
 }
@@ -932,6 +943,10 @@ impl ParseContext for SchemaFileContext {
     fn insert_role(&mut self, role: &Role) {
         self.catalog.ownership.insert_role(role);
     }
+    fn apply_extension_membership(&mut self, change: &ExtensionMembershipChange) {
+        self.catalog.apply_extension_membership(change);
+    }
+
     fn insert_owned_object(&mut self, definition: &OwnedObjectDefinition) {
         self.catalog.ownership.insert(definition);
     }
@@ -1043,6 +1058,7 @@ impl ParseContext for SchemaFileContext {
             return Ok(self);
         }
         self.catalog.schemas.insert(name, create_schema.clone());
+        self.record_named_extension_member(ObjectKind::SCHEMA, &FullName::from_local_name(name));
         Ok(self)
     }
 

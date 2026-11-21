@@ -70,10 +70,10 @@ use crate::{
     sem::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisState, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CursorInfo, InputTypeConstraint, Kind, ObjectPrivilegeChange,
-        OwnedObjectDefinition, ParameterConstraints, Role, RoleMembershipDeclaration,
-        SamplingMethodLookup, SelectStatement, SemScalarExpr, VariableSet,
-        parameter_resolution::ParameterResolution, problem::CreationProblem,
+        CreateTable, CursorInfo, ExtensionMembershipChange, InputTypeConstraint, Kind,
+        ObjectPrivilegeChange, OwnedObjectDefinition, ParameterConstraints, Role,
+        RoleMembershipDeclaration, SamplingMethodLookup, SelectStatement, SemScalarExpr,
+        VariableSet, parameter_resolution::ParameterResolution, problem::CreationProblem,
     },
 };
 
@@ -423,6 +423,9 @@ where
     /// Register an existing object of a class without a richer retained DDL model.
     /// This establishes existence, never an implicit consequence of ALTER OWNER.
     fn insert_owned_object(&mut self, definition: &OwnedObjectDefinition);
+
+    /// Publish a validated membership declaration.
+    fn apply_extension_membership(&mut self, change: &ExtensionMembershipChange);
 
     /// Apply a resolved ownership change. Invalid outcomes leave the catalog unchanged.
     fn apply_alter_owner(self, alter_owner: &AlterOwner) -> Result<Self, AnalysisError>;

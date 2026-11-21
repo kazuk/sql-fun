@@ -4,6 +4,12 @@ use crate::sem::{CastDefinition, TypeReference};
 
 /// get cast definition
 pub trait CastInfoRead {
+    /// Whether a declared cast object exists for this exact type pair.
+    /// Implicit conversions, identity conversions and synthetic coercions do not qualify.
+    fn has_declared_cast(&self, _source: &TypeReference, _target: &TypeReference) -> bool {
+        false
+    }
+
     /// Enumerate source types accepted by a cast to `target`, including identity.
     ///
     /// `explicit` selects explicit-cast eligibility; otherwise only implicit

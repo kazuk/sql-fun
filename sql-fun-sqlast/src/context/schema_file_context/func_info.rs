@@ -293,8 +293,11 @@ impl FunctionInfoWrite for SchemaFileContext {
     ) -> Result<Self, AnalysisError> {
         let existing = OwnershipInfoRead::routine_definitions(&self, name);
         let mut candidates = Vec::new();
+        let mut new_members = Vec::new();
         for mut candidate in create_function.split_definitions() {
-            if let Some(previous) = candidate.previous_definition(&existing, &candidates) {
+            let previous = candidate.previous_definition(&existing, &candidates);
+            let is_new = previous.is_none();
+            if let Some(previous) = previous {
                 if !create_function.replace() || !candidate.can_replace(previous) {
                     self.report_analysis_problem(AnalysisProblem::creation(
                         CreationProblem::routine(
@@ -310,6 +313,9 @@ impl FunctionInfoWrite for SchemaFileContext {
                     candidate.change_owner(owner);
                 }
             }
+            if is_new {
+                new_members.push(candidate.ownership_identity(name));
+            }
             candidates.push(candidate);
         }
         for candidate in candidates {
@@ -317,6 +323,9 @@ impl FunctionInfoWrite for SchemaFileContext {
                 .function_tombstones
                 .remove(&candidate.ownership_identity(name));
             self.catalog.functions.insert(name, &candidate);
+        }
+        for member in new_members {
+            self.record_extension_member(&member);
         }
         Ok(self)
     }

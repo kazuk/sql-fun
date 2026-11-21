@@ -19,12 +19,13 @@ use crate::{
         CatalogNameLookup, ColumnDefinition, Comment, CreateCompositeType, CreateDomain,
         CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex,
         CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger,
-        CreateView, CursorInfo, DataSource, DropTable, FromClause, FunctionOverloadCollection,
-        InsertArbiter, InsertInferenceModifiers, Kind, OperatorDefinition, OverloadVariant,
-        OwnedObjectDefinition, ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup,
-        SourcePathWithSpan, TriggerIdentity, TypeDefinition, TypeReference, VariableSet,
-        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
-        WithClause, ownership::model_definitions, problem::TriggerProblem,
+        CreateView, CursorInfo, DataSource, DropTable, ExtensionMembershipChange, FromClause,
+        FunctionOverloadCollection, InsertArbiter, InsertInferenceModifiers, Kind,
+        OperatorDefinition, OverloadVariant, OwnedObjectDefinition, OwnershipIdentity,
+        ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan,
+        TriggerIdentity, TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport,
+        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport, WithClause,
+        ownership::model_definitions, problem::TriggerProblem,
         search_path::expand_search_path_inst,
     },
     test_helpers::{ast_query, source_span},
@@ -37,6 +38,7 @@ pub struct TestContext<Constraints> {
     lint_configuration: ::sql_fun_core::LintConfigurations,
     rules: HashMap<RuleIdentity, Option<CreateRule>>,
     ownership: OwnershipCatalog,
+    extension_memberships: HashMap<OwnershipIdentity, Vec<ExtensionMembershipChange>>,
     foreign_data_wrappers: HashMap<String, CreateForeignDataWrapper>,
     triggers: HashMap<TriggerIdentity, Option<CreateTrigger>>,
     masters: Option<ConflictMasters>,
@@ -708,6 +710,13 @@ impl ParseContext for TestParseContext {
     fn insert_role(&mut self, role: &Role) {
         self.ownership.insert_role(role);
     }
+    fn apply_extension_membership(&mut self, change: &ExtensionMembershipChange) {
+        self.extension_memberships
+            .entry(change.member().clone())
+            .or_default()
+            .push(change.clone());
+    }
+
     fn insert_owned_object(&mut self, definition: &OwnedObjectDefinition) {
         self.ownership.insert(definition);
     }
@@ -759,6 +768,7 @@ impl ParseContext for TestParseContext {
             lint_configuration: self.lint_configuration,
             rules: self.rules,
             ownership: self.ownership,
+            extension_memberships: self.extension_memberships,
             triggers: self.triggers,
             foreign_data_wrappers: self.foreign_data_wrappers,
             masters: self.masters,
@@ -1030,5 +1040,14 @@ impl<Constraints: std::fmt::Debug> crate::context::ObjectInfoRead for TestContex
 impl<Constraints: std::fmt::Debug> crate::context::ExtensionInfoRead for TestContext<Constraints> {
     fn extension_exists(&self, _: &str) -> bool {
         false
+    }
+
+    fn extension_membership_history(
+        &self,
+        member: &OwnershipIdentity,
+    ) -> &[ExtensionMembershipChange] {
+        self.extension_memberships
+            .get(member)
+            .map_or(&[], Vec::as_slice)
     }
 }

@@ -1,14 +1,14 @@
 use crate::{
     StringSpan,
-    ast::Dialect,
+    ast::{Dialect, ObjectKind},
     context::{
         BaseParseContext, ExtensionInfoRead, ObjectInfoRead,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::FullName,
     sem::{
-        AnalysisError, CreateCompositeType, CreateIndex, CreateSequence, CreateTable, Kind,
-        ViewLike,
+        AnalysisError, CreateCompositeType, CreateIndex, CreateSequence, CreateTable,
+        ExtensionMembershipChange, Kind, OwnershipIdentity, ViewLike,
     },
 };
 
@@ -37,7 +37,30 @@ impl ObjectInfoRead for SchemaCatalog {
 }
 impl ExtensionInfoRead for SchemaCatalog {
     fn extension_exists(&self, name: &str) -> bool {
-        self.extensions.contains(name) || self.base.extension_exists(name)
+        self.installed_extensions.contains_key(name)
+            || self.extensions.contains(name)
+            || self.base.extension_exists(name)
+    }
+
+    fn extension_schema(&self, name: &str) -> Option<&str> {
+        match self.installed_extensions.get(name) {
+            Some(schema) => schema.as_deref(),
+            None => match self.extensions.get(name) {
+                Some(extension) => extension.schema(),
+                None => self.base.extension_schema(name),
+            },
+        }
+    }
+
+    fn extension_membership_history(
+        &self,
+        member: &OwnershipIdentity,
+    ) -> &[ExtensionMembershipChange] {
+        if let Some(history) = self.extension_memberships.get(member) {
+            history
+        } else {
+            self.base.extension_membership_history(member)
+        }
     }
 }
 impl SchemaCatalog {
@@ -106,5 +129,124 @@ impl SchemaCatalog {
 impl SchemaFileContext {
     pub(super) const fn creation_span(&self) -> StringSpan {
         self.statement_span
+    }
+}
+
+impl SchemaCatalog {
+    pub(super) fn apply_extension_membership(&mut self, change: &ExtensionMembershipChange) {
+        let member = change.member();
+        self.extension_memberships
+            .entry(member.clone())
+            .or_insert_with(|| self.base.extension_membership_history(member).to_vec())
+            .push(change.clone());
+    }
+}
+
+impl SchemaFileContext {
+    pub(crate) fn enter_extension_script(&mut self, name: &str, schema: Option<&str>) {
+        self.catalog
+            .installed_extensions
+            .insert(name.to_owned(), schema.map(str::to_owned));
+        self.active_extension = Some(name.to_owned());
+    }
+
+    pub(super) fn record_named_extension_member(&mut self, kind: ObjectKind, name: &FullName) {
+        if self.active_extension.is_some() {
+            self.record_extension_member(&OwnershipIdentity::named(kind, name));
+        }
+    }
+
+    pub(super) fn record_extension_member(&mut self, member: &OwnershipIdentity) {
+        if let Some(extension) = &self.active_extension {
+            let change =
+                ExtensionMembershipChange::created(extension, member, self.catalog.source.as_ref());
+            self.catalog.apply_extension_membership(&change);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_extension_membership_history {
+    use std::path::Path;
+
+    use crate::{
+        StringSpan,
+        ast::ObjectKind,
+        context::{ExtensionInfoRead, MutSourcePathWithSpan, OwnershipInfoRead, ParseContext},
+        names::FullName,
+        sem::{OwnershipIdentity, SourcePathWithSpan},
+        test_helpers::{
+            ownership::{apply_ownership_sql, ownership_context},
+            schema_layer,
+        },
+    };
+
+    #[test]
+    fn update_masks_the_parent_membership_and_retains_the_member() -> testresult::TestResult {
+        let mut install = ownership_context();
+        install.enter_extension_script("pg_stat_statements", Some("public"));
+        let span = StringSpan::new(6, 15);
+        let create = SourcePathWithSpan::new(Path::new("pg_stat_statements--1.4.sql"), &span);
+        install.set_source_path_with_span(&create);
+        let install = apply_ownership_sql(
+            install,
+            "CREATE FUNCTION pg_stat_statements_reset() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+        )?
+        .into_context()
+        .freeze();
+        let name = FullName::with_schema("public", "pg_stat_statements_reset");
+        let member = OwnershipIdentity::with_arguments(ObjectKind::FUNCTION, &name, &[]);
+        let mut update = schema_layer(Path::new("pg_stat_statements--1.6--1.7.sql"), &install);
+        let drop = SourcePathWithSpan::new(Path::new("pg_stat_statements--1.6--1.7.sql"), &span);
+        update.set_source_path_with_span(&drop);
+        let update = apply_ownership_sql(
+            update,
+            "ALTER EXTENSION pg_stat_statements DROP FUNCTION pg_stat_statements_reset()",
+        )?
+        .into_context()
+        .freeze();
+        assert_eq!(update.extension_membership(&member), None);
+        assert_eq!(
+            install.extension_membership(&member),
+            Some("pg_stat_statements")
+        );
+        assert!(!update.routine_definitions(&name).is_empty());
+        let history = update.extension_membership_history(&member);
+        assert_eq!(history.len(), 2);
+        assert!(history[0].is_add());
+        assert_eq!(
+            history[0].source().unwrap().source_path(),
+            create.source_path()
+        );
+        assert!(!history[1].is_add());
+        assert_eq!(
+            history[1].source().unwrap().source_path(),
+            drop.source_path()
+        );
+        let child = schema_layer(Path::new("repeat.sql"), &update);
+        let rejected = apply_ownership_sql(
+            child,
+            "ALTER EXTENSION pg_stat_statements DROP FUNCTION pg_stat_statements_reset()",
+        )?;
+        assert_eq!(rejected.context().problems().len(), 1);
+        assert_eq!(
+            rejected
+                .context()
+                .extension_membership_history(&member)
+                .len(),
+            2
+        );
+        let child = apply_ownership_sql(
+            rejected.into_context(),
+            "ALTER EXTENSION pg_stat_statements ADD FUNCTION pg_stat_statements_reset()",
+        )?
+        .into_context();
+        assert_eq!(
+            child.extension_membership(&member),
+            Some("pg_stat_statements")
+        );
+        assert_eq!(child.extension_membership_history(&member).len(), 3);
+        assert_eq!(update.extension_membership(&member), None);
+        Ok(())
     }
 }

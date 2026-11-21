@@ -41,6 +41,9 @@ mod def_elem;
 mod delete_statement;
 mod deprecated_lint;
 pub(crate) mod drop_function;
+mod extension_membership;
+pub use extension_membership::ExtensionMembershipChange;
+
 pub use drop_function::{DropFunction, FunctionTombstone, ViewTombstone};
 mod drop_rule_ast;
 mod drop_trigger;
@@ -344,6 +347,9 @@ pub enum SemAst {
 
     /// A resolved object privilege declaration.
     ObjectPrivileges(ObjectPrivilegeChange),
+
+    /// A validated extension membership declaration.
+    ExtensionMembership(Box<ExtensionMembershipChange>),
 
     /// A resolved role membership declaration.
     RoleMembership(RoleMembershipDeclaration),
@@ -844,6 +850,7 @@ pub struct CreateExtension {
     if_not_exists: bool,
 
     name: String,
+    schema: Option<String>,
 }
 
 impl CreateExtension {
@@ -859,7 +866,13 @@ impl CreateExtension {
         Self {
             if_not_exists: false,
             name: name.to_owned(),
+            schema: None,
         }
+    }
+
+    /// Explicit target schema, when specified.
+    pub fn schema(&self) -> Option<&str> {
+        self.schema.as_deref()
     }
 
     /// get extension name
@@ -879,7 +892,8 @@ impl CreateExtension {
     where
         TContext: ParseContext,
     {
-        let extension = Self::from_name(ast.name()).with_if_not_exists(ast.if_not_exists());
+        let mut extension = Self::from_name(ast.name()).with_if_not_exists(ast.if_not_exists());
+        extension.schema = ast.schema().map(str::to_owned);
         let context = context.apply_create_extension(&extension)?;
         Ok(AstAndContextPair::new(
             SemAst::from_create_extension(&extension),

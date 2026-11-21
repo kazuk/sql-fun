@@ -120,6 +120,25 @@ pub enum OperatorDefinition {
 }
 
 impl OperatorDefinition {
+    pub(crate) fn has_operands(
+        &self,
+        left: Option<&TypeReference>,
+        right: Option<&TypeReference>,
+    ) -> bool {
+        match (self, left, right) {
+            (Self::Binary(overloads), Some(left), Some(right)) => {
+                overloads.iter().any(|candidate| {
+                    candidate.left_arg_type() == left && candidate.right_arg_type() == right
+                })
+            }
+            (Self::LeftUnary(overloads), Some(arg), None)
+            | (Self::RightUnary(overloads), None, Some(arg)) => overloads
+                .iter()
+                .any(|candidate| candidate.arg_type() == arg),
+            _ => false,
+        }
+    }
+
     pub(crate) fn diagnostic_definition(
         &self,
         name: &OperatorName,

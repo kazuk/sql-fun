@@ -6,10 +6,10 @@ use crate::{
         TypeName as AstTypeName,
     },
     context::ParseContext,
-    names::{FullName, SchemaName},
+    names::{FullName, OperatorName, SchemaName},
     sem::{
         AnalysisError, AnalysisProblem, OwnerSpecification, OwnershipIdentity, OwnershipLookup,
-        TypeReference,
+        TypeReference, search_path::expand_operator_search_path,
     },
 };
 
@@ -423,6 +423,85 @@ impl RequestedIdentity {
             self.identity.resolve(context)
         } else {
             OwnershipLookup::argument_type_not_found(&self.identity, &self.missing_types)
+        }
+    }
+
+    pub(crate) fn resolve_extension_operator(
+        &self,
+        context: &impl ParseContext,
+    ) -> OwnershipLookup {
+        let identity = &self.identity;
+        if !self.missing_types.is_empty() {
+            return OwnershipLookup::argument_type_not_found(identity, &self.missing_types);
+        }
+        let Some([left, right]) = identity.arguments() else {
+            return OwnershipLookup::invalid_kind(identity);
+        };
+        let operator = OperatorName::from_full_name(identity.name());
+        let resolved = expand_operator_search_path(context, &operator, |key| {
+            let definition = context.get_operator_op(key, left.is_some(), right.is_some())?;
+            if definition.has_operands(left.as_ref(), right.as_ref()) {
+                key.full_name()
+            } else {
+                None
+            }
+        });
+        resolved.map_or_else(
+            || OwnershipLookup::not_found(identity),
+            |name| OwnershipLookup::resolved(&identity.with_name(&name)),
+        )
+    }
+
+    pub(crate) fn resolve_extension_routine(&self, context: &impl ParseContext) -> OwnershipLookup {
+        let identity = &self.identity;
+        if !self.missing_types.is_empty() {
+            return OwnershipLookup::argument_type_not_found(identity, &self.missing_types);
+        }
+        let mut visible = Vec::new();
+        for name in identity.qualified_candidate_names(context) {
+            for definition in context.routine_definitions(&name) {
+                let candidate = definition.ownership_identity(&name);
+                let candidate = if definition.catalog_aggregate() {
+                    OwnershipIdentity::with_arguments(
+                        ObjectKind::AGGREGATE,
+                        &name,
+                        candidate
+                            .arguments()
+                            .expect("routine identity has arguments"),
+                    )
+                } else {
+                    candidate
+                };
+                if identity
+                    .arguments()
+                    .is_none_or(|args| candidate.arguments() == Some(args))
+                    && !OwnershipIdentity::contains_signature(&visible, &candidate)
+                {
+                    visible.push(candidate);
+                }
+            }
+        }
+        let accepts_kind = |candidate: &OwnershipIdentity| match identity.kind() {
+            ObjectKind::FUNCTION => matches!(
+                candidate.kind(),
+                ObjectKind::FUNCTION | ObjectKind::AGGREGATE
+            ),
+            ObjectKind::ROUTINE => true,
+            kind => kind == candidate.kind(),
+        };
+        if identity.arguments().is_none() {
+            visible.retain(accepts_kind);
+        }
+        if visible.len() > 1 {
+            return OwnershipLookup::ambiguous(&visible);
+        }
+        let Some(candidate) = visible.pop() else {
+            return OwnershipLookup::not_found(identity);
+        };
+        if accepts_kind(&candidate) {
+            OwnershipLookup::resolved(&candidate)
+        } else {
+            OwnershipLookup::invalid_kind(identity)
         }
     }
 

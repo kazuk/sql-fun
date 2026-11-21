@@ -103,6 +103,18 @@ mod test_load {
 }
 
 impl CastInfoRead for BaseContextBaseContext {
+    fn has_declared_cast(&self, source: &TypeReference, target: &TypeReference) -> bool {
+        let Some((source, false)) = self.builtin_cast_type(source) else {
+            return false;
+        };
+        let Some((target, false)) = self.builtin_cast_type(target) else {
+            return false;
+        };
+        self.casts
+            .get(source)
+            .is_some_and(|casts| casts.get(target).is_some())
+    }
+
     fn get_assignment_cast(
         &self,
         source: &TypeReference,

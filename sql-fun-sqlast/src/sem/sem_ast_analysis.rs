@@ -9,9 +9,9 @@ use crate::{
         CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex,
         CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger,
         CreateView, DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger,
-        EngineFeatureValidation, InsertStatement, MergeStatement, ObjectPrivilegeChange,
-        ParameterConstraints, RelationAlteration, RoleMembershipDeclaration, SelectStatement,
-        SemAst, UpdateStatement, VariableSet,
+        EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
+        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
+        SelectStatement, SemAst, UpdateStatement, VariableSet,
     },
 };
 
@@ -34,8 +34,10 @@ impl SemAst {
             AstStatementNode::ExtensionMembership(ast) if ast.targets_transform() => {
                 todo!("ALTER EXTENSION transform lookup and application (#1187)")
             }
-            AstStatementNode::ExtensionMembership(_) => {
-                todo!("ALTER EXTENSION membership interpretation (#1168)")
+            AstStatementNode::ExtensionMembership(ast) => {
+                Ok(ExtensionMembershipChange::analyze(ast, context)?
+                    .map(|change| Self::ExtensionMembership(Box::new(change)))
+                    .unwrap_or_else(Self::unresolved_statement))
             }
             AstStatementNode::AlterFunctionParallel(_) => {
                 todo!("ALTER FUNCTION PARALLEL interpretation (#1172)")
@@ -153,6 +155,13 @@ impl SemAst {
             ));
         }
         match ast {
+            AstStatementNode::ExtensionMembership(_) => {
+                let statement = Self::from_ast_node(ast, &mut context, cache)?;
+                if let Self::ExtensionMembership(change) = &statement {
+                    context.apply_extension_membership(change);
+                }
+                Ok(AstAndContextPair::new(statement, context))
+            }
             AstStatementNode::RoleMembership(ast) => {
                 let declaration = RoleMembershipDeclaration::analyze(ast, &mut context)?;
                 let context = if declaration.is_applicable() {

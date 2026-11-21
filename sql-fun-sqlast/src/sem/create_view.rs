@@ -7,7 +7,7 @@ use crate::{
         SemScalarExpr, TriggerReferences, ViewCheckOption, ViewColumnLineage, ViewOption,
         create_table::ColumnDefinition,
         problem::ViewProblem,
-        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
+        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -91,6 +91,16 @@ impl CreateView {
     ) -> Result<(), AnalysisError> {
         self.query.walk(visitor)
     }
+    pub(crate) fn visit_defaults(
+        &self,
+        visitor: &mut impl SemanticVisitor,
+    ) -> Result<(), AnalysisError> {
+        for (_, value) in &self.defaults {
+            value.visit(visitor)?;
+        }
+        Ok(())
+    }
+
     /// The resolved defining query.
     pub const fn query(&self) -> &SelectStatement {
         &self.query

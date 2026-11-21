@@ -4,11 +4,25 @@ use crate::{
     sem::{AlterView, AnalysisError, CreateTableAs, CreateView, DropView, ViewLike, ViewTombstone},
 };
 
+/// Recorded view dependents of a relation.
+#[derive(Default)]
+pub struct ViewDependents {
+    /// Views whose defining queries depend on the relation.
+    pub queries: Vec<FullName>,
+    /// Views with column defaults that depend on the relation.
+    pub defaults: Vec<FullName>,
+}
+
 /// get view definition
 pub trait ViewInfoRead {
     /// Inspect a view removed by a catalog cascade.
     fn view_tombstone(&self, _name: &FullName) -> Option<&ViewTombstone> {
         None
+    }
+
+    /// Effective defining-query and column-default dependents of a relation.
+    fn view_dependents(&self, _name: &FullName) -> ViewDependents {
+        ViewDependents::default()
     }
 
     /// get `CREATE VIEW` statement by view name

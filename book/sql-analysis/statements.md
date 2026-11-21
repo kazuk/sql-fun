@@ -70,11 +70,12 @@ recreate them.
 An extension script can drop its own member views. A direct drop outside
 that script is rejected while the extension still owns the view.
 
-Analysis stops when a drop encounters a tracked routine, type, table, or
-index dependency, a rule or trigger on a surviving relation, or a cascade
-that would remove an indexed materialized view or an extension. Analysis
-also stops if the catalog contains a routine declared with a SQL-standard
-body whose dependencies are unavailable.
+A column default on a surviving view can also block `RESTRICT`. Analysis
+stops if `CASCADE` would need to remove such a default, an index on a
+dependent materialized view, or an extension. Dependency registration
+currently covers view queries and view column defaults. Other objects,
+including dependencies inside SQL-standard routine bodies, need separate
+catalog support.
 Further dependency coverage is tracked in
 [#1197](https://github.com/kazuk/sql-fun/issues/1197). Commands requiring
 standalone SQL rendering still report `query_deparse` for `DROP VIEW`.

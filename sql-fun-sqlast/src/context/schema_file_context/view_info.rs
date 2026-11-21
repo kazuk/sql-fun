@@ -1,27 +1,92 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     TrieMap,
     ast::ObjectKind,
     context::{
-        ExtensionInfoRead, ParseContext, RuleInfoWrite, TriggerInfoWrite, ViewInfoRead,
-        ViewInfoWrite,
+        ExtensionInfoRead, ObjectInfoRead, ParseContext, RuleInfoWrite, TriggerInfoWrite,
+        ViewDependents, ViewInfoRead, ViewInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::FullName,
     sem::{
         AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, DropView,
-        ExtensionMembershipChange, Kind, OwnershipIdentity, TriggerIdentity, ViewLike,
-        ViewTombstone, problem::CreationProblem, search_path::expand_relation_search_path,
+        ExtensionMembershipChange, Kind, OwnershipIdentity, TriggerIdentity, TypeReference,
+        ViewLike, ViewTombstone, problem::CreationProblem,
+        search_path::expand_relation_search_path, traversal::SemanticVisitor,
     },
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct ViewInformationCollection(TrieMap<ViewLike>, Vec<FullName>);
+pub struct ViewInformationCollection {
+    definitions: TrieMap<ViewLike>,
+    names: Vec<FullName>,
+    dependencies: HashMap<FullName, ViewDependencies>,
+    query_dependents: HashMap<FullName, Vec<FullName>>,
+    default_dependents: HashMap<FullName, Vec<FullName>>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(super) struct ViewDependencies {
+    query: Vec<FullName>,
+    defaults: Vec<FullName>,
+}
+
+impl ViewDependencies {
+    pub(super) fn collect(view: &ViewLike) -> Result<Self, AnalysisError> {
+        let mut query = RelationReferences::default();
+        view.query().visit(&mut query)?;
+        let mut defaults = RelationReferences::default();
+        if let Some(view) = view.ordinary_definition() {
+            view.visit_defaults(&mut defaults)?;
+        }
+        Ok(Self {
+            query: query.0,
+            defaults: defaults.0,
+        })
+    }
+
+    fn update_index(
+        index: &mut HashMap<FullName, Vec<FullName>>,
+        owner: &FullName,
+        old: &[FullName],
+        new: &[FullName],
+    ) {
+        for name in old {
+            if let Some(owners) = index.get_mut(name) {
+                owners.retain(|candidate| candidate != owner);
+                if owners.is_empty() {
+                    index.remove(name);
+                }
+            }
+        }
+        for name in new {
+            index.entry(name.clone()).or_default().push(owner.clone());
+        }
+    }
+}
+
+#[derive(Default)]
+struct RelationReferences(Vec<FullName>);
+
+impl SemanticVisitor for RelationReferences {
+    fn relation_identity(&mut self, name: &FullName) {
+        if !self.0.contains(name) {
+            self.0.push(name.clone());
+        }
+    }
+
+    fn schema_type(&mut self, reference: &TypeReference) -> Result<(), AnalysisError> {
+        if let Some(name) = reference.full_name() {
+            self.relation_identity(name);
+        }
+        Ok(())
+    }
+}
 
 impl ViewInformationCollection {
     pub(super) fn append_names(&self, names: &mut Vec<FullName>) {
-        for name in &self.1 {
+        for name in &self.names {
             if !names.contains(name) {
                 names.push(name.clone());
             }
@@ -29,20 +94,43 @@ impl ViewInformationCollection {
     }
 
     pub(super) fn sqlite_name(&self, name: &FullName) -> Option<FullName> {
-        self.1
+        self.names
             .iter()
             .find(|candidate| candidate.sqlite_eq(name))
             .cloned()
     }
 
     fn get(&self, key: &FullName) -> Option<&ViewLike> {
-        self.0.get(&key.to_string())
+        self.definitions.get(&key.to_string())
+    }
+
+    pub(super) fn register(
+        &mut self,
+        key: &FullName,
+        value: &ViewLike,
+        dependencies: ViewDependencies,
+    ) {
+        let previous = self.dependencies.remove(key).unwrap_or_default();
+        ViewDependencies::update_index(
+            &mut self.query_dependents,
+            key,
+            &previous.query,
+            &dependencies.query,
+        );
+        ViewDependencies::update_index(
+            &mut self.default_dependents,
+            key,
+            &previous.defaults,
+            &dependencies.defaults,
+        );
+        self.dependencies.insert(key.clone(), dependencies);
+        self.insert(key, value);
     }
 
     pub(super) fn insert(&mut self, key: &FullName, value: &ViewLike) {
-        self.0.insert(&key.to_string(), value.clone());
-        if !self.1.contains(key) {
-            self.1.push(key.clone());
+        self.definitions.insert(&key.to_string(), value.clone());
+        if !self.names.contains(key) {
+            self.names.push(key.clone());
         }
     }
 }
@@ -65,6 +153,26 @@ impl ViewInfoRead for SchemaCatalog {
             return None;
         }
         self.base.view_tombstone(&key)
+    }
+
+    fn view_dependents(&self, name: &FullName) -> ViewDependents {
+        let mut dependents = self.base.view_dependents(name);
+        for (owners, index) in [
+            (&mut dependents.queries, &self.views.query_dependents),
+            (&mut dependents.defaults, &self.views.default_dependents),
+        ] {
+            owners.retain(|owner| !self.views.dependencies.contains_key(owner));
+            if let Some(local) = index.get(name) {
+                owners.extend(local.iter().cloned());
+            }
+            owners.retain(|owner| {
+                matches!(
+                    self.object_kind(owner),
+                    Some(Kind::View | Kind::MaterializedView)
+                )
+            });
+        }
+        dependents
     }
 
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {

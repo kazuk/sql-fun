@@ -139,5 +139,16 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "restrict_reports_surviving_column_default",
+    "sql": "DROP VIEW public.drop_view_row_type",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "drop_view_dependency"
+      ],
+      "columns": []
+    }
   }
 ]

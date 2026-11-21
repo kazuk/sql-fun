@@ -23,7 +23,6 @@ pub struct CreateFunction {
     name: FullName,
     overloads: FunctionOverloadCollection,
     returning_columdef: Option<ColumnCollection>,
-    has_sql_body: bool,
     builtin_properties: Option<(bool, bool)>,
     privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
@@ -37,10 +36,6 @@ impl CreateFunction {
 
     pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
         self.privilege_declarations.push(declaration.clone());
-    }
-
-    pub(crate) const fn has_sql_body(&self) -> bool {
-        self.has_sql_body
     }
 
     pub(crate) fn visit_references<V: SemanticVisitor>(
@@ -122,7 +117,6 @@ impl CreateFunction {
             name: name.clone(),
             overloads: overloads.clone(),
             returning_columdef: returning_columns.clone(),
-            has_sql_body: false,
         }
     }
 

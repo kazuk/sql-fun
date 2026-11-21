@@ -3,8 +3,9 @@ use crate::{
     context::ParseContext,
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, CatalogNameLookup, OwnershipIdentity, OwnershipLookup,
-        SourcePathWithSpan, ownership::RequestedIdentity,
+        AnalysisError, AnalysisProblem, CatalogNameLookup, Kind, OwnershipIdentity,
+        OwnershipLookup, SourcePathWithSpan, ownership::RequestedIdentity,
+        search_path::expand_relation_search_path,
     },
 };
 use ::sql_fun_core::analysis_problem::QueryAnalysisStage;
@@ -91,6 +92,12 @@ impl ExtensionMembershipChange {
         match kind {
             ObjectKind::CAST => return Self::resolve_cast(ast, context),
             ObjectKind::DOMAIN | ObjectKind::TYPE => return Self::resolve_type(ast, context),
+            ObjectKind::TABLE => return Self::resolve_relation(ast, context, Kind::Table),
+            ObjectKind::VIEW => return Self::resolve_relation(ast, context, Kind::View),
+            ObjectKind::MATERIALIZED_VIEW => {
+                return Self::resolve_relation(ast, context, Kind::MaterializedView);
+            }
+            ObjectKind::SEQUENCE => return Self::resolve_relation(ast, context, Kind::Sequence),
             ObjectKind::OPERATOR_CLASS => {
                 let (name, method) = ast.access_method_target().expect("operator class target");
                 let name = FullName::from_ast_name(name)?;
@@ -110,14 +117,10 @@ impl ExtensionMembershipChange {
             ObjectKind::AGGREGATE
             | ObjectKind::FOREIGN_DATA_WRAPPER
             | ObjectKind::FUNCTION
-            | ObjectKind::MATERIALIZED_VIEW
             | ObjectKind::OPERATOR
             | ObjectKind::PROCEDURE
             | ObjectKind::ROUTINE
-            | ObjectKind::SCHEMA
-            | ObjectKind::SEQUENCE
-            | ObjectKind::TABLE
-            | ObjectKind::VIEW => {}
+            | ObjectKind::SCHEMA => {}
             _ => todo!("extension membership object resolution (#1189)"),
         }
         let target = ast
@@ -145,6 +148,26 @@ impl ExtensionMembershipChange {
         } else {
             OwnershipLookup::not_found(&identity(lookup.requested()))
         }
+    }
+
+    fn resolve_relation(
+        ast: &AstMembership,
+        context: &impl ParseContext,
+        expected: Kind,
+    ) -> Result<OwnershipLookup, AnalysisError> {
+        let target = ast.object_target().expect("relation target");
+        let name = FullName::from_ast_name(&Name::from_parts(target.name()))?;
+        let class = ast.kind();
+        let resolved = expand_relation_search_path(context, &name, |key| {
+            context.object_kind(key).map(|kind| (key.clone(), kind))
+        });
+        Ok(match resolved {
+            Some((key, kind)) if kind == expected => {
+                OwnershipLookup::resolved(&OwnershipIdentity::named(class, &key))
+            }
+            Some((key, _)) => OwnershipLookup::invalid_kind(&OwnershipIdentity::named(class, &key)),
+            None => OwnershipLookup::not_found(&OwnershipIdentity::named(class, &name)),
+        })
     }
 
     fn resolve_type(
@@ -249,6 +272,7 @@ mod test_membership_validation {
         "ownership_target_not_found"
     )]
     #[case::ambiguous("ALTER EXTENSION one DROP FUNCTION f", "ownership_target_ambiguous")]
+    #[case::wrong_relation_kind("ALTER EXTENSION one ADD TABLE v", "ownership_invalid_target_kind")]
     fn rejected_change_keeps_existing_membership(
         #[case] statement: &str,
         #[case] diagnostic: &str,
@@ -257,6 +281,7 @@ mod test_membership_validation {
         for sql in [
             "CREATE EXTENSION one",
             "CREATE EXTENSION two",
+            "CREATE VIEW public.v AS SELECT 1 AS value",
             "CREATE FUNCTION f() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
             "CREATE FUNCTION f(text) RETURNS text LANGUAGE sql AS 'SELECT $1'",
         ] {

@@ -9,7 +9,8 @@ use crate::{
     names::{FullName, OperatorName, SchemaName},
     sem::{
         AnalysisError, AnalysisProblem, OwnerSpecification, OwnershipIdentity, OwnershipLookup,
-        TypeReference, search_path::expand_operator_search_path,
+        TypeReference,
+        search_path::{expand_operator_search_path, search_schemas},
     },
 };
 
@@ -457,8 +458,16 @@ impl RequestedIdentity {
         if !self.missing_types.is_empty() {
             return OwnershipLookup::argument_type_not_found(identity, &self.missing_types);
         }
+        let names = if identity.name().schema().is_some() {
+            vec![identity.name().clone()]
+        } else {
+            search_schemas(context, false)
+                .iter()
+                .map(|schema| identity.name().replace_schema(schema))
+                .collect()
+        };
         let mut visible = Vec::new();
-        for name in identity.qualified_candidate_names(context) {
+        for name in names {
             for definition in context.routine_definitions(&name) {
                 let candidate = definition.ownership_identity(&name);
                 let candidate = if definition.catalog_aggregate() {

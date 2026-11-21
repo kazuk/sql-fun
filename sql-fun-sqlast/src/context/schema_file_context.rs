@@ -913,6 +913,10 @@ mod test_parameter_type_hint_write {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn active_extension(&self) -> Option<&str> {
+        self.active_extension.as_deref()
+    }
+
     fn lint_configuration(&self) -> &::sql_fun_core::LintConfigurations {
         &self.lint_configuration
     }

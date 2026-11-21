@@ -1,0 +1,143 @@
+[
+  {
+    "name": "removed_child",
+    "sql": "SELECT 1 AS value FROM public.drop_view_child",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "removed_materialized_view",
+    "sql": "SELECT 1 AS value FROM public.drop_view_leaf",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "removed_group_target",
+    "sql": "SELECT 1 AS value FROM public.drop_view_group",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "removed_group_dependent",
+    "sql": "SELECT 1 AS value FROM public.drop_view_group_child",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "recreated_view_columns",
+    "sql": "SELECT value FROM public.drop_view_base",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_view",
+    "sql": "DROP VIEW public.drop_view_missing",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "view_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "skip_missing_view",
+    "sql": "DROP VIEW IF EXISTS public.drop_view_missing",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "if_exists_still_reports_wrong_kind",
+    "sql": "DROP VIEW IF EXISTS public.drop_view_wrong_kind",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "drop_view_wrong_kind"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "restrict_reports_dependent_view",
+    "sql": "DROP VIEW public.drop_view_retained",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "drop_view_dependency"
+      ],
+      "columns": []
+    }
+  }
+]

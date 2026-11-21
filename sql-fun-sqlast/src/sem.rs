@@ -42,10 +42,12 @@ mod def_elem;
 mod delete_statement;
 mod deprecated_lint;
 pub(crate) mod drop_function;
+mod drop_view;
+pub use self::drop_view::{DropView, DropViewLookup, DropViewTarget};
 mod extension_membership;
 pub use extension_membership::{ExtensionMembershipChange, ExtensionMembershipRejection};
 
-pub use drop_function::{DropFunction, FunctionTombstone, ViewTombstone};
+pub use drop_function::{DropFunction, FunctionTombstone, ViewDropCause, ViewTombstone};
 mod drop_rule_ast;
 mod drop_trigger;
 mod engine_features;
@@ -400,6 +402,8 @@ pub enum SemAst {
     AlterFunctionParallel(AlterFunctionParallel),
     /// Analyzed PostgreSQL DROP FUNCTION.
     DropFunction(DropFunction),
+    /// PostgreSQL DROP VIEW.
+    DropView(DropView),
 
     /// `create view` statement
     CreateView(CreateView),

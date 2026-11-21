@@ -1,7 +1,7 @@
 use crate::sem::{ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport, ViewUpdateSupport};
 use crate::{
     names::FullName,
-    sem::{AlterView, AnalysisError, CreateTableAs, CreateView, ViewLike, ViewTombstone},
+    sem::{AlterView, AnalysisError, CreateTableAs, CreateView, DropView, ViewLike, ViewTombstone},
 };
 
 /// get view definition
@@ -20,6 +20,9 @@ pub trait ViewInfoWrite
 where
     Self: Sized,
 {
+    /// Apply a validated DROP VIEW statement.
+    fn apply_drop_view(self, statement: &DropView) -> Result<Self, AnalysisError>;
+
     /// apply `alter view` statement to current schema
     fn apply_alter_view(self, alter_table: &AlterView) -> Result<Self, AnalysisError>;
 

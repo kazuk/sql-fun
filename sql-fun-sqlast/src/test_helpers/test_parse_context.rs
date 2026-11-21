@@ -19,8 +19,8 @@ use crate::{
         CatalogNameLookup, ColumnDefinition, Comment, CreateCompositeType, CreateDomain,
         CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex,
         CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger,
-        CreateView, CursorInfo, DataSource, DropTable, ExtensionMembershipChange, FromClause,
-        FunctionOverloadCollection, InsertArbiter, InsertInferenceModifiers, Kind,
+        CreateView, CursorInfo, DataSource, DropTable, DropView, ExtensionMembershipChange,
+        FromClause, FunctionOverloadCollection, InsertArbiter, InsertInferenceModifiers, Kind,
         OperatorDefinition, OverloadVariant, OwnedObjectDefinition, OwnershipIdentity,
         ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan,
         TriggerIdentity, TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport,
@@ -233,6 +233,10 @@ impl<Constraints: std::fmt::Debug> ViewInfoRead for TestContext<Constraints> {
 }
 
 impl ViewInfoWrite for TestParseContext {
+    fn apply_drop_view(self, _statement: &DropView) -> Result<Self, AnalysisError> {
+        todo!()
+    }
+
     fn apply_alter_view(self, _alter_table: &AlterView) -> Result<Self, AnalysisError> {
         todo!()
     }

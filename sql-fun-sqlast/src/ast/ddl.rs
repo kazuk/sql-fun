@@ -525,7 +525,6 @@ pub(crate) struct Function {
     replace: bool,
     #[getter(copy)]
     procedure: bool,
-    #[getter(skip)]
     body: Option<FunctionBody>,
 }
 

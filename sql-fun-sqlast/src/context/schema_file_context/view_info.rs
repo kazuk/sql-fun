@@ -1,13 +1,17 @@
+use std::sync::Arc;
+
 use crate::{
     TrieMap,
     ast::ObjectKind,
     context::{
-        ParseContext, ViewInfoRead, ViewInfoWrite,
+        ExtensionInfoRead, ParseContext, RuleInfoWrite, TriggerInfoWrite, ViewInfoRead,
+        ViewInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::FullName,
     sem::{
-        AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, Kind, ViewLike,
+        AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, DropView,
+        ExtensionMembershipChange, Kind, OwnershipIdentity, TriggerIdentity, ViewLike,
         ViewTombstone, problem::CreationProblem, search_path::expand_relation_search_path,
     },
 };
@@ -40,6 +44,14 @@ impl ViewInformationCollection {
         if !self.1.contains(key) {
             self.1.push(key.clone());
         }
+    }
+}
+
+impl SchemaCatalog {
+    pub(super) fn mask_view(&mut self, name: FullName, tombstone: ViewTombstone) {
+        // The relation and its composite row type disappear together.
+        self.renamed_types.insert(name.clone());
+        self.view_tombstones.insert(name, tombstone);
     }
 }
 
@@ -76,6 +88,48 @@ impl ViewInfoRead for SchemaCatalog {
 }
 
 impl ViewInfoWrite for SchemaFileContext {
+    fn apply_drop_view(mut self, statement: &DropView) -> Result<Self, AnalysisError> {
+        if !statement.applicable() {
+            return Ok(self);
+        }
+        let cause = Arc::new(statement.clone());
+        let mut staged = Vec::new();
+        for name in statement.removals() {
+            let Some(view) = self.get_view_impl(name).cloned() else {
+                return AnalysisError::raise_unexpected_input("DROP VIEW definition missing");
+            };
+            staged.push((name.clone(), ViewTombstone::for_view_drop(view, &cause)));
+        }
+        for (name, tombstone) in staged {
+            if let Some(rules) = tombstone.definition().rules() {
+                for rule in rules.identities() {
+                    self = self.cancel_rule(rule)?;
+                }
+            }
+            if let Some(triggers) = tombstone.definition().triggers() {
+                for trigger in triggers.names() {
+                    self = self.cancel_trigger(&TriggerIdentity::postgres(&name, trigger))?;
+                }
+            }
+            let kind = if tombstone.definition().ordinary_definition().is_some() {
+                ObjectKind::VIEW
+            } else {
+                ObjectKind::MATERIALIZED_VIEW
+            };
+            let member = OwnershipIdentity::named(kind, &name);
+            if let Some(extension) = self.extension_membership(&member) {
+                let change = ExtensionMembershipChange::removed(
+                    extension,
+                    &member,
+                    statement.source().as_ref(),
+                );
+                self.catalog.apply_extension_membership(&change);
+            }
+            self.catalog.mask_view(name, tombstone);
+        }
+        Ok(self)
+    }
+
     #[tracing::instrument(skip(self))]
     fn apply_alter_view(mut self, alter_view: &AlterView) -> Result<Self, AnalysisError>
     where
@@ -182,6 +236,171 @@ impl ViewInfoWrite for SchemaFileContext {
             self.record_named_extension_member(kind, &name);
         }
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod drop_view_tests {
+    use std::path::Path;
+
+    use crate::{
+        ast::ObjectKind,
+        context::{
+            ExtensionInfoRead, MutSourcePathWithSpan, ParseContext, TypeInfoRead, ViewInfoRead,
+        },
+        names::{FullName, SchemaName},
+        sem::{DropViewLookup, OwnershipIdentity, SemAst, SourcePathWithSpan, ViewDropCause},
+        test_helpers::{
+            ownership::{apply_ownership_sql, ownership_context},
+            schema_layer, source_span,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::restriction("DROP VIEW public.base", Some("drop_view_dependency"))]
+    #[case::missing("DROP VIEW public.base, missing CASCADE", Some("view_not_found"))]
+    #[case::wrong_kind(
+        "DROP VIEW IF EXISTS public.base, public.other CASCADE",
+        Some("drop_view_wrong_kind")
+    )]
+    #[case::cascade("DROP VIEW public.base CASCADE", None)]
+    #[case::group("DROP VIEW public.leaf, public.base, public.base", None)]
+    fn applies_the_group_atomically(
+        #[case] sql: &str,
+        #[case] diagnostic: Option<&str>,
+    ) -> testresult::TestResult {
+        let applicable = diagnostic.is_none();
+        let mut context = ownership_context();
+        for ddl in [
+            "CREATE VIEW public.base AS SELECT 1 AS n",
+            "CREATE VIEW public.leaf AS SELECT * FROM public.base",
+            "CREATE TABLE public.other (n integer)",
+        ] {
+            context = apply_ownership_sql(context, ddl)?.into_context();
+            assert!(context.problems().is_empty());
+        }
+        let parent = context.freeze();
+        let path = Path::new("drop-views.sql");
+        let mut layer = schema_layer(path, &parent);
+        layer.set_source_path_with_span(&SourcePathWithSpan::new(path, source_span().span()));
+        let result = apply_ownership_sql(layer, sql)?;
+        let SemAst::DropView(statement) = result.ast() else {
+            panic!("expected DROP VIEW");
+        };
+        assert_eq!(statement.applicable(), applicable);
+        assert_eq!(statement.source().as_ref().unwrap().source_path(), path);
+        assert!(matches!(
+            statement.targets()[0].lookup(),
+            DropViewLookup::Resolved(_)
+        ));
+        let codes: Vec<_> = result
+            .context()
+            .problems()
+            .iter()
+            .map(|problem| problem.code())
+            .collect();
+        assert_eq!(codes, diagnostic.into_iter().collect::<Vec<_>>());
+
+        let child = result.into_context().freeze();
+        for name in ["base", "leaf"] {
+            let name = FullName::with_schema("public", name);
+            assert!(parent.get_view_impl(&name).is_some());
+            assert!(parent.get_type_impl(&name).is_some());
+            assert_eq!(child.get_view_impl(&name).is_none(), applicable);
+            assert_eq!(child.get_type_impl(&name).is_none(), applicable);
+            if applicable {
+                let tombstone = child.view_tombstone(&name).unwrap();
+                let ViewDropCause::View(cause) = tombstone.cause() else {
+                    panic!("expected DROP VIEW provenance");
+                };
+                assert_eq!(cause.source().as_ref().unwrap().source_path(), path);
+            } else {
+                assert!(child.view_tombstone(&name).is_none());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn only_the_owning_extension_script_can_drop_its_member() -> testresult::TestResult {
+        let mut install = ownership_context();
+        install.enter_extension_script("extension_one", Some("public"));
+        let parent = apply_ownership_sql(install, "CREATE VIEW public.member AS SELECT 1 AS n")?
+            .into_context()
+            .freeze();
+        let name = FullName::with_schema("public", "member");
+        let identity = OwnershipIdentity::named(ObjectKind::VIEW, &name);
+        let path = Path::new("extension-update.sql");
+        let outside = apply_ownership_sql(
+            schema_layer(path, &parent),
+            "DROP VIEW public.member CASCADE",
+        )?;
+        assert!(outside.context().get_view_impl(&name).is_some());
+        assert!(!outside.context().problems().is_empty());
+
+        let mut update = schema_layer(path, &parent);
+        update.enter_extension_script("extension_one", Some("public"));
+        let dropped = apply_ownership_sql(update, "DROP VIEW public.member")?.into_context();
+        assert!(dropped.problems().is_empty());
+        assert!(dropped.get_view_impl(&name).is_none());
+        assert_eq!(dropped.extension_membership(&identity), None);
+        assert_eq!(
+            parent.extension_membership(&identity),
+            Some("extension_one")
+        );
+
+        let recreated = apply_ownership_sql(dropped, "CREATE VIEW public.member AS SELECT 2 AS n")?
+            .into_context();
+        assert!(recreated.problems().is_empty());
+        assert!(recreated.view_tombstone(&name).is_none());
+        assert_eq!(
+            recreated.extension_membership(&identity),
+            Some("extension_one")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn search_path_shadows_views_and_if_exists_accepts_missing_targets() -> testresult::TestResult {
+        let mut context = ownership_context();
+        for ddl in [
+            "CREATE SCHEMA shadow",
+            "CREATE TABLE shadow.v (n integer)",
+            "CREATE VIEW public.v AS SELECT 1 AS n",
+        ] {
+            context = apply_ownership_sql(context, ddl)?.into_context();
+            assert!(context.problems().is_empty());
+        }
+        context.set_search_path(&[SchemaName::from("shadow"), SchemaName::from("public")]);
+        let parent = context.freeze();
+        let path = Path::new("view-path.sql");
+        let rejected = apply_ownership_sql(schema_layer(path, &parent), "DROP VIEW IF EXISTS v")?;
+        let SemAst::DropView(statement) = rejected.ast() else {
+            panic!("expected DROP VIEW");
+        };
+        assert!(!statement.applicable());
+        assert!(matches!(
+            statement.targets()[0].lookup(),
+            DropViewLookup::WrongKind(name, _) if name == &FullName::with_schema("shadow", "v")
+        ));
+
+        let dropped =
+            apply_ownership_sql(schema_layer(path, &parent), "DROP VIEW public.v")?.into_context();
+        assert!(dropped.problems().is_empty());
+        let skipped = apply_ownership_sql(dropped, "DROP VIEW IF EXISTS public.v, missing")?;
+        let SemAst::DropView(statement) = skipped.ast() else {
+            panic!("expected DROP VIEW");
+        };
+        assert!(statement.applicable());
+        assert!(statement.removals().is_empty());
+        assert!(
+            statement
+                .targets()
+                .iter()
+                .all(|target| matches!(target.lookup(), DropViewLookup::Missing))
+        );
+        assert!(skipped.context().problems().is_empty());
+        Ok(())
     }
 }
 

@@ -48,12 +48,16 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 
 ## Codes
 
+- [cross_database_drop_view](cross_database_drop_view.md)
 - [deprecated](deprecated.md)
 - [duplicate_lint_target](duplicate_lint_target.md)
 - [lint_configuration](lint_configuration.md)
 - [unmet_lint_expectation](unmet_lint_expectation.md)
 - [drop_column_dependency](drop_column_dependency.md)
 - [drop_function_dependency](drop_function_dependency.md)
+- [drop_view_dependency](drop_view_dependency.md)
+- [drop_view_extension_member](drop_view_extension_member.md)
+- [drop_view_wrong_kind](drop_view_wrong_kind.md)
 - [drop_column_last_column](drop_column_last_column.md)
 - [add_column_default](add_column_default.md)
 - [add_column_nullability](add_column_nullability.md)

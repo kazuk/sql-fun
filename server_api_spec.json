@@ -3326,6 +3326,68 @@
                   "description": "`PostgreSQL` does not allow this ALTER operation on a view.",
                   "type": "string",
                   "const": "InvalidAlter"
+                },
+                {
+                  "description": "A dependent view prevents DROP VIEW.",
+                  "type": "object",
+                  "properties": {
+                    "DropDependency": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A DROP VIEW name resolves to a different kind of relation.",
+                  "type": "object",
+                  "properties": {
+                    "DropWrongKind": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "$ref": "#/$defs/Kind"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "DropWrongKind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An extension owns a view selected for deletion.",
+                  "type": "object",
+                  "properties": {
+                    "DropExtensionMember": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropExtensionMember"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "DROP VIEW referenced another database.",
+                  "type": "object",
+                  "properties": {
+                    "DropCrossDatabase": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropCrossDatabase"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },
@@ -8497,6 +8559,68 @@
                   "description": "`PostgreSQL` does not allow this ALTER operation on a view.",
                   "type": "string",
                   "const": "InvalidAlter"
+                },
+                {
+                  "description": "A dependent view prevents DROP VIEW.",
+                  "type": "object",
+                  "properties": {
+                    "DropDependency": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A DROP VIEW name resolves to a different kind of relation.",
+                  "type": "object",
+                  "properties": {
+                    "DropWrongKind": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "$ref": "#/$defs/Kind"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "DropWrongKind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An extension owns a view selected for deletion.",
+                  "type": "object",
+                  "properties": {
+                    "DropExtensionMember": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropExtensionMember"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "DROP VIEW referenced another database.",
+                  "type": "object",
+                  "properties": {
+                    "DropCrossDatabase": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropCrossDatabase"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },
@@ -13560,6 +13684,68 @@
                   "description": "`PostgreSQL` does not allow this ALTER operation on a view.",
                   "type": "string",
                   "const": "InvalidAlter"
+                },
+                {
+                  "description": "A dependent view prevents DROP VIEW.",
+                  "type": "object",
+                  "properties": {
+                    "DropDependency": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A DROP VIEW name resolves to a different kind of relation.",
+                  "type": "object",
+                  "properties": {
+                    "DropWrongKind": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "$ref": "#/$defs/Kind"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "DropWrongKind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An extension owns a view selected for deletion.",
+                  "type": "object",
+                  "properties": {
+                    "DropExtensionMember": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropExtensionMember"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "DROP VIEW referenced another database.",
+                  "type": "object",
+                  "properties": {
+                    "DropCrossDatabase": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropCrossDatabase"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },

@@ -5,9 +5,9 @@ use crate::{
     context::ParseContext,
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, CreateFunction, OverloadVariant, OwnershipIdentity,
-        OwnershipLookup, SemScalarExpr, SourcePathWithSpan, TypeReference, ViewLike,
-        ownership::RequestedIdentity, traversal::SemanticVisitor,
+        AnalysisError, AnalysisProblem, CreateFunction, DropView, OverloadVariant,
+        OwnershipIdentity, OwnershipLookup, SemScalarExpr, SourcePathWithSpan, TypeReference,
+        ViewLike, ownership::RequestedIdentity, traversal::SemanticVisitor,
     },
 };
 
@@ -75,7 +75,7 @@ impl DropFunction {
         }
         let cascade = ast.behavior() == ast::DropBehavior::Cascade;
         let dependent_views = if applicable && !targets.is_empty() {
-            dependent_views(context, &targets)?
+            dependent_views(context, &targets, &[])?
         } else {
             Vec::new()
         };
@@ -145,18 +145,34 @@ impl FunctionTombstone {
     }
 }
 
-/// A dependent view removed by a DROP FUNCTION cascade.
+/// The semantic statement responsible for removing a view.
+#[derive(Debug, Clone)]
+pub enum ViewDropCause {
+    /// A DROP FUNCTION cascade.
+    Function(Arc<DropFunction>),
+    /// A DROP VIEW statement.
+    View(Arc<DropView>),
+}
+
+/// A deleted view definition and its deletion provenance.
 #[derive(Debug, Clone)]
 pub struct ViewTombstone {
     definition: ViewLike,
-    cause: Arc<DropFunction>,
+    cause: ViewDropCause,
 }
 
 impl ViewTombstone {
-    pub(crate) fn new(definition: ViewLike, cause: &Arc<DropFunction>) -> Self {
+    pub(crate) fn for_function_drop(definition: ViewLike, cause: &Arc<DropFunction>) -> Self {
         Self {
             definition,
-            cause: Arc::clone(cause),
+            cause: ViewDropCause::Function(Arc::clone(cause)),
+        }
+    }
+
+    pub(crate) fn for_view_drop(definition: ViewLike, cause: &Arc<DropView>) -> Self {
+        Self {
+            definition,
+            cause: ViewDropCause::View(Arc::clone(cause)),
         }
     }
 
@@ -165,19 +181,23 @@ impl ViewTombstone {
         &self.definition
     }
 
-    /// The DROP FUNCTION statement responsible for removing the view.
-    pub fn cause(&self) -> &DropFunction {
+    /// The semantic DROP statement that removed the view.
+    pub const fn cause(&self) -> &ViewDropCause {
         &self.cause
     }
 }
 
-fn dependent_views(
+pub(crate) fn dependent_views(
     context: &impl ParseContext,
     targets: &[OwnershipIdentity],
+    initial_views: &[FullName],
 ) -> Result<Vec<FullName>, AnalysisError> {
     // TODO(#1185): Extend dependency traversal and removal to non-view objects.
     let names = context.relation_names();
-    let mut removed = std::collections::HashSet::new();
+    let mut removed = initial_views
+        .iter()
+        .cloned()
+        .collect::<std::collections::HashSet<_>>();
     let mut views = Vec::new();
     loop {
         let previous_count = removed.len();

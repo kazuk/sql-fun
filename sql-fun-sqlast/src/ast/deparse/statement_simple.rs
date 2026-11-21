@@ -778,7 +778,7 @@ mod test_alter_function_parallel_emit {
         let statement = parse_statements(&sql, dialect)
             .next()
             .expect("one statement")?;
-        assert_eq!(statement.kind(), StatementKind::AlterFunctionParallel);
+        assert_eq!(statement.kind(), StatementKind::alter_function_parallel());
         let rendered = statement.deparse_sql(dialect)?;
         assert_eq!(
             rendered,
@@ -787,7 +787,7 @@ mod test_alter_function_parallel_emit {
         let reparsed = parse_statements(&rendered, dialect)
             .next()
             .expect("one statement")?;
-        assert_eq!(reparsed.kind(), StatementKind::AlterFunctionParallel);
+        assert_eq!(reparsed.kind(), StatementKind::alter_function_parallel());
         assert_eq!(reparsed.deparse_sql(dialect)?, rendered);
         Ok(())
     }

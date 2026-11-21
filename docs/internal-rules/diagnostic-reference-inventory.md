@@ -36,7 +36,9 @@ reported target problems only when `target.identity().is_none()`. That analysis
 now lives in `sem/alter_owner/ddl.rs`; `OwnershipLookup::identity` in
 `sem/alter_owner.rs` returns Some only for `Resolved`. All four failure outcomes
 have production lookup branches and flow through the ownership target adapter.
-Missing role is separately produced by `Role::resolve_owner`.
+`sem/alter_function_parallel.rs` reports through the same adapter only when its
+target identity is absent. Missing role is separately produced by
+`Role::resolve_owner`.
 
 Unimplemented TODO-returning helper constructors do not yield AnalysisProblem
 codes. Existing readability audit lists these; avoid creating pages for

@@ -1,8 +1,8 @@
 use crate::{
     names::FullName,
     sem::{
-        AnalysisError, CreateFunction, DropFunction, FunctionOverloadCollection, FunctionTombstone,
-        OverloadVariant, OwnershipIdentity,
+        AlterFunctionParallel, AnalysisError, CreateFunction, DropFunction,
+        FunctionOverloadCollection, FunctionTombstone, OverloadVariant, OwnershipIdentity,
     },
 };
 
@@ -43,6 +43,19 @@ pub trait FunctionInfoWrite
 where
     Self: Sized,
 {
+    /// Apply an analyzed ALTER FUNCTION PARALLEL to this catalog.
+    fn apply_alter_function_parallel(
+        self,
+        statement: &AlterFunctionParallel,
+    ) -> Result<Self, AnalysisError> {
+        if statement.applicable() {
+            return AnalysisError::raise_unexpected_input(
+                "catalog does not support ALTER FUNCTION PARALLEL",
+            );
+        }
+        Ok(self)
+    }
+
     /// Apply an analyzed DROP FUNCTION to this catalog.
     fn apply_drop_function(self, statement: &DropFunction) -> Result<Self, AnalysisError> {
         if statement.applicable() {

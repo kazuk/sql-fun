@@ -187,7 +187,7 @@ impl ExtensionMembershipChange {
             ObjectKind::AGGREGATE
             | ObjectKind::FUNCTION
             | ObjectKind::PROCEDURE
-            | ObjectKind::ROUTINE => requested.resolve_extension_routine(context),
+            | ObjectKind::ROUTINE => requested.resolve_routine(context),
             _ => requested.resolve(context),
         })
     }

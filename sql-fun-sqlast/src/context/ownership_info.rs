@@ -1,7 +1,7 @@
 use crate::{
     ast::ObjectKind,
     names::FullName,
-    sem::{CreateFunction, CreateSchema, OwnedObjectDefinition, Role},
+    sem::{CreateFunction, CreateSchema, OwnedObjectDefinition, OwnershipIdentity, Role},
 };
 
 /// Exact-name role lookup supplied by the explicitly selected analysis environment.
@@ -36,6 +36,13 @@ pub trait OwnershipInfoRead {
     /// Retained routine DDL, one definition per exact input signature.
     fn routine_definitions(&self, _name: &FullName) -> Vec<CreateFunction> {
         Vec::new()
+    }
+
+    /// Read the effective declaration for an already bound routine identity.
+    fn exact_routine_definition(&self, identity: &OwnershipIdentity) -> Option<CreateFunction> {
+        self.routine_definitions(identity.name())
+            .into_iter()
+            .find(|definition| definition.ownership_identity(identity.name()) == *identity)
     }
 
     /// Existing definitions of the requested class at this exact name.

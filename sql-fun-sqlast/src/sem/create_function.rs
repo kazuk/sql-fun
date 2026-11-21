@@ -4,9 +4,9 @@ use crate::{
     ast::ObjectKind,
     names::{FullName, TableName},
     sem::{
-        ColumnCollection, FunctionOverloadCollection, ObjectPrivilegeDeclaration, OverloadVariant,
-        OwnerSpecification, OwnershipIdentity, ParseContext, SourcePathWithSpan,
-        type_system::ArgumentBindingCollection,
+        AlterFunctionParallel, ColumnCollection, FunctionOverloadCollection,
+        ObjectPrivilegeDeclaration, OverloadVariant, OwnerSpecification, OwnershipIdentity,
+        ParallelSafety, ParseContext, SourcePathWithSpan, type_system::ArgumentBindingCollection,
     },
 };
 
@@ -14,6 +14,8 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
     replace: bool,
+    parallel_safety: Option<ParallelSafety>,
+    parallel_changes: Vec<AlterFunctionParallel>,
     source: Option<SourcePathWithSpan>,
 
     owner: Option<OwnerSpecification>,
@@ -59,6 +61,21 @@ impl CreateFunction {
             || self.returning_columdef != previous.returning_columdef
     }
 
+    /// Parallel safety recorded for this definition, if available.
+    pub const fn parallel_safety(&self) -> Option<ParallelSafety> {
+        self.parallel_safety
+    }
+
+    /// Applied ALTER FUNCTION PARALLEL statements in source order.
+    pub fn parallel_changes(&self) -> &[AlterFunctionParallel] {
+        &self.parallel_changes
+    }
+
+    pub(crate) fn change_parallel_safety(&mut self, statement: &AlterFunctionParallel) {
+        self.parallel_safety = Some(statement.mode());
+        self.parallel_changes.push(statement.clone());
+    }
+
     /// Source of the declaration, when the catalog supplies one.
     pub const fn source(&self) -> Option<&SourcePathWithSpan> {
         self.source.as_ref()
@@ -90,6 +107,8 @@ impl CreateFunction {
     ) -> Self {
         Self {
             replace: false,
+            parallel_safety: None,
+            parallel_changes: Vec::new(),
             source: None,
             builtin_properties: None,
             owner: None,

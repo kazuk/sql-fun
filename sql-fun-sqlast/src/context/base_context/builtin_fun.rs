@@ -2,6 +2,7 @@ mod parse_util;
 
 use self::parse_util::{deserialize_braced_list, deserialize_braced_list_opt};
 use crate::{
+    context::base_context::aggregate_info::builtin_aggregate,
     names::{ColumnName, FullName},
     sem::{
         AnalysisError, ColumnCollection, ColumnDefinition, CompositeFieldCollection,
@@ -229,11 +230,19 @@ impl PgBuiltInFunctions {
     pub(super) fn returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         self.property(name, overload, PgFunctionProto::returns_set)
     }
+    pub(super) fn is_aggregate(&self, name: &FullName, overload: &OverloadVariant) -> bool {
+        self.property(name, overload, |definition| {
+            definition
+                .kind
+                .as_deref()
+                .map_or_else(|| builtin_aggregate(name), |kind| kind == "a")
+        })
+    }
     fn property(
         &self,
         name: &FullName,
         overload: &OverloadVariant,
-        property: fn(&PgFunctionProto) -> bool,
+        property: impl Fn(&PgFunctionProto) -> bool,
     ) -> bool {
         let definitions = self
             .function_by_name

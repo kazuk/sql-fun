@@ -711,8 +711,11 @@ impl ParseContext for TestParseContext {
         self.ownership.insert_role(role);
     }
     fn apply_extension_membership(&mut self, change: &ExtensionMembershipChange) {
+        let Some(member) = change.member().filter(|_| change.applicable()) else {
+            return;
+        };
         self.extension_memberships
-            .entry(change.member().clone())
+            .entry(member.clone())
             .or_default()
             .push(change.clone());
     }

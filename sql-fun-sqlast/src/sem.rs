@@ -42,7 +42,7 @@ mod delete_statement;
 mod deprecated_lint;
 pub(crate) mod drop_function;
 mod extension_membership;
-pub use extension_membership::ExtensionMembershipChange;
+pub use extension_membership::{ExtensionMembershipChange, ExtensionMembershipRejection};
 
 pub use drop_function::{DropFunction, FunctionTombstone, ViewTombstone};
 mod drop_rule_ast;
@@ -348,7 +348,7 @@ pub enum SemAst {
     /// A resolved object privilege declaration.
     ObjectPrivileges(ObjectPrivilegeChange),
 
-    /// A validated extension membership declaration.
+    /// An analyzed extension membership declaration.
     ExtensionMembership(Box<ExtensionMembershipChange>),
 
     /// A resolved role membership declaration.

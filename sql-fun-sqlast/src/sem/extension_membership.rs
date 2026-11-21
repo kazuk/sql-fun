@@ -10,11 +10,27 @@ use crate::{
 };
 use ::sql_fun_core::analysis_problem::QueryAnalysisStage;
 
-/// A validated membership change and its declaration site.
+/// Why a membership declaration did not apply.
+#[derive(Clone, Debug)]
+pub enum ExtensionMembershipRejection {
+    /// The named extension is absent.
+    MissingExtension,
+    /// The requested object could not be resolved.
+    MemberLookup,
+    /// The object already belongs to this extension or another extension.
+    AlreadyMember(String),
+    /// The object does not belong to the extension named by DROP.
+    NotMember,
+    /// The extension's own schema cannot be added.
+    ExtensionSchema,
+}
+
+/// Analyzed membership declaration and its application outcome.
 #[derive(Clone, Debug)]
 pub struct ExtensionMembershipChange {
     extension: String,
-    member: OwnershipIdentity,
+    lookup: OwnershipLookup,
+    rejection: Option<ExtensionMembershipRejection>,
     add: bool,
     source: Option<SourcePathWithSpan>,
 }
@@ -26,8 +42,23 @@ impl ExtensionMembershipChange {
     }
 
     /// Exact identity of the existing object.
-    pub const fn member(&self) -> &OwnershipIdentity {
-        &self.member
+    pub const fn member(&self) -> Option<&OwnershipIdentity> {
+        self.lookup.identity()
+    }
+
+    /// Completed member lookup, including lookup failures.
+    pub const fn lookup(&self) -> &OwnershipLookup {
+        &self.lookup
+    }
+
+    /// Reason the declaration was rejected, if any.
+    pub const fn rejection(&self) -> Option<&ExtensionMembershipRejection> {
+        self.rejection.as_ref()
+    }
+
+    /// Whether the declaration can change the catalog.
+    pub const fn applicable(&self) -> bool {
+        self.rejection.is_none()
     }
 
     /// Whether this operation establishes membership.
@@ -43,45 +74,69 @@ impl ExtensionMembershipChange {
     pub(crate) fn analyze(
         ast: &AstMembership,
         context: &mut impl ParseContext,
-    ) -> Result<Option<Self>, AnalysisError> {
-        let extension = ast.extension();
-        if !context.extension_exists(extension) {
-            return Self::reject(context, &format!("extension {extension:?} does not exist"));
+    ) -> Result<Self, AnalysisError> {
+        let mut change = Self {
+            extension: ast.extension().to_owned(),
+            lookup: Self::resolve(ast, context)?,
+            rejection: None,
+            add: ast.is_add(),
+            source: context.get_source_path_with_span().cloned(),
+        };
+        change.rejection = change.validate(context);
+        if let Some(problem) = change.problem() {
+            context.report_analysis_problem(problem)?;
         }
-        let lookup = Self::resolve(ast, context)?;
-        let Some(member) = lookup.identity() else {
-            context.report_analysis_problem(AnalysisProblem::ownership_target(&lookup))?;
-            return Ok(None);
+        Ok(change)
+    }
+
+    fn validate(&self, context: &impl ParseContext) -> Option<ExtensionMembershipRejection> {
+        use ExtensionMembershipRejection as Rejection;
+        if !context.extension_exists(&self.extension) {
+            return Some(Rejection::MissingExtension);
+        }
+        let Some(member) = self.member() else {
+            return Some(Rejection::MemberLookup);
         };
         let current = context.extension_membership(member);
-        let add = ast.is_add();
-        if add {
+        if self.add {
             if let Some(existing) = current {
-                return Self::reject(
-                    context,
-                    &format!("{member} is already a member of extension {existing:?}"),
-                );
+                return Some(Rejection::AlreadyMember(existing.to_owned()));
             }
             if member.kind() == ObjectKind::SCHEMA
-                && context.extension_schema(extension) == Some(member.name().name().as_str())
+                && context.extension_schema(&self.extension) == Some(member.name().name().as_str())
             {
-                return Self::reject(
-                    context,
-                    &format!("cannot add the extension's own schema to extension {extension:?}"),
-                );
+                return Some(Rejection::ExtensionSchema);
             }
-        } else if current != Some(extension) {
-            return Self::reject(
-                context,
-                &format!("{member} is not a member of extension {extension:?}"),
-            );
+        } else if current != Some(self.extension.as_str()) {
+            return Some(Rejection::NotMember);
         }
-        Ok(Some(Self {
-            extension: extension.to_owned(),
-            member: member.clone(),
-            add,
-            source: context.get_source_path_with_span().cloned(),
-        }))
+        None
+    }
+
+    fn problem(&self) -> Option<AnalysisProblem> {
+        use ExtensionMembershipRejection as Rejection;
+        let extension = &self.extension;
+        let message = match self.rejection.as_ref()? {
+            Rejection::MissingExtension => format!("extension {extension:?} does not exist"),
+            Rejection::MemberLookup => {
+                return Some(AnalysisProblem::ownership_target(&self.lookup));
+            }
+            Rejection::AlreadyMember(existing) => {
+                let member = self.member().expect("validated member identity");
+                format!("{member} is already a member of extension {existing:?}")
+            }
+            Rejection::NotMember => {
+                let member = self.member().expect("validated member identity");
+                format!("{member} is not a member of extension {extension:?}")
+            }
+            Rejection::ExtensionSchema => {
+                format!("cannot add the extension's own schema to extension {extension:?}")
+            }
+        };
+        Some(AnalysisProblem::query_analysis(
+            QueryAnalysisStage::Analysis,
+            &message,
+        ))
     }
 
     fn resolve(
@@ -229,17 +284,6 @@ impl ExtensionMembershipChange {
         })
     }
 
-    fn reject(
-        context: &mut impl ParseContext,
-        message: &str,
-    ) -> Result<Option<Self>, AnalysisError> {
-        context.report_analysis_problem(AnalysisProblem::query_analysis(
-            QueryAnalysisStage::Analysis,
-            message,
-        ))?;
-        Ok(None)
-    }
-
     pub(crate) fn created(
         extension: &str,
         member: &OwnershipIdentity,
@@ -247,7 +291,8 @@ impl ExtensionMembershipChange {
     ) -> Self {
         Self {
             extension: extension.to_owned(),
-            member: member.clone(),
+            lookup: OwnershipLookup::resolved(member),
+            rejection: None,
             add: true,
             source: source.cloned(),
         }
@@ -291,9 +336,18 @@ mod test_membership_validation {
         let SemAst::ExtensionMembership(change) = added.ast() else {
             panic!("membership ADD must succeed");
         };
-        let member = change.member().clone();
+        let member = change.member().unwrap().clone();
         let rejected = apply_ownership_sql(added.into_context(), statement)?;
-        assert!(matches!(rejected.ast(), SemAst::UnresolvedStatement));
+        let SemAst::ExtensionMembership(change) = rejected.ast() else {
+            panic!("rejected membership must retain its analysis");
+        };
+        assert!(!change.applicable());
+        assert!(change.rejection().is_some());
+        if diagnostic == "query_analysis" {
+            assert_eq!(change.member(), Some(&member));
+        } else {
+            assert_eq!(change.lookup().code(), diagnostic);
+        }
         assert_eq!(rejected.context().problems().len(), 1);
         assert_eq!(rejected.context().problems()[0].code(), diagnostic);
         assert_eq!(

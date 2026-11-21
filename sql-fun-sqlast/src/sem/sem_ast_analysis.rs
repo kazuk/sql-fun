@@ -34,11 +34,9 @@ impl SemAst {
             AstStatementNode::ExtensionMembership(ast) if ast.targets_transform() => {
                 todo!("ALTER EXTENSION transform lookup and application (#1187)")
             }
-            AstStatementNode::ExtensionMembership(ast) => {
-                Ok(ExtensionMembershipChange::analyze(ast, context)?
-                    .map(|change| Self::ExtensionMembership(Box::new(change)))
-                    .unwrap_or_else(Self::unresolved_statement))
-            }
+            AstStatementNode::ExtensionMembership(ast) => Ok(Self::ExtensionMembership(Box::new(
+                ExtensionMembershipChange::analyze(ast, context)?,
+            ))),
             AstStatementNode::AlterFunctionParallel(_) => {
                 todo!("ALTER FUNCTION PARALLEL interpretation (#1172)")
             }
@@ -157,7 +155,9 @@ impl SemAst {
         match ast {
             AstStatementNode::ExtensionMembership(_) => {
                 let statement = Self::from_ast_node(ast, &mut context, cache)?;
-                if let Self::ExtensionMembership(change) = &statement {
+                if let Self::ExtensionMembership(change) = &statement
+                    && change.applicable()
+                {
                     context.apply_extension_membership(change);
                 }
                 Ok(AstAndContextPair::new(statement, context))

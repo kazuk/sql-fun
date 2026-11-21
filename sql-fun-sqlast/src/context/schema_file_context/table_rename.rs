@@ -1,7 +1,7 @@
 //! Stage dependent metadata before committing one catalog identity transition.
 
 use crate::{
-    ast::Dialect,
+    ast::{Dialect, ObjectKind},
     context::{
         FunctionInfoRead, IndexInfoRead, ObjectInfoRead, OwnershipInfoRead, ParseContext,
         SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
@@ -36,6 +36,10 @@ impl SchemaFileContext {
         self.catalog.renamed_relations.insert(key.clone());
         self.catalog.renamed_tables.insert(key.clone());
         if self.dialect() == Dialect::postgres() {
+            for kind in [ObjectKind::TABLE, ObjectKind::TYPE] {
+                self.catalog
+                    .rename_extension_member(kind, &key, destination.full_name());
+            }
             self.catalog.renamed_types.insert(key);
             self.catalog.types.insert_table_ref(destination);
         }

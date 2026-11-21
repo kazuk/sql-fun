@@ -217,7 +217,7 @@ SOURCE_WITNESS = {
         "ownership_target": 1
     },
     "sql-fun-sqlast/src/sem/extension_membership.rs": {
-        "OwnershipLookup": 19,
+        "OwnershipLookup": 22,
         "ownership_target": 1
     },
     "sql-fun-sqlast/src/sem/ownership/ddl.rs": {

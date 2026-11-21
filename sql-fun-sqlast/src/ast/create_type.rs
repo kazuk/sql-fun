@@ -18,13 +18,27 @@ pub(crate) struct CreateType {
 }
 
 #[derive(Clone, Debug)]
-struct BaseTypeOption {
+pub(crate) struct BaseTypeOption {
     syntax: SyntaxOption,
     // Token span relative to the statement being converted.
     location: Option<StringSpan>,
 }
 
+impl BaseTypeOption {
+    pub(crate) const fn syntax(&self) -> &SyntaxOption {
+        &self.syntax
+    }
+}
+
 impl CreateType {
+    pub(crate) const fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn definition(&self) -> Option<&[BaseTypeOption]> {
+        self.definition.as_deref()
+    }
+
     pub(super) const fn kind(&self) -> StatementKind {
         if self.definition.is_some() {
             StatementKind::BaseType

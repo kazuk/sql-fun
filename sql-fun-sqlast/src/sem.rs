@@ -21,6 +21,7 @@ mod common_type;
 pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
 mod constraint;
+mod create_base_type;
 mod create_comp_type;
 mod create_domain;
 mod create_enum_type;
@@ -377,6 +378,9 @@ pub enum SemAst {
 
     /// `create type` (enum type variant) statement
     CreateEnum(CreateEnum),
+
+    /// PostgreSQL shell or completed base type declaration.
+    CreateBaseType(TypeDefinition),
 
     /// `create function` / `create procedure` statement
     CreateFunction(CreateFunction),

@@ -535,9 +535,16 @@ impl FunctionParam {
     ) -> Result<Self, AnalysisError> {
         let name = Some(ast.name().clone());
         let type_name = FullName::from_ast_name(ast.type_name().name())?;
-        let param_type = context.resolve_type_name(&type_name).map(|name| {
-            TypeReference::concrete_type_ref(&name, !ast.type_name().array_bounds().is_empty())
-        });
+        let array = !ast.type_name().array_bounds().is_empty();
+        let param_type = if array {
+            context
+                .resolve_type_name(&type_name)
+                .map(|name| TypeReference::concrete_type_ref(&name, true))
+        } else {
+            context
+                .get_declared_type(&type_name)
+                .and_then(|definition| definition.type_reference().cloned())
+        };
         let default = ast
             .default()
             .as_ref()

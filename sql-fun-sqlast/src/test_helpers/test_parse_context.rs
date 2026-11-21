@@ -591,6 +591,10 @@ impl TypeInfoWrite for TestParseContext {
         todo!()
     }
 
+    fn insert_shell_or_base_type(&mut self, _name: &FullName, _definition: &TypeDefinition) {
+        todo!()
+    }
+
     fn insert_create_enum(&mut self, _name: &FullName, _create_enum_type: &CreateEnum) {
         todo!()
     }

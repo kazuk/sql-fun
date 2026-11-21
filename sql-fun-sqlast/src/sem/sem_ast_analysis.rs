@@ -45,9 +45,7 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
-            AstStatementNode::CreateType(_) => {
-                todo!("CREATE TYPE shell/base semantic interpretation (#1206)")
-            }
+            AstStatementNode::CreateType(ast) => super::create_base_type::analyze(ast, context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
             }
@@ -157,6 +155,7 @@ impl SemAst {
             ));
         }
         match ast {
+            AstStatementNode::CreateType(ast) => super::create_base_type::apply(ast, context),
             AstStatementNode::ExtensionMembership(_) => {
                 let statement = Self::from_ast_node(ast, &mut context, cache)?;
                 if let Self::ExtensionMembership(change) = &statement

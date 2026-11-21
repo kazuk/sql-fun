@@ -104,7 +104,7 @@ impl CreateFunction {
         for param in ast.parameters() {
             params.push(FunctionParam::from_ast(param, context)?);
         }
-        let ret_type = if let Some(ty) = context.get_type(&ret_name) {
+        let ret_type = if let Some(ty) = context.get_declared_type(&ret_name) {
             ty.type_reference().cloned()
         } else {
             None

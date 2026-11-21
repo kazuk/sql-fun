@@ -90,6 +90,11 @@ impl TypeInfoWrite for SchemaFileContext {
         self.record_named_extension_member(ObjectKind::DOMAIN, name);
     }
 
+    fn insert_shell_or_base_type(&mut self, name: &FullName, definition: &TypeDefinition) {
+        self.catalog.renamed_types.remove(name);
+        self.catalog.types.replace_definition(name, definition);
+    }
+
     fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
         self.catalog.renamed_types.remove(name);
         self.catalog.types.insert_create_enum(name, create_enum);
@@ -108,7 +113,7 @@ impl TypeDefinitionCollection {
     pub(super) fn cast_source_types(&self) -> Vec<TypeReference> {
         let mut sources = Vec::new();
         for (_, definition) in self.0.iter() {
-            if let Some(name) = definition.full_name() {
+            if let Some(name) = definition.full_name().filter(|_| !definition.is_shell()) {
                 sources.push(TypeReference::concrete_type_ref(name, false));
                 sources.push(TypeReference::concrete_type_ref(name, true));
             }

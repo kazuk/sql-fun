@@ -35,7 +35,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 174 groups are split 10/82/82.
+in the committed file. The current 180 groups are split 10/85/85.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -102,8 +102,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1621 inputs for PostgreSQL 17 and 1601 for
-PostgreSQL 18 (3222 total). These count positive contract inputs separately from
+manifest totals are 1643 inputs for PostgreSQL 17 and 1639 for
+PostgreSQL 18 (3282 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -291,6 +291,12 @@ The six cases per version check new names, fixed PostgreSQL view outputs,
 repeated renames, old-name reuse, quoted names and explicit aliases. Rust
 schema-chain tests retain analyzed applicability, bindings, failure atomicity,
 source history, layer isolation, FK identities and SQLite oracle comparisons.
+
+The `privilege-statements` fixture selects its extension through datasource
+metadata and uses the fixture-owned `.extensions` directory for the script.
+It checks target and sibling builtin overloads, builtin type lookup, and
+privilege diagnostics after extension initialization on PostgreSQL 17/18.
+Declaration history and layer isolation are covered by Rust tests.
 
 ## Parallel CI execution
 

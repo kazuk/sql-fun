@@ -5,7 +5,8 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AnalysisError, CatalogNameLookup, ColumnCollection, ColumnDefinition, DeclarationCollation,
-        Nullable, OwnerSpecification, TypeReference, WithTypmod, traversal::SemanticVisitor,
+        Nullable, ObjectPrivilegeDeclaration, OwnerSpecification, TypeReference, WithTypmod,
+        traversal::SemanticVisitor,
     },
 };
 use std::convert::Infallible;
@@ -62,9 +63,21 @@ pub struct CreateCompositeType {
     owner: Option<OwnerSpecification>,
     type_ref: Option<TypeReference>,
     fields: CompositeFieldCollection,
+    #[serde(skip)]
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateCompositeType {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn visit_references<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
@@ -96,6 +109,7 @@ impl CreateCompositeType {
     pub(crate) fn new(name: &FullName, fields: &CompositeFieldCollection) -> Self {
         Self {
             owner: None,
+            privilege_declarations: Vec::new(),
             type_ref: Some(TypeReference::from_full_name(name.clone())),
             fields: fields.clone(),
         }
@@ -138,6 +152,7 @@ impl CreateCompositeType {
     pub fn from_fields(fields: &CompositeFieldCollection) -> Self {
         Self {
             owner: None,
+            privilege_declarations: Vec::new(),
             type_ref: None,
             fields: fields.clone(),
         }

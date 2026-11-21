@@ -11,8 +11,8 @@ use crate::{
         AlterTable, AnalysisError, AnalysisProblem, CheckConstraint, ColumnAttributeAction,
         ColumnConstraint, ColumnDrop, ColumnRename, Constraint, ConstraintNames, CreateIndex,
         CreateSequence, ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
-        OwnerSpecification, RuleIdentity, RuleReferences, SemScalarExpr, SourcePathWithSpan,
-        TriggerReferences, TypeReference,
+        ObjectPrivilegeDeclaration, OwnerSpecification, RuleIdentity, RuleReferences,
+        SemScalarExpr, SourcePathWithSpan, TriggerReferences, TypeReference,
         alter_table::AlterObjSubCommand,
         problem::CreationProblem,
         traversal::{RelationRenamer, SemanticVisitor, SemanticVisitorMut},
@@ -376,6 +376,8 @@ pub struct CreateTable {
     mode: CreateTableMode,
     temporary: bool,
     source: SourcePathWithSpan,
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
+    row_type_privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 #[cfg(test)]
@@ -415,6 +417,27 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    /// Privilege declarations on the type generated for this table's rows.
+    #[must_use]
+    pub fn row_type_privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.row_type_privilege_declarations
+    }
+
+    pub(crate) fn append_row_type_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.row_type_privilege_declarations
+            .push(declaration.clone());
+    }
+
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn visit_references<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
@@ -639,6 +662,8 @@ impl CreateTable {
             alter_statements: Default::default(),
             drop_statements: Default::default(),
             owner: Default::default(),
+            privilege_declarations: Vec::new(),
+            row_type_privilege_declarations: Vec::new(),
             cluster_on: Default::default(),
             row_security_enabled: false,
             row_security_forced: false,

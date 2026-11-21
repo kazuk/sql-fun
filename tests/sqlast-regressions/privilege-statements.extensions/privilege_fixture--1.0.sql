@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION pg_catalog.abs(integer) FROM PUBLIC;
+GRANT USAGE ON TYPE pg_catalog.int8 TO PUBLIC;

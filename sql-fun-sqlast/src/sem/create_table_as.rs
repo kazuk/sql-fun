@@ -4,8 +4,8 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AlterView, AnalysisError, AnalysisProblem, AstAndContextPair, ColumnRename, CreateTable,
-        Kind, OwnerSpecification, ParseContext, ResultColumnCollection, SelectStatement, SemAst,
-        SourcePathWithSpan,
+        Kind, ObjectPrivilegeDeclaration, OwnerSpecification, ParseContext, ResultColumnCollection,
+        SelectStatement, SemAst, SourcePathWithSpan,
         alter_table::AlterObjSubCommand,
         create_table::ColumnDefinition,
         problem::CreationProblem,
@@ -23,9 +23,20 @@ pub struct CreateTableAs {
     obj_type: Kind,
     owner: Option<OwnerSpecification>,
     alter_statements: Vec<AlterView>,
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateTableAs {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn set_operations_valid(&self) -> Result<bool, AnalysisError> {
         self.query
             .select_statement()
@@ -94,6 +105,7 @@ impl CreateTableAs {
                 Kind::Table
             },
             owner: None,
+            privilege_declarations: Vec::new(),
             alter_statements: Vec::new(),
         }
     }

@@ -1,7 +1,10 @@
 //! Analysis owned by the semantic definitions in this module.
 
 use crate::{
-    ast::{ObjectKind, Role as AstRole, TypeName as AstTypeName},
+    ast::{
+        Name as AstName, ObjectKind, ObjectTarget as AstObjectTarget, Role as AstRole,
+        TypeName as AstTypeName,
+    },
     context::ParseContext,
     names::{FullName, SchemaName},
     sem::{
@@ -399,5 +402,77 @@ impl OwnershipIdentity {
             }
         }
         false
+    }
+}
+
+pub(crate) struct RequestedIdentity {
+    identity: OwnershipIdentity,
+    missing_types: Vec<FullName>,
+}
+
+impl RequestedIdentity {
+    pub(crate) fn new(identity: &OwnershipIdentity, missing_types: &[FullName]) -> Self {
+        Self {
+            identity: identity.clone(),
+            missing_types: missing_types.to_vec(),
+        }
+    }
+
+    pub(crate) fn resolve(&self, context: &impl ParseContext) -> OwnershipLookup {
+        if self.missing_types.is_empty() {
+            self.identity.resolve(context)
+        } else {
+            OwnershipLookup::argument_type_not_found(&self.identity, &self.missing_types)
+        }
+    }
+
+    pub(crate) fn from_ast_object_target(
+        ast: &AstObjectTarget,
+        kind: ObjectKind,
+        context: &mut impl ParseContext,
+    ) -> Result<Self, AnalysisError> {
+        let (name, access_method) = if matches!(
+            kind,
+            ObjectKind::OPERATOR_CLASS | ObjectKind::OPERATOR_FAMILY
+        ) {
+            let Some((method, name)) = ast.name().split_first() else {
+                return AnalysisError::raise_unexpected_input("operator class/family identity");
+            };
+            (
+                FullName::from_ast_name(&AstName::from_parts(name))?,
+                Some(method.as_str()),
+            )
+        } else if let Some(type_name) = &ast.type_name() {
+            (FullName::from_ast_name(type_name.name())?, None)
+        } else {
+            (
+                FullName::from_ast_name(&AstName::from_parts(ast.name()))?,
+                None,
+            )
+        };
+        let mut missing = Vec::new();
+        let identity = if let Some(method) = access_method {
+            OwnershipIdentity::with_access_method(kind, &name, method)
+        } else if let Some(arguments) = &ast.argument_types() {
+            let mut types = Vec::new();
+            for argument in arguments {
+                if argument.is_output_only() {
+                    continue;
+                }
+                if let Some(ty) = &argument.type_name() {
+                    let reference = OwnershipIdentity::argument_type_from_ast(ty, context)?;
+                    if reference.is_none() {
+                        missing.push(FullName::from_ast_name(ty.name())?);
+                    }
+                    types.push(reference);
+                } else {
+                    types.push(None);
+                }
+            }
+            OwnershipIdentity::with_arguments(kind, &name, &types)
+        } else {
+            OwnershipIdentity::named(kind, &name)
+        };
+        Ok(Self::new(&identity, &missing))
     }
 }

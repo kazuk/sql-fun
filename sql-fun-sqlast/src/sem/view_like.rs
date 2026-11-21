@@ -14,7 +14,7 @@ pub enum ViewLike {
     /// normal view
     View(Box<CreateView>),
     /// materialized view
-    MaterializedView(CreateTableAs),
+    MaterializedView(Box<CreateTableAs>),
 }
 
 impl ViewLike {
@@ -191,6 +191,6 @@ impl From<&CreateView> for ViewLike {
 
 impl From<&CreateTableAs> for ViewLike {
     fn from(value: &CreateTableAs) -> Self {
-        Self::MaterializedView(value.clone())
+        Self::MaterializedView(Box::new(value.clone()))
     }
 }

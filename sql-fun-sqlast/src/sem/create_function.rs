@@ -4,8 +4,9 @@ use crate::{
     ast::ObjectKind,
     names::{FullName, TableName},
     sem::{
-        ColumnCollection, FunctionOverloadCollection, OverloadVariant, OwnerSpecification,
-        OwnershipIdentity, ParseContext, type_system::ArgumentBindingCollection,
+        ColumnCollection, FunctionOverloadCollection, ObjectPrivilegeDeclaration, OverloadVariant,
+        OwnerSpecification, OwnershipIdentity, ParseContext,
+        type_system::ArgumentBindingCollection,
     },
 };
 
@@ -19,9 +20,21 @@ pub struct CreateFunction {
     name: FullName,
     overloads: FunctionOverloadCollection,
     returning_columdef: Option<ColumnCollection>,
+    builtin_properties: Option<(bool, bool)>,
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateFunction {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn visit_references<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
@@ -71,7 +84,9 @@ impl CreateFunction {
     ) -> Self {
         Self {
             replace: false,
+            builtin_properties: None,
             owner: None,
+            privilege_declarations: Vec::new(),
             object_kind: ObjectKind::from(20),
             name: name.clone(),
             overloads: overloads.clone(),
@@ -168,6 +183,19 @@ impl CreateFunction {
     pub const fn object_kind(&self) -> ObjectKind {
         self.object_kind
     }
+    pub(crate) const fn set_builtin_properties(&mut self, aggregate: bool, returns_set: bool) {
+        self.builtin_properties = Some((aggregate, returns_set));
+    }
+
+    pub(crate) const fn catalog_aggregate(&self) -> bool {
+        matches!(self.builtin_properties, Some((true, _)))
+    }
+
+    pub(crate) fn catalog_returns_set(&self) -> bool {
+        self.builtin_properties
+            .map_or_else(|| self.is_table_function(), |(_, returns_set)| returns_set)
+    }
+
     pub(crate) fn split_definitions(&self) -> Vec<Self> {
         let mut definitions = Vec::new();
         for overload in &self.overloads {

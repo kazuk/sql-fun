@@ -21,6 +21,10 @@ impl From<&::sql_fun_core::SqlFunMetadata> for ConfiguredRoles {
     }
 }
 impl ConfiguredRoles {
+    pub(crate) fn insert(&mut self, role: Role) {
+        self.0.insert(role.name().to_owned(), role);
+    }
+
     pub(crate) fn role(&self, name: &str) -> Option<&Role> {
         self.0.get(name)
     }

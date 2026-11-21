@@ -164,6 +164,10 @@ macro_rules! forward_catalog_reads {
                     name,
                 )
             }
+            fn routine_names(&self) -> Vec<crate::names::FullName> {
+                self.$catalog().routine_names()
+            }
+
             fn routine_definitions(
                 &self,
                 name: &crate::names::FullName,
@@ -352,6 +356,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::SequenceInfoRead for $context {
+            fn sequence_names(&self) -> Vec<crate::names::FullName> {
+                self.$catalog().sequence_names()
+            }
+
             fn sequences_owned_by(
                 &self,
                 table: &crate::names::TableName,

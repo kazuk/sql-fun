@@ -2,8 +2,8 @@ use crate::{
     CacheContext,
     ast::Schema,
     sem::{
-        AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst,
-        traversal::SemanticVisitor,
+        AnalysisError, AstAndContextPair, ObjectPrivilegeDeclaration, OwnerSpecification,
+        ParseContext, SemAst, traversal::SemanticVisitor,
     },
 };
 
@@ -15,9 +15,20 @@ pub struct CreateSchema {
     owner: Option<OwnerSpecification>,
     name: String,
     elements: Vec<SemAst>,
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateSchema {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn visit_references<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
@@ -49,6 +60,7 @@ impl CreateSchema {
         Self {
             if_not_exists: false,
             owner: None,
+            privilege_declarations: Vec::new(),
             name: name.to_owned(),
             elements: elements.to_vec(),
         }

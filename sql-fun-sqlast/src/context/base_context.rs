@@ -595,11 +595,30 @@ impl crate::context::RoleInfoRead for BaseContext {
     }
 }
 impl crate::context::OwnershipInfoRead for BaseContext {
+    fn routine_names(&self) -> Vec<FullName> {
+        self.functions.routine_names()
+    }
+
     fn routine_definitions(&self, name: &FullName) -> Vec<CreateFunction> {
-        self.get_function_impl(name)
-            .map_or_else(Vec::new, |overloads| {
-                CreateFunction::new(name, &overloads, &None).split_definitions()
-            })
+        if name
+            .schema()
+            .is_some_and(|schema| schema.canonical().as_str() != "pg_catalog")
+        {
+            return Vec::new();
+        }
+        let Some(function) = self.functions.find_function_by_name(name) else {
+            return Vec::new();
+        };
+        let mut definitions = function.split_definitions();
+        for definition in &mut definitions {
+            if let Some(overload) = definition.overloads().get_at(0) {
+                definition.set_builtin_properties(
+                    builtin_aggregate(name),
+                    self.functions.returns_set(name, overload),
+                );
+            }
+        }
+        definitions
     }
     fn ownership_definitions(
         &self,

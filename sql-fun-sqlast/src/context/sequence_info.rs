@@ -5,6 +5,11 @@ use crate::{
 
 /// get sequence definition
 pub trait SequenceInfoRead {
+    /// Exact names of sequences in the selected catalog.
+    fn sequence_names(&self) -> Vec<FullName> {
+        Vec::new()
+    }
+
     /// Existing sequences dependent on this exact owning table.
     fn sequences_owned_by(&self, _table: &TableName) -> Vec<CreateSequence> {
         Vec::new()

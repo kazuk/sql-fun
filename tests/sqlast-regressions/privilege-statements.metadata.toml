@@ -1,0 +1,2 @@
+roles = ["reader", "member"]
+extensions = [{ name = "privilege_fixture" }]

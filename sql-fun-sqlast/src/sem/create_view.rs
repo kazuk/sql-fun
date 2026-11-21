@@ -2,9 +2,9 @@ mod ddl;
 use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
-        AlterView, AnalysisError, ColumnRename, OwnerSpecification, ParseContext,
-        ResultColumnCollection, RuleIdentity, RuleReferences, SelectStatement, SemScalarExpr,
-        TriggerReferences, ViewCheckOption, ViewColumnLineage, ViewOption,
+        AlterView, AnalysisError, ColumnRename, ObjectPrivilegeDeclaration, OwnerSpecification,
+        ParseContext, ResultColumnCollection, RuleIdentity, RuleReferences, SelectStatement,
+        SemScalarExpr, TriggerReferences, ViewCheckOption, ViewColumnLineage, ViewOption,
         create_table::ColumnDefinition,
         problem::ViewProblem,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
@@ -29,9 +29,20 @@ pub struct CreateView {
     alter_statements: Vec<AlterView>,
     owner: Option<OwnerSpecification>,
     materialized: bool,
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateView {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         self.rename_column_with(rename, &mut ColumnRenamer::new(rename))
     }
@@ -212,6 +223,7 @@ impl CreateView {
             check_option: ViewCheckOption::none(),
             alter_statements: alter_statements.to_owned(),
             owner: owner.as_deref().map(OwnerSpecification::named),
+            privilege_declarations: Vec::new(),
             materialized,
         }
     }

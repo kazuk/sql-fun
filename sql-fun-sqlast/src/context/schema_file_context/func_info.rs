@@ -15,7 +15,7 @@ use crate::{
 pub struct FunctionDefinitionCollection(TrieMap<Vec<CreateFunction>>, Vec<FullName>);
 
 impl FunctionDefinitionCollection {
-    fn append_names(&self, names: &mut Vec<FullName>) {
+    pub(super) fn append_names(&self, names: &mut Vec<FullName>) {
         for name in &self.1 {
             if !names.contains(name) {
                 names.push(name.clone());
@@ -51,10 +51,11 @@ impl FunctionInfoRead for SchemaCatalog {
     }
 
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
-        if self.functions.definitions(name).is_empty() {
+        let local = self.functions.definitions(name);
+        if local.is_empty() {
             self.base.is_aggregate_impl(name)
         } else {
-            false
+            local.iter().any(CreateFunction::catalog_aggregate)
         }
     }
     fn function_returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
@@ -63,7 +64,7 @@ impl FunctionInfoRead for SchemaCatalog {
                 .overloads()
                 .contains_instantiation(overload, self)
             {
-                return definition.is_table_function();
+                return definition.catalog_returns_set();
             }
         }
         self.base.function_returns_set(name, overload)

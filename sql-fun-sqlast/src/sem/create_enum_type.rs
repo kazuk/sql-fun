@@ -2,7 +2,8 @@ use crate::{
     ast::EnumType as AstEnumType,
     names::FullName,
     sem::{
-        AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst, TypeReference,
+        AnalysisError, AstAndContextPair, ObjectPrivilegeDeclaration, OwnerSpecification,
+        ParseContext, SemAst, TypeReference,
     },
 };
 
@@ -13,9 +14,21 @@ pub struct CreateEnum {
     owner: Option<OwnerSpecification>,
     type_ref: TypeReference,
     values: Vec<EnumValueDefinition>,
+    #[serde(skip)]
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateEnum {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn has_label(&self, label: &str) -> bool {
         self.values.iter().any(|value| value.name == label)
     }
@@ -34,6 +47,7 @@ impl CreateEnum {
     pub(crate) fn new(name: &FullName, values: &[String]) -> Self {
         Self {
             owner: None,
+            privilege_declarations: Vec::new(),
             type_ref: TypeReference::from_full_name(name.clone()),
             values: values
                 .iter()

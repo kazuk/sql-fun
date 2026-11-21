@@ -89,12 +89,24 @@ additional [PRAGMA-state limitation](statements/alter-table.md#rename-table).
 
 ## Other PostgreSQL utility statements
 
-PostgreSQL `GRANT` and `REVOKE` statements for object privileges and role
-membership are accepted during syntax conversion, including in extension
-scripts. Analysis stops at privilege interpretation, including during extension
-initialization. When the server terminates at this step, the CLI can report
-`EOF with missing responses`. SQL rendering is also unimplemented.
-See the [privilege analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1158).
+SQL analysis checks PostgreSQL `GRANT` and `REVOKE` declarations in schema
+and extension scripts. It resolves catalog objects, routine signatures, columns
+and named roles. Schema-wide declarations apply to matching objects present
+when the statement is analyzed. The catalog retains declarations in order,
+including grant options and membership options. Analysis does not compute
+effective permissions or execute cascading revocations. SQL rendering is
+tracked separately.
+
+For `GRANT` and `REVOKE` on large objects, SQL analysis cannot resolve
+the target OID or record its privilege declarations because the analysis
+catalog has no large-object definitions. See
+[#1177](https://github.com/kazuk/sql-fun/issues/1177).
+
+The shipped catalogs lack privilege targets for configuration parameters,
+databases, foreign-data wrappers and servers, procedural languages, and
+tablespaces. Schema privileges require a retained schema definition. A
+declaration targeting a missing definition produces a diagnostic. See
+[#1178](https://github.com/kazuk/sql-fun/issues/1178).
 
 PostgreSQL `CREATE FOREIGN DATA WRAPPER` syntax is recognized, including
 `HANDLER`, `VALIDATOR`, their explicit `NO` forms, and `OPTIONS`.

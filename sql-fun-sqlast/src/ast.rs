@@ -21,7 +21,7 @@ mod mutation;
 mod notify;
 mod options;
 pub(crate) mod postgres;
-mod privileges;
+pub(crate) mod privileges;
 pub(crate) mod projection;
 mod public;
 mod query_construction;

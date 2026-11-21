@@ -3,8 +3,8 @@ use crate::{
     context::ParseContext,
     names::{FullName, TableName},
     sem::{
-        AnalysisError, CatalogNameLookup, DeclarationCollation, OwnerSpecification, TypeCategory,
-        TypeReference, WithTypmod,
+        AnalysisError, CatalogNameLookup, DeclarationCollation, ObjectPrivilegeDeclaration,
+        OwnerSpecification, TypeCategory, TypeReference, WithTypmod,
     },
 };
 
@@ -21,9 +21,21 @@ pub struct CreateDomain {
     requested_base: Option<Box<WithTypmod<TypeReference>>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     category: Option<TypeCategory>,
+    #[serde(skip)]
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateDomain {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     /// Requested declaration type and modifiers, separate from canonical identity.
     pub fn requested_base(&self) -> Option<&WithTypmod<TypeReference>> {
         self.requested_base.as_deref()
@@ -73,6 +85,7 @@ impl CreateDomain {
     pub(crate) fn new(type_ref: &TypeReference, base_type: &Option<TypeReference>) -> Self {
         Self {
             owner: None,
+            privilege_declarations: Vec::new(),
             category: None,
             type_ref: type_ref.clone(),
             base_type: base_type.clone(),

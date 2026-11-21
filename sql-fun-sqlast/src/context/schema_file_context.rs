@@ -44,11 +44,11 @@ use crate::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisProblem, AnalysisState, CastDefinition,
         CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
         CreateIndex, CreateRule, CreateSchema, CreateTrigger, CursorInfo, DatabaseCollation,
-        ImplicitChange, InsertConflict, Kind, OperatorClassDefinition, OperatorDefinition,
-        OverloadVariant as SemOverloadVariant, OwnedObjectDefinition, ParameterConstraints, Role,
-        RuleIdentity, SemAst, SemScalarExpr, SourcePathWithSpan, TriggerIdentity, TypeReference,
-        VariableSet, ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport,
-        ViewUpdateSupport,
+        ImplicitChange, InsertConflict, Kind, ObjectPrivilegeChange, OperatorClassDefinition,
+        OperatorDefinition, OverloadVariant as SemOverloadVariant, OwnedObjectDefinition,
+        ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr,
+        SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport,
+        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -908,6 +908,20 @@ impl ParseContext for SchemaFileContext {
     }
     fn apply_alter_owner(self, alteration: &AlterOwner) -> Result<Self, AnalysisError> {
         self.apply_ownership_change(alteration)
+    }
+
+    fn apply_role_membership(
+        self,
+        declaration: &RoleMembershipDeclaration,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::apply_role_membership(self, declaration))
+    }
+
+    fn apply_object_privileges(
+        self,
+        change: &ObjectPrivilegeChange,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::apply_object_privileges(self, change))
     }
 
     fn resolve_cursor(&self, name: &str) -> Option<&CursorInfo> {

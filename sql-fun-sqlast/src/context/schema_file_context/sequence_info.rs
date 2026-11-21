@@ -33,6 +33,16 @@ impl SequenceInfoCollection {
 }
 
 impl SequenceInfoRead for SchemaCatalog {
+    fn sequence_names(&self) -> Vec<FullName> {
+        let mut names = self.base.sequence_names();
+        for (_, definition) in self.sequences.0.iter() {
+            if !names.contains(definition.name()) {
+                names.push(definition.name().clone());
+            }
+        }
+        names
+    }
+
     fn sequences_owned_by(&self, table: &TableName) -> Vec<CreateSequence> {
         let mut sequences = self.sequences.owned_by(table);
         for inherited in self.base.sequences_owned_by(table) {

@@ -761,7 +761,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             return Ok(Self::object_privileges(privileges));
         }
         if let Some(grant) = value.as_grant_role_stmt().as_inner() {
-            return Ok(Self::role_membership(RoleMembership::try_from(&grant)?));
+            return Ok(Self::role_membership(RoleMembership::try_from_with_tokens(
+                &grant, tokens,
+            )?));
         }
         if let Some(value) = value.as_alter_default_privileges_stmt().as_inner() {
             let value = DefaultPrivileges::try_from_with_tokens(&value, tokens)?;

@@ -210,11 +210,10 @@ SOURCE_WITNESS = {
         "extension_not_found": 1
     },
     "sql-fun-sqlast/src/sem/alter_owner/ddl.rs": {
-        "OwnershipLookup": 2,
         "ownership_target": 1
     },
     "sql-fun-sqlast/src/sem/ownership/ddl.rs": {
-        "OwnershipLookup": 14
+        "OwnershipLookup": 16
     },
     "sql-fun-sqlast/src/sem.rs": {
         "OwnershipLookup": 1

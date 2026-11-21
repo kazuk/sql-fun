@@ -66,9 +66,10 @@ use crate::{
     sem::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisState, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CursorInfo, InputTypeConstraint, Kind, OwnedObjectDefinition,
-        ParameterConstraints, Role, SamplingMethodLookup, SelectStatement, SemScalarExpr,
-        VariableSet, parameter_resolution::ParameterResolution, problem::CreationProblem,
+        CreateTable, CursorInfo, InputTypeConstraint, Kind, ObjectPrivilegeChange,
+        OwnedObjectDefinition, ParameterConstraints, Role, RoleMembershipDeclaration,
+        SamplingMethodLookup, SelectStatement, SemScalarExpr, VariableSet,
+        parameter_resolution::ParameterResolution, problem::CreationProblem,
     },
 };
 
@@ -419,6 +420,22 @@ where
 
     /// Apply a resolved ownership change. Invalid outcomes leave the catalog unchanged.
     fn apply_alter_owner(self, alter_owner: &AlterOwner) -> Result<Self, AnalysisError>;
+
+    /// Apply role membership after complete semantic validation.
+    fn apply_role_membership(
+        self,
+        _declaration: &RoleMembershipDeclaration,
+    ) -> Result<Self, AnalysisError> {
+        Ok(self)
+    }
+
+    /// Apply object privilege declarations after complete semantic validation.
+    fn apply_object_privileges(
+        self,
+        _change: &ObjectPrivilegeChange,
+    ) -> Result<Self, AnalysisError> {
+        Ok(self)
+    }
 
     /// apply `comment` statement to current schema
     fn apply_comment(self, comment: &Comment) -> Result<Self, AnalysisError>;

@@ -216,6 +216,13 @@ impl PgBuiltInFunctions {
         Self::load_from(path, details_path).expect("test function catalog")
     }
 
+    pub(super) fn routine_names(&self) -> Vec<FullName> {
+        self.function_by_name
+            .keys()
+            .map(|name| FullName::with_schema("pg_catalog", name))
+            .collect()
+    }
+
     pub(super) fn preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         self.property(name, overload, PgFunctionProto::preserves_view_rows)
     }

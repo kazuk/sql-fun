@@ -31,6 +31,9 @@ impl SemAst {
             AstStatementNode::RoleMembership(ast) => {
                 RoleMembershipDeclaration::analyze(ast, context).map(Self::RoleMembership)
             }
+            AstStatementNode::ExtensionMembership(ast) if ast.targets_transform() => {
+                todo!("ALTER EXTENSION transform lookup and application (#1187)")
+            }
             AstStatementNode::ExtensionMembership(_) => {
                 todo!("ALTER EXTENSION membership interpretation (#1168)")
             }

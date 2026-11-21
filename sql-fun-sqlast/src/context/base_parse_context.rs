@@ -11,7 +11,8 @@ use crate::{
     context::{
         CastInfoRead, ConflictInfoRead, ForeignDataWrapperInfoRead, FunctionInfoRead,
         GetSourcePathWithSpanOpt, IndexInfoRead, OperatorInfoRead, RuleInfoRead, SearchPathRead,
-        SequenceInfoRead, TableInfoRead, TriggerInfoRead, TypeInfoRead, ViewInfoRead,
+        SequenceInfoRead, TableInfoRead, TransformationInfoRead, TriggerInfoRead, TypeInfoRead,
+        ViewInfoRead,
     },
     names::{FullName, OperatorName, TableName, ViewName},
     sem::{
@@ -42,6 +43,7 @@ pub trait BaseParseContext:
     + OperatorInfoRead
     + RuleInfoRead
     + ForeignDataWrapperInfoRead
+    + TransformationInfoRead
     + TriggerInfoRead
     + SequenceInfoRead
     + TypeInfoRead

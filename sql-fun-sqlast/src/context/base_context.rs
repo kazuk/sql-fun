@@ -505,6 +505,8 @@ impl crate::context::TriggerInfoRead for BaseContext {
     }
 }
 
+impl crate::context::TransformationInfoRead for BaseContext {}
+
 impl BaseParseContext for BaseContext {
     fn sqlite_relation_identity(&self, _name: &FullName) -> Option<FullName> {
         None

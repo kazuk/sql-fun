@@ -661,6 +661,9 @@ impl crate::context::TriggerInfoRead for SchemaCatalog {
     }
 }
 
+impl crate::context::TransformationInfoRead for SchemaCatalog {}
+impl crate::context::TransformationInfoWrite for SchemaFileContext {}
+
 impl BaseParseContext for SchemaCatalog {
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         if self.renamed_relations.contains(&name.sqlite_identity()) {

@@ -21,6 +21,29 @@ pub(crate) struct ObjectPrivileges {
 }
 
 impl ObjectPrivileges {
+    pub(crate) const fn action(&self) -> &PrivilegeAction {
+        &self.action
+    }
+
+    pub(crate) const fn kind(&self) -> PrivilegeTargetKind {
+        self.kind
+    }
+
+    pub(crate) const fn targets(&self) -> &PrivilegeTargets {
+        &self.targets
+    }
+
+    pub(crate) fn privileges(&self) -> &[PrivilegeSpecification] {
+        &self.privileges
+    }
+
+    pub(crate) fn grantees(&self) -> &[PrivilegeGrantee] {
+        &self.grantees
+    }
+
+    pub(crate) const fn grantor(&self) -> Option<&PrivilegeGrantee> {
+        self.grantor.as_ref()
+    }
     pub(crate) const fn is_grant(&self) -> bool {
         self.action.is_grant()
     }
@@ -31,20 +54,20 @@ impl ObjectPrivileges {
 }
 
 #[derive(Clone, Debug)]
-enum PrivilegeTargets {
+pub(crate) enum PrivilegeTargets {
     Objects(Vec<PrivilegeTarget>),
     AllInSchemas(Vec<String>),
 }
 
 #[derive(Clone, Debug)]
-enum PrivilegeTarget {
+pub(crate) enum PrivilegeTarget {
     Name(Name),
     Routine(Box<ObjectTarget>),
     LargeObjectId(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PrivilegeTargetKind {
+pub(crate) enum PrivilegeTargetKind {
     Table,
     Sequence,
     Database,
@@ -331,18 +354,18 @@ mod object_privilege_conversion_tests {
 }
 
 #[derive(Clone, Debug)]
-enum PrivilegeAction {
+pub(crate) enum PrivilegeAction {
     Grant(GrantPrivilegeAction),
     Revoke(RevokePrivilegeAction),
 }
 
 #[derive(Clone, Debug)]
-struct GrantPrivilegeAction {
+pub(crate) struct GrantPrivilegeAction {
     grant_option: bool,
 }
 
 #[derive(Clone, Debug)]
-struct RevokePrivilegeAction {
+pub(crate) struct RevokePrivilegeAction {
     grant_option_only: bool,
     behavior: DropBehavior,
 }
@@ -374,33 +397,33 @@ impl PrivilegeAction {
         }
     }
 
+    const fn command(&self) -> &'static str {
+        if self.is_grant() { "GRANT" } else { "REVOKE" }
+    }
+
     const fn is_grant(&self) -> bool {
         matches!(self, Self::Grant(_))
     }
 
-    const fn grants_with_grant_option(&self) -> bool {
+    pub(crate) const fn grants_with_grant_option(&self) -> bool {
         match self {
             Self::Grant(grant) => grant.grant_option,
             Self::Revoke(_) => false,
         }
     }
 
-    const fn revokes_grant_option_only(&self) -> bool {
+    pub(crate) const fn revokes_grant_option_only(&self) -> bool {
         match self {
             Self::Grant(_) => false,
             Self::Revoke(revoke) => revoke.grant_option_only,
         }
     }
 
-    const fn revoke_behavior(&self) -> Option<DropBehavior> {
+    pub(crate) const fn revoke_behavior(&self) -> Option<DropBehavior> {
         match self {
             Self::Grant(_) => None,
             Self::Revoke(revoke) => Some(revoke.behavior),
         }
-    }
-
-    const fn command(&self) -> &'static str {
-        if self.is_grant() { "GRANT" } else { "REVOKE" }
     }
 }
 
@@ -414,30 +437,78 @@ pub(crate) struct RoleMembership {
 }
 
 impl RoleMembership {
-    pub(crate) const fn is_grant(&self) -> bool {
-        self.action.is_grant()
+    pub(crate) const fn action(&self) -> &PrivilegeAction {
+        &self.action
+    }
+
+    pub(crate) fn roles(&self) -> &[PrivilegeSpecification] {
+        &self.roles
+    }
+
+    pub(crate) fn members(&self) -> &[PrivilegeGrantee] {
+        &self.members
+    }
+
+    pub(crate) const fn grantor(&self) -> Option<&PrivilegeGrantee> {
+        self.grantor.as_ref()
+    }
+
+    pub(crate) fn options(&self) -> &[MembershipOption] {
+        &self.options
     }
 
     pub(crate) const fn command(&self) -> &'static str {
         self.action.command()
     }
+
+    pub(crate) const fn is_grant(&self) -> bool {
+        self.action.is_grant()
+    }
 }
 
 #[derive(Clone, Debug)]
-struct MembershipOption {
+pub(crate) struct MembershipOption {
     name: String,
     value: bool,
+    explicit_boolean: bool,
 }
 
-impl TryFrom<&syn::GrantRoleStmt> for RoleMembership {
+impl MembershipOption {
+    pub(crate) const fn uses_explicit_boolean(&self) -> bool {
+        self.explicit_boolean
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) const fn value(&self) -> bool {
+        self.value
+    }
+}
+
+impl TryFromWithTokens<&syn::GrantRoleStmt> for RoleMembership {
     type Error = AnalysisError;
 
-    fn try_from(value: &syn::GrantRoleStmt) -> Result<Self, Self::Error> {
+    fn try_from_with_tokens(
+        value: &syn::GrantRoleStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let mut options = Vec::new();
         for node in value.get_opt().as_inner().unwrap_or_default() {
             let option = required(node.as_def_elem().as_inner(), "membership option")?;
             let arg = required(option.get_arg().as_inner(), "membership option value")?;
+            let explicit_boolean = tokens
+                .iter()
+                .find(|token| token.get_start() > option.get_location())
+                .is_some_and(|token| {
+                    matches!(
+                        token.get_token().as_inner(),
+                        Some(syn::Token::TrueP | syn::Token::FalseP)
+                    )
+                });
             options.push(MembershipOption {
+                explicit_boolean,
                 name: option.get_defname(),
                 value: required(arg.as_boolean().get_boolval(), "membership boolean")?,
             });

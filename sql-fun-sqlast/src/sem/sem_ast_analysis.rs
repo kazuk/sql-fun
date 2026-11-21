@@ -9,8 +9,8 @@ use crate::{
         CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateRule, CreateSchema,
         CreateSequence, CreateTable, CreateTableAs, CreateTrigger, CreateView, DeleteStatement,
         DropRule, DropTable, DropTrigger, EngineFeatureValidation, InsertStatement, MergeStatement,
-        ParameterConstraints, RelationAlteration, SelectStatement, SemAst, UpdateStatement,
-        VariableSet,
+        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
+        SelectStatement, SemAst, UpdateStatement, VariableSet,
     },
 };
 
@@ -24,8 +24,13 @@ impl SemAst {
             return Ok(Self::unresolved_statement());
         }
         match ast {
-            AstStatementNode::ObjectPrivileges(_) | AstStatementNode::RoleMembership(_) => {
-                todo!("GRANT and REVOKE interpretation (#1158)")
+            AstStatementNode::ObjectPrivileges(ast) => {
+                Ok(ObjectPrivilegeChange::analyze(ast, context)?
+                    .map_or_else(Self::unresolved_statement, Self::ObjectPrivileges))
+            }
+            AstStatementNode::RoleMembership(ast) => {
+                Ok(RoleMembershipDeclaration::analyze(ast, context)?
+                    .map_or_else(Self::unresolved_statement, Self::RoleMembership))
             }
             AstStatementNode::ExtensionMembership(_) => {
                 todo!("ALTER EXTENSION membership interpretation (#1168)")
@@ -144,6 +149,33 @@ impl SemAst {
             ));
         }
         match ast {
+            AstStatementNode::RoleMembership(ast) => {
+                let Some(declaration) = RoleMembershipDeclaration::analyze(ast, &mut context)?
+                else {
+                    return Ok(AstAndContextPair::new(
+                        Self::unresolved_statement(),
+                        context,
+                    ));
+                };
+                let context = context.apply_role_membership(&declaration)?;
+                Ok(AstAndContextPair::new(
+                    Self::RoleMembership(declaration),
+                    context,
+                ))
+            }
+            AstStatementNode::ObjectPrivileges(ast) => {
+                let Some(change) = ObjectPrivilegeChange::analyze(ast, &mut context)? else {
+                    return Ok(AstAndContextPair::new(
+                        Self::unresolved_statement(),
+                        context,
+                    ));
+                };
+                let context = context.apply_object_privileges(&change)?;
+                Ok(AstAndContextPair::new(
+                    Self::ObjectPrivileges(change),
+                    context,
+                ))
+            }
             AstStatementNode::CreateTrigger(trigger) => CreateTrigger::apply_ast(trigger, context),
             AstStatementNode::DropTrigger(trigger) => DropTrigger::apply_ast(trigger, context),
             AstStatementNode::CreateRule(rule) => CreateRule::apply_ast(rule, context),

@@ -1,20 +1,45 @@
 //! Semantic identities and ownership of PostgreSQL catalog objects.
 
 mod ddl;
+pub(crate) use self::ddl::RequestedIdentity;
 use crate::{
-    ast::ObjectKind, context::BaseParseContext, identifier::CanonicalIdentifier, names::FullName,
-    sem::TypeReference,
+    ast::ObjectKind,
+    context::BaseParseContext,
+    identifier::CanonicalIdentifier,
+    names::FullName,
+    sem::{ObjectPrivilegeDeclaration, RoleMembershipDeclaration, TypeReference},
 };
 
 /// A role supplied by the analysis environment, independent of SQL spelling.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Role(String);
+#[derive(Clone, Debug)]
+pub struct Role(String, Vec<RoleMembershipDeclaration>);
+impl PartialEq for Role {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl Eq for Role {}
+impl std::hash::Hash for Role {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 impl From<&str> for Role {
     fn from(name: &str) -> Self {
-        Self(name.to_owned())
+        Self(name.to_owned(), Vec::new())
     }
 }
 impl Role {
+    /// Role membership declarations in statement order.
+    #[must_use]
+    pub fn membership_declarations(&self) -> &[RoleMembershipDeclaration] {
+        &self.1
+    }
+
+    pub(crate) fn append_membership(&mut self, declaration: &RoleMembershipDeclaration) {
+        self.1.push(declaration.clone());
+    }
+
     /// Exact role name (SQL quoting has already been decoded).
     pub fn name(&self) -> &str {
         &self.0
@@ -77,7 +102,7 @@ impl OwnerSpecification {
     pub fn role(role: &Role) -> Self {
         Self {
             kind: OwnerKind::named(role.name()),
-            role: Some(role.clone()),
+            role: Some(Role::from(role.name())),
         }
     }
     /// CURRENT_ROLE, without assuming a concrete session identity.
@@ -287,8 +312,19 @@ mod identity_display_tests {
 pub struct OwnedObjectDefinition {
     identity: OwnershipIdentity,
     owner: Option<OwnerSpecification>,
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 impl OwnedObjectDefinition {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) fn contains_identity(definitions: &[Self], identity: &OwnershipIdentity) -> bool {
         for definition in definitions {
             if definition.identity() == identity {
@@ -303,6 +339,7 @@ impl OwnedObjectDefinition {
         Self {
             identity: identity.clone(),
             owner: owner.cloned(),
+            privilege_declarations: Vec::new(),
         }
     }
     /// Exact definition identity.

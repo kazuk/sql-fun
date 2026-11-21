@@ -50,6 +50,11 @@ mod name_analysis;
 mod object_info;
 mod operators;
 mod overload_rank;
+mod privileges;
+pub use self::privileges::{
+    DeclaredPrivilege, ObjectPrivilegeChange, ObjectPrivilegeDeclaration, PrivilegeOperation,
+    PrivilegeRole, RoleMembershipDeclaration,
+};
 pub(crate) mod ownership;
 mod parameter_constraints;
 pub(crate) mod parameter_resolution;
@@ -329,6 +334,12 @@ pub enum SemAst {
 
     /// `alter owner` statement
     AlterOwner(AlterOwner),
+
+    /// A resolved object privilege declaration.
+    ObjectPrivileges(ObjectPrivilegeChange),
+
+    /// A resolved role membership declaration.
+    RoleMembership(RoleMembershipDeclaration),
 
     /// `alter sequence` statement
     AlterSequence(AlterSequence),

@@ -1,7 +1,10 @@
 mod ddl;
 use crate::{
     names::{FullName, TableName},
-    sem::{AlterSequence, AnalysisError, OwnerSpecification, alter_table::AlterObjSubCommand},
+    sem::{
+        AlterSequence, AnalysisError, ObjectPrivilegeDeclaration, OwnerSpecification,
+        alter_table::AlterObjSubCommand,
+    },
 };
 
 /// Analyzed CREATE SEQUENCE statement.
@@ -14,9 +17,20 @@ pub struct CreateSequence {
     alter_statements: Vec<AlterSequence>,
     owner: Option<OwnerSpecification>,
     owned_by: Option<TableName>,
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
 impl CreateSequence {
+    /// Object privilege declarations in statement order.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        &self.privilege_declarations
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) {
+        self.privilege_declarations.push(declaration.clone());
+    }
+
     pub(crate) const fn temporary(&self) -> bool {
         self.temporary
     }
@@ -66,6 +80,7 @@ impl CreateSequence {
             name: name.clone(),
             alter_statements: Default::default(),
             owner: Default::default(),
+            privilege_declarations: Vec::new(),
             owned_by: None,
         }
     }

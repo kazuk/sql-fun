@@ -23,6 +23,11 @@ pub trait RoleInfoRead {
 
 /// Exact catalog reads used for ownership analysis (no search-path expansion here).
 pub trait OwnershipInfoRead {
+    /// Exact names available for schema-wide routine declarations.
+    fn routine_names(&self) -> Vec<FullName> {
+        Vec::new()
+    }
+
     /// Retained schema DDL by exact global schema name.
     fn schema_definition(&self, _name: &str) -> Option<&CreateSchema> {
         None

@@ -11,7 +11,10 @@ use crate::ast::Dialect;
 use crate::{
     context::{BaseParseContext, ParseContext},
     names::{ColumnName, FullName, LocalName, SchemaName, TableName},
-    sem::{ColumnCollection, CreateCompositeType, CreateDomain, CreateEnum, OwnerSpecification},
+    sem::{
+        ColumnCollection, CreateCompositeType, CreateDomain, CreateEnum,
+        ObjectPrivilegeDeclaration, OwnerSpecification,
+    },
 };
 use std::collections::HashSet;
 
@@ -36,7 +39,7 @@ pub enum TypeDefinition {
 
 /// Catalog-loaded nominal type and its optional PostgreSQL facts.
 /// The flattened reference retains the existing serialized reference shape.
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BuiltinTypeDefinition {
     #[serde(flatten)]
     reference: TypeReference,
@@ -44,6 +47,24 @@ pub struct BuiltinTypeDefinition {
     category: Option<TypeCategory>,
     #[serde(deserialize_with = "deserialize_collatable")]
     collatable: Option<bool>,
+    #[serde(skip)]
+    privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
+}
+
+impl PartialEq for BuiltinTypeDefinition {
+    fn eq(&self, other: &Self) -> bool {
+        self.reference == other.reference
+            && self.category == other.category
+            && self.collatable == other.collatable
+    }
+}
+impl Eq for BuiltinTypeDefinition {}
+impl std::hash::Hash for BuiltinTypeDefinition {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.reference.hash(state);
+        self.category.hash(state);
+        self.collatable.hash(state);
+    }
 }
 
 #[cfg(test)]
@@ -344,6 +365,7 @@ impl TypeDefinition {
             reference: TypeReference::concrete_type_ref(full_name, false),
             category,
             collatable,
+            privilege_declarations: Vec::new(),
         })
     }
 
@@ -791,5 +813,30 @@ impl PgBuiltInType {
     #[must_use]
     pub fn varbit() -> TypeReference {
         Self::builtin_reference("varbit")
+    }
+}
+
+impl TypeDefinition {
+    /// Recorded privilege declarations on the nominal type.
+    #[must_use]
+    pub fn privilege_declarations(&self) -> &[ObjectPrivilegeDeclaration] {
+        match self {
+            Self::Builtin(value) => &value.privilege_declarations,
+            Self::Domain(value) => value.privilege_declarations(),
+            Self::CompositeType(value) => value.privilege_declarations(),
+            Self::Enum(value) => value.privilege_declarations(),
+            _ => &[],
+        }
+    }
+
+    pub(crate) fn append_privilege(&mut self, declaration: &ObjectPrivilegeDeclaration) -> bool {
+        match self {
+            Self::Builtin(value) => value.privilege_declarations.push(declaration.clone()),
+            Self::Domain(value) => value.append_privilege(declaration),
+            Self::CompositeType(value) => value.append_privilege(declaration),
+            Self::Enum(value) => value.append_privilege(declaration),
+            _ => return false,
+        }
+        true
     }
 }

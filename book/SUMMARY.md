@@ -183,6 +183,7 @@
   - [inference_candidate_space_unsupported](diagnostics/inference_candidate_space_unsupported.md)
   - [insert_semantics](diagnostics/insert_semantics.md)
   - [invalid_parameter_hint](diagnostics/invalid_parameter_hint.md)
+  - [invalid_privilege_declaration](diagnostics/invalid_privilege_declaration.md)
   - [member_access_requires_composite_type](diagnostics/member_access_requires_composite_type.md)
   - [membership_comparison_result](diagnostics/membership_comparison_result.md)
   - [membership_width](diagnostics/membership_width.md)

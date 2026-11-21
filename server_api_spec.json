@@ -776,6 +776,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid or unresolved PostgreSQL privilege declaration.",
+                  "type": "object",
+                  "properties": {
+                    "Privilege": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Privilege"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid trigger semantics.",
                   "type": "object",
                   "properties": {
@@ -5510,6 +5523,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid or unresolved PostgreSQL privilege declaration.",
+                  "type": "object",
+                  "properties": {
+                    "Privilege": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Privilege"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid trigger semantics.",
                   "type": "object",
                   "properties": {
@@ -10132,6 +10158,19 @@
                   },
                   "required": [
                     "Ownership"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid or unresolved PostgreSQL privilege declaration.",
+                  "type": "object",
+                  "properties": {
+                    "Privilege": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Privilege"
                   ],
                   "additionalProperties": false
                 },

@@ -144,6 +144,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [inference_candidate_space_unsupported](inference_candidate_space_unsupported.md)
 - [insert_semantics](insert_semantics.md)
 - [invalid_parameter_hint](invalid_parameter_hint.md)
+- [invalid_privilege_declaration](invalid_privilege_declaration.md)
 - [member_access_requires_composite_type](member_access_requires_composite_type.md)
 - [membership_comparison_result](membership_comparison_result.md)
 - [membership_width](membership_width.md)

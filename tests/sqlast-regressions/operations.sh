@@ -27,10 +27,14 @@ run_group() {
   if [[ "$schema" != - ]]; then args+=(--schema-file "$suite/$schema"); fi
   echo "== $fixture PostgreSQL $version ($level), expected $count cases; catalog $SQL_FUN_HOME/postgres/$version"
   rm -f "$reports/$fixture-$version.xml"
+  local -a fixture_env=()
+  if [[ -d "$suite/$fixture.extensions" ]]; then
+    fixture_env+=("SQL_FUN_EXTENSIONS_DIR=$suite/$fixture.extensions")
+  fi
   status=0
   group_failed=0
   # Measure only the product invocation; parsing reports and setup are outside.
-  { time "$SQL_FUN_BIN" "${args[@]}" test "$file" \
+  { time env "${fixture_env[@]}" "$SQL_FUN_BIN" "${args[@]}" test "$file" \
       --schema-level "$level" --junit-xml "$reports/$fixture-$version.xml" \
       >"$reports/$fixture-$version.log" 2>&1;
   } 2>"$runtime/test-seconds" || status=$?

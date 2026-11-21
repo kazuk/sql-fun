@@ -163,6 +163,8 @@ pub enum AnalysisProblem {
     Rule(RuleProblem),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
+    /// Invalid or unresolved PostgreSQL privilege declaration.
+    Privilege(String),
     /// Invalid trigger semantics.
     Trigger(TriggerProblem),
     /// A view declaration or catalog capability violation.
@@ -562,6 +564,7 @@ impl AnalysisProblem {
             Self::Serial(problem) => problem.code(),
             Self::Creation(_) => "conflicting_creation",
             Self::Ownership(problem) => problem.code(),
+            Self::Privilege(_) => "invalid_privilege_declaration",
             Self::Rule(_) => "rule_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
@@ -661,6 +664,7 @@ impl AnalysisProblem {
             Self::Serial(problem) => problem.render_metadata(),
             Self::Creation(problem) => problem.render_metadata(),
             Self::Ownership(problem) => problem.render_metadata(),
+            Self::Privilege(message) => DiagnosticMetadata::from(message.clone()),
             Self::Rule(problem) => problem.render_metadata(),
             Self::Trigger(problem) => problem.render_metadata(),
             Self::View(problem) => problem.render_metadata(),
@@ -716,6 +720,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::Creation(problem) => problem.diagnostic_message(),
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),
+            Self::Privilege(message) => message.clone(),
             Self::Trigger(problem) => problem.diagnostic_message(),
             Self::View(problem) => problem.diagnostic_message(),
             Self::Insert(problem) => problem.diagnostic_message(),

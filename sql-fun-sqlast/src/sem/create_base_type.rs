@@ -138,13 +138,13 @@ fn check_support_function(
         _ => unreachable!("only recognized support roles reach signature lookup"),
     };
     let mut args = args.into_iter().map(Some).collect::<Vec<_>>();
-    let exact = context.find_exact_function(routine, &args).or_else(|| {
-        if !alternate {
-            return None;
+    let exact = match context.find_exact_function(routine, &args) {
+        None if alternate => {
+            args.extend([Some(builtin("oid")), Some(builtin("int4"))]);
+            context.find_exact_function(routine, &args)
         }
-        args.extend([Some(builtin("oid")), Some(builtin("int4"))]);
-        context.find_exact_function(routine, &args)
-    });
+        found => found,
+    };
     if exact.is_some_and(|function| function.overload().ret_type().as_ref() == Some(&result)) {
         Ok(())
     } else {

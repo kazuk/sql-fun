@@ -93,6 +93,8 @@ impl TypeInfoWrite for SchemaFileContext {
     fn insert_shell_or_base_type(&mut self, name: &FullName, definition: &TypeDefinition) {
         self.catalog.renamed_types.remove(name);
         self.catalog.types.replace_definition(name, definition);
+        // TODO(#1209): register PostgreSQL's generated name for the completed array
+        // once catalog lookup can resolve that key to the existing T[] identity.
     }
 
     fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {

@@ -19,11 +19,16 @@ conflicts; see the [creation policy](../statements.md).
 
 ## Dialect and engine-specific behavior
 
-These are PostgreSQL enum and composite analysis paths, not complete support for
-all CREATE TYPE forms. SQLite has no corresponding PostgreSQL named
-enum/composite implementation. Defining a type does not install database
-input/output functions or validate values at runtime. Unimplemented
-base/range-type grammar must not be inferred from enum/composite support.
+PostgreSQL analysis supports enum and composite declarations. SQLite has no
+corresponding named enum or composite implementation. Defining a type does
+not install database input/output functions or validate values at runtime.
+
+Shell declarations (`CREATE TYPE name`) and base definitions
+(`CREATE TYPE name (...)`) are recognized. Schema and extension analysis stop
+when they reach either declaration because interpretation and catalog
+registration are pending
+([#1206](https://github.com/kazuk/sql-fun/issues/1206)). Range type
+declarations remain unsupported.
 
 PostgreSQL ALTER TYPE operations that alter composite types remain unimplemented
 and can terminate analysis

@@ -149,6 +149,10 @@ pub enum StatementKind {
     VariableSet,
     /// An enum type definition.
     EnumType,
+    /// A PostgreSQL shell type declaration.
+    ShellType,
+    /// A PostgreSQL base type definition.
+    BaseType,
     /// A sequence definition.
     Sequence,
     /// DROP TABLE.
@@ -207,6 +211,7 @@ impl std::fmt::Display for StatementKind {
             Self::Extension => "CREATE EXTENSION",
             Self::VariableSet => "configuration statement",
             Self::EnumType => "CREATE TYPE AS ENUM",
+            Self::ShellType | Self::BaseType => "CREATE TYPE",
             Self::Sequence => "CREATE SEQUENCE",
             Self::DropTable => "DROP TABLE",
             Self::AlterSequence => "ALTER SEQUENCE",
@@ -419,6 +424,7 @@ impl StatementNode {
             Self::Extension(_) => StatementKind::extension(),
             Self::VariableSet(_) => StatementKind::variable_set(),
             Self::EnumType(_) => StatementKind::enum_type(),
+            Self::CreateType(value) => value.kind(),
             Self::Sequence(_) => StatementKind::sequence(),
             Self::DropTable(_) => StatementKind::drop_table(),
             Self::AlterSequence(_) => StatementKind::alter_sequence(),

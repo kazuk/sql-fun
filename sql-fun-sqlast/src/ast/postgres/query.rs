@@ -881,17 +881,28 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for SyntaxOption {
         let mut options = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             let option = required(node.as_def_elem().as_inner(), "syntax option")?;
-            options.push(Self {
-                namespace: nonempty(option.get_defnamespace()),
-                name: option.get_defname(),
-                value: option
-                    .get_arg()
-                    .as_inner()
-                    .map(|node| SyntaxValue::try_from_with_tokens(&node, tokens))
-                    .transpose()?,
-            });
+            options.push(Self::try_from_with_tokens(&option, tokens)?);
         }
         Ok(options)
+    }
+}
+
+impl TryFromWithTokens<&syn::DefElem> for SyntaxOption {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        option: &syn::DefElem,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            namespace: nonempty(option.get_defnamespace()),
+            name: option.get_defname(),
+            value: option
+                .get_arg()
+                .as_inner()
+                .map(|node| SyntaxValue::try_from_with_tokens(&node, tokens))
+                .transpose()?,
+        })
     }
 }
 

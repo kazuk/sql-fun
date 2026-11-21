@@ -1333,7 +1333,7 @@ mod test_drop_view {
         let statement = parse_statements(sql, Dialect::postgres())
             .next()
             .expect("DROP VIEW")?;
-        assert_eq!(statement.kind(), StatementKind::DropView);
+        assert_eq!(statement.kind(), StatementKind::drop_view());
         let StatementNode::DropView(drop) = statement.into_test_node() else {
             panic!("DROP VIEW");
         };

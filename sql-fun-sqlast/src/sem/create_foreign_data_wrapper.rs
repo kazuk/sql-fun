@@ -2,6 +2,10 @@
 
 use std::collections::HashSet;
 
+use ::sql_fun_core::analysis_problem::{
+    FdwRoutineKind, ForeignDataWrapperFailure, ForeignDataWrapperProblem,
+};
+
 use crate::{
     AstAndContextPair,
     ast::{FdwOption, FdwRoutineClause, ForeignDataWrapper, ObjectKind},
@@ -17,9 +21,9 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct CreateForeignDataWrapper {
     syntax: ForeignDataWrapper,
-    handler: Option<FullName>,
-    validator: Option<FullName>,
-    problems: Vec<AnalysisProblem>,
+    routines: Vec<FdwRoutineBinding>,
+    problems: Vec<ForeignDataWrapperProblem>,
+    applicable: bool,
 }
 
 impl CreateForeignDataWrapper {
@@ -31,14 +35,28 @@ impl CreateForeignDataWrapper {
 
     /// Resolved zero-argument handler.
     #[must_use]
-    pub const fn handler(&self) -> Option<&FullName> {
-        self.handler.as_ref()
+    pub fn handler(&self) -> Option<&FullName> {
+        self.routine_name(FdwRoutineKind::Handler)
     }
 
     /// Resolved validator with input types `text[], oid`.
     #[must_use]
-    pub const fn validator(&self) -> Option<&FullName> {
-        self.validator.as_ref()
+    pub fn validator(&self) -> Option<&FullName> {
+        self.routine_name(FdwRoutineKind::Validator)
+    }
+
+    /// Completed lookup outcomes for the routine clauses in source order.
+    #[must_use]
+    pub fn routines(&self) -> &[FdwRoutineBinding] {
+        &self.routines
+    }
+
+    fn routine_name(&self, kind: FdwRoutineKind) -> Option<&FullName> {
+        self.routines
+            .iter()
+            .find(|binding| binding.kind() == kind)?
+            .outcome()
+            .resolved_name()
     }
 
     /// Declared option pairs in source order.
@@ -50,12 +68,12 @@ impl CreateForeignDataWrapper {
     /// Whether the definition passed offline validation.
     #[must_use]
     pub const fn is_applicable(&self) -> bool {
-        self.problems.is_empty()
+        self.applicable
     }
 
     /// Static validation failures recorded for this declaration.
     #[must_use]
-    pub fn problems(&self) -> &[AnalysisProblem] {
+    pub fn problems(&self) -> &[ForeignDataWrapperProblem] {
         &self.problems
     }
 
@@ -63,11 +81,10 @@ impl CreateForeignDataWrapper {
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        if let Some(handler) = self.handler() {
-            visitor.schema_function(handler)?;
-        }
-        if let Some(validator) = self.validator() {
-            visitor.schema_function(validator)?;
+        for binding in self.routines() {
+            if let Some(name) = binding.outcome().resolved_name() {
+                visitor.schema_function(name)?;
+            }
         }
         Ok(())
     }
@@ -78,15 +95,12 @@ impl CreateForeignDataWrapper {
     ) -> Result<Self, AnalysisError> {
         let mut statement = Self {
             syntax: syntax.clone(),
-            handler: None,
-            validator: None,
+            routines: Vec::new(),
             problems: Vec::new(),
+            applicable: true,
         };
         if context.foreign_data_wrapper(syntax.name()).is_some() {
-            statement.reject(
-                context,
-                &format!("foreign-data wrapper {:?} already exists", syntax.name()),
-            )?;
+            statement.reject(context, &ForeignDataWrapperFailure::DuplicateWrapper)?;
         }
         statement.resolve_routines(syntax, context)?;
         let mut options = HashSet::new();
@@ -94,10 +108,7 @@ impl CreateForeignDataWrapper {
             if !options.insert(option.name()) {
                 statement.reject(
                     context,
-                    &format!(
-                        "foreign-data wrapper option {:?} provided more than once",
-                        option.name()
-                    ),
+                    &ForeignDataWrapperFailure::DuplicateOption(option.name().to_owned()),
                 )?;
             }
         }
@@ -107,11 +118,13 @@ impl CreateForeignDataWrapper {
     fn reject(
         &mut self,
         context: &mut impl ParseContext,
-        message: &str,
+        failure: &ForeignDataWrapperFailure,
     ) -> Result<(), AnalysisError> {
-        let problem = AnalysisProblem::foreign_data_wrapper(message);
-        self.problems.push(problem.clone());
-        context.report_analysis_problem(problem)
+        self.applicable = false;
+        let problem = ForeignDataWrapperProblem::new(self.name(), failure);
+        context.report_analysis_problem(AnalysisProblem::foreign_data_wrapper(&problem))?;
+        self.problems.push(problem);
+        Ok(())
     }
 
     fn resolve_routines(
@@ -121,25 +134,17 @@ impl CreateForeignDataWrapper {
     ) -> Result<(), AnalysisError> {
         let mut seen = HashSet::new();
         for clause in syntax.routines() {
-            let (kind, parts) = RoutineKind::from_clause(clause);
-            if !seen.insert(kind) {
-                self.reject(
-                    context,
-                    &format!("conflicting foreign-data wrapper {} clauses", kind.label()),
-                )?;
-                continue;
-            }
-            let Some(parts) = parts else { continue };
-            let name = match kind.resolve(parts, context) {
-                Ok(name) => name,
-                Err(message) => {
-                    self.reject(context, &message)?;
-                    continue;
-                }
+            let (kind, parts) = match clause {
+                FdwRoutineClause::Handler(parts) => (FdwRoutineKind::Handler, parts.as_deref()),
+                FdwRoutineClause::Validator(parts) => (FdwRoutineKind::Validator, parts.as_deref()),
             };
-            match kind {
-                RoutineKind::Handler => self.handler = Some(name),
-                RoutineKind::Validator => self.validator = Some(name),
+            if !seen.insert(kind) {
+                self.reject(context, &ForeignDataWrapperFailure::ConflictingClause(kind))?;
+            }
+            let (outcome, failure) = FdwRoutineOutcome::analyze(kind, parts, context);
+            self.routines.push(FdwRoutineBinding { kind, outcome });
+            if let Some(failure) = failure {
+                self.reject(context, &failure)?;
             }
         }
         Ok(())
@@ -170,13 +175,14 @@ impl CreateForeignDataWrapper {
 
 #[cfg(test)]
 mod test_catalog_application {
+    use ::sql_fun_core::analysis_problem::ForeignDataWrapperFailure;
     use std::path::Path;
 
     use crate::{
         ast::ObjectKind,
         context::{ForeignDataWrapperInfoRead, OwnershipInfoRead, ParseContext},
         names::FullName,
-        sem::{OwnerSpecification, SemAst},
+        sem::{FdwRoutineOutcome, OwnerSpecification, SemAst},
         test_helpers::{
             ownership::{apply_ownership_sql, ownership_context},
             schema_layer,
@@ -253,6 +259,44 @@ mod test_catalog_application {
     }
 
     #[test]
+    fn retains_each_lookup_even_when_the_declaration_is_rejected() -> testresult::TestResult {
+        let context = apply_ownership_sql(
+            ownership_context(),
+            "CREATE FUNCTION public.bad_handler() RETURNS text LANGUAGE sql AS 'SELECT NULL'",
+        )?
+        .into_context();
+        let result = apply_ownership_sql(
+            context,
+            "CREATE FOREIGN DATA WRAPPER rejected NO HANDLER HANDLER public.bad_handler VALIDATOR missing",
+        )?;
+        let SemAst::CreateForeignDataWrapper(wrapper) = result.ast() else {
+            panic!("expected a retained wrapper declaration");
+        };
+        assert!(!wrapper.is_applicable());
+        let [explicit_none, invalid_handler, missing_validator] = wrapper.routines() else {
+            panic!("expected an outcome for every clause");
+        };
+        assert!(matches!(
+            explicit_none.outcome(),
+            FdwRoutineOutcome::ExplicitNone
+        ));
+        assert_eq!(
+            invalid_handler.outcome().resolved_name(),
+            Some(&FullName::with_schema("public", "bad_handler")),
+        );
+        assert!(matches!(
+            missing_validator.outcome(),
+            FdwRoutineOutcome::NotFound(name) if name == &FullName::from_local_name("missing")
+        ));
+        assert!(matches!(
+            wrapper.problems()[1].failure(),
+            ForeignDataWrapperFailure::InvalidHandlerReturn(_, Some(_))
+        ));
+        assert!(result.context().foreign_data_wrapper("rejected").is_none());
+        Ok(())
+    }
+
+    #[test]
     fn rejected_wrapper_does_not_publish_even_without_delivered_diagnostics()
     -> testresult::TestResult {
         let mut context = ownership_context();
@@ -265,10 +309,10 @@ mod test_catalog_application {
             panic!("expected a retained wrapper declaration");
         };
         assert!(!wrapper.is_applicable());
-        assert_eq!(
-            wrapper.problems()[0].code(),
-            "foreign_data_wrapper_invalid_definition"
-        );
+        assert!(matches!(
+            wrapper.problems()[0].failure(),
+            ForeignDataWrapperFailure::DuplicateOption(option) if option == "a"
+        ));
         let mut context = result.into_context();
         assert!(context.problems().is_empty());
         let suppressed = context.analysis_state_mut().take_problems();
@@ -288,28 +332,59 @@ mod test_catalog_application {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum RoutineKind {
-    Handler,
-    Validator,
+/// A routine clause and its completed semantic lookup.
+#[derive(Clone, Debug)]
+pub struct FdwRoutineBinding {
+    kind: FdwRoutineKind,
+    outcome: FdwRoutineOutcome,
 }
 
-impl RoutineKind {
-    fn from_clause(clause: &FdwRoutineClause) -> (Self, Option<&[String]>) {
-        match clause {
-            FdwRoutineClause::Handler(parts) => (Self::Handler, parts.as_deref()),
-            FdwRoutineClause::Validator(parts) => (Self::Validator, parts.as_deref()),
+impl FdwRoutineBinding {
+    /// The role of this clause's routine.
+    #[must_use]
+    pub const fn kind(&self) -> FdwRoutineKind {
+        self.kind
+    }
+
+    /// The result of looking up this clause's routine.
+    #[must_use]
+    pub const fn outcome(&self) -> &FdwRoutineOutcome {
+        &self.outcome
+    }
+}
+
+/// Completed lookup for a handler or validator clause. An omitted clause has no binding.
+#[derive(Clone, Debug)]
+pub enum FdwRoutineOutcome {
+    /// An explicit `NO HANDLER` or `NO VALIDATOR`.
+    ExplicitNone,
+    /// The identifier components could not be resolved in the selected database.
+    InvalidName(Vec<String>),
+    /// No visible function matched the requested identifier and this clause's signature.
+    NotFound(FullName),
+    /// The exact qualified function selected by lookup, even if validation rejected it.
+    Resolved(FullName),
+}
+
+impl FdwRoutineOutcome {
+    /// Return the qualified binding when exact lookup succeeded.
+    #[must_use]
+    pub const fn resolved_name(&self) -> Option<&FullName> {
+        if let Self::Resolved(name) = self {
+            Some(name)
+        } else {
+            None
         }
     }
 
-    const fn label(self) -> &'static str {
-        match self {
-            Self::Handler => "handler",
-            Self::Validator => "validator",
-        }
-    }
-
-    fn resolve(self, parts: &[String], context: &impl ParseContext) -> Result<FullName, String> {
+    fn analyze(
+        kind: FdwRoutineKind,
+        parts: Option<&[String]>,
+        context: &impl ParseContext,
+    ) -> (Self, Option<ForeignDataWrapperFailure>) {
+        let Some(parts) = parts else {
+            return (Self::ExplicitNone, None);
+        };
         let requested = match parts {
             [local] => FullName::from_local_name(local),
             [schema, local] => FullName::with_schema(schema, local),
@@ -319,44 +394,53 @@ impl RoutineKind {
                 FullName::with_schema(schema, local)
             }
             _ => {
-                return Err(format!(
-                    "cannot resolve foreign-data wrapper {} name {} in the selected database",
-                    self.label(),
-                    parts.join("."),
-                ));
+                return (
+                    Self::InvalidName(parts.to_vec()),
+                    Some(ForeignDataWrapperFailure::InvalidRoutineName(
+                        kind,
+                        parts.to_vec(),
+                    )),
+                );
             }
         };
-        let (arguments, signature) = match self {
-            Self::Handler => (Vec::new(), ""),
-            Self::Validator => (
-                vec![
-                    Some(PgBuiltInType::text().array_type()),
-                    Some(TypeReference::concrete_type_ref(
-                        &FullName::with_schema("pg_catalog", "oid"),
-                        false,
-                    )),
-                ],
-                "pg_catalog.text[], pg_catalog.oid",
-            ),
+        let arguments = match kind {
+            FdwRoutineKind::Handler => Vec::new(),
+            FdwRoutineKind::Validator => vec![
+                Some(PgBuiltInType::text().array_type()),
+                Some(TypeReference::concrete_type_ref(
+                    &FullName::with_schema("pg_catalog", "oid"),
+                    false,
+                )),
+            ],
         };
         let Some(function) = context.find_exact_function(&requested, &arguments) else {
-            return Err(format!(
-                "foreign-data wrapper {} requires a function matching {requested}({signature})",
-                self.label(),
-            ));
+            let failure = ForeignDataWrapperFailure::RoutineNotFound(kind, (&requested).into());
+            return (Self::NotFound(requested), Some(failure));
         };
-        if self == Self::Handler {
-            let expected = TypeReference::concrete_type_ref(
-                &FullName::with_schema("pg_catalog", "fdw_handler"),
-                false,
-            );
-            if function.overload().ret_type().as_ref() != Some(&expected) {
-                return Err(format!(
-                    "foreign-data wrapper handler {} must return pg_catalog.fdw_handler",
-                    function.name(),
-                ));
-            }
+        let failure = Self::validate(
+            kind,
+            function.name(),
+            function.overload().ret_type().as_ref(),
+        );
+        (Self::Resolved(function.name().clone()), failure)
+    }
+
+    fn validate(
+        kind: FdwRoutineKind,
+        name: &FullName,
+        return_type: Option<&TypeReference>,
+    ) -> Option<ForeignDataWrapperFailure> {
+        let expected = TypeReference::concrete_type_ref(
+            &FullName::with_schema("pg_catalog", "fdw_handler"),
+            false,
+        );
+        if kind == FdwRoutineKind::Handler && return_type != Some(&expected) {
+            Some(ForeignDataWrapperFailure::InvalidHandlerReturn(
+                name.into(),
+                return_type.map(Into::into),
+            ))
+        } else {
+            None
         }
-        Ok(function.name().clone())
     }
 }

@@ -6,8 +6,8 @@ use crate::{
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, CreateFunction, OverloadVariant, OwnershipIdentity,
-        OwnershipLookup, SemScalarExpr, SourcePathWithSpan, ViewLike, ownership::RequestedIdentity,
-        traversal::SemanticVisitor,
+        OwnershipLookup, SemScalarExpr, SourcePathWithSpan, TypeReference, ViewLike,
+        ownership::RequestedIdentity, traversal::SemanticVisitor,
     },
 };
 
@@ -17,6 +17,7 @@ pub struct DropFunction {
     targets: Vec<OwnershipIdentity>,
     source: Option<SourcePathWithSpan>,
     cascade: bool,
+    dependent_views: Vec<FullName>,
     applicable: bool,
 }
 
@@ -72,10 +73,22 @@ impl DropFunction {
                 }
             }
         }
+        let cascade = ast.behavior() == ast::DropBehavior::Cascade;
+        let dependent_views = if applicable && !targets.is_empty() {
+            dependent_views(context, &targets)?
+        } else {
+            Vec::new()
+        };
+        if !cascade && let Some(name) = dependent_views.first() {
+            applicable = false;
+            context
+                .report_analysis_problem(AnalysisProblem::DropFunctionDependency(name.into()))?;
+        }
         Ok(Self {
             targets,
+            dependent_views,
             source: context.get_source_path_with_span().cloned(),
-            cascade: ast.behavior() == ast::DropBehavior::Cascade,
+            cascade,
             applicable,
         })
     }
@@ -95,7 +108,13 @@ impl DropFunction {
         self.cascade
     }
 
-    pub(crate) const fn applicable(&self) -> bool {
+    /// Views that block RESTRICT or will be removed by CASCADE.
+    pub fn dependent_views(&self) -> &[FullName] {
+        &self.dependent_views
+    }
+
+    /// Whether this statement can apply catalog changes.
+    pub const fn applicable(&self) -> bool {
         self.applicable && !self.targets.is_empty()
     }
 }
@@ -152,10 +171,10 @@ impl ViewTombstone {
     }
 }
 
-pub(crate) fn dependent_views(
+fn dependent_views(
     context: &impl ParseContext,
     targets: &[OwnershipIdentity],
-) -> Result<Vec<(FullName, ViewLike)>, AnalysisError> {
+) -> Result<Vec<FullName>, AnalysisError> {
     // TODO(#1185): Extend dependency traversal and removal to non-view objects.
     let names = context.relation_names();
     let mut removed = std::collections::HashSet::new();
@@ -177,7 +196,7 @@ pub(crate) fn dependent_views(
             view.query().visit(&mut probe)?;
             if probe.found {
                 removed.insert(name.clone());
-                views.push((name.clone(), view.clone()));
+                views.push(name.clone());
             }
         }
         if previous_count == removed.len() {
@@ -196,6 +215,13 @@ struct ViewDependencyProbe<'a> {
 impl SemanticVisitor for ViewDependencyProbe<'_> {
     fn relation_identity(&mut self, name: &FullName) {
         self.found |= self.removed.contains(name);
+    }
+
+    fn schema_type(&mut self, reference: &TypeReference) -> Result<(), AnalysisError> {
+        if let Some(name) = reference.full_name() {
+            self.relation_identity(name);
+        }
+        Ok(())
     }
 
     fn expression(&mut self, expression: &SemScalarExpr) -> Result<(), AnalysisError> {

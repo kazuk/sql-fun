@@ -66,7 +66,10 @@ where
     None
 }
 
-fn search_schemas(context: &(impl BaseParseContext + ?Sized), temporary: bool) -> Vec<SchemaName> {
+pub(crate) fn search_schemas(
+    context: &(impl BaseParseContext + ?Sized),
+    temporary: bool,
+) -> Vec<SchemaName> {
     let postgres = Dialect::from(context.metadata()) == Dialect::postgres();
     let temp = SchemaName::from(if postgres { "pg_temp" } else { "temp" });
     let catalog = SchemaName::from("pg_catalog");

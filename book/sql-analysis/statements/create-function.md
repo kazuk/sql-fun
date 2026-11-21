@@ -76,6 +76,20 @@ preserves the function name and signature, including the distinction between
 an omitted signature and explicit empty parentheses. Statements that combine
 `PARALLEL` with other actions are unsupported in this conversion.
 
-Schema and extension analysis stops when it reaches one of these converted
-statements. Semantic interpretation is tracked in
-[#1172](https://github.com/kazuk/sql-fun/issues/1172).
+Schema and extension analysis records the requested mode on the selected
+function. An explicit signature matches exact input argument types, including
+`INOUT` and `VARIADIC` arguments. Argument names and `OUT`-only arguments do
+not participate in matching. Empty parentheses select a zero-input function.
+Without a signature, the function name must identify a single visible candidate.
+An unqualified name uses the search path, where an earlier schema hides a
+later candidate with the same input signature. A schema-qualified name
+restricts lookup to that schema. Ordinary and window functions can be altered.
+
+Missing and ambiguous targets report
+[`ownership_target_not_found`](../../diagnostics/ownership_target_not_found.md)
+and [`ownership_target_ambiguous`](../../diagnostics/ownership_target_ambiguous.md).
+An unknown input type reports
+[`ownership_argument_type_not_found`](../../diagnostics/ownership_argument_type_not_found.md).
+An explicitly matched procedure or a selected aggregate reports
+[`ownership_invalid_target_kind`](../../diagnostics/ownership_invalid_target_kind.md).
+Analysis continues after a rejected change using the existing definition.

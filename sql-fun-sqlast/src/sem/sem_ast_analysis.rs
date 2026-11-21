@@ -5,13 +5,14 @@ use crate::{
     ast::{Statement as AstStatement, StatementNode as AstStatementNode},
     context::ParseContext,
     sem::{
-        AlterOwner, AlterSequence, AnalysisError, Comment, CreateCompositeType, CreateDomain,
-        CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex,
-        CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger,
-        CreateView, DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger,
-        EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
-        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
-        SelectStatement, SemAst, UpdateStatement, VariableSet,
+        AlterFunctionParallel, AlterOwner, AlterSequence, AnalysisError, Comment,
+        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateForeignDataWrapper,
+        CreateFunction, CreateIndex, CreateRule, CreateSchema, CreateSequence, CreateTable,
+        CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropFunction, DropRule,
+        DropTable, DropTrigger, EngineFeatureValidation, ExtensionMembershipChange,
+        InsertStatement, MergeStatement, ObjectPrivilegeChange, ParameterConstraints,
+        RelationAlteration, RoleMembershipDeclaration, SelectStatement, SemAst, UpdateStatement,
+        VariableSet,
     },
 };
 
@@ -37,8 +38,8 @@ impl SemAst {
             AstStatementNode::ExtensionMembership(ast) => Ok(Self::ExtensionMembership(Box::new(
                 ExtensionMembershipChange::analyze(ast, context)?,
             ))),
-            AstStatementNode::AlterFunctionParallel(_) => {
-                todo!("ALTER FUNCTION PARALLEL interpretation (#1172)")
+            AstStatementNode::AlterFunctionParallel(ast) => {
+                AlterFunctionParallel::analyze(ast, context).map(Self::AlterFunctionParallel)
             }
             AstStatementNode::DropFunction(ast) => {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
@@ -205,6 +206,14 @@ impl SemAst {
             }
             AstStatementNode::Sequence(sequence) => {
                 CreateSequence::from_ast_and_apply(sequence, context)
+            }
+            AstStatementNode::AlterFunctionParallel(ast) => {
+                let statement = AlterFunctionParallel::analyze(ast, &mut context)?;
+                let context = context.apply_alter_function_parallel(&statement)?;
+                Ok(AstAndContextPair::new(
+                    Self::AlterFunctionParallel(statement),
+                    context,
+                ))
             }
             AstStatementNode::DropFunction(ast) => {
                 let statement = DropFunction::analyze(ast, &mut context)?;

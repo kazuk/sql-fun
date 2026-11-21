@@ -7,9 +7,9 @@ use crate::{
     },
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, CreateFunction, DropFunction, FunctionOverloadCollection,
-        FunctionTombstone, OverloadVariant, OwnershipIdentity, ViewTombstone,
-        problem::CreationProblem,
+        AlterFunctionParallel, AnalysisError, AnalysisProblem, CreateFunction, DropFunction,
+        FunctionOverloadCollection, FunctionTombstone, OverloadVariant, OwnershipIdentity,
+        ViewTombstone, problem::CreationProblem,
     },
 };
 
@@ -67,21 +67,17 @@ impl FunctionInfoRead for SchemaCatalog {
     }
 
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
-        if self
-            .function_tombstones
-            .keys()
-            .any(|identity| identity.name() == name)
+        if self.functions.definitions(name).is_empty()
+            && !self
+                .function_tombstones
+                .keys()
+                .any(|identity| identity.name() == name)
         {
-            return self
-                .routine_definitions(name)
-                .iter()
-                .any(CreateFunction::catalog_aggregate);
-        }
-        let local = self.functions.definitions(name);
-        if local.is_empty() {
             self.base.is_aggregate_impl(name)
         } else {
-            local.iter().any(CreateFunction::catalog_aggregate)
+            self.routine_definitions(name)
+                .iter()
+                .any(CreateFunction::catalog_aggregate)
         }
     }
     fn function_returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
@@ -235,6 +231,23 @@ mod test_expression_classification {
 }
 
 impl FunctionInfoWrite for SchemaFileContext {
+    fn apply_alter_function_parallel(
+        mut self,
+        statement: &AlterFunctionParallel,
+    ) -> Result<Self, AnalysisError> {
+        let Some(identity) = statement.target().identity() else {
+            return Ok(self);
+        };
+        let Some(mut definition) = self.exact_routine_definition(identity) else {
+            return AnalysisError::raise_unexpected_input(
+                "ALTER FUNCTION definition missing from catalog",
+            );
+        };
+        definition.change_parallel_safety(statement);
+        self.catalog.functions.insert(identity.name(), &definition);
+        Ok(self)
+    }
+
     fn apply_drop_function(mut self, statement: &DropFunction) -> Result<Self, AnalysisError> {
         if !statement.applicable() {
             return Ok(self);
@@ -242,11 +255,7 @@ impl FunctionInfoWrite for SchemaFileContext {
         let cause = std::sync::Arc::new(statement.clone());
         let mut removals = Vec::new();
         for identity in statement.targets() {
-            let Some(definition) = self
-                .routine_definitions(identity.name())
-                .into_iter()
-                .find(|definition| definition.ownership_identity(identity.name()) == *identity)
-            else {
+            let Some(definition) = self.exact_routine_definition(identity) else {
                 return AnalysisError::raise_unexpected_input(
                     "DROP FUNCTION definition missing from catalog",
                 );
@@ -328,6 +337,148 @@ impl FunctionInfoWrite for SchemaFileContext {
             self.record_extension_member(&member);
         }
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod test_parallel_safety_catalog_transition {
+    use std::path::Path;
+
+    use crate::{
+        StringSpan,
+        ast::{ObjectKind, StatementNode},
+        context::{FunctionInfoWrite, MutSourcePathWithSpan, OwnershipInfoRead, ParseContext},
+        names::FullName,
+        sem::{
+            AlterFunctionParallel, OwnershipIdentity, ParallelSafety, PgBuiltInType, SemAst,
+            SourcePathWithSpan,
+        },
+        test_helpers::{
+            ownership::{apply_ownership_sql, ownership_context, ownership_statement},
+            schema_layer,
+        },
+    };
+
+    // The schema application path must retain the analyzed statement and publish
+    // an exact-overload copy that subsequent analyses can read.
+    #[test]
+    fn preserves_parent_siblings_and_ordered_source_history() -> testresult::TestResult {
+        let mut context = ownership_context();
+        for sql in [
+            "CREATE FUNCTION public.f(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+            "CREATE FUNCTION public.f(text) RETURNS text LANGUAGE sql AS 'SELECT $1'",
+            "ALTER FUNCTION public.f(integer) OWNER TO alice",
+            "ALTER FUNCTION public.f(integer) PARALLEL SAFE",
+        ] {
+            context = apply_ownership_sql(context, sql)?.into_context();
+        }
+        let parent = context.freeze();
+        let path = Path::new("alter.sql");
+        let mut context = schema_layer(path, &parent);
+        let name = FullName::with_schema("public", "f");
+        let identity = OwnershipIdentity::with_arguments(
+            ObjectKind::FUNCTION,
+            &name,
+            &[Some(PgBuiltInType::int4())],
+        );
+        let sibling = OwnershipIdentity::with_arguments(
+            ObjectKind::FUNCTION,
+            &name,
+            &[Some(PgBuiltInType::text())],
+        );
+        let previous = parent.exact_routine_definition(&identity).unwrap();
+
+        for (offset, mode, sql) in [
+            (
+                10,
+                ParallelSafety::Restricted,
+                "ALTER FUNCTION public.f(integer) PARALLEL RESTRICTED",
+            ),
+            (
+                90,
+                ParallelSafety::Unsafe,
+                "ALTER FUNCTION public.f(integer) PARALLEL UNSAFE",
+            ),
+        ] {
+            let span = StringSpan::new(offset, sql.len());
+            let source = SourcePathWithSpan::new(path, &span);
+            context.set_source_path_with_span(&source);
+            let result = apply_ownership_sql(context, sql)?;
+            let SemAst::AlterFunctionParallel(statement) = result.ast() else {
+                panic!("expected analyzed ALTER FUNCTION");
+            };
+            assert_eq!(statement.target().identity(), Some(&identity));
+            assert_eq!(statement.mode(), mode);
+            let location = statement.source().unwrap();
+            assert_eq!(location.source_path(), path);
+            assert_eq!(location.span(), &span);
+            context = result.into_context();
+        }
+
+        let query = apply_ownership_sql(context, "SELECT public.f(1), public.f('x'::text)")?;
+        assert!(matches!(query.ast(), SemAst::SelectStatement(_)));
+        assert!(query.context().problems().is_empty());
+        let child = query.into_context().freeze();
+        let definition = child.exact_routine_definition(&identity).unwrap();
+        assert_eq!(definition.parallel_safety(), Some(ParallelSafety::Unsafe));
+        assert_eq!(definition.owner(), previous.owner());
+        assert_eq!(previous.parallel_safety(), Some(ParallelSafety::Safe));
+        assert_eq!(
+            parent
+                .exact_routine_definition(&identity)
+                .unwrap()
+                .parallel_changes()
+                .len(),
+            1
+        );
+        assert!(
+            child
+                .exact_routine_definition(&sibling)
+                .unwrap()
+                .parallel_changes()
+                .is_empty()
+        );
+
+        let changes = definition.parallel_changes();
+        assert_eq!(changes.len(), 3);
+        assert_eq!(changes[0].mode(), ParallelSafety::Safe);
+        assert_eq!(changes[1].mode(), ParallelSafety::Restricted);
+        assert_eq!(changes[2].mode(), ParallelSafety::Unsafe);
+        assert_eq!(changes[1].source().unwrap().span().offset(), 10);
+        assert_eq!(changes[2].source().unwrap().span().offset(), 90);
+        Ok(())
+    }
+
+    #[test]
+    fn discarded_diagnostics_do_not_apply_rejected_change() -> testresult::TestResult {
+        let mut context = ownership_context();
+        for sql in [
+            "CREATE FUNCTION public.f() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+            "CREATE FUNCTION public.f(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+            "ALTER FUNCTION public.f() PARALLEL SAFE",
+        ] {
+            context = apply_ownership_sql(context, sql)?.into_context();
+        }
+        let syntax = ownership_statement("ALTER FUNCTION public.f PARALLEL UNSAFE")?;
+        let StatementNode::AlterFunctionParallel(ast) = syntax else {
+            panic!("expected ALTER FUNCTION");
+        };
+        context.begin_parameter_type_analysis();
+        let rejected = AlterFunctionParallel::analyze(&ast, &mut context)?;
+        assert!(!rejected.applicable());
+        assert_eq!(context.analysis_state_mut().take_problems().len(), 1);
+        let context = context.apply_alter_function_parallel(&rejected)?;
+        let subsequent = apply_ownership_sql(context, "SELECT public.f()")?;
+        assert!(subsequent.context().problems().is_empty());
+        let identity =
+            OwnershipIdentity::with_arguments(ObjectKind::FUNCTION, &"public.f".parse()?, &[]);
+        let definition = subsequent
+            .context()
+            .exact_routine_definition(&identity)
+            .unwrap();
+        assert_eq!(definition.parallel_safety(), Some(ParallelSafety::Safe));
+        assert_eq!(definition.parallel_changes().len(), 1);
+        Ok(())
     }
 }
 

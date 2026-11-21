@@ -617,7 +617,7 @@ impl crate::context::OwnershipInfoRead for BaseContext {
         for definition in &mut definitions {
             if let Some(overload) = definition.overloads().get_at(0) {
                 definition.set_builtin_properties(
-                    builtin_aggregate(name),
+                    self.functions.is_aggregate(name, overload),
                     self.functions.returns_set(name, overload),
                 );
             }

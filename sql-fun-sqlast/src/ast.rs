@@ -1859,7 +1859,7 @@ pub(crate) enum RuleEvent {
     Delete,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct AlterFunctionParallel {
     target: ObjectTarget,
     option: ddl::FunctionOption,

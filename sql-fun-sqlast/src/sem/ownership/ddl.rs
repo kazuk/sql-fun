@@ -453,7 +453,7 @@ impl RequestedIdentity {
         )
     }
 
-    pub(crate) fn resolve_extension_routine(&self, context: &impl ParseContext) -> OwnershipLookup {
+    pub(crate) fn resolve_routine(&self, context: &impl ParseContext) -> OwnershipLookup {
         let identity = &self.identity;
         if !self.missing_types.is_empty() {
             return OwnershipLookup::argument_type_not_found(identity, &self.missing_types);

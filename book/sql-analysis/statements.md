@@ -171,10 +171,6 @@ membership statements. Schema-file analysis can apply supported forms
 PostgreSQL `DROP VIEW` stops during semantic analysis before removing the
 view, including in `pg_stat_statements` update scripts
 ([#1175](https://github.com/kazuk/sql-fun/issues/1175)).
-Bundled extension scripts can also stop during semantic interpretation of
-[ALTER FUNCTION PARALLEL](statements/create-function.md#alter-function-parallel),
-including during a `pageinspect` update. See the
-[bundled extension audit][audit-1150] for affected versions.
 
 `ALTER DEFAULT PRIVILEGES` and `CREATE FOREIGN TABLE` support syntax recognition
 and SQL text generation, including PostgreSQL 18's `ON LARGE OBJECTS` and
@@ -197,7 +193,5 @@ syntax conversion, but semantic analysis is unimplemented and can terminate
 analysis ([#1098](https://github.com/kazuk/sql-fun/issues/1098)). Notification
 delivery and SQL rendering are not supported. For NOTIFY within a rule, see
 [CREATE RULE](statements/rules.md).
-
-[audit-1150]: https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7035507185
 
 [fdw-diagnostic]: ../diagnostics/foreign_data_wrapper_invalid_definition.md

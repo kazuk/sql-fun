@@ -4,6 +4,7 @@ mod alter_column;
 mod alter_column_definition;
 mod alter_column_type;
 mod alter_constraint;
+mod alter_function_parallel;
 mod alter_index;
 mod alter_owner;
 mod alter_seq;
@@ -98,6 +99,7 @@ pub use self::{
     alter_constraint::{
         AlterConstraint, ConstraintAction, ConstraintChangeOutcome, ConstraintTarget,
     },
+    alter_function_parallel::{AlterFunctionParallel, ParallelSafety},
     column_drop::{
         ColumnDrop, ColumnDropOutcome, DropDependency, DropDependencyDecision, DropDependencyKind,
         DropKnowledgeGap,
@@ -394,6 +396,8 @@ pub enum SemAst {
 
     /// `drop table` statement
     DropTable(DropTable),
+    /// Analyzed PostgreSQL ALTER FUNCTION PARALLEL.
+    AlterFunctionParallel(AlterFunctionParallel),
     /// Analyzed PostgreSQL DROP FUNCTION.
     DropFunction(DropFunction),
 
@@ -443,6 +447,7 @@ impl SemAst {
             Self::AlterTable(table) => table.visit_references(visitor),
             Self::AlterView(view) => view.visit_references(visitor),
             Self::AlterOwner(owner) => owner.visit_references(visitor),
+            Self::AlterFunctionParallel(statement) => statement.visit_references(visitor),
             Self::CreateSequence(sequence) => {
                 if let Some(table) = sequence.owned_by() {
                     visitor.schema_relation(table.full_name(), false)?;

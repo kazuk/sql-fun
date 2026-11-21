@@ -429,11 +429,7 @@ impl SchemaFileContext {
 
     fn change_routine_owner(&mut self, identity: &OwnershipIdentity, owner: &OwnerSpecification) {
         let name = identity.name();
-        if let Some(mut definition) = self
-            .routine_definitions(name)
-            .into_iter()
-            .find(|definition| definition.ownership_identity(name) == *identity)
-        {
+        if let Some(mut definition) = self.exact_routine_definition(identity) {
             definition.change_owner(owner);
             self.catalog.functions.insert(name, &definition);
         } else {

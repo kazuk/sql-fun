@@ -511,3 +511,9 @@ unrelated column on the same non-deprecated table. The shared runner stages its
 `<fixture>.lint.toml` next to the generated datasource metadata so that
 `lint_configuration` selects it by its relative path. These cases cover
 query-level warnings through both source and installed CLI checks.
+
+Issue #1172 covers single-action ALTER FUNCTION PARALLEL in
+`alter-function-parallel` on PostgreSQL 17/18. It verifies target diagnostics
+and use of altered routines in subsequent schema statements and queries
+through the source and installed runners. Rust tests cover stored modes,
+source history and layer isolation.

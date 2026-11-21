@@ -10,6 +10,7 @@ An ALTER OWNER target signature contains an input argument type that cannot be
 resolved in the selected catalog. Output-only OUT/TABLE argument declarations
 are not input signature types. PostgreSQL `DROP FUNCTION` also reports this
 diagnostic for an unresolved input type when `IF EXISTS` is omitted.
+`ALTER FUNCTION ... PARALLEL` reports it for an unresolved input type.
 PostgreSQL `ALTER EXTENSION ... ADD/DROP` reports it when a member signature
 or cast type is unresolved.
 

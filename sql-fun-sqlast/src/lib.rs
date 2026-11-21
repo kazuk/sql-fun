@@ -310,6 +310,65 @@ impl PostgresDialect {
     }
 }
 
+#[cfg(test)]
+mod test_extension_parallel_safety {
+    use crate::{
+        PostgresDialect, SqlFileSnapshot,
+        ast::ObjectKind,
+        context::{
+            BaseParseContext, ExtensionInfoRead, OwnershipInfoRead, ParseContext, ViewInfoRead,
+        },
+        names::{FullName, SchemaName},
+        sem::{OwnershipIdentity, ParallelSafety},
+        test_helpers::{ownership::ownership_context, schema_content_hash::schema_file},
+    };
+
+    // Exercise the real extension loader, including its search path and the
+    // catalog visible to the next statement in the prepared script.
+    #[test]
+    fn prepared_script_alters_function_and_continues() -> testresult::TestResult {
+        let environment = ownership_context();
+        let input = ownership_context().freeze();
+        let file = schema_file(
+            "CREATE FUNCTION extension_probe() RETURNS integer LANGUAGE sql AS 'SELECT 1';\n
+             ALTER FUNCTION extension_probe() PARALLEL SAFE;\n
+             CREATE VIEW extension_result AS SELECT extension_probe() AS value;",
+        );
+        let snapshot = SqlFileSnapshot::read(file.path())?;
+        let parsed = PostgresDialect::parse_extension_snapshot(
+            &snapshot,
+            &input,
+            environment.get_args(),
+            environment.metadata(),
+            &[SchemaName::from("public")],
+            ("parallel_probe", Some("public")),
+        )?;
+        assert!(parsed.problems().is_empty());
+        let catalog = parsed.base_context();
+        let function = FullName::with_schema("public", "extension_probe");
+        let identity = OwnershipIdentity::with_arguments(ObjectKind::FUNCTION, &function, &[]);
+        let definition = catalog.exact_routine_definition(&identity).unwrap();
+        assert_eq!(definition.parallel_safety(), Some(ParallelSafety::Safe));
+        assert_eq!(
+            catalog.extension_membership(&identity),
+            Some("parallel_probe")
+        );
+        assert_eq!(
+            definition.parallel_changes()[0]
+                .source()
+                .unwrap()
+                .source_path(),
+            file.path()
+        );
+        assert!(
+            catalog
+                .get_view_impl(&FullName::with_schema("public", "extension_result"))
+                .is_some()
+        );
+        Ok(())
+    }
+}
+
 // TODO(msrv >= 1.98): replace with str::substr_range
 fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
     let base = haystack.as_ptr() as usize;

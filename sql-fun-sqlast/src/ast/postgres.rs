@@ -3,7 +3,7 @@ use crate::{
     ast::{
         Access, AlterFunctionParallel, AlterOwner, AlterRelation, AlterSequence, BooleanExpr,
         BooleanOperator, Call, CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment,
-        CompositeType, CreateRule, CreateTrigger, CurrentOf, DefaultPrivileges, Delete,
+        CompositeType, CreateRule, CreateTrigger, CreateType, CurrentOf, DefaultPrivileges, Delete,
         DomainConstraintTarget, DropBehavior, DropFunction, DropRule, DropTable, DropTrigger,
         DropView, EnumType, Expr, Extension, ExtensionMembership, ForeignDataWrapper, ForeignTable,
         Indirection, Insert, Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument,
@@ -824,6 +824,15 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 &variable_set,
                 tokens,
             )?));
+        }
+        if let Some(define) = value.as_define_stmt().as_inner()
+            && matches!(
+                define.get_kind().as_inner(),
+                Some(syn::ObjectType::ObjectType)
+            )
+        {
+            let create_type = CreateType::try_from_with_tokens(&define, tokens)?;
+            return Ok(Self::create_type(create_type));
         }
         if let Some(enum_type) = value.as_create_enum_stmt().as_inner() {
             return Ok(Self::enum_type(EnumType::try_from(&enum_type)?));
@@ -1845,7 +1854,7 @@ impl TryFromWithTokens<&syn::ParamRef> for Parameter {
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             position: value.get_number() as u32,
-            location: call_argument_token_span(value.get_location(), tokens),
+            location: anchored_token_span(value.get_location(), tokens),
             name: None,
             type_name: None,
         })
@@ -2232,7 +2241,10 @@ mod test_source_span {
     }
 }
 
-fn call_argument_token_span(location: i32, tokens: &IVec<syn::ScanToken>) -> Option<StringSpan> {
+pub(super) fn anchored_token_span(
+    location: i32,
+    tokens: &IVec<syn::ScanToken>,
+) -> Option<StringSpan> {
     if location < 0 {
         return None;
     }
@@ -2250,31 +2262,31 @@ fn call_argument_token_span(location: i32, tokens: &IVec<syn::ScanToken>) -> Opt
 // Keep absent parser anchors absent rather than guessing an expression location.
 fn call_argument_span(node: &syn::Node, tokens: &IVec<syn::ScanToken>) -> Option<StringSpan> {
     if let Some(value) = node.as_column_ref().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_param_ref().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_func_call().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_a_expr().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_type_cast().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_a_array_expr().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_row_expr().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_case_expr().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     if let Some(value) = node.as_named_arg_expr().as_inner() {
-        return call_argument_token_span(value.get_location(), tokens);
+        return anchored_token_span(value.get_location(), tokens);
     }
     None
 }
@@ -2306,8 +2318,8 @@ mod test_call_argument_span {
             None
         };
         assert_eq!(text, expected);
-        assert!(super::call_argument_token_span(-1, &tokens).is_none());
-        assert!(super::call_argument_token_span(sql.len() as i32, &tokens).is_none());
+        assert!(super::anchored_token_span(-1, &tokens).is_none());
+        assert!(super::anchored_token_span(sql.len() as i32, &tokens).is_none());
     }
 }
 

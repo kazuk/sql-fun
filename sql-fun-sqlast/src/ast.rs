@@ -9,6 +9,7 @@
 #![allow(dead_code)]
 
 pub(crate) mod client_type;
+mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;
 pub(crate) mod deparse;
@@ -36,6 +37,7 @@ mod trigger;
 pub(crate) mod validation;
 
 pub(crate) use self::{
+    create_type::CreateType,
     ddl::{CompositeType, Domain, Function, Index, Schema, TableAs},
     deparse::render_full_name,
     document::{
@@ -293,6 +295,7 @@ pub(crate) enum StatementNode {
     ExtensionMembership(ExtensionMembership),
     VariableSet(VariableSet),
     EnumType(EnumType),
+    CreateType(CreateType),
     Sequence(Sequence),
     DropTable(DropTable),
     DropView(DropView),
@@ -395,6 +398,10 @@ impl StatementNode {
 
     const fn variable_set(value: VariableSet) -> Self {
         Self::VariableSet(value)
+    }
+
+    const fn create_type(value: CreateType) -> Self {
+        Self::CreateType(value)
     }
 
     const fn enum_type(value: EnumType) -> Self {

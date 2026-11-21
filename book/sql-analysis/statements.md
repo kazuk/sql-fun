@@ -53,6 +53,12 @@ reports an object-identity conflict. Statement-specific existence diagnostics
 and permitted no-op or replacement behavior are described on the statement
 pages.
 
+## PostgreSQL view removal
+
+The parser recognizes PostgreSQL `DROP VIEW`. Schema analysis stops when it
+reaches the statement. View removal during schema analysis is tracked in
+[#1175](https://github.com/kazuk/sql-fun/issues/1175).
+
 ## Unimplemented SQLite and Turso statement analysis
 
 The following SQLite/Turso statements are recognized but cannot yet be analyzed

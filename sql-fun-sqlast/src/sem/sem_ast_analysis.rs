@@ -34,6 +34,7 @@ impl SemAst {
                 todo!("ALTER FUNCTION PARALLEL interpretation (#1172)")
             }
             AstStatementNode::DropFunction(_) => todo!("DROP FUNCTION interpretation (#1165)"),
+            AstStatementNode::DropView(_) => todo!("PostgreSQL DROP VIEW interpretation"),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
             }

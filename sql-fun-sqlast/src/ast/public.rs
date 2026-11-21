@@ -119,6 +119,8 @@ pub enum StatementKind {
     AlterFunctionParallel,
     /// A PostgreSQL DROP FUNCTION statement.
     DropFunction,
+    /// A PostgreSQL DROP VIEW statement.
+    DropView,
     /// A PostgreSQL extension membership change.
     AlterExtensionMembership,
     /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
@@ -190,6 +192,7 @@ impl std::fmt::Display for StatementKind {
             Self::DropRule => "DROP RULE",
             Self::AlterFunctionParallel => "ALTER FUNCTION",
             Self::DropFunction => "DROP FUNCTION",
+            Self::DropView => "DROP VIEW",
             Self::AlterExtensionMembership => "ALTER EXTENSION",
             Self::CreateTrigger => "CREATE TRIGGER",
             Self::CreateRule => "CREATE RULE",
@@ -404,6 +407,7 @@ impl StatementNode {
             Self::DropTrigger(_) => StatementKind::drop_trigger(),
             Self::AlterFunctionParallel(_) => StatementKind::alter_function_parallel(),
             Self::DropFunction(_) => StatementKind::DropFunction,
+            Self::DropView(_) => StatementKind::DropView,
             Self::ExtensionMembership(_) => StatementKind::AlterExtensionMembership,
             Self::DropRule(_) => StatementKind::drop_rule(),
             Self::Extension(_) => StatementKind::extension(),

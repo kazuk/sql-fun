@@ -5,7 +5,7 @@ use crate::{
         BooleanOperator, Call, CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment,
         CompositeType, CreateRule, CreateTrigger, CurrentOf, DefaultPrivileges, Delete,
         DomainConstraintTarget, DropBehavior, DropFunction, DropRule, DropTable, DropTrigger,
-        EnumType, Expr, Extension, ExtensionMembership, ForeignDataWrapper, ForeignTable,
+        DropView, EnumType, Expr, Extension, ExtensionMembership, ForeignDataWrapper, ForeignTable,
         Indirection, Insert, Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument,
         ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter,
         Query, Role, RoleMembership, Sequence, Slice, SqlValue, StatementNode, Subquery,
@@ -847,6 +847,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 Some(syn::ObjectType::ObjectRule) => {
                     Ok(Self::drop_rule(DropRule::try_from(&drop)?))
                 }
+                Some(syn::ObjectType::ObjectView) => {
+                    Ok(Self::drop_view(DropView::try_from(&drop)?))
+                }
                 _ => Ok(Self::drop_table(DropTable::try_from(&drop)?)),
             };
         }
@@ -1290,6 +1293,60 @@ mod test_drop_function {
     }
 }
 
+fn drop_relation_names(value: &syn::DropStmt) -> Result<Vec<Name>, AnalysisError> {
+    let objects = required(value.get_objects().as_inner(), "drop_stmt.objects")?;
+    objects
+        .iter()
+        .map(|object| Name::try_from(object.as_list().get_items()))
+        .collect()
+}
+
+impl TryFrom<&syn::DropStmt> for DropView {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::DropStmt) -> Result<Self, Self::Error> {
+        Ok(Self {
+            targets: drop_relation_names(value)?,
+            if_exists: value.get_missing_ok(),
+            behavior: DropBehavior::try_from(value.get_behavior().as_inner())?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_drop_view {
+    use crate::{
+        ast::{Dialect, DropBehavior, StatementKind, StatementNode},
+        parse_statements,
+    };
+
+    #[rstest::rstest]
+    #[case::bundled("DROP VIEW pg_stat_statements;", &[["pg_stat_statements"].as_slice()], false, DropBehavior::Restrict)]
+    #[case::restrict(r#"DROP VIEW IF EXISTS "My.Schema".First, public."Second" RESTRICT"#, &[["My.Schema", "first"].as_slice(), ["public", "Second"].as_slice()], true, DropBehavior::Restrict)]
+    #[case::cascade("DROP VIEW public.v CASCADE", &[["public", "v"].as_slice()], false, DropBehavior::Cascade)]
+    fn retains_drop_view(
+        #[case] sql: &str,
+        #[case] targets: &[&[&str]],
+        #[case] if_exists: bool,
+        #[case] behavior: DropBehavior,
+    ) -> testresult::TestResult {
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .expect("DROP VIEW")?;
+        assert_eq!(statement.kind(), StatementKind::DropView);
+        let StatementNode::DropView(drop) = statement.into_test_node() else {
+            panic!("DROP VIEW");
+        };
+        assert_eq!(drop.targets.len(), targets.len());
+        for (name, expected) in drop.targets.iter().zip(targets) {
+            assert_eq!(name.0.as_slice(), *expected);
+        }
+        assert_eq!(drop.if_exists, if_exists);
+        assert_eq!(drop.behavior, behavior);
+        Ok(())
+    }
+}
+
 impl TryFrom<&syn::DropStmt> for DropTable {
     type Error = AnalysisError;
 
@@ -1300,11 +1357,7 @@ impl TryFrom<&syn::DropStmt> for DropTable {
         ) {
             return AnalysisError::raise_unexpected_input("drop statement object type");
         }
-        let objects = required(value.get_objects().as_inner(), "drop_stmt.objects")?;
-        let names = objects
-            .iter()
-            .map(|object| Name::try_from(object.as_list().get_items()))
-            .collect::<Result<Vec<_>, _>>()?;
+        let names = drop_relation_names(value)?;
         Ok(Self::new(
             names,
             value.get_missing_ok(),

@@ -605,6 +605,8 @@ impl SchemaCacheService {
         let snapshot = SqlFileSnapshot::from_text(&path, sql);
         let mut hasher = Hasher::new();
         hasher.append_str("extension");
+        hasher.append_str(script.name());
+        hasher.append_str(&::serde_json::to_string(&schema).expect("schema serialization"));
         hasher.append_str(snapshot.content_hash());
         hasher.append_str(
             &::serde_json::to_string(&search_path).expect("string array serialization"),
@@ -622,6 +624,8 @@ impl SchemaCacheService {
             .iter()
             .map(|name| SchemaName::from(name))
             .collect();
+        let extension = script.name().to_owned();
+        let schema = schema.map(str::to_owned);
         let parent = parent.clone();
         let args = args.clone();
         let metadata = metadata.clone();
@@ -634,6 +638,7 @@ impl SchemaCacheService {
                 &args,
                 &metadata,
                 &search_path,
+                (&extension, schema.as_deref()),
             );
             let outcome = Self::outcome(parsed, &path, &base.diagnostics)?;
             let outcome = layers.publish(&key, &outcome);

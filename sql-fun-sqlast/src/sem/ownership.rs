@@ -219,6 +219,17 @@ impl OwnershipIdentity {
 
 impl std::fmt::Display for OwnershipIdentity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.kind == ObjectKind::CAST
+            && let Some([source, target]) = self.arguments()
+        {
+            let source = source
+                .as_ref()
+                .map_or_else(|| "unresolved type".to_owned(), ToString::to_string);
+            let target = target
+                .as_ref()
+                .map_or_else(|| "unresolved type".to_owned(), ToString::to_string);
+            return write!(f, "cast ({source} AS {target})");
+        }
         write!(f, "{} ", Self::owner_kind_label(self.kind))?;
         if self.kind == ObjectKind::OPERATOR {
             if let Some(catalog) = self.name.catalog() {

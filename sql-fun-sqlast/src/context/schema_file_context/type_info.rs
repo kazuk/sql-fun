@@ -1,5 +1,6 @@
 use crate::{
     TrieMap,
+    ast::ObjectKind,
     context::{
         BaseParseContext, TypeInfoRead, TypeInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
@@ -80,16 +81,19 @@ impl TypeInfoWrite for SchemaFileContext {
         self.catalog
             .objects
             .insert(&name.to_string(), Kind::composite_type());
+        self.record_named_extension_member(ObjectKind::TYPE, name);
     }
 
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {
         self.catalog.renamed_types.remove(name);
         self.catalog.types.insert_create_domain(name, create_domain);
+        self.record_named_extension_member(ObjectKind::DOMAIN, name);
     }
 
     fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
         self.catalog.renamed_types.remove(name);
         self.catalog.types.insert_create_enum(name, create_enum);
+        self.record_named_extension_member(ObjectKind::TYPE, name);
     }
 }
 

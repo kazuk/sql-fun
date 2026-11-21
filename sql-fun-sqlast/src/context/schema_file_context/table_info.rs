@@ -1,5 +1,6 @@
 use crate::{
     TrieMap,
+    ast::ObjectKind,
     context::{
         ParseContext, TableInfoRead, TableInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
@@ -170,6 +171,7 @@ impl TableInfoWrite for SchemaFileContext {
 
     fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
         self.catalog.store_table(name, create_table);
+        self.record_named_extension_member(ObjectKind::TABLE, name);
     }
 }
 

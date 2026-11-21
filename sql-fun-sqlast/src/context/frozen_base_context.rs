@@ -138,6 +138,17 @@ macro_rules! forward_catalog_reads {
             fn extension_exists(&self, name: &str) -> bool {
                 self.$catalog().extension_exists(name)
             }
+
+            fn extension_schema(&self, name: &str) -> Option<&str> {
+                self.$catalog().extension_schema(name)
+            }
+
+            fn extension_membership_history(
+                &self,
+                member: &crate::sem::OwnershipIdentity,
+            ) -> &[crate::sem::ExtensionMembershipChange] {
+                self.$catalog().extension_membership_history(member)
+            }
         }
 
         impl crate::context::RoleInfoRead for $context {
@@ -176,6 +187,10 @@ macro_rules! forward_catalog_reads {
             }
         }
         impl crate::context::CastInfoRead for $context {
+            fn has_declared_cast(&self, source: &TypeReference, target: &TypeReference) -> bool {
+                crate::context::CastInfoRead::has_declared_cast(self.$catalog(), source, target)
+            }
+
             fn get_assignment_cast(
                 &self,
                 source: &crate::sem::TypeReference,

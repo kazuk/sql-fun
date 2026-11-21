@@ -1,0 +1,56 @@
+[
+  {
+    "name": "released_function_remains_callable",
+    "sql": "SELECT public.former_member() AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "installed_function_remains_callable",
+    "sql": "SELECT public.membership_install_member() AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgraded_function_remains_callable",
+    "sql": "SELECT public.membership_released_member() AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

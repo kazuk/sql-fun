@@ -1,5 +1,6 @@
 use crate::{
     TrieMap,
+    ast::ObjectKind,
     context::{
         ParseContext, ViewInfoRead, ViewInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
@@ -118,6 +119,7 @@ impl ViewInfoWrite for SchemaFileContext {
                 }
                 self.catalog
                     .store_view(&name, &ViewLike::from(create_table_as))?;
+                self.record_named_extension_member(ObjectKind::MATERIALIZED_VIEW, &name);
                 Ok(self)
             }
             _ => {
@@ -145,6 +147,7 @@ impl ViewInfoWrite for SchemaFileContext {
         )? {
             return Ok(self);
         }
+        let is_new = self.get_view_impl(&name).is_none();
         let mut definition = ViewLike::from(create_view);
         if create_view.replace()
             && let Some(previous) = self.get_view_impl(&name)
@@ -170,6 +173,14 @@ impl ViewInfoWrite for SchemaFileContext {
             }
         }
         self.catalog.store_view(&name, &definition)?;
+        if is_new {
+            let kind = if create_view.is_materialized() {
+                ObjectKind::MATERIALIZED_VIEW
+            } else {
+                ObjectKind::VIEW
+            };
+            self.record_named_extension_member(kind, &name);
+        }
         Ok(self)
     }
 }

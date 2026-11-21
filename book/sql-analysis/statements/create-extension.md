@@ -2,8 +2,8 @@
 
 ## Overview
 
-The PostgreSQL schema analyzer records the requested extension name and
-supported IF NOT EXISTS behavior. A duplicate without that explicit flag reports
+The PostgreSQL schema analyzer records the requested extension name, the
+explicit SCHEMA option when present, and supported IF NOT EXISTS behavior. A duplicate without that explicit flag reports
 a creation conflict.
 
 ```sql

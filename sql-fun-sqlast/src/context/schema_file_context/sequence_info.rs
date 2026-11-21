@@ -1,5 +1,6 @@
 use crate::{
     TrieMap,
+    ast::ObjectKind,
     context::{
         ParseContext, SequenceInfoRead, SequenceInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
@@ -96,6 +97,7 @@ impl SequenceInfoWrite for SchemaFileContext {
         }
         self.catalog
             .store_sequence(&name, &create_sequence.with_catalog_name(&name));
+        self.record_named_extension_member(ObjectKind::SEQUENCE, &name);
         Ok(self)
     }
 }

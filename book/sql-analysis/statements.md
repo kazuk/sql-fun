@@ -147,13 +147,26 @@ not yet check or remove other
 dependents, such as triggers, rules and expression indexes. See
 [#1185](https://github.com/kazuk/sql-fun/issues/1185).
 
-PostgreSQL `ALTER EXTENSION ... ADD` and `ALTER EXTENSION ... DROP` membership
-syntax is recognized. When analysis reaches one of these statements in an
-extension script, it stops before resolving the target or applying the
-membership change. SQL rendering is also unimplemented. See the
-[extension membership analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1168).
-Transform targets (`TRANSFORM FOR type LANGUAGE language`) have a separate
-[tracking issue for lookup and catalog application](https://github.com/kazuk/sql-fun/issues/1187).
+PostgreSQL `ALTER EXTENSION ... ADD` and `ALTER EXTENSION ... DROP` resolve
+existing objects in the analysis catalog. Supply the extension through the
+configured extension loader or register its name with `CREATE EXTENSION`.
+Configured scripts establish membership for supported objects created during
+installation and updates. Routine signatures use exact input types. An omitted
+signature requires a unique visible match.
+
+ADD requires an object without an extension membership. DROP requires the
+object to belong to the named extension and leaves its definition available.
+Subsequent statements see the revised membership.
+
+Analysis stops on TRANSFORM targets
+([#1187](https://github.com/kazuk/sql-fun/issues/1187)) and on access methods,
+conversions, event triggers, foreign tables and servers, operator families,
+procedural languages, text search objects, and array types whose PostgreSQL
+catalog identities are unavailable
+([#1189](https://github.com/kazuk/sql-fun/issues/1189)).
+Commands that render the submitted SQL report `query_deparse` for standalone
+membership statements. Schema-file analysis can apply supported forms
+([#1190](https://github.com/kazuk/sql-fun/issues/1190)).
 
 PostgreSQL `DROP VIEW` stops during syntax conversion, including in
 `pg_stat_statements` update scripts

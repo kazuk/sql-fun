@@ -8,6 +8,13 @@ use crate::{
 use crate::context::schema_file_context::SchemaCatalog;
 
 impl CastInfoRead for SchemaCatalog {
+    fn has_declared_cast(&self, source: &TypeReference, target: &TypeReference) -> bool {
+        self.casts
+            .get(&source.to_string())
+            .is_some_and(|casts| casts.get(&target.to_string()).is_some())
+            || self.base.has_declared_cast(source, target)
+    }
+
     fn get_assignment_cast(
         &self,
         source: &TypeReference,

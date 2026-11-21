@@ -5,7 +5,7 @@ mod deparse;
 use crate::syn::sqlite::{DeferSubclause, GeneratedColumnType, RefAct, ResolveType};
 use crate::{
     error::AnalysisError,
-    syn::{Constraint, Constraint as SynConstraint},
+    syn::{Constraint, Constraint as SynConstraint, ObjectType},
 };
 
 /// foreign key match type
@@ -393,6 +393,7 @@ pub struct ObjectKind(u32);
 
 impl ObjectKind {
     pub(crate) const AGGREGATE: Self = Self(2);
+    pub(crate) const CAST: Self = Self(ObjectType::ObjectCast as u32);
     pub(crate) const COLLATION: Self = Self(8);
     pub(crate) const CONVERSION: Self = Self(9);
     pub(crate) const DATABASE: Self = Self(10);

@@ -1,7 +1,7 @@
 //! Retains unresolved PostgreSQL extension membership changes.
 
 use crate::{
-    ast::{Name, ObjectKind, ObjectTarget, TryFromWithTokens, postgres::required},
+    ast::{Name, ObjectKind, ObjectTarget, TryFromWithTokens, TypeName, postgres::required},
     error::AnalysisError,
     syn::{self, ListOpt, ObjectType, Opt, ScanToken},
 };
@@ -92,6 +92,37 @@ mod test_access_method_object {
 }
 
 impl ExtensionMembership {
+    pub(crate) fn extension(&self) -> &str {
+        &self.extension
+    }
+
+    pub(crate) fn is_add(&self) -> bool {
+        self.action == MembershipAction::Add
+    }
+
+    pub(crate) const fn kind(&self) -> ObjectKind {
+        self.member.kind
+    }
+
+    pub(crate) fn object_target(&self) -> Option<&ObjectTarget> {
+        match &self.member.target {
+            MemberTarget::Object(target) => Some(target),
+            MemberTarget::AccessMethodObject(_) => None,
+        }
+    }
+
+    pub(crate) fn access_method_target(&self) -> Option<(&Name, &str)> {
+        match &self.member.target {
+            MemberTarget::AccessMethodObject(target) => Some((&target.name, &target.method)),
+            MemberTarget::Object(_) => None,
+        }
+    }
+
+    pub(crate) fn cast_types(&self) -> Option<(&TypeName, &TypeName)> {
+        let cast = self.object_target()?.cast.as_ref()?;
+        Some((&cast.source, &cast.target))
+    }
+
     pub(crate) const fn targets_transform(&self) -> bool {
         self.member.kind.code() == ObjectType::ObjectTransform as u32
     }

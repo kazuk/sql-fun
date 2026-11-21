@@ -252,6 +252,7 @@ impl PostgresDialect {
         args: &::sql_fun_core::SqlFunArgs,
         metadata: &::sql_fun_core::SqlFunMetadata,
         search_path: &[names::SchemaName],
+        (extension, schema): (&str, Option<&str>),
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         Self::parse_schema_text(
             snapshot.text().to_owned(),
@@ -259,7 +260,7 @@ impl PostgresDialect {
             input_context,
             args,
             metadata,
-            Some(search_path),
+            Some((search_path, extension, schema)),
         )
     }
 
@@ -269,12 +270,13 @@ impl PostgresDialect {
         input_context: &FrozenBaseContext,
         args: &::sql_fun_core::SqlFunArgs,
         metadata: &::sql_fun_core::SqlFunMetadata,
-        search_path: Option<&[names::SchemaName]>,
+        extension_script: Option<(&[names::SchemaName], &str, Option<&str>)>,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         let statements = split_postgres_statements(&sql_statements)?;
         let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-        let previous_search_path = search_path.map(|path| {
+        let previous_search_path = extension_script.map(|(path, extension, schema)| {
+            context.enter_extension_script(extension, schema);
             let previous = context.get_search_path().to_vec();
             context.set_search_path(path);
             previous

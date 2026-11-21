@@ -540,10 +540,10 @@ impl FunctionParam {
             context
                 .resolve_type_name(&type_name)
                 .map(|name| TypeReference::concrete_type_ref(&name, true))
+        } else if let Some(definition) = context.get_declared_type(&type_name) {
+            definition.type_reference().cloned()
         } else {
-            context
-                .get_declared_type(&type_name)
-                .and_then(|definition| definition.type_reference().cloned())
+            None
         };
         let default = ast
             .default()

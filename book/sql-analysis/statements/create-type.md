@@ -23,12 +23,19 @@ PostgreSQL analysis supports enum and composite declarations. SQLite has no
 corresponding named enum or composite implementation. Defining a type does
 not install database input/output functions or validate values at runtime.
 
-Shell declarations (`CREATE TYPE name`) and base definitions
-(`CREATE TYPE name (...)`) are recognized. Schema and extension analysis stop
-when they reach either declaration because interpretation and catalog
-registration are pending
-([#1206](https://github.com/kazuk/sql-fun/issues/1206)). Range type
-declarations remain unsupported.
+In PostgreSQL schema and extension analysis, a shell declaration
+(`CREATE TYPE name`) reserves the type name so its input and output functions
+can declare it as an argument or result. A subsequent base definition
+(`CREATE TYPE name (...)`) resolves its support functions and makes the
+completed type and its `name[]` array form available to subsequent analysis.
+A shell cannot serve as a table column type.
+
+Generated array catalog names such as `_name` are not registered for
+user-defined base types ([#1209](https://github.com/kazuk/sql-fun/issues/1209)).
+Declare the shell explicitly before its functions. Implicit shell creation in
+C-language function declarations remains unsupported
+([#1210](https://github.com/kazuk/sql-fun/issues/1210)). Range type declarations
+remain unsupported.
 
 PostgreSQL ALTER TYPE operations that alter composite types remain unimplemented
 and can terminate analysis

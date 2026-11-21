@@ -134,10 +134,17 @@ Direct `analyze` and `test` inputs can report the semantic outcome and also
 emit `query_deparse` because executable SQL rendering for this statement
 is pending. See [#1182](https://github.com/kazuk/sql-fun/issues/1182).
 
-PostgreSQL `DROP FUNCTION` syntax is accepted during syntax conversion and can
-be rendered back to SQL. Analysis stops at function-drop interpretation,
-including when an extension script reaches the statement. See the
-[function-drop analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1165).
+PostgreSQL `DROP FUNCTION` removes the selected overload from subsequent
+schema and extension analysis. Supply the input argument types to select one
+overload, or omit the signature when the name identifies a unique function.
+`IF EXISTS` skips a missing target. An ambiguous name still produces a
+diagnostic.
+
+The default `RESTRICT` rejects removal when a view or materialized view
+depends on the function. `CASCADE` removes those dependent views, including
+views depending on them. Analysis does not yet check or remove other
+dependents, such as triggers, rules and expression indexes. See
+[#1185](https://github.com/kazuk/sql-fun/issues/1185).
 
 PostgreSQL `ALTER EXTENSION ... ADD` and `ALTER EXTENSION ... DROP` membership
 syntax is recognized. When analysis reaches one of these statements in an

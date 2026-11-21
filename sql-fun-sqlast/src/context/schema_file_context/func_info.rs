@@ -1,13 +1,15 @@
 use crate::{
     TrieMap,
+    ast::ObjectKind,
     context::{
         FunctionInfoRead, FunctionInfoWrite, OwnershipInfoRead, ParseContext,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, CreateFunction, FunctionOverloadCollection,
-        OverloadVariant, problem::CreationProblem,
+        AnalysisError, AnalysisProblem, CreateFunction, DropFunction, FunctionOverloadCollection,
+        FunctionTombstone, OverloadVariant, OwnershipIdentity, ViewTombstone,
+        drop_function::dependent_views, problem::CreationProblem,
     },
 };
 
@@ -44,6 +46,20 @@ impl FunctionDefinitionCollection {
 }
 
 impl FunctionInfoRead for SchemaCatalog {
+    fn function_tombstone(&self, identity: &OwnershipIdentity) -> Option<&FunctionTombstone> {
+        if let Some(tombstone) = self.function_tombstones.get(identity) {
+            return Some(tombstone);
+        }
+        if CreateFunction::contains_identity(
+            &self.functions.definitions(identity.name()),
+            identity.name(),
+            identity,
+        ) {
+            return None;
+        }
+        self.base.function_tombstone(identity)
+    }
+
     fn declared_routine_names(&self) -> Vec<FullName> {
         let mut names = self.base.declared_routine_names();
         self.functions.append_names(&mut names);
@@ -51,6 +67,16 @@ impl FunctionInfoRead for SchemaCatalog {
     }
 
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
+        if self
+            .function_tombstones
+            .keys()
+            .any(|identity| identity.name() == name)
+        {
+            return self
+                .routine_definitions(name)
+                .iter()
+                .any(CreateFunction::catalog_aggregate);
+        }
         let local = self.functions.definitions(name);
         if local.is_empty() {
             self.base.is_aggregate_impl(name)
@@ -59,6 +85,9 @@ impl FunctionInfoRead for SchemaCatalog {
         }
     }
     fn function_returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
+        if self.masks_overload(name, overload) {
+            return false;
+        }
         for definition in self.functions.definitions(name) {
             if definition
                 .overloads()
@@ -71,6 +100,9 @@ impl FunctionInfoRead for SchemaCatalog {
     }
 
     fn function_preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
+        if self.masks_overload(name, overload) {
+            return false;
+        }
         if let Some(preserves) = self
             .function_view_rows
             .get(&(name.clone(), overload.clone()))
@@ -106,6 +138,17 @@ impl FunctionInfoRead for SchemaCatalog {
         } else {
             Some(overloads)
         }
+    }
+}
+
+impl SchemaCatalog {
+    fn masks_overload(&self, name: &FullName, overload: &OverloadVariant) -> bool {
+        if self.function_tombstones.is_empty() {
+            return false;
+        }
+        let arguments = overload.declaration_arguments();
+        let identity = OwnershipIdentity::with_arguments(ObjectKind::FUNCTION, name, &arguments);
+        self.function_tombstones.contains_key(&identity)
     }
 }
 
@@ -192,6 +235,42 @@ mod test_expression_classification {
 }
 
 impl FunctionInfoWrite for SchemaFileContext {
+    fn apply_drop_function(mut self, statement: &DropFunction) -> Result<Self, AnalysisError> {
+        if !statement.applicable() {
+            return Ok(self);
+        }
+        let cause = std::sync::Arc::new(statement.clone());
+        let mut removals = Vec::new();
+        for identity in statement.targets() {
+            let Some(definition) = self
+                .routine_definitions(identity.name())
+                .into_iter()
+                .find(|definition| definition.ownership_identity(identity.name()) == *identity)
+            else {
+                return AnalysisError::raise_unexpected_input(
+                    "DROP FUNCTION definition missing from catalog",
+                );
+            };
+            removals.push((identity.clone(), FunctionTombstone::new(definition, &cause)));
+        }
+        let dependent_views = dependent_views(&self, statement.targets())?;
+        if !statement.cascade()
+            && let Some((name, _)) = dependent_views.first()
+        {
+            self.report_analysis_problem(AnalysisProblem::DropFunctionDependency(name.into()))?;
+            return Ok(self);
+        }
+        for (name, definition) in dependent_views {
+            // The relation's composite row type disappears with the view.
+            self.catalog.renamed_types.insert(name.clone());
+            self.catalog
+                .view_tombstones
+                .insert(name, ViewTombstone::new(definition, &cause));
+        }
+        self.catalog.function_tombstones.extend(removals);
+        Ok(self)
+    }
+
     fn apply_function_view_rows(
         mut self,
         function: &CreateFunction,
@@ -234,9 +313,106 @@ impl FunctionInfoWrite for SchemaFileContext {
             candidates.push(candidate);
         }
         for candidate in candidates {
+            self.catalog
+                .function_tombstones
+                .remove(&candidate.ownership_identity(name));
             self.catalog.functions.insert(name, &candidate);
         }
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod test_drop_function {
+    use std::path::Path;
+
+    use crate::{
+        ast::ObjectKind,
+        context::{FunctionInfoRead, MutSourcePathWithSpan, ParseContext, ViewInfoRead},
+        names::FullName,
+        sem::{OwnershipIdentity, PgBuiltInType, SourcePathWithSpan},
+        test_helpers::{
+            ownership::{apply_ownership_sql, ownership_context},
+            schema_layer, source_span,
+        },
+    };
+
+    #[test]
+    fn rejected_drop_is_atomic_and_cascade_retains_shared_provenance() -> testresult::TestResult {
+        let context = apply_ownership_sql(
+            ownership_context(),
+            "CREATE FUNCTION public.f(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+        )?
+        .into_context();
+        let context = apply_ownership_sql(
+            context,
+            "CREATE FUNCTION public.f(text) RETURNS text LANGUAGE sql AS 'SELECT $1'",
+        )?
+        .into_context();
+        let context =
+            apply_ownership_sql(context, "CREATE VIEW public.v AS SELECT public.f(1) AS n")?
+                .into_context();
+        let parent = context.freeze();
+        let function = FullName::with_schema("public", "f");
+        let view = FullName::with_schema("public", "v");
+        let identity = OwnershipIdentity::with_arguments(
+            ObjectKind::FUNCTION,
+            &function,
+            &[Some(PgBuiltInType::int4())],
+        );
+
+        let restricted = apply_ownership_sql(
+            schema_layer(Path::new("restrict.sql"), &parent),
+            "DROP FUNCTION public.f(integer) RESTRICT",
+        )?;
+        assert!(!restricted.context().problems().is_empty());
+        assert!(restricted.context().function_tombstone(&identity).is_none());
+        assert!(restricted.context().get_view_impl(&view).is_some());
+
+        let cascade_path = Path::new("cascade.sql");
+        let mut context = schema_layer(cascade_path, &parent);
+        let drop_source = SourcePathWithSpan::new(cascade_path, source_span().span());
+        context.set_source_path_with_span(&drop_source);
+        let result = apply_ownership_sql(context, "DROP FUNCTION public.f(integer) CASCADE")?;
+        assert!(result.context().problems().is_empty());
+        let child = result.into_context().freeze();
+        let function_tombstone = child.function_tombstone(&identity).unwrap();
+        let view_tombstone = child.view_tombstone(&view).unwrap();
+        assert!(function_tombstone.definition().source().is_some());
+        assert_eq!(
+            function_tombstone.cause().source().unwrap().source_path(),
+            cascade_path
+        );
+        assert!(std::ptr::eq(
+            function_tombstone.cause(),
+            view_tombstone.cause()
+        ));
+        assert!(child.get_view_impl(&view).is_none());
+        assert!(parent.get_view_impl(&view).is_some());
+        assert!(parent.function_tombstone(&identity).is_none());
+        assert!(
+            child
+                .get_function_impl(&function)
+                .unwrap()
+                .get_at(1)
+                .is_none()
+        );
+
+        let recreated = apply_ownership_sql(
+            schema_layer(Path::new("recreate.sql"), &child),
+            "CREATE FUNCTION public.f(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+        )?;
+        assert!(recreated.context().problems().is_empty());
+        assert!(recreated.context().function_tombstone(&identity).is_none());
+        assert!(
+            recreated
+                .context()
+                .get_function_impl(&function)
+                .unwrap()
+                .get_at(1)
+                .is_some()
+        );
+        Ok(())
     }
 }
 

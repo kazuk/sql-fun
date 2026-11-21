@@ -172,6 +172,10 @@ def match_arms(body):
 # boundary, not code strings. New imports, aliases, Self::variant references
 # and constructor calls require a source review; unrelated edits do not.
 SOURCE_WITNESS = {
+    "sql-fun-sqlast/src/sem/drop_function.rs": {
+        "OwnershipLookup": 8,
+        "ownership_target": 2
+    },
     "sql-fun-core/src/analysis_problem.rs": {
         "ArgumentTypeMismatch": 5,
         "CaseWhenExprTypeUnknown": 4,

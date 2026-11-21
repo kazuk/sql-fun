@@ -40,6 +40,8 @@ mod declaration_collation;
 mod def_elem;
 mod delete_statement;
 mod deprecated_lint;
+pub(crate) mod drop_function;
+pub use drop_function::{DropFunction, FunctionTombstone, ViewTombstone};
 mod drop_rule_ast;
 mod drop_trigger;
 mod engine_features;
@@ -386,6 +388,8 @@ pub enum SemAst {
 
     /// `drop table` statement
     DropTable(DropTable),
+    /// Analyzed PostgreSQL DROP FUNCTION.
+    DropFunction(DropFunction),
 
     /// `create view` statement
     CreateView(CreateView),

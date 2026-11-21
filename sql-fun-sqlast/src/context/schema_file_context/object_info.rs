@@ -19,12 +19,13 @@ impl ObjectInfoRead for SchemaCatalog {
         self.tables.append_names(&mut names);
         self.views.append_names(&mut names);
         names.retain(|name| !self.renamed_relations.contains(name));
+        names.retain(|name| !self.view_tombstones.contains_key(name));
         names
     }
 
     fn object_kind(&self, name: &FullName) -> Option<Kind> {
         let name = self.relation_identity(name);
-        if self.renamed_relations.contains(&name) {
+        if self.renamed_relations.contains(&name) || self.view_tombstones.contains_key(&name) {
             return None;
         }
         if let Some(kind) = self.objects.get(&name.to_string()) {
@@ -54,6 +55,7 @@ impl SchemaCatalog {
         self.renamed_relations.remove(&name);
         self.renamed_tables.remove(&name);
         self.renamed_types.remove(&name);
+        self.view_tombstones.remove(&name);
         self.tables.insert_create_table(&name, definition);
         self.objects.insert(&name.to_string(), Kind::table());
     }
@@ -73,6 +75,7 @@ impl SchemaCatalog {
         };
         self.renamed_relations.remove(&name);
         self.renamed_types.remove(&name);
+        self.view_tombstones.remove(&name);
         self.views.insert(&name, definition);
         if let Some(row_type) = row_type {
             self.types.insert_create_composite_type(&name, &row_type);
@@ -87,11 +90,13 @@ impl SchemaCatalog {
     }
     pub(super) fn store_sequence(&mut self, name: &FullName, definition: &CreateSequence) {
         self.renamed_relations.remove(name);
+        self.view_tombstones.remove(name);
         self.sequences.insert(name, definition);
         self.objects.insert(&name.to_string(), Kind::sequence());
     }
     pub(super) fn store_index(&mut self, definition: &CreateIndex) {
         self.renamed_relations.remove(definition.name());
+        self.view_tombstones.remove(definition.name());
         self.indexes
             .insert(&definition.name().to_string(), definition.clone());
         self.objects

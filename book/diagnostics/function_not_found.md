@@ -7,7 +7,8 @@ Code: `function_not_found`. Severity: Error.
 ## When it is reported
 
 No function definition can be found for a scalar function name in the selected
-catalog/search path.
+catalog/search path. PostgreSQL `DROP FUNCTION` also reports the diagnostic
+when the selected signature is absent and `IF EXISTS` was omitted.
 
 ## What analysis knows and does not know
 

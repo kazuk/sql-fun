@@ -76,6 +76,7 @@ impl TypeInfoWrite for SchemaFileContext {
         self.catalog
             .types
             .insert_create_composite_type(name, create_comp_type);
+        self.catalog.view_tombstones.remove(name);
         self.catalog
             .objects
             .insert(&name.to_string(), Kind::composite_type());

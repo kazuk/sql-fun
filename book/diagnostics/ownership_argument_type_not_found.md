@@ -8,7 +8,8 @@ Code: `ownership_argument_type_not_found`. Severity: Error.
 
 An ALTER OWNER target signature contains an input argument type that cannot be
 resolved in the selected catalog. Output-only OUT/TABLE argument declarations
-are not input signature types.
+are not input signature types. PostgreSQL `DROP FUNCTION` also reports this
+diagnostic for an unresolved input type when `IF EXISTS` is omitted.
 
 ## What analysis knows and does not know
 

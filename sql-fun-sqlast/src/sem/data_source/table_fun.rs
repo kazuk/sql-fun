@@ -106,6 +106,7 @@ impl TableFunctionDataSource {
             && let Some(name) = name.resolution().function_identity()
         {
             visitor.function_binding(name, &self.alias, &self.output.names());
+            visitor.function_overload(name, &self.function);
         }
         for argument in self.args.iter() {
             argument.visit(visitor)?;

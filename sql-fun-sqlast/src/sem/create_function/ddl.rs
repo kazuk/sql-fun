@@ -157,7 +157,8 @@ impl CreateFunction {
         ast: &AstFunction,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let function = Self::from_ast(ast, &mut context)?.with_replace(ast.replace());
+        let mut function = Self::from_ast(ast, &mut context)?.with_replace(ast.replace());
+        function.source = context.get_source_path_with_span().cloned();
         let preserves_rows = ast
             .result_type()
             .as_ref()

@@ -8,7 +8,8 @@ Code: `ownership_invalid_target_kind`. Severity: Error.
 
 An ALTER OWNER request names an unsupported ownership kind, a type/domain of an
 incompatible kind, or a function/procedure identity that resolves only to the
-other routine kind.
+other routine kind. PostgreSQL `DROP FUNCTION` also reports this diagnostic
+when it identifies a procedure by explicit signature or selects an aggregate.
 
 ## What analysis knows and does not know
 

@@ -1,11 +1,16 @@
 use crate::sem::{ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport, ViewUpdateSupport};
 use crate::{
     names::FullName,
-    sem::{AlterView, AnalysisError, CreateTableAs, CreateView, ViewLike},
+    sem::{AlterView, AnalysisError, CreateTableAs, CreateView, ViewLike, ViewTombstone},
 };
 
 /// get view definition
 pub trait ViewInfoRead {
+    /// Inspect a view removed by a catalog cascade.
+    fn view_tombstone(&self, _name: &FullName) -> Option<&ViewTombstone> {
+        None
+    }
+
     /// get `CREATE VIEW` statement by view name
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike>;
 }

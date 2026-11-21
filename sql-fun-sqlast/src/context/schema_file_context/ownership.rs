@@ -69,12 +69,19 @@ impl OwnershipInfoRead for SchemaCatalog {
     }
     fn routine_definitions(&self, name: &FullName) -> Vec<CreateFunction> {
         let mut definitions = self.functions.definitions(name);
+        definitions.retain(|definition| {
+            !self
+                .function_tombstones
+                .contains_key(&definition.ownership_identity(name))
+        });
         if self.replaced_routines.contains(name) {
             return definitions;
         }
         for base in self.base.routine_definitions(name) {
             let identity = base.ownership_identity(name);
-            if !CreateFunction::contains_identity(&definitions, name, &identity) {
+            if !self.function_tombstones.contains_key(&identity)
+                && !CreateFunction::contains_identity(&definitions, name, &identity)
+            {
                 definitions.push(base);
             }
         }
@@ -90,6 +97,24 @@ impl OwnershipInfoRead for SchemaCatalog {
         {
             return Vec::new();
         }
+        if matches!(kind, ObjectKind::VIEW | ObjectKind::MATERIALIZED_VIEW)
+            && self.view_tombstones.contains_key(name)
+        {
+            return Vec::new();
+        }
+        let mut definitions = self.effective_ownership_definitions(kind, name);
+        definitions
+            .retain(|definition| !self.function_tombstones.contains_key(definition.identity()));
+        definitions
+    }
+}
+
+impl SchemaCatalog {
+    fn effective_ownership_definitions(
+        &self,
+        kind: ObjectKind,
+        name: &FullName,
+    ) -> Vec<OwnedObjectDefinition> {
         let modeled = model_definitions(self, kind, name);
         let mut definitions = self.ownership.definitions(kind, name);
         if !modeled.is_empty() {

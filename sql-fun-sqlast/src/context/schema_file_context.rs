@@ -44,11 +44,12 @@ use crate::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisProblem, AnalysisState, CastDefinition,
         CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
         CreateForeignDataWrapper, CreateIndex, CreateRule, CreateSchema, CreateTrigger, CursorInfo,
-        DatabaseCollation, ImplicitChange, InsertConflict, Kind, ObjectPrivilegeChange,
-        OperatorClassDefinition, OperatorDefinition, OverloadVariant as SemOverloadVariant,
-        OwnedObjectDefinition, ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity,
-        SemAst, SemScalarExpr, SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet,
-        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
+        DatabaseCollation, FunctionTombstone, ImplicitChange, InsertConflict, Kind,
+        ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition,
+        OverloadVariant as SemOverloadVariant, OwnedObjectDefinition, OwnershipIdentity,
+        ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr,
+        SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport,
+        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewTombstone, ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -82,6 +83,8 @@ pub struct SchemaFileContext {
 
 #[derive(Clone, Debug)]
 pub(super) struct SchemaCatalog {
+    function_tombstones: std::collections::HashMap<OwnershipIdentity, FunctionTombstone>,
+    view_tombstones: std::collections::HashMap<FullName, ViewTombstone>,
     replaced_routines: std::collections::HashSet<FullName>,
     renamed_relations: std::collections::HashSet<FullName>,
     renamed_tables: std::collections::HashSet<FullName>,
@@ -151,6 +154,8 @@ impl SchemaFileContext {
         let search_path = base.get_search_path().to_vec();
         Self {
             catalog: SchemaCatalog {
+                function_tombstones: std::collections::HashMap::new(),
+                view_tombstones: std::collections::HashMap::new(),
                 replaced_routines: std::collections::HashSet::new(),
                 renamed_relations: std::collections::HashSet::new(),
                 renamed_tables: std::collections::HashSet::new(),

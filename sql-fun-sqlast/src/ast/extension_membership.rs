@@ -91,6 +91,12 @@ mod test_access_method_object {
     }
 }
 
+impl ExtensionMembership {
+    pub(crate) const fn targets_transform(&self) -> bool {
+        self.member.kind.code() == ObjectType::ObjectTransform as u32
+    }
+}
+
 impl ExtensionMember {
     fn try_from_node(
         kind: ObjectType,

@@ -518,6 +518,11 @@ impl<Constraints: std::fmt::Debug> crate::context::TriggerInfoRead for TestConte
     }
 }
 
+impl<Constraints: std::fmt::Debug> crate::context::TransformationInfoRead
+    for TestContext<Constraints>
+{
+}
+
 impl<Constraints: std::fmt::Debug> BaseParseContext for TestContext<Constraints> {
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         for (candidate, definition) in &self.table_definitions {
@@ -677,6 +682,8 @@ impl crate::context::ParameterTypeHintWrite for TestParseContext {
         Ok(())
     }
 }
+
+impl crate::context::TransformationInfoWrite for TestParseContext {}
 
 impl ParseContext for TestParseContext {
     fn lint_configuration(&self) -> &::sql_fun_core::LintConfigurations {

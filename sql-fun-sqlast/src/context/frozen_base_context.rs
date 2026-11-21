@@ -491,6 +491,16 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::context::TransformationInfoRead for $context {
+            fn transformation_exists(
+                &self,
+                data_type: &crate::sem::TypeReference,
+                language: &str,
+            ) -> bool {
+                self.$catalog().transformation_exists(data_type, language)
+            }
+        }
+
         impl crate::context::BaseParseContext for $context {
             fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
                 self.$catalog().sqlite_relation_identity(name)

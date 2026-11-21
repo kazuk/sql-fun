@@ -152,6 +152,8 @@ syntax is recognized. When analysis reaches one of these statements in an
 extension script, it stops before resolving the target or applying the
 membership change. SQL rendering is also unimplemented. See the
 [extension membership analysis tracking issue](https://github.com/kazuk/sql-fun/issues/1168).
+Transform targets (`TRANSFORM FOR type LANGUAGE language`) have a separate
+[tracking issue for lookup and catalog application](https://github.com/kazuk/sql-fun/issues/1187).
 
 PostgreSQL `DROP VIEW` stops during syntax conversion, including in
 `pg_stat_statements` update scripts

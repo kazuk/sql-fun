@@ -10,6 +10,8 @@ An ALTER OWNER request names an unsupported ownership kind, a type/domain of an
 incompatible kind, or a function/procedure identity that resolves only to the
 other routine kind. PostgreSQL `DROP FUNCTION` also reports this diagnostic
 when it identifies a procedure by explicit signature or selects an aggregate.
+PostgreSQL `ALTER EXTENSION ... ADD/DROP` reports it when the resolved member
+has an incompatible kind, such as a view supplied as a table.
 
 ## What analysis knows and does not know
 

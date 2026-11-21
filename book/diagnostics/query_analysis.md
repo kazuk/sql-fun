@@ -7,7 +7,11 @@ Code: `query_analysis`. Severity: Error.
 ## When it is reported
 
 Statement analysis or requested access analysis returns an unrecoverable
-analysis-stage failure rather than an ordinary structured semantic diagnostic.
+analysis-stage failure. PostgreSQL schema-file analysis also reports this
+code when an extension membership change names a missing extension, attempts
+to add a member that already belongs to an extension, or attempts to remove
+an object from an extension it does not belong to. Adding the extension's own
+schema also reports this code when that schema is known.
 
 ## What analysis knows and does not know
 

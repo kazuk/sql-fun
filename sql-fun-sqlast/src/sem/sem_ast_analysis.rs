@@ -1,6 +1,6 @@
 //! Analysis owned by the semantic definitions in this module.
 
-use super::create_base_type::{analyze as analyze_base_type, apply as apply_base_type};
+use crate::sem::create_base_type::{analyze as analyze_base_type, apply as apply_base_type};
 use crate::{
     AstAndContextPair, CacheContext,
     ast::{Statement as AstStatement, StatementNode as AstStatementNode},

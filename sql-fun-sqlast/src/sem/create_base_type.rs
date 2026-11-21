@@ -62,15 +62,11 @@ pub(super) fn analyze(
                 collatable = match value {
                     None => true,
                     Some(SyntaxValue::Expression(Expr::Literal(Literal::Boolean(value)))) => *value,
-                    Some(SyntaxValue::Expression(Expr::Column(name)))
-                        if name.parts() == ["true"] =>
-                    {
-                        true
-                    }
-                    Some(SyntaxValue::Expression(Expr::Column(name)))
-                        if name.parts() == ["false"] =>
-                    {
-                        false
+                    Some(SyntaxValue::Expression(Expr::Literal(
+                        Literal::String(value) | Literal::Keyword(value),
+                    ))) => parse_boolean(value)?,
+                    Some(SyntaxValue::Type(ty)) if ty.name().parts().len() == 1 => {
+                        parse_boolean(&ty.name().parts()[0])?
                     }
                     _ => return Err(invalid("COLLATABLE requires a boolean")),
                 };
@@ -154,4 +150,12 @@ fn check_support_function(
 
 fn invalid(message: &str) -> AnalysisError {
     AnalysisError::unexpected_input_error(&format!("CREATE TYPE: {message}"))
+}
+
+fn parse_boolean(value: &str) -> Result<bool, AnalysisError> {
+    match value.to_ascii_lowercase().as_str() {
+        "true" | "on" => Ok(true),
+        "false" | "off" => Ok(false),
+        _ => Err(invalid("COLLATABLE requires a boolean")),
+    }
 }

@@ -1,5 +1,6 @@
 //! Analysis owned by the semantic definitions in this module.
 
+use super::create_base_type::{analyze as analyze_base_type, apply as apply_base_type};
 use crate::{
     AstAndContextPair, CacheContext,
     ast::{Statement as AstStatement, StatementNode as AstStatementNode},
@@ -45,7 +46,7 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
-            AstStatementNode::CreateType(ast) => super::create_base_type::analyze(ast, context),
+            AstStatementNode::CreateType(ast) => analyze_base_type(ast, context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
             }
@@ -155,7 +156,7 @@ impl SemAst {
             ));
         }
         match ast {
-            AstStatementNode::CreateType(ast) => super::create_base_type::apply(ast, context),
+            AstStatementNode::CreateType(ast) => apply_base_type(ast, context),
             AstStatementNode::ExtensionMembership(_) => {
                 let statement = Self::from_ast_node(ast, &mut context, cache)?;
                 if let Self::ExtensionMembership(change) = &statement

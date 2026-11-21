@@ -2791,24 +2791,7 @@
                   "type": "object",
                   "properties": {
                     "UnsupportedTargets": {
-                      "type": "object",
-                      "properties": {
-                        "target_kind": {
-                          "description": "Requested target class.",
-                          "type": "string"
-                        },
-                        "targets": {
-                          "description": "Requested configuration parameter names or large-object identifiers.",
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
-                      },
-                      "required": [
-                        "target_kind",
-                        "targets"
-                      ]
+                      "$ref": "#/$defs/UnsupportedPrivilegeTargets"
                     }
                   },
                   "required": [
@@ -2863,24 +2846,7 @@
                   "type": "object",
                   "properties": {
                     "MissingArgumentTypes": {
-                      "type": "object",
-                      "properties": {
-                        "target": {
-                          "description": "Requested routine.",
-                          "$ref": "#/$defs/OwnershipIdentity"
-                        },
-                        "types": {
-                          "description": "Unresolved type names.",
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/$defs/FullName"
-                          }
-                        }
-                      },
-                      "required": [
-                        "target",
-                        "types"
-                      ]
+                      "$ref": "#/$defs/MissingPrivilegeArgumentTypes"
                     }
                   },
                   "required": [
@@ -2893,21 +2859,7 @@
                   "type": "object",
                   "properties": {
                     "InvalidPrivilege": {
-                      "type": "object",
-                      "properties": {
-                        "privilege": {
-                          "description": "Written privilege.",
-                          "type": "string"
-                        },
-                        "target_kind": {
-                          "description": "Requested object class.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "privilege",
-                        "target_kind"
-                      ]
+                      "$ref": "#/$defs/InvalidObjectPrivilege"
                     }
                   },
                   "required": [
@@ -2933,21 +2885,7 @@
                   "type": "object",
                   "properties": {
                     "MissingColumn": {
-                      "type": "object",
-                      "properties": {
-                        "target": {
-                          "description": "Resolved target identity.",
-                          "$ref": "#/$defs/OwnershipIdentity"
-                        },
-                        "column": {
-                          "description": "Written column name.",
-                          "$ref": "#/$defs/ColumnName"
-                        }
-                      },
-                      "required": [
-                        "target",
-                        "column"
-                      ]
+                      "$ref": "#/$defs/MissingPrivilegeColumn"
                     }
                   },
                   "required": [
@@ -2968,6 +2906,76 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "UnsupportedPrivilegeTargets": {
+              "description": "Data retained by the `UnsupportedTargets` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target_kind": {
+                  "type": "string"
+                },
+                "targets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "target_kind",
+                "targets"
+              ]
+            },
+            "MissingPrivilegeArgumentTypes": {
+              "description": "Data retained by the `MissingArgumentTypes` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/OwnershipIdentity"
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/FullName"
+                  }
+                }
+              },
+              "required": [
+                "target",
+                "types"
+              ]
+            },
+            "InvalidObjectPrivilege": {
+              "description": "Data retained by the `InvalidPrivilege` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "privilege": {
+                  "type": "string"
+                },
+                "target_kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "privilege",
+                "target_kind"
+              ]
+            },
+            "MissingPrivilegeColumn": {
+              "description": "Data retained by the `MissingColumn` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/OwnershipIdentity"
+                },
+                "column": {
+                  "$ref": "#/$defs/ColumnName"
+                }
+              },
+              "required": [
+                "target",
+                "column"
               ]
             },
             "TriggerProblem": {
@@ -7782,24 +7790,7 @@
                   "type": "object",
                   "properties": {
                     "UnsupportedTargets": {
-                      "type": "object",
-                      "properties": {
-                        "target_kind": {
-                          "description": "Requested target class.",
-                          "type": "string"
-                        },
-                        "targets": {
-                          "description": "Requested configuration parameter names or large-object identifiers.",
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
-                      },
-                      "required": [
-                        "target_kind",
-                        "targets"
-                      ]
+                      "$ref": "#/$defs/UnsupportedPrivilegeTargets"
                     }
                   },
                   "required": [
@@ -7854,24 +7845,7 @@
                   "type": "object",
                   "properties": {
                     "MissingArgumentTypes": {
-                      "type": "object",
-                      "properties": {
-                        "target": {
-                          "description": "Requested routine.",
-                          "$ref": "#/$defs/OwnershipIdentity"
-                        },
-                        "types": {
-                          "description": "Unresolved type names.",
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/$defs/FullName"
-                          }
-                        }
-                      },
-                      "required": [
-                        "target",
-                        "types"
-                      ]
+                      "$ref": "#/$defs/MissingPrivilegeArgumentTypes"
                     }
                   },
                   "required": [
@@ -7884,21 +7858,7 @@
                   "type": "object",
                   "properties": {
                     "InvalidPrivilege": {
-                      "type": "object",
-                      "properties": {
-                        "privilege": {
-                          "description": "Written privilege.",
-                          "type": "string"
-                        },
-                        "target_kind": {
-                          "description": "Requested object class.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "privilege",
-                        "target_kind"
-                      ]
+                      "$ref": "#/$defs/InvalidObjectPrivilege"
                     }
                   },
                   "required": [
@@ -7924,21 +7884,7 @@
                   "type": "object",
                   "properties": {
                     "MissingColumn": {
-                      "type": "object",
-                      "properties": {
-                        "target": {
-                          "description": "Resolved target identity.",
-                          "$ref": "#/$defs/OwnershipIdentity"
-                        },
-                        "column": {
-                          "description": "Written column name.",
-                          "$ref": "#/$defs/ColumnName"
-                        }
-                      },
-                      "required": [
-                        "target",
-                        "column"
-                      ]
+                      "$ref": "#/$defs/MissingPrivilegeColumn"
                     }
                   },
                   "required": [
@@ -7959,6 +7905,76 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "UnsupportedPrivilegeTargets": {
+              "description": "Data retained by the `UnsupportedTargets` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target_kind": {
+                  "type": "string"
+                },
+                "targets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "target_kind",
+                "targets"
+              ]
+            },
+            "MissingPrivilegeArgumentTypes": {
+              "description": "Data retained by the `MissingArgumentTypes` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/OwnershipIdentity"
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/FullName"
+                  }
+                }
+              },
+              "required": [
+                "target",
+                "types"
+              ]
+            },
+            "InvalidObjectPrivilege": {
+              "description": "Data retained by the `InvalidPrivilege` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "privilege": {
+                  "type": "string"
+                },
+                "target_kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "privilege",
+                "target_kind"
+              ]
+            },
+            "MissingPrivilegeColumn": {
+              "description": "Data retained by the `MissingColumn` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/OwnershipIdentity"
+                },
+                "column": {
+                  "$ref": "#/$defs/ColumnName"
+                }
+              },
+              "required": [
+                "target",
+                "column"
               ]
             },
             "TriggerProblem": {
@@ -12665,24 +12681,7 @@
                   "type": "object",
                   "properties": {
                     "UnsupportedTargets": {
-                      "type": "object",
-                      "properties": {
-                        "target_kind": {
-                          "description": "Requested target class.",
-                          "type": "string"
-                        },
-                        "targets": {
-                          "description": "Requested configuration parameter names or large-object identifiers.",
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
-                      },
-                      "required": [
-                        "target_kind",
-                        "targets"
-                      ]
+                      "$ref": "#/$defs/UnsupportedPrivilegeTargets"
                     }
                   },
                   "required": [
@@ -12737,24 +12736,7 @@
                   "type": "object",
                   "properties": {
                     "MissingArgumentTypes": {
-                      "type": "object",
-                      "properties": {
-                        "target": {
-                          "description": "Requested routine.",
-                          "$ref": "#/$defs/OwnershipIdentity"
-                        },
-                        "types": {
-                          "description": "Unresolved type names.",
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/$defs/FullName"
-                          }
-                        }
-                      },
-                      "required": [
-                        "target",
-                        "types"
-                      ]
+                      "$ref": "#/$defs/MissingPrivilegeArgumentTypes"
                     }
                   },
                   "required": [
@@ -12767,21 +12749,7 @@
                   "type": "object",
                   "properties": {
                     "InvalidPrivilege": {
-                      "type": "object",
-                      "properties": {
-                        "privilege": {
-                          "description": "Written privilege.",
-                          "type": "string"
-                        },
-                        "target_kind": {
-                          "description": "Requested object class.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "privilege",
-                        "target_kind"
-                      ]
+                      "$ref": "#/$defs/InvalidObjectPrivilege"
                     }
                   },
                   "required": [
@@ -12807,21 +12775,7 @@
                   "type": "object",
                   "properties": {
                     "MissingColumn": {
-                      "type": "object",
-                      "properties": {
-                        "target": {
-                          "description": "Resolved target identity.",
-                          "$ref": "#/$defs/OwnershipIdentity"
-                        },
-                        "column": {
-                          "description": "Written column name.",
-                          "$ref": "#/$defs/ColumnName"
-                        }
-                      },
-                      "required": [
-                        "target",
-                        "column"
-                      ]
+                      "$ref": "#/$defs/MissingPrivilegeColumn"
                     }
                   },
                   "required": [
@@ -12842,6 +12796,76 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "UnsupportedPrivilegeTargets": {
+              "description": "Data retained by the `UnsupportedTargets` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target_kind": {
+                  "type": "string"
+                },
+                "targets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "target_kind",
+                "targets"
+              ]
+            },
+            "MissingPrivilegeArgumentTypes": {
+              "description": "Data retained by the `MissingArgumentTypes` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/OwnershipIdentity"
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/FullName"
+                  }
+                }
+              },
+              "required": [
+                "target",
+                "types"
+              ]
+            },
+            "InvalidObjectPrivilege": {
+              "description": "Data retained by the `InvalidPrivilege` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "privilege": {
+                  "type": "string"
+                },
+                "target_kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "privilege",
+                "target_kind"
+              ]
+            },
+            "MissingPrivilegeColumn": {
+              "description": "Data retained by the `MissingColumn` privilege diagnostic.",
+              "type": "object",
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/OwnershipIdentity"
+                },
+                "column": {
+                  "$ref": "#/$defs/ColumnName"
+                }
+              },
+              "required": [
+                "target",
+                "column"
               ]
             },
             "TriggerProblem": {

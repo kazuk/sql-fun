@@ -122,12 +122,7 @@ pub enum PrivilegeProblem {
     /// A schema selector is absent.
     MissingSchema(String),
     /// No catalog definition is available for this class of targets.
-    UnsupportedTargets {
-        /// Requested target class.
-        target_kind: String,
-        /// Requested configuration parameter names or large-object identifiers.
-        targets: Vec<String>,
-    },
+    UnsupportedTargets(UnsupportedPrivilegeTargets),
     /// No catalog target matches the identity and signature.
     MissingTarget(OwnershipIdentity),
     /// Multiple catalog targets match an omitted signature.
@@ -135,30 +130,141 @@ pub enum PrivilegeProblem {
     /// The target exists under an incompatible object kind.
     InvalidTargetKind(OwnershipIdentity),
     /// A routine signature contains unresolved argument types.
-    MissingArgumentTypes {
-        /// Requested routine.
-        target: OwnershipIdentity,
-        /// Unresolved type names.
-        types: Vec<FullName>,
-    },
+    MissingArgumentTypes(MissingPrivilegeArgumentTypes),
     /// Privilege incompatible with a target class.
-    InvalidPrivilege {
-        /// Written privilege.
-        privilege: String,
-        /// Requested object class.
-        target_kind: String,
-    },
+    InvalidPrivilege(InvalidObjectPrivilege),
     /// Array types do not have independent privileges.
     ArrayTarget(OwnershipIdentity),
     /// Column absent from the exact target relation.
-    MissingColumn {
-        /// Resolved target identity.
-        target: OwnershipIdentity,
-        /// Written column name.
-        column: ColumnName,
-    },
+    MissingColumn(MissingPrivilegeColumn),
     /// Unavailable or repeated membership option.
     MembershipOption(String),
+}
+
+/// Data retained by the `UnsupportedTargets` privilege diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct UnsupportedPrivilegeTargets {
+    target_kind: String,
+    targets: Vec<String>,
+}
+
+impl UnsupportedPrivilegeTargets {
+    /// The retained target kind.
+    #[must_use]
+    pub fn target_kind(&self) -> &str {
+        &self.target_kind
+    }
+
+    /// The retained targets.
+    #[must_use]
+    pub fn targets(&self) -> &[String] {
+        &self.targets
+    }
+}
+
+/// Data retained by the `MissingArgumentTypes` privilege diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct MissingPrivilegeArgumentTypes {
+    target: OwnershipIdentity,
+    types: Vec<FullName>,
+}
+
+impl MissingPrivilegeArgumentTypes {
+    /// The retained target.
+    #[must_use]
+    pub const fn target(&self) -> &OwnershipIdentity {
+        &self.target
+    }
+
+    /// The retained types.
+    #[must_use]
+    pub fn types(&self) -> &[FullName] {
+        &self.types
+    }
+}
+
+/// Data retained by the `InvalidPrivilege` privilege diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct InvalidObjectPrivilege {
+    privilege: String,
+    target_kind: String,
+}
+
+impl InvalidObjectPrivilege {
+    /// The retained privilege.
+    #[must_use]
+    pub fn privilege(&self) -> &str {
+        &self.privilege
+    }
+
+    /// The retained target kind.
+    #[must_use]
+    pub fn target_kind(&self) -> &str {
+        &self.target_kind
+    }
+}
+
+/// Data retained by the `MissingColumn` privilege diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct MissingPrivilegeColumn {
+    target: OwnershipIdentity,
+    column: ColumnName,
+}
+
+impl MissingPrivilegeColumn {
+    /// The retained target.
+    #[must_use]
+    pub const fn target(&self) -> &OwnershipIdentity {
+        &self.target
+    }
+
+    /// The retained column.
+    #[must_use]
+    pub const fn column(&self) -> &ColumnName {
+        &self.column
+    }
+}
+
+impl PrivilegeProblem {
+    /// Construct the `UnsupportedTargets` privilege diagnostic.
+    #[must_use]
+    pub fn unsupported_targets(target_kind: &str, targets: &[String]) -> Self {
+        Self::UnsupportedTargets(UnsupportedPrivilegeTargets {
+            target_kind: target_kind.to_owned(),
+            targets: targets.to_vec(),
+        })
+    }
+
+    /// Construct the `MissingArgumentTypes` privilege diagnostic.
+    #[must_use]
+    pub fn missing_argument_types(target: &OwnershipIdentity, types: &[FullName]) -> Self {
+        Self::MissingArgumentTypes(MissingPrivilegeArgumentTypes {
+            target: target.clone(),
+            types: types.to_vec(),
+        })
+    }
+
+    /// Construct the `InvalidPrivilege` privilege diagnostic.
+    #[must_use]
+    pub fn invalid_privilege(privilege: &str, target_kind: &str) -> Self {
+        Self::InvalidPrivilege(InvalidObjectPrivilege {
+            privilege: privilege.to_owned(),
+            target_kind: target_kind.to_owned(),
+        })
+    }
+
+    /// Construct the `MissingColumn` privilege diagnostic.
+    #[must_use]
+    pub fn missing_column(target: &OwnershipIdentity, column: &ColumnName) -> Self {
+        Self::MissingColumn(MissingPrivilegeColumn {
+            target: target.clone(),
+            column: column.clone(),
+        })
+    }
 }
 
 impl DiagnosticMessage for PrivilegeProblem {
@@ -169,7 +275,8 @@ impl DiagnosticMessage for PrivilegeProblem {
             Self::GrantedRoleColumns(name) => format!("invalid granted role: {name}"),
             Self::MissingRelation(name) => format!("relation does not exist: {name}"),
             Self::MissingSchema(name) => format!("schema does not exist: {name}"),
-            Self::UnsupportedTargets { target_kind, .. } => {
+            Self::UnsupportedTargets(problem) => {
+                let target_kind = problem.target_kind();
                 format!("analysis catalog does not contain {target_kind} privilege targets")
             }
             Self::MissingTarget(target) => format!("privilege target does not exist: {target}"),
@@ -186,23 +293,30 @@ impl DiagnosticMessage for PrivilegeProblem {
             Self::InvalidTargetKind(target) => {
                 format!("privilege target is not an object of the requested kind: {target}")
             }
-            Self::MissingArgumentTypes { target, types } => {
-                let names = types
+            Self::MissingArgumentTypes(problem) => {
+                let target = problem.target();
+                let names = problem
+                    .types()
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ");
                 format!("argument type not found for privilege target {target}: {names}")
             }
-            Self::InvalidPrivilege {
-                privilege,
-                target_kind,
-            } => format!("privilege {privilege} is invalid for {target_kind}"),
+            Self::InvalidPrivilege(problem) => format!(
+                "privilege {} is invalid for {}",
+                problem.privilege(),
+                problem.target_kind()
+            ),
             Self::ArrayTarget(target) => {
                 format!("cannot declare privileges on array target {target}")
             }
-            Self::MissingColumn { target, column } => {
-                format!("column {column} does not exist on {target}")
+            Self::MissingColumn(problem) => {
+                format!(
+                    "column {} does not exist on {}",
+                    problem.column(),
+                    problem.target()
+                )
             }
             Self::MembershipOption(name) => format!("invalid role membership option: {name}"),
         }

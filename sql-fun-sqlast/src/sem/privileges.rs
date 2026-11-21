@@ -259,7 +259,7 @@ impl ObjectPrivilegeChange {
         let targets = if let Some(kind) = ast.kind().object_kind() {
             Self::resolve_targets(ast.targets(), kind, context, &mut problems)?
         } else {
-            let targets = match ast.targets() {
+            let targets: Vec<_> = match ast.targets() {
                 PrivilegeTargets::Objects(targets) => targets
                     .iter()
                     .filter_map(|target| match target {
@@ -270,10 +270,10 @@ impl ObjectPrivilegeChange {
                     .collect(),
                 PrivilegeTargets::AllInSchemas(schemas) => schemas.clone(),
             };
-            problems.push(PrivilegeProblem::UnsupportedTargets {
-                target_kind: format!("{:?}", ast.kind()),
-                targets,
-            });
+            problems.push(PrivilegeProblem::unsupported_targets(
+                &format!("{:?}", ast.kind()),
+                &targets,
+            ));
             Vec::new()
         };
         let grantees = ast
@@ -336,10 +336,10 @@ impl ObjectPrivilegeChange {
             if !sequence_usage
                 && !kind.permits(privilege.name(), !privilege.columns().is_empty(), version)
             {
-                problems.push(PrivilegeProblem::InvalidPrivilege {
-                    privilege: privilege.name().to_owned(),
-                    target_kind: format!("{kind:?}"),
-                });
+                problems.push(PrivilegeProblem::invalid_privilege(
+                    privilege.name(),
+                    &format!("{kind:?}"),
+                ));
             }
         }
         for identity in targets {
@@ -366,10 +366,10 @@ impl ObjectPrivilegeChange {
                             .get_view_impl(name)
                             .is_some_and(|view| view.has_column(&column_name))
                     {
-                        problems.push(PrivilegeProblem::MissingColumn {
-                            target: identity.into(),
-                            column: (&column_name).into(),
-                        });
+                        problems.push(PrivilegeProblem::missing_column(
+                            &identity.into(),
+                            &(&column_name).into(),
+                        ));
                     }
                 }
             }

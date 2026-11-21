@@ -98,7 +98,7 @@ pub use self::{
         DropKnowledgeGap,
     },
     column_rename::ColumnRename,
-    create_foreign_data_wrapper::CreateForeignDataWrapper,
+    create_foreign_data_wrapper::{CreateForeignDataWrapper, FdwRoutineBinding, FdwRoutineOutcome},
     create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
     create_trigger::{
         CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,

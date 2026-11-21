@@ -767,7 +767,7 @@
                   "type": "object",
                   "properties": {
                     "ForeignDataWrapper": {
-                      "type": "string"
+                      "$ref": "#/$defs/ForeignDataWrapperProblem"
                     }
                   },
                   "required": [
@@ -2699,6 +2699,152 @@
               "required": [
                 "identity",
                 "detail"
+              ]
+            },
+            "ForeignDataWrapperProblem": {
+              "description": "Structured validation failure for a named foreign-data wrapper.",
+              "type": "object",
+              "properties": {
+                "wrapper": {
+                  "type": "string"
+                },
+                "failure": {
+                  "$ref": "#/$defs/ForeignDataWrapperFailure"
+                }
+              },
+              "required": [
+                "wrapper",
+                "failure"
+              ]
+            },
+            "ForeignDataWrapperFailure": {
+              "description": "Facts explaining why a foreign-data wrapper declaration was rejected.",
+              "oneOf": [
+                {
+                  "description": "The database-wide wrapper name already exists.",
+                  "type": "string",
+                  "const": "DuplicateWrapper"
+                },
+                {
+                  "description": "The named option appears more than once.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateOption"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More than one clause specifies the same routine role.",
+                  "type": "object",
+                  "properties": {
+                    "ConflictingClause": {
+                      "$ref": "#/$defs/FdwRoutineKind"
+                    }
+                  },
+                  "required": [
+                    "ConflictingClause"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The routine identifier components cannot be resolved in the selected database.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidRoutineName": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidRoutineName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No visible function matches the requested name and exact signature.",
+                  "type": "object",
+                  "properties": {
+                    "RoutineNotFound": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "$ref": "#/$defs/FullName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "RoutineNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The resolved handler has an incompatible or unknown return type.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidHandlerReturn": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/TypeReference"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidHandlerReturn"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "FdwRoutineKind": {
+              "description": "Role of a routine in a foreign-data wrapper declaration.",
+              "oneOf": [
+                {
+                  "description": "Zero-input handler.",
+                  "type": "string",
+                  "const": "Handler"
+                },
+                {
+                  "description": "Option validator.",
+                  "type": "string",
+                  "const": "Validator"
+                }
               ]
             },
             "OwnershipProblem": {
@@ -5779,7 +5925,7 @@
                   "type": "object",
                   "properties": {
                     "ForeignDataWrapper": {
-                      "type": "string"
+                      "$ref": "#/$defs/ForeignDataWrapperProblem"
                     }
                   },
                   "required": [
@@ -7711,6 +7857,152 @@
               "required": [
                 "identity",
                 "detail"
+              ]
+            },
+            "ForeignDataWrapperProblem": {
+              "description": "Structured validation failure for a named foreign-data wrapper.",
+              "type": "object",
+              "properties": {
+                "wrapper": {
+                  "type": "string"
+                },
+                "failure": {
+                  "$ref": "#/$defs/ForeignDataWrapperFailure"
+                }
+              },
+              "required": [
+                "wrapper",
+                "failure"
+              ]
+            },
+            "ForeignDataWrapperFailure": {
+              "description": "Facts explaining why a foreign-data wrapper declaration was rejected.",
+              "oneOf": [
+                {
+                  "description": "The database-wide wrapper name already exists.",
+                  "type": "string",
+                  "const": "DuplicateWrapper"
+                },
+                {
+                  "description": "The named option appears more than once.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateOption"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More than one clause specifies the same routine role.",
+                  "type": "object",
+                  "properties": {
+                    "ConflictingClause": {
+                      "$ref": "#/$defs/FdwRoutineKind"
+                    }
+                  },
+                  "required": [
+                    "ConflictingClause"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The routine identifier components cannot be resolved in the selected database.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidRoutineName": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidRoutineName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No visible function matches the requested name and exact signature.",
+                  "type": "object",
+                  "properties": {
+                    "RoutineNotFound": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "$ref": "#/$defs/FullName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "RoutineNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The resolved handler has an incompatible or unknown return type.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidHandlerReturn": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/TypeReference"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidHandlerReturn"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "FdwRoutineKind": {
+              "description": "Role of a routine in a foreign-data wrapper declaration.",
+              "oneOf": [
+                {
+                  "description": "Zero-input handler.",
+                  "type": "string",
+                  "const": "Handler"
+                },
+                {
+                  "description": "Option validator.",
+                  "type": "string",
+                  "const": "Validator"
+                }
               ]
             },
             "OwnershipProblem": {
@@ -10683,7 +10975,7 @@
                   "type": "object",
                   "properties": {
                     "ForeignDataWrapper": {
-                      "type": "string"
+                      "$ref": "#/$defs/ForeignDataWrapperProblem"
                     }
                   },
                   "required": [
@@ -12615,6 +12907,152 @@
               "required": [
                 "identity",
                 "detail"
+              ]
+            },
+            "ForeignDataWrapperProblem": {
+              "description": "Structured validation failure for a named foreign-data wrapper.",
+              "type": "object",
+              "properties": {
+                "wrapper": {
+                  "type": "string"
+                },
+                "failure": {
+                  "$ref": "#/$defs/ForeignDataWrapperFailure"
+                }
+              },
+              "required": [
+                "wrapper",
+                "failure"
+              ]
+            },
+            "ForeignDataWrapperFailure": {
+              "description": "Facts explaining why a foreign-data wrapper declaration was rejected.",
+              "oneOf": [
+                {
+                  "description": "The database-wide wrapper name already exists.",
+                  "type": "string",
+                  "const": "DuplicateWrapper"
+                },
+                {
+                  "description": "The named option appears more than once.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateOption"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More than one clause specifies the same routine role.",
+                  "type": "object",
+                  "properties": {
+                    "ConflictingClause": {
+                      "$ref": "#/$defs/FdwRoutineKind"
+                    }
+                  },
+                  "required": [
+                    "ConflictingClause"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The routine identifier components cannot be resolved in the selected database.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidRoutineName": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidRoutineName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No visible function matches the requested name and exact signature.",
+                  "type": "object",
+                  "properties": {
+                    "RoutineNotFound": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "$ref": "#/$defs/FullName"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "RoutineNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The resolved handler has an incompatible or unknown return type.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidHandlerReturn": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FullName"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/TypeReference"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidHandlerReturn"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "FdwRoutineKind": {
+              "description": "Role of a routine in a foreign-data wrapper declaration.",
+              "oneOf": [
+                {
+                  "description": "Zero-input handler.",
+                  "type": "string",
+                  "const": "Handler"
+                },
+                {
+                  "description": "Option validator.",
+                  "type": "string",
+                  "const": "Validator"
+                }
               ]
             },
             "OwnershipProblem": {

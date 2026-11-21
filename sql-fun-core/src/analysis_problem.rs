@@ -9,6 +9,7 @@ mod delete;
 mod distinct;
 mod engine_version;
 mod facts;
+mod foreign_data_wrapper;
 mod index;
 mod insert;
 mod lint;
@@ -43,6 +44,7 @@ pub use self::{
         ArgumentBindingCollection, ExpressionList, OperatorDefinition, OperatorSignature,
         OptionalExpression, SemScalarExpr, TypeList,
     },
+    foreign_data_wrapper::{FdwRoutineKind, ForeignDataWrapperFailure, ForeignDataWrapperProblem},
     index::{IndexProblem, IndexProblemKind},
     insert::{InsertProblem, InsertProblemKind},
     lint::{LintProblem, LintTarget},
@@ -378,7 +380,7 @@ pub enum AnalysisProblem {
     /// Invalid rule definition.
     Rule(RuleProblem),
     /// Invalid foreign-data wrapper declaration.
-    ForeignDataWrapper(String),
+    ForeignDataWrapper(ForeignDataWrapperProblem),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -598,8 +600,8 @@ impl AnalysisProblem {
     }
     /// Report an invalid PostgreSQL foreign-data wrapper declaration.
     #[must_use]
-    pub fn foreign_data_wrapper(message: &str) -> Self {
-        Self::ForeignDataWrapper(message.to_owned())
+    pub fn foreign_data_wrapper(problem: &ForeignDataWrapperProblem) -> Self {
+        Self::ForeignDataWrapper(problem.clone())
     }
 
     /// Diagnostic ownership target.
@@ -945,7 +947,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::Serial(problem) => problem.diagnostic_message(),
             Self::Creation(problem) => problem.diagnostic_message(),
             Self::Rule(problem) => problem.diagnostic_message(),
-            Self::ForeignDataWrapper(message) => message.clone(),
+            Self::ForeignDataWrapper(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),
             Self::Privilege(problem) => problem.diagnostic_message(),
             Self::Trigger(problem) => problem.diagnostic_message(),

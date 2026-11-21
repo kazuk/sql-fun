@@ -1851,10 +1851,12 @@ pub(crate) struct AlterFunctionParallel {
     option: ddl::FunctionOption,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct DropFunction {
     targets: Vec<ObjectTarget>,
+    #[getter(copy)]
     if_exists: bool,
+    #[getter(copy)]
     behavior: DropBehavior,
 }
 

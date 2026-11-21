@@ -5,7 +5,7 @@ use crate::{
     names::{FullName, TableName},
     sem::{
         ColumnCollection, FunctionOverloadCollection, ObjectPrivilegeDeclaration, OverloadVariant,
-        OwnerSpecification, OwnershipIdentity, ParseContext,
+        OwnerSpecification, OwnershipIdentity, ParseContext, SourcePathWithSpan,
         type_system::ArgumentBindingCollection,
     },
 };
@@ -14,6 +14,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
     replace: bool,
+    source: Option<SourcePathWithSpan>,
 
     owner: Option<OwnerSpecification>,
     object_kind: ObjectKind,
@@ -58,6 +59,11 @@ impl CreateFunction {
             || self.returning_columdef != previous.returning_columdef
     }
 
+    /// Source of the declaration, when the catalog supplies one.
+    pub const fn source(&self) -> Option<&SourcePathWithSpan> {
+        self.source.as_ref()
+    }
+
     pub(crate) const fn replace(&self) -> bool {
         self.replace
     }
@@ -84,6 +90,7 @@ impl CreateFunction {
     ) -> Self {
         Self {
             replace: false,
+            source: None,
             builtin_properties: None,
             owner: None,
             privilege_declarations: Vec::new(),

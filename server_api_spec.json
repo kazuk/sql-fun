@@ -750,6 +750,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A dependent view prevents DROP FUNCTION.",
+                  "type": "object",
+                  "properties": {
+                    "DropFunctionDependency": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropFunctionDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid rule definition.",
                   "type": "object",
                   "properties": {
@@ -5908,6 +5921,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A dependent view prevents DROP FUNCTION.",
+                  "type": "object",
+                  "properties": {
+                    "DropFunctionDependency": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropFunctionDependency"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid rule definition.",
                   "type": "object",
                   "properties": {
@@ -10954,6 +10980,19 @@
                   },
                   "required": [
                     "Creation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A dependent view prevents DROP FUNCTION.",
+                  "type": "object",
+                  "properties": {
+                    "DropFunctionDependency": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropFunctionDependency"
                   ],
                   "additionalProperties": false
                 },

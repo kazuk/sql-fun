@@ -1,0 +1,114 @@
+[
+  {
+    "name": "sibling_overload_survives",
+    "sql": "SELECT public.drop_probe('text'::text) AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "recreated_signature_is_visible",
+    "sql": "SELECT public.drop_recreate() AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "masked_signature_is_missing",
+    "sql": "DROP FUNCTION public.drop_probe(integer)",
+    "expected": {
+      "diagnostics": [
+        "function_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "if_exists_skips_masked_signature",
+    "sql": "DROP FUNCTION IF EXISTS public.drop_probe(integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "cascade_removes_transitive_view",
+    "sql": "SELECT 1 AS value FROM public.drop_probe_indirect",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "restrict_preserves_dependent_view",
+    "sql": "DROP FUNCTION public.drop_recreate() RESTRICT",
+    "expected": {
+      "diagnostics": [
+        "drop_function_dependency"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "concrete_binding_is_independent_of_polymorphic_overload",
+    "sql": "DROP FUNCTION public.drop_poly(anyelement) RESTRICT",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "new_overload_does_not_change_existing_view_binding",
+    "sql": "SELECT 1 AS value FROM public.drop_bound_view",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

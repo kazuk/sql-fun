@@ -8,10 +8,10 @@ use crate::{
         AlterOwner, AlterSequence, AnalysisError, Comment, CreateCompositeType, CreateDomain,
         CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex,
         CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger,
-        CreateView, DeleteStatement, DropRule, DropTable, DropTrigger, EngineFeatureValidation,
-        InsertStatement, MergeStatement, ObjectPrivilegeChange, ParameterConstraints,
-        RelationAlteration, RoleMembershipDeclaration, SelectStatement, SemAst, UpdateStatement,
-        VariableSet,
+        CreateView, DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger,
+        EngineFeatureValidation, InsertStatement, MergeStatement, ObjectPrivilegeChange,
+        ParameterConstraints, RelationAlteration, RoleMembershipDeclaration, SelectStatement,
+        SemAst, UpdateStatement, VariableSet,
     },
 };
 
@@ -37,7 +37,9 @@ impl SemAst {
             AstStatementNode::AlterFunctionParallel(_) => {
                 todo!("ALTER FUNCTION PARALLEL interpretation (#1172)")
             }
-            AstStatementNode::DropFunction(_) => todo!("DROP FUNCTION interpretation (#1165)"),
+            AstStatementNode::DropFunction(ast) => {
+                DropFunction::analyze(ast, context).map(Self::DropFunction)
+            }
             AstStatementNode::DropView(_) => todo!("PostgreSQL DROP VIEW interpretation"),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
@@ -191,6 +193,14 @@ impl SemAst {
             }
             AstStatementNode::Sequence(sequence) => {
                 CreateSequence::from_ast_and_apply(sequence, context)
+            }
+            AstStatementNode::DropFunction(ast) => {
+                let statement = DropFunction::analyze(ast, &mut context)?;
+                let context = context.apply_drop_function(&statement)?;
+                Ok(AstAndContextPair::new(
+                    Self::DropFunction(statement),
+                    context,
+                ))
             }
             AstStatementNode::DropTable(drop_table) => {
                 DropTable::from_ast_and_apply(drop_table, context)

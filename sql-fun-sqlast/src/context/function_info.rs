@@ -1,10 +1,18 @@
 use crate::{
     names::FullName,
-    sem::{AnalysisError, CreateFunction, FunctionOverloadCollection, OverloadVariant},
+    sem::{
+        AnalysisError, CreateFunction, DropFunction, FunctionOverloadCollection, FunctionTombstone,
+        OverloadVariant, OwnershipIdentity,
+    },
 };
 
 /// get function definition
 pub trait FunctionInfoRead {
+    /// Inspect the active tombstone for an exact qualified function identity.
+    fn function_tombstone(&self, _identity: &OwnershipIdentity) -> Option<&FunctionTombstone> {
+        None
+    }
+
     /// Declared routine identities that can depend on schema-defined row types.
     /// Immutable builtin-only catalogs have no such declarations.
     fn declared_routine_names(&self) -> Vec<FullName> {
@@ -35,6 +43,14 @@ pub trait FunctionInfoWrite
 where
     Self: Sized,
 {
+    /// Apply an analyzed DROP FUNCTION to this catalog.
+    fn apply_drop_function(self, statement: &DropFunction) -> Result<Self, AnalysisError> {
+        if statement.applicable() {
+            return AnalysisError::raise_unexpected_input("catalog does not support DROP FUNCTION");
+        }
+        Ok(self)
+    }
+
     /// Record source function properties separately from its readable signature.
     fn apply_function_view_rows(
         self,

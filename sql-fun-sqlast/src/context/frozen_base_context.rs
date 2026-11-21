@@ -226,6 +226,13 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::FunctionInfoRead for $context {
+            fn function_tombstone(
+                &self,
+                identity: &$crate::sem::OwnershipIdentity,
+            ) -> Option<&$crate::sem::FunctionTombstone> {
+                self.$catalog().function_tombstone(identity)
+            }
+
             fn declared_routine_names(&self) -> Vec<crate::names::FullName> {
                 self.$catalog().declared_routine_names()
             }
@@ -420,6 +427,13 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::ViewInfoRead for $context {
+            fn view_tombstone(
+                &self,
+                name: &$crate::names::FullName,
+            ) -> Option<&$crate::sem::ViewTombstone> {
+                self.$catalog().view_tombstone(name)
+            }
+
             fn get_view_impl(
                 &self,
                 name: &crate::names::FullName,

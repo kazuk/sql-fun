@@ -19,7 +19,11 @@ use crate::{
     },
 };
 
-use std::collections::VecDeque;
+use std::{
+    borrow::Cow,
+    collections::VecDeque,
+    hash::{Hash, Hasher},
+};
 
 use crate::{
     context::ParseContext,
@@ -101,12 +105,36 @@ impl ArgumentBindingCollection {
 }
 
 /// function overload variant
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OverloadVariant {
     ret_type: Option<TypeReference>,
     params: Vec<FunctionParam>,
     is_strict: bool,
     returns_not_null: bool,
+    #[serde(skip)]
+    declaration_arguments: Option<Vec<Option<TypeReference>>>,
+}
+
+// The selected declaration is local analysis provenance. The overload's
+// evaluated signature and its serialized representation remain the same.
+impl PartialEq for OverloadVariant {
+    fn eq(&self, other: &Self) -> bool {
+        self.ret_type == other.ret_type
+            && self.params == other.params
+            && self.is_strict == other.is_strict
+            && self.returns_not_null == other.returns_not_null
+    }
+}
+
+impl Eq for OverloadVariant {}
+
+impl Hash for OverloadVariant {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ret_type.hash(state);
+        self.params.hash(state);
+        self.is_strict.hash(state);
+        self.returns_not_null.hash(state);
+    }
 }
 
 impl OverloadVariant {
@@ -129,6 +157,11 @@ impl OverloadVariant {
         }
         for param in &mut self.params {
             param.rename_relation(old, new);
+        }
+        if let Some(arguments) = &mut self.declaration_arguments {
+            for reference in arguments.iter_mut().flatten() {
+                reference.rename_relation(old, new);
+            }
         }
     }
 
@@ -155,6 +188,20 @@ impl OverloadVariant {
             .iter()
             .filter_map(FunctionParam::identity_argument)
             .collect()
+    }
+
+    pub(crate) fn declaration_arguments(&self) -> Cow<'_, [Option<TypeReference>]> {
+        if let Some(arguments) = &self.declaration_arguments {
+            Cow::Borrowed(arguments)
+        } else {
+            Cow::Owned(self.identity_arguments())
+        }
+    }
+
+    fn retain_declaration(&mut self, declaration: &Self) {
+        if self.params != declaration.params {
+            self.declaration_arguments = Some(declaration.declaration_arguments().into_owned());
+        }
     }
 
     pub(crate) fn has_input_parameters(&self) -> bool {
@@ -205,6 +252,7 @@ impl OverloadVariant {
             params: params.to_owned(),
             is_strict,
             returns_not_null,
+            declaration_arguments: None,
         }
     }
 

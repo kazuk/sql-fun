@@ -334,8 +334,8 @@ impl FunctionOverloadCollection {
     ) -> Option<(OverloadVariant, Vec<bool>)> {
         let mut candidates = Vec::new();
 
-        'overload: for overload in &self.overloads {
-            let mut overload = overload.clone();
+        'overload: for declaration in &self.overloads {
+            let mut overload = declaration.clone();
             if !arg_types.valid_explicit_arrays(context, &overload) {
                 continue;
             }
@@ -373,15 +373,18 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
             let common_inputs = ParameterBindResult::common_inputs(&declared_bindings);
-            candidates.push((overload, score, common_inputs));
+            candidates.push((overload, score, common_inputs, declaration));
         }
 
-        let best = candidates.iter().map(|(_, rank, _)| *rank).max()?;
-        let mut best_candidates = candidates.into_iter().filter(|(_, rank, _)| *rank == best);
-        let (overload, _, common_inputs) = best_candidates.next()?;
+        let best = candidates.iter().map(|(_, rank, _, _)| *rank).max()?;
+        let mut best_candidates = candidates
+            .into_iter()
+            .filter(|(_, rank, _, _)| *rank == best);
+        let (mut overload, _, common_inputs, declaration) = best_candidates.next()?;
         if best_candidates.next().is_some() {
             None
         } else {
+            overload.retain_declaration(declaration);
             Some((overload, common_inputs))
         }
     }

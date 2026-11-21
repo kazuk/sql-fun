@@ -53,6 +53,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [lint_configuration](lint_configuration.md)
 - [unmet_lint_expectation](unmet_lint_expectation.md)
 - [drop_column_dependency](drop_column_dependency.md)
+- [drop_function_dependency](drop_function_dependency.md)
 - [drop_column_last_column](drop_column_last_column.md)
 - [add_column_default](add_column_default.md)
 - [add_column_nullability](add_column_nullability.md)

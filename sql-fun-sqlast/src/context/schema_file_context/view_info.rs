@@ -7,7 +7,7 @@ use crate::{
     names::FullName,
     sem::{
         AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, Kind, ViewLike,
-        problem::CreationProblem, search_path::expand_relation_search_path,
+        ViewTombstone, problem::CreationProblem, search_path::expand_relation_search_path,
     },
 };
 
@@ -43,9 +43,29 @@ impl ViewInformationCollection {
 }
 
 impl ViewInfoRead for SchemaCatalog {
+    fn view_tombstone(&self, key: &FullName) -> Option<&ViewTombstone> {
+        let key = self.relation_identity(key);
+        if let Some(tombstone) = self.view_tombstones.get(&key) {
+            return Some(tombstone);
+        }
+        if self.objects.get(&key.to_string()).is_some() {
+            return None;
+        }
+        self.base.view_tombstone(&key)
+    }
+
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
         let identity = self.relation_identity(key);
         let key = &identity;
+        if self.view_tombstones.contains_key(key) {
+            return None;
+        }
+        if let Some(kind) = self.objects.get(&key.to_string())
+            && *kind != Kind::view()
+            && *kind != Kind::materialized_view()
+        {
+            return None;
+        }
         if let Some(v) = self.views.get(key) {
             Some(v)
         } else {

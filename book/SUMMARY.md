@@ -86,6 +86,7 @@
 
 - [Diagnostic reference](diagnostics/README.md)
   - [drop_column_dependency](diagnostics/drop_column_dependency.md)
+  - [drop_function_dependency](diagnostics/drop_function_dependency.md)
   - [drop_column_last_column](diagnostics/drop_column_last_column.md)
   - [add_column_default](diagnostics/add_column_default.md)
   - [add_column_nullability](diagnostics/add_column_nullability.md)

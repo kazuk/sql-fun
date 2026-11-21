@@ -4,9 +4,9 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AccessKind, AliasSpec, AnalysisError, ArraySubqueryExpr, ColumnCollection,
-        ColumnDefinition, ColumnRename, InsertTarget, MembershipExpr, QueryName, QueryOrder,
-        QueryWindow, ResolvedOperator, ResultColumnCollection, SemScalarExpr, SetOperationQuery,
-        TableSampleSource, TypeReference, data_source::JoinExprDataSource,
+        ColumnDefinition, ColumnRename, InsertTarget, MembershipExpr, OverloadVariant, QueryName,
+        QueryOrder, QueryWindow, ResolvedOperator, ResultColumnCollection, SemScalarExpr,
+        SetOperationQuery, TableSampleSource, TypeReference, data_source::JoinExprDataSource,
     },
 };
 
@@ -46,6 +46,8 @@ pub(crate) trait SemanticVisitor {
     fn access_join(&mut self, _join: &JoinExprDataSource) {}
     fn leave_access_join(&mut self) {}
     fn access_action(&mut self, _name: &FullName, _kind: AccessKind) {}
+    fn function_overload(&mut self, _name: &FullName, _overload: &OverloadVariant) {}
+
     fn function_binding(&mut self, _name: &FullName, _alias: &AliasSpec, _columns: &[ColumnName]) {}
 
     // Placement validators inspect written operands, not definitions behind bindings.

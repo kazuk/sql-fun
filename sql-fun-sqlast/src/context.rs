@@ -7,6 +7,7 @@ mod conflict_info;
 mod conflict_masters;
 mod cursor_bindings;
 mod diagnostic;
+mod foreign_data_wrapper_info;
 mod frozen_base_context;
 mod function_info;
 mod index_info;
@@ -31,6 +32,7 @@ pub use self::{
     cast_info::CastInfoRead,
     conflict_info::ConflictInfoRead,
     diagnostic::DiagnosticContext,
+    foreign_data_wrapper_info::{ForeignDataWrapperInfoRead, ForeignDataWrapperInfoWrite},
     frozen_base_context::FrozenBaseContext,
     function_info::{FunctionInfoRead, FunctionInfoWrite},
     index_info::IndexInfoRead,
@@ -86,6 +88,7 @@ pub trait ParseContext:
     ParameterTypeHintRead
     + ParameterTypeHintWrite
     + RuleInfoWrite
+    + ForeignDataWrapperInfoWrite
     + TriggerInfoWrite
     + SequenceInfoWrite
     + TypeInfoWrite

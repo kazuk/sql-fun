@@ -57,6 +57,12 @@ this setting, analysis retains a `column_database_name_required` failure. A
 different database name produces `column_cross_database`; PostgreSQL
 cross-database column references are unsupported.
 
+The CLI analysis server currently drops the configured database name from
+the schema context. Database-qualified columns can then produce
+`column_database_name_required` even when the selected datasource sets
+`database-name`. Use a schema-qualified column reference in that path.
+See [#1181](https://github.com/kazuk/sql-fun/issues/1181).
+
 With the `sqlite` feature, SQLite uses `database.table_or_alias.column`, where
 `database` is an explicitly referenced SQLite namespace such as `main`.
 PostgreSQL's four-component column form is invalid in SQLite.

@@ -18,7 +18,10 @@ inputs](../../installation.md).
 
 The semantic path requires exactly one argument. General RESET, DEFAULT, FROM
 CURRENT, transaction options and multiargument setting forms may be retained by
-syntax but are not completed by that path. Recording a setting is not evidence
+syntax but are not completed by that path. A project schema containing
+`SET search_path TO public, app;` can stop analysis during schema
+initialization. See [#1183](https://github.com/kazuk/sql-fun/issues/1183).
+Recording a setting is not evidence
 that all effects on PostgreSQL semantics are modeled. SQLite PRAGMA and
 attachment changes are separate analysis boundaries; in particular
 rename-related PRAGMA behavior remains unmodeled.

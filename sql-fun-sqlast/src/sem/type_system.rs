@@ -12,7 +12,7 @@ pub use self::{
 };
 
 use crate::{
-    names::TableName,
+    names::{FullName, TableName},
     sem::{
         AnalysisError, pg_type::TypeReference as PgTypeTypeReference,
         scalar_expr::SemScalarExpr as ScalarExprSemScalarExpr, traversal::SemanticVisitor,
@@ -429,5 +429,27 @@ impl OverloadVariant {
             return Err(TypeError::too_many_arguments());
         }
         Ok(results)
+    }
+}
+
+/// A resolved routine name and its exact overload.
+#[derive(Clone, Debug)]
+pub struct ExactFunction(FullName, OverloadVariant);
+
+impl ExactFunction {
+    pub(crate) fn new(name: &FullName, overload: &OverloadVariant) -> Self {
+        Self(name.clone(), overload.clone())
+    }
+
+    /// Qualified routine name.
+    #[must_use]
+    pub const fn name(&self) -> &FullName {
+        &self.0
+    }
+
+    /// Matching overload.
+    #[must_use]
+    pub const fn overload(&self) -> &OverloadVariant {
+        &self.1
     }
 }

@@ -7,15 +7,16 @@ use std::path::Path;
 use ::sql_fun_core::SqlFunArgs;
 
 use crate::{
+    ast::ObjectKind,
     context::{
-        CastInfoRead, ConflictInfoRead, FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead,
-        OperatorInfoRead, RuleInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead,
-        TriggerInfoRead, TypeInfoRead, ViewInfoRead,
+        CastInfoRead, ConflictInfoRead, ForeignDataWrapperInfoRead, FunctionInfoRead,
+        GetSourcePathWithSpanOpt, IndexInfoRead, OperatorInfoRead, RuleInfoRead, SearchPathRead,
+        SequenceInfoRead, TableInfoRead, TriggerInfoRead, TypeInfoRead, ViewInfoRead,
     },
     names::{FullName, OperatorName, TableName, ViewName},
     sem::{
-        CreateIndex, CreateSequence, CreateTable, FunctionOverloadCollection, OperatorDefinition,
-        TypeDefinition, TypeReference, ViewLike,
+        CreateIndex, CreateSequence, CreateTable, ExactFunction, FunctionOverloadCollection,
+        OperatorDefinition, TypeDefinition, TypeReference, ViewLike,
         search_path::{
             expand_operator_search_path, expand_relation_search_path, expand_search_path_inst,
             expand_type_search_path,
@@ -40,6 +41,7 @@ pub trait BaseParseContext:
     + IndexInfoRead
     + OperatorInfoRead
     + RuleInfoRead
+    + ForeignDataWrapperInfoRead
     + TriggerInfoRead
     + SequenceInfoRead
     + TypeInfoRead
@@ -146,6 +148,29 @@ pub trait BaseParseContext:
     /// get `CREATE FUNCTION` statement by function name
     fn get_function_by_name(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         expand_search_path_inst(self, name, |key| self.get_function_impl(key))
+    }
+
+    /// Find the first visible overload with the exact input types.
+    fn find_exact_function(
+        &self,
+        name: &FullName,
+        arguments: &[Option<TypeReference>],
+    ) -> Option<ExactFunction> {
+        expand_search_path_inst(self, name, |key| {
+            // Lookup must stop at an exact procedure even when expression
+            // function lookup omits procedures from its overload collection.
+            if self
+                .ownership_definitions(ObjectKind::PROCEDURE, key)
+                .iter()
+                .any(|definition| definition.identity().arguments() == Some(arguments))
+            {
+                return Some(None);
+            }
+            self.get_function_impl(key)?
+                .exact_function(key, arguments)
+                .map(Some)
+        })
+        .flatten()
     }
 
     /// get resolved function name

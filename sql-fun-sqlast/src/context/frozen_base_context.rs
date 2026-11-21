@@ -456,6 +456,15 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::context::ForeignDataWrapperInfoRead for $context {
+            fn foreign_data_wrapper(
+                &self,
+                name: &str,
+            ) -> Option<&crate::sem::CreateForeignDataWrapper> {
+                self.$catalog().foreign_data_wrapper(name)
+            }
+        }
+
         impl crate::context::TriggerInfoRead for $context {
             fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
                 self.$catalog().trigger_is_cancelled(identity)

@@ -6,11 +6,12 @@ use crate::{
     context::ParseContext,
     sem::{
         AlterOwner, AlterSequence, AnalysisError, Comment, CreateCompositeType, CreateDomain,
-        CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateRule, CreateSchema,
-        CreateSequence, CreateTable, CreateTableAs, CreateTrigger, CreateView, DeleteStatement,
-        DropRule, DropTable, DropTrigger, EngineFeatureValidation, InsertStatement, MergeStatement,
-        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
-        SelectStatement, SemAst, UpdateStatement, VariableSet,
+        CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex,
+        CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger,
+        CreateView, DeleteStatement, DropRule, DropTable, DropTrigger, EngineFeatureValidation,
+        InsertStatement, MergeStatement, ObjectPrivilegeChange, ParameterConstraints,
+        RelationAlteration, RoleMembershipDeclaration, SelectStatement, SemAst, UpdateStatement,
+        VariableSet,
     },
 };
 
@@ -44,9 +45,9 @@ impl SemAst {
             AstStatementNode::DefaultPrivileges(_) => {
                 todo!("ALTER DEFAULT PRIVILEGES interpretation (#955)")
             }
-            AstStatementNode::ForeignDataWrapper(_) => {
-                todo!("CREATE FOREIGN DATA WRAPPER interpretation (#1163)")
-            }
+            AstStatementNode::ForeignDataWrapper(ast) => Ok(Self::CreateForeignDataWrapper(
+                Box::new(CreateForeignDataWrapper::analyze(ast, context)?),
+            )),
             AstStatementNode::ForeignTable(_) => {
                 todo!("CREATE FOREIGN TABLE interpretation (#956)")
             }
@@ -170,6 +171,9 @@ impl SemAst {
                     Self::ObjectPrivileges(change),
                     context,
                 ))
+            }
+            AstStatementNode::ForeignDataWrapper(ast) => {
+                CreateForeignDataWrapper::analyze_and_apply(ast, context)
             }
             AstStatementNode::CreateTrigger(trigger) => CreateTrigger::apply_ast(trigger, context),
             AstStatementNode::DropTrigger(trigger) => DropTrigger::apply_ast(trigger, context),

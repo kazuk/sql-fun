@@ -17,14 +17,14 @@ use crate::{
         AlterIndex, AlterOwner, AlterSequence, AlterTable, AlterView, AnalysisError,
         AnalysisProblem, AnalysisState, BinaryOperatorDefinition, CastContext, CastDefinition,
         CatalogNameLookup, ColumnDefinition, Comment, CreateCompositeType, CreateDomain,
-        CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateRule, CreateSchema,
-        CreateSequence, CreateTable, CreateTableAs, CreateTrigger, CreateView, CursorInfo,
-        DataSource, DropTable, FromClause, FunctionOverloadCollection, InsertArbiter,
-        InsertInferenceModifiers, Kind, OperatorDefinition, OverloadVariant, OwnedObjectDefinition,
-        ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan,
-        TriggerIdentity, TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport,
-        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport, WithClause,
-        ownership::model_definitions, problem::TriggerProblem,
+        CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex,
+        CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger,
+        CreateView, CursorInfo, DataSource, DropTable, FromClause, FunctionOverloadCollection,
+        InsertArbiter, InsertInferenceModifiers, Kind, OperatorDefinition, OverloadVariant,
+        OwnedObjectDefinition, ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup,
+        SourcePathWithSpan, TriggerIdentity, TypeDefinition, TypeReference, VariableSet,
+        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
+        WithClause, ownership::model_definitions, problem::TriggerProblem,
         search_path::expand_search_path_inst,
     },
     test_helpers::{ast_query, source_span},
@@ -37,6 +37,7 @@ pub struct TestContext<Constraints> {
     lint_configuration: ::sql_fun_core::LintConfigurations,
     rules: HashMap<RuleIdentity, Option<CreateRule>>,
     ownership: OwnershipCatalog,
+    foreign_data_wrappers: HashMap<String, CreateForeignDataWrapper>,
     triggers: HashMap<TriggerIdentity, Option<CreateTrigger>>,
     masters: Option<ConflictMasters>,
     function_set_properties: HashMap<(FullName, OverloadVariant), bool>,
@@ -472,6 +473,20 @@ impl DiagnosticContext for TestParseContext {
     }
 }
 
+impl<Constraints> crate::context::ForeignDataWrapperInfoRead for TestContext<Constraints> {
+    fn foreign_data_wrapper(&self, name: &str) -> Option<&CreateForeignDataWrapper> {
+        self.foreign_data_wrappers.get(name)
+    }
+}
+
+impl crate::context::ForeignDataWrapperInfoWrite for TestParseContext {
+    fn register_foreign_data_wrapper(mut self, definition: &CreateForeignDataWrapper) -> Self {
+        self.foreign_data_wrappers
+            .insert(definition.name().to_owned(), definition.clone());
+        self
+    }
+}
+
 impl<Constraints: std::fmt::Debug> crate::context::RuleInfoRead for TestContext<Constraints> {
     fn local_rule(&self, identity: &RuleIdentity) -> Option<Option<&CreateRule>> {
         self.rules.get(identity).map(Option::as_ref)
@@ -738,6 +753,7 @@ impl ParseContext for TestParseContext {
             rules: self.rules,
             ownership: self.ownership,
             triggers: self.triggers,
+            foreign_data_wrappers: self.foreign_data_wrappers,
             masters: self.masters,
             function_set_properties: self.function_set_properties,
             sampling_methods: self.sampling_methods,

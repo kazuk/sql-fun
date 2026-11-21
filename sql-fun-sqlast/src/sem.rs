@@ -23,6 +23,7 @@ mod constraint;
 mod create_comp_type;
 mod create_domain;
 mod create_enum_type;
+mod create_foreign_data_wrapper;
 mod create_function;
 mod create_index;
 mod create_rule;
@@ -97,6 +98,7 @@ pub use self::{
         DropKnowledgeGap,
     },
     column_rename::ColumnRename,
+    create_foreign_data_wrapper::CreateForeignDataWrapper,
     create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
     create_trigger::{
         CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
@@ -252,7 +254,8 @@ pub use {
             ResultColumnCollection, SelectStatement, SetOperationKind, SetOperationQuery,
         },
         type_system::{
-            FunctionOverloadCollection, FunctionParam, OverloadVariant, SimpleInferResult,
+            ExactFunction, FunctionOverloadCollection, FunctionParam, OverloadVariant,
+            SimpleInferResult,
         },
         update_statement::{
             UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
@@ -322,6 +325,8 @@ impl From<CreateIndex> for ImplicitChange {
 pub enum SemAst {
     /// A resolved CREATE TRIGGER statement.
     CreateTrigger(Box<CreateTrigger>),
+    /// An analyzed PostgreSQL foreign-data wrapper declaration.
+    CreateForeignDataWrapper(Box<CreateForeignDataWrapper>),
     /// Resolved DROP TRIGGER, including explicit IF EXISTS no-op outcomes.
     DropTrigger(DropTrigger),
     /// Analyzed PostgreSQL CREATE RULE.
@@ -457,6 +462,7 @@ impl SemAst {
             Self::CreateSchema(schema) => schema.visit_references(visitor),
             Self::CreateRule(rule) => rule.visit_references(visitor),
             Self::CreateTrigger(trigger) => trigger.visit_references(visitor),
+            Self::CreateForeignDataWrapper(wrapper) => wrapper.visit_references(visitor),
             Self::CreateTable(table) => table.visit_references(visitor),
             Self::CreateCompType(composite) => composite.visit_references(visitor),
             Self::CreateIndex(index) => index.visit_references(visitor),

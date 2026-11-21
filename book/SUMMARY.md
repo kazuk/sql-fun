@@ -156,6 +156,7 @@
   - [domain_base_type_not_found](diagnostics/domain_base_type_not_found.md)
   - [deprecated](diagnostics/deprecated.md)
   - [duplicate_lint_target](diagnostics/duplicate_lint_target.md)
+  - [foreign_data_wrapper_invalid_definition](diagnostics/foreign_data_wrapper_invalid_definition.md)
   - [foreign_key_period_mismatch](diagnostics/foreign_key_period_mismatch.md)
   - [foreign_key_temporal_action](diagnostics/foreign_key_temporal_action.md)
   - [foreign_key_temporal_key_missing](diagnostics/foreign_key_temporal_key_missing.md)

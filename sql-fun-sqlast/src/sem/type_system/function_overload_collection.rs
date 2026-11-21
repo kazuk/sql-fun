@@ -2,7 +2,7 @@ use crate::{
     context::{BaseParseContext, ParseContext},
     names::{ColumnName, FullName, TableName},
     sem::{
-        ColumnCollection, OverloadVariant, TypeReference,
+        ColumnCollection, ExactFunction, OverloadVariant, TypeReference,
         overload_rank::OverloadRank,
         parameter_resolution::Signature,
         problem::CallArgumentProblem,
@@ -550,5 +550,17 @@ impl FunctionOverloadCollection {
             }
         }
         intersection.unwrap_or_default()
+    }
+}
+
+impl FunctionOverloadCollection {
+    pub(crate) fn exact_function(
+        &self,
+        name: &FullName,
+        arguments: &[Option<TypeReference>],
+    ) -> Option<ExactFunction> {
+        self.into_iter()
+            .find(|overload| overload.identity_arguments() == arguments)
+            .map(|overload| ExactFunction::new(name, overload))
     }
 }

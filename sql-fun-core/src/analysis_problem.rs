@@ -377,6 +377,8 @@ pub enum AnalysisProblem {
     Creation(CreationProblem),
     /// Invalid rule definition.
     Rule(RuleProblem),
+    /// Invalid foreign-data wrapper declaration.
+    ForeignDataWrapper(String),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -594,6 +596,12 @@ impl AnalysisProblem {
     pub fn rule(problem: &RuleProblem) -> Self {
         Self::Rule(problem.clone())
     }
+    /// Report an invalid PostgreSQL foreign-data wrapper declaration.
+    #[must_use]
+    pub fn foreign_data_wrapper(message: &str) -> Self {
+        Self::ForeignDataWrapper(message.to_owned())
+    }
+
     /// Diagnostic ownership target.
     #[must_use]
     pub fn ownership_target(target: impl Into<OwnershipLookup>) -> Self {
@@ -782,6 +790,7 @@ impl AnalysisProblem {
             Self::Ownership(problem) => problem.code(),
             Self::Privilege(_) => "invalid_privilege_declaration",
             Self::Rule(_) => "rule_invalid_definition",
+            Self::ForeignDataWrapper(_) => "foreign_data_wrapper_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
             Self::Insert(_) => "insert_semantics",
@@ -868,6 +877,7 @@ impl AnalysisProblem {
             | Self::InferenceCandidateSpaceUnsupported { .. }
             | Self::CoalesceExprTypeUnknown(..)
             | Self::OperatorNameSyntax(_)
+            | Self::ForeignDataWrapper(_)
             | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
             }
@@ -935,6 +945,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::Serial(problem) => problem.diagnostic_message(),
             Self::Creation(problem) => problem.diagnostic_message(),
             Self::Rule(problem) => problem.diagnostic_message(),
+            Self::ForeignDataWrapper(message) => message.clone(),
             Self::Ownership(problem) => problem.diagnostic_message(),
             Self::Privilege(problem) => problem.diagnostic_message(),
             Self::Trigger(problem) => problem.diagnostic_message(),

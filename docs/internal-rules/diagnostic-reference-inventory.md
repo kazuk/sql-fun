@@ -243,6 +243,13 @@ The #1000 message-fragment formatter adds one `ArgumentTypeMismatch` match in
 `analysis_problem.rs`. It only describes an existing payload and does not
 construct or emit the excluded diagnostic; its witness count increases by one.
 
+The #1168 extension membership analyzer reports an existing target lookup
+diagnostic only after resolution fails. The two reviewed sources add lookup
+types and constructors for the same resolved, missing, ambiguous, invalid-kind,
+and unresolved-argument outcomes. The guarded reporter emits only failure
+outcomes. The existing analysis-stage code covers extension membership
+validation errors.
+
 Production entry points come from the root/workspace Cargo manifests, including
 explicit binary paths and nested workspace members. The scanner follows ordinary
 modules and explicit path attributes, excluding test-only modules. Unsupported

@@ -9,7 +9,9 @@ Code: `ownership_target_ambiguous`. Severity: Error.
 An ALTER OWNER target matches more than one eligible identity after visibility
 rules, commonly because an overloaded routine was named without its input
 signature. PostgreSQL `DROP FUNCTION` also reports this diagnostic when an
-omitted signature matches multiple visible overloads.
+omitted signature matches multiple visible overloads. PostgreSQL
+`ALTER EXTENSION ... ADD/DROP` reports the same diagnostic for ambiguous
+member lookup.
 
 ## What analysis knows and does not know
 

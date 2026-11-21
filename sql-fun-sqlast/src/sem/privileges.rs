@@ -1,5 +1,7 @@
 //! Retained PostgreSQL privilege declarations on catalog definitions.
 
+use ::sql_fun_core::analysis_problem::PrivilegeProblem;
+
 use crate::{
     ast::{
         DropBehavior, ObjectKind, PrivilegeGrantee,
@@ -11,7 +13,7 @@ use crate::{
     context::ParseContext,
     names::{ColumnName, FullName},
     sem::{
-        AnalysisError, AnalysisProblem, OwnerSpecification, OwnershipIdentity, Role,
+        AnalysisError, AnalysisProblem, OwnerSpecification, OwnershipIdentity,
         ownership::RequestedIdentity, search_path::expand_relation_search_path,
     },
 };
@@ -37,30 +39,98 @@ pub enum PrivilegeOperation {
 /// A privilege name and its explicitly listed columns.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DeclaredPrivilege {
-    /// PostgreSQL privilege name. An empty name with columns means ALL on those columns.
-    pub name: String,
-    /// Exact column names supplied by the declaration.
-    pub columns: Vec<String>,
+    name: String,
+    columns: Vec<String>,
+}
+
+impl DeclaredPrivilege {
+    /// The retained name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The retained columns.
+    #[must_use]
+    pub fn columns(&self) -> &[String] {
+        &self.columns
+    }
 }
 
 /// One object privilege declaration in source order.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ObjectPrivilegeDeclaration {
-    /// GRANT or REVOKE and its options.
-    pub operation: PrivilegeOperation,
-    /// Privilege names and their column lists. An empty list means ALL.
-    pub privileges: Vec<DeclaredPrivilege>,
-    /// Grantees in declaration order.
-    pub grantees: Vec<PrivilegeRole>,
-    /// Explicit grantor, when supplied.
-    pub grantor: Option<PrivilegeRole>,
+    operation: PrivilegeOperation,
+    privileges: Vec<DeclaredPrivilege>,
+    grantees: Vec<PrivilegeRole>,
+    grantor: Option<PrivilegeRole>,
+}
+
+impl ObjectPrivilegeDeclaration {
+    /// The retained operation.
+    #[must_use]
+    pub const fn operation(&self) -> &PrivilegeOperation {
+        &self.operation
+    }
+
+    /// The retained privileges.
+    #[must_use]
+    pub fn privileges(&self) -> &[DeclaredPrivilege] {
+        &self.privileges
+    }
+
+    /// The retained grantees.
+    #[must_use]
+    pub fn grantees(&self) -> &[PrivilegeRole] {
+        &self.grantees
+    }
+
+    /// The retained grantor.
+    #[must_use]
+    pub const fn grantor(&self) -> Option<&PrivilegeRole> {
+        self.grantor.as_ref()
+    }
 }
 
 /// A validated object privilege declaration with its resolved targets.
 #[derive(Clone, Debug)]
 pub struct ObjectPrivilegeChange {
-    pub(crate) targets: Vec<OwnershipIdentity>,
-    pub(crate) declaration: ObjectPrivilegeDeclaration,
+    targets: Vec<OwnershipIdentity>,
+    schemas: Option<Vec<String>>,
+    declaration: ObjectPrivilegeDeclaration,
+    problems: Vec<PrivilegeProblem>,
+}
+
+impl ObjectPrivilegeChange {
+    /// Failures recorded independently of diagnostic delivery.
+    #[must_use]
+    pub fn problems(&self) -> &[PrivilegeProblem] {
+        &self.problems
+    }
+
+    /// Whether the whole declaration may update the catalog.
+    #[must_use]
+    pub const fn is_applicable(&self) -> bool {
+        self.problems.is_empty()
+    }
+
+    /// Schema names in an ALL IN SCHEMA selector.
+    #[must_use]
+    pub fn schemas(&self) -> Option<&[String]> {
+        self.schemas.as_deref()
+    }
+
+    /// The retained targets.
+    #[must_use]
+    pub fn targets(&self) -> &[OwnershipIdentity] {
+        &self.targets
+    }
+
+    /// The retained declaration.
+    #[must_use]
+    pub const fn declaration(&self) -> &ObjectPrivilegeDeclaration {
+        &self.declaration
+    }
 }
 
 impl From<&PrivilegeAction> for PrivilegeOperation {
@@ -87,39 +157,43 @@ fn postgres_major(context: &impl ParseContext) -> Option<u32> {
         .map(|version| version.major())
 }
 
-fn report(context: &mut impl ParseContext, message: String) -> Result<(), AnalysisError> {
-    context.report_analysis_problem(AnalysisProblem::Privilege(message))
+fn report(
+    context: &mut impl ParseContext,
+    problems: &[PrivilegeProblem],
+) -> Result<(), AnalysisError> {
+    for problem in problems {
+        context.report_analysis_problem(AnalysisProblem::Privilege(problem.clone()))?;
+    }
+    Ok(())
 }
 
 impl PrivilegeRole {
     fn resolve(
         ast: &PrivilegeGrantee,
         public_allowed: bool,
-        context: &mut impl ParseContext,
-    ) -> Result<Option<Self>, AnalysisError> {
+        context: &impl ParseContext,
+        problems: &mut Vec<PrivilegeProblem>,
+    ) -> Self {
         let specification = match ast.keyword() {
-            Some("PUBLIC") if public_allowed => return Ok(Some(Self::Public)),
             Some("CURRENT_ROLE") => OwnerSpecification::current_role(),
             Some("CURRENT_USER") => OwnerSpecification::current_user(),
             Some("SESSION_USER") => OwnerSpecification::session_user(),
             _ => {
-                if let Some(name) = ast.name() {
-                    if context.role_by_name(name).is_some() {
-                        OwnerSpecification::role(&Role::from(name))
-                    } else {
-                        report(context, format!("role does not exist: {name}"))?;
-                        return Ok(None);
+                let Some(name) = ast.name() else {
+                    if !public_allowed {
+                        problems.push(PrivilegeProblem::PublicNotAllowed);
                     }
+                    return Self::Public;
+                };
+                if let Some(role) = context.role_by_name(name) {
+                    OwnerSpecification::role(role)
                 } else {
-                    report(
-                        context,
-                        "PUBLIC is not allowed in this role position".to_owned(),
-                    )?;
-                    return Ok(None);
+                    problems.push(PrivilegeProblem::MissingRole(name.to_owned()));
+                    OwnerSpecification::named(name)
                 }
             }
         };
-        Ok(Some(Self::Role(specification)))
+        Self::Role(specification)
     }
 }
 
@@ -180,58 +254,78 @@ impl ObjectPrivilegeChange {
     pub(crate) fn analyze(
         ast: &ObjectPrivileges,
         context: &mut impl ParseContext,
-    ) -> Result<Option<Self>, AnalysisError> {
-        let kind = ast.kind();
-        let Some(object_kind) = kind.object_kind() else {
-            report(
-                context,
-                format!("analysis catalog does not contain {kind:?} privilege targets"),
-            )?;
-            return Ok(None);
-        };
-        let mut grantees = Vec::new();
-        for grantee in ast.grantees() {
-            let Some(grantee) =
-                PrivilegeRole::resolve(grantee, !ast.action().grants_with_grant_option(), context)?
-            else {
-                return Ok(None);
-            };
-            grantees.push(grantee);
-        }
-        let grantor = if let Some(grantor) = ast.grantor() {
-            let Some(grantor) = PrivilegeRole::resolve(grantor, false, context)? else {
-                return Ok(None);
-            };
-            Some(grantor)
+    ) -> Result<Self, AnalysisError> {
+        let mut problems = Vec::new();
+        let targets = if let Some(kind) = ast.kind().object_kind() {
+            Self::resolve_targets(ast.targets(), kind, context, &mut problems)?
         } else {
-            None
+            let targets = match ast.targets() {
+                PrivilegeTargets::Objects(targets) => targets
+                    .iter()
+                    .filter_map(|target| match target {
+                        PrivilegeTarget::LargeObjectId(id) => Some(id.clone()),
+                        PrivilegeTarget::Name(name) => Some(name.parts().join(".")),
+                        PrivilegeTarget::Routine(_) => None,
+                    })
+                    .collect(),
+                PrivilegeTargets::AllInSchemas(schemas) => schemas.clone(),
+            };
+            problems.push(PrivilegeProblem::UnsupportedTargets {
+                target_kind: format!("{:?}", ast.kind()),
+                targets,
+            });
+            Vec::new()
         };
-        let Some(targets) = Self::targets(ast.targets(), object_kind, context)? else {
-            return Ok(None);
-        };
-        let Some(privileges) = Self::validate_privileges(ast, &targets, context)? else {
-            return Ok(None);
-        };
-        Ok(Some(Self {
+        let grantees = ast
+            .grantees()
+            .iter()
+            .map(|role| {
+                PrivilegeRole::resolve(
+                    role,
+                    !ast.action().grants_with_grant_option(),
+                    context,
+                    &mut problems,
+                )
+            })
+            .collect();
+        let grantor = ast
+            .grantor()
+            .map(|role| PrivilegeRole::resolve(role, false, context, &mut problems));
+        let privileges: Vec<_> = ast
+            .privileges()
+            .iter()
+            .map(|privilege| DeclaredPrivilege {
+                name: privilege.name().to_owned(),
+                columns: privilege.columns().to_vec(),
+            })
+            .collect();
+        Self::validate_privileges(ast.kind(), &privileges, &targets, context, &mut problems);
+        report(context, &problems)?;
+        Ok(Self {
             targets,
+            schemas: match ast.targets() {
+                PrivilegeTargets::AllInSchemas(schemas) => Some(schemas.clone()),
+                PrivilegeTargets::Objects(_) => None,
+            },
             declaration: ObjectPrivilegeDeclaration {
                 operation: ast.action().into(),
                 privileges,
                 grantees,
                 grantor,
             },
-        }))
+            problems,
+        })
     }
 
     fn validate_privileges(
-        ast: &ObjectPrivileges,
+        kind: PrivilegeTargetKind,
+        privileges: &[DeclaredPrivilege],
         targets: &[OwnershipIdentity],
-        context: &mut impl ParseContext,
-    ) -> Result<Option<Vec<DeclaredPrivilege>>, AnalysisError> {
-        let kind = ast.kind();
+        context: &impl ParseContext,
+        problems: &mut Vec<PrivilegeProblem>,
+    ) {
         let version = postgres_major(context);
-        let mut privileges = Vec::new();
-        for privilege in ast.privileges() {
+        for privilege in privileges {
             let sequence_usage = kind == PrivilegeTargetKind::Table
                 && privilege.name() == "usage"
                 && privilege.columns().is_empty()
@@ -242,16 +336,11 @@ impl ObjectPrivilegeChange {
             if !sequence_usage
                 && !kind.permits(privilege.name(), !privilege.columns().is_empty(), version)
             {
-                report(
-                    context,
-                    format!("privilege {} is invalid for {kind:?}", privilege.name()),
-                )?;
-                return Ok(None);
+                problems.push(PrivilegeProblem::InvalidPrivilege {
+                    privilege: privilege.name().to_owned(),
+                    target_kind: format!("{kind:?}"),
+                });
             }
-            privileges.push(DeclaredPrivilege {
-                name: privilege.name().to_owned(),
-                columns: privilege.columns().to_vec(),
-            });
         }
         for identity in targets {
             if matches!(identity.kind(), ObjectKind::TYPE | ObjectKind::DOMAIN)
@@ -259,16 +348,9 @@ impl ObjectPrivilegeChange {
                     .get_type_impl(identity.name())
                     .is_some_and(|definition| definition.is_array() == Some(true))
             {
-                report(
-                    context,
-                    format!(
-                        "cannot declare privileges on array type {}",
-                        identity.name()
-                    ),
-                )?;
-                return Ok(None);
+                problems.push(PrivilegeProblem::ArrayTarget(identity.into()));
             }
-            for privilege in &privileges {
+            for privilege in privileges {
                 for column in &privilege.columns {
                     let name = identity.name();
                     let column_name = ColumnName::from(column.as_str());
@@ -284,13 +366,14 @@ impl ObjectPrivilegeChange {
                             .get_view_impl(name)
                             .is_some_and(|view| view.has_column(&column_name))
                     {
-                        report(context, format!("column {column} does not exist on {name}"))?;
-                        return Ok(None);
+                        problems.push(PrivilegeProblem::MissingColumn {
+                            target: identity.into(),
+                            column: (&column_name).into(),
+                        });
                     }
                 }
             }
         }
-        Ok(Some(privileges))
     }
 
     fn relation_target(name: &FullName, context: &impl ParseContext) -> Option<OwnershipIdentity> {
@@ -312,11 +395,12 @@ impl ObjectPrivilegeChange {
         })
     }
 
-    fn targets(
+    fn resolve_targets(
         ast: &PrivilegeTargets,
         kind: ObjectKind,
         context: &mut impl ParseContext,
-    ) -> Result<Option<Vec<OwnershipIdentity>>, AnalysisError> {
+        problems: &mut Vec<PrivilegeProblem>,
+    ) -> Result<Vec<OwnershipIdentity>, AnalysisError> {
         let mut identities = Vec::new();
         match ast {
             PrivilegeTargets::Objects(objects) => {
@@ -326,8 +410,8 @@ impl ObjectPrivilegeChange {
                     {
                         let name = FullName::from_ast_name(name)?;
                         let Some(identity) = Self::relation_target(&name, context) else {
-                            report(context, format!("relation does not exist: {name}"))?;
-                            return Ok(None);
+                            problems.push(PrivilegeProblem::MissingRelation((&name).into()));
+                            continue;
                         };
                         if !identities.contains(&identity) {
                             identities.push(identity);
@@ -348,8 +432,8 @@ impl ObjectPrivilegeChange {
                     };
                     let outcome = requested.resolve(context);
                     let Some(identity) = outcome.identity() else {
-                        report(context, outcome.diagnostic_message())?;
-                        return Ok(None);
+                        problems.extend(outcome.privilege_problem());
+                        continue;
                     };
                     if !identities.contains(identity) {
                         identities.push(identity.clone());
@@ -367,8 +451,8 @@ impl ObjectPrivilegeChange {
                     .identity()
                     .is_none()
                     {
-                        report(context, format!("schema does not exist: {schema}"))?;
-                        return Ok(None);
+                        problems.push(PrivilegeProblem::MissingSchema(schema.clone()));
+                        continue;
                     }
                     for name in match kind {
                         ObjectKind::TABLE => context.relation_names(),
@@ -398,56 +482,92 @@ impl ObjectPrivilegeChange {
                 }
             }
         }
-        Ok(Some(identities))
+        Ok(identities)
     }
 }
 
 /// Validated role membership declaration, retained on each granted role.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct RoleMembershipDeclaration {
-    /// GRANT or REVOKE and its drop behavior.
-    pub operation: PrivilegeOperation,
-    /// Exact names of the roles being granted or revoked.
-    pub roles: Vec<String>,
-    /// Member role specifications in declaration order.
-    pub members: Vec<PrivilegeRole>,
-    /// Explicit grantor, when supplied.
-    pub grantor: Option<PrivilegeRole>,
-    /// Explicit ADMIN, INHERIT and SET options.
-    pub options: Vec<(String, bool)>,
+    operation: PrivilegeOperation,
+    roles: Vec<String>,
+    members: Vec<PrivilegeRole>,
+    grantor: Option<PrivilegeRole>,
+    options: Vec<(String, bool)>,
+    problems: Vec<PrivilegeProblem>,
+}
+
+impl RoleMembershipDeclaration {
+    /// Failures recorded independently of diagnostic delivery.
+    #[must_use]
+    pub fn problems(&self) -> &[PrivilegeProblem] {
+        &self.problems
+    }
+
+    /// Whether the whole declaration may update the catalog.
+    #[must_use]
+    pub const fn is_applicable(&self) -> bool {
+        self.problems.is_empty()
+    }
+
+    /// The retained operation.
+    #[must_use]
+    pub const fn operation(&self) -> &PrivilegeOperation {
+        &self.operation
+    }
+
+    /// The retained roles.
+    #[must_use]
+    pub fn roles(&self) -> &[String] {
+        &self.roles
+    }
+
+    /// The retained members.
+    #[must_use]
+    pub fn members(&self) -> &[PrivilegeRole] {
+        &self.members
+    }
+
+    /// The retained grantor.
+    #[must_use]
+    pub const fn grantor(&self) -> Option<&PrivilegeRole> {
+        self.grantor.as_ref()
+    }
+
+    /// The retained options.
+    #[must_use]
+    pub fn options(&self) -> &[(String, bool)] {
+        &self.options
+    }
 }
 
 impl RoleMembershipDeclaration {
     pub(crate) fn analyze(
         ast: &RoleMembership,
         context: &mut impl ParseContext,
-    ) -> Result<Option<Self>, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
+        let mut problems = Vec::new();
         let mut roles = Vec::new();
         for role in ast.roles() {
             let name = role.name();
-            if !role.columns().is_empty() || context.role_by_name(name).is_none() {
-                report(context, format!("invalid granted role: {name}"))?;
-                return Ok(None);
+            if !role.columns().is_empty() {
+                problems.push(PrivilegeProblem::GrantedRoleColumns(name.to_owned()));
+            }
+            if context.role_by_name(name).is_none() {
+                problems.push(PrivilegeProblem::MissingRole(name.to_owned()));
             }
             if !roles.iter().any(|role| role == name) {
                 roles.push(name.to_owned());
             }
         }
-        let mut members = Vec::new();
-        for member in ast.members() {
-            let Some(member) = PrivilegeRole::resolve(member, false, context)? else {
-                return Ok(None);
-            };
-            members.push(member);
-        }
-        let grantor = if let Some(grantor) = ast.grantor() {
-            let Some(grantor) = PrivilegeRole::resolve(grantor, false, context)? else {
-                return Ok(None);
-            };
-            Some(grantor)
-        } else {
-            None
-        };
+        let members = ast
+            .members()
+            .iter()
+            .map(|role| PrivilegeRole::resolve(role, false, context, &mut problems))
+            .collect();
+        let grantor = ast
+            .grantor()
+            .map(|role| PrivilegeRole::resolve(role, false, context, &mut problems));
         let version = postgres_major(context);
         let mut options = Vec::new();
         for option in ast.options() {
@@ -459,17 +579,18 @@ impl RoleMembershipDeclaration {
                         || (ast.is_grant() && !option.value())))
                 || options.iter().any(|(existing, _)| existing == name)
             {
-                report(context, format!("invalid role membership option: {name}"))?;
-                return Ok(None);
+                problems.push(PrivilegeProblem::MembershipOption(name.to_owned()));
             }
             options.push((name.to_owned(), option.value()));
         }
-        Ok(Some(Self {
+        report(context, &problems)?;
+        Ok(Self {
             operation: ast.action().into(),
             roles,
             members,
             grantor,
             options,
-        }))
+            problems,
+        })
     }
 }

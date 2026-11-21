@@ -8,8 +8,8 @@ use crate::{
     names::{FullName, TableName},
     sem::{
         AlterOwner, AnalysisError, CreateFunction, CreateSchema, ObjectPrivilegeChange,
-        OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, Role,
-        RoleMembershipDeclaration, TypeDefinition, ViewLike, ownership::model_definitions,
+        ObjectPrivilegeDeclaration, OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity,
+        Role, RoleMembershipDeclaration, TypeDefinition, ViewLike, ownership::model_definitions,
     },
 };
 
@@ -509,76 +509,119 @@ impl SchemaFileContext {
 
 impl SchemaFileContext {
     pub(super) fn apply_object_privileges(mut self, change: &ObjectPrivilegeChange) -> Self {
-        let declaration = &change.declaration;
-        for identity in &change.targets {
+        if !change.is_applicable() {
+            return self;
+        }
+        let declaration = change.declaration();
+        for identity in change.targets() {
             let name = identity.name();
             match identity.kind() {
-                ObjectKind::TABLE => {
-                    if let Some(mut definition) = self.get_table_impl(name).cloned() {
-                        definition.append_privilege(declaration);
-                        self.catalog.store_table(name, &definition);
-                    }
-                }
+                ObjectKind::TABLE => self.append_table_privilege(name, declaration),
                 ObjectKind::VIEW | ObjectKind::MATERIALIZED_VIEW => {
-                    if let Some(mut definition) = self.get_view_impl(name).cloned() {
-                        match &mut definition {
-                            ViewLike::View(view) => view.append_privilege(declaration),
-                            ViewLike::MaterializedView(view) => view.append_privilege(declaration),
-                        }
-                        self.catalog.views.insert(name, &definition);
-                    }
+                    self.append_view_privilege(name, declaration)
                 }
-                ObjectKind::SEQUENCE => {
-                    if let Some(mut definition) = self.get_sequence_impl(name).cloned() {
-                        definition.append_privilege(declaration);
-                        self.catalog.store_sequence(name, &definition);
-                    }
-                }
+                ObjectKind::SEQUENCE => self.append_sequence_privilege(name, declaration),
                 ObjectKind::FUNCTION | ObjectKind::PROCEDURE => {
-                    if let Some(mut definition) = self
-                        .routine_definitions(name)
-                        .into_iter()
-                        .find(|definition| definition.ownership_identity(name) == *identity)
-                    {
-                        definition.append_privilege(declaration);
-                        self.catalog.functions.insert(name, &definition);
-                    }
+                    self.append_routine_privilege(identity, declaration)
                 }
                 ObjectKind::DOMAIN | ObjectKind::TYPE => {
-                    if let Some(mut definition) = self.get_type_impl(name).cloned() {
-                        if definition.append_privilege(declaration) {
-                            self.catalog.types.replace_definition(name, &definition);
-                        } else if matches!(definition, TypeDefinition::TableRef(..))
-                            && let Some(mut table) = self.get_table_impl(name).cloned()
-                        {
-                            table.append_row_type_privilege(declaration);
-                            self.catalog.store_table(name, &table);
-                        }
-                    }
+                    self.append_type_privilege(name, declaration)
                 }
-                ObjectKind::SCHEMA => {
-                    if let Some(mut definition) =
-                        self.schema_definition(name.name().as_str()).cloned()
-                    {
-                        definition.append_privilege(declaration);
-                        self.catalog
-                            .schemas
-                            .insert(name.name().as_str(), definition);
-                    }
-                }
-                kind => {
-                    if let Some(mut definition) = self
-                        .ownership_definitions(kind, name)
-                        .into_iter()
-                        .find(|definition| definition.identity() == identity)
-                    {
-                        definition.append_privilege(declaration);
-                        self.catalog.ownership.insert(&definition);
-                    }
-                }
+                ObjectKind::SCHEMA => self.append_schema_privilege(name, declaration),
+                _ => self.append_registered_object_privilege(identity, declaration),
             }
         }
         self
+    }
+
+    fn append_table_privilege(
+        &mut self,
+        name: &FullName,
+        declaration: &ObjectPrivilegeDeclaration,
+    ) {
+        if let Some(mut definition) = self.get_table_impl(name).cloned() {
+            definition.append_privilege(declaration);
+            self.catalog.store_table(name, &definition);
+        }
+    }
+
+    fn append_view_privilege(&mut self, name: &FullName, declaration: &ObjectPrivilegeDeclaration) {
+        if let Some(mut definition) = self.get_view_impl(name).cloned() {
+            match &mut definition {
+                ViewLike::View(view) => view.append_privilege(declaration),
+                ViewLike::MaterializedView(view) => view.append_privilege(declaration),
+            }
+            self.catalog.views.insert(name, &definition);
+        }
+    }
+
+    fn append_sequence_privilege(
+        &mut self,
+        name: &FullName,
+        declaration: &ObjectPrivilegeDeclaration,
+    ) {
+        if let Some(mut definition) = self.get_sequence_impl(name).cloned() {
+            definition.append_privilege(declaration);
+            self.catalog.store_sequence(name, &definition);
+        }
+    }
+
+    fn append_routine_privilege(
+        &mut self,
+        identity: &OwnershipIdentity,
+        declaration: &ObjectPrivilegeDeclaration,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self
+            .routine_definitions(name)
+            .into_iter()
+            .find(|definition| definition.ownership_identity(name) == *identity)
+        {
+            definition.append_privilege(declaration);
+            self.catalog.functions.insert(name, &definition);
+        }
+    }
+
+    fn append_type_privilege(&mut self, name: &FullName, declaration: &ObjectPrivilegeDeclaration) {
+        if let Some(mut definition) = self.get_type_impl(name).cloned() {
+            if definition.append_privilege(declaration) {
+                self.catalog.types.replace_definition(name, &definition);
+            } else if matches!(definition, TypeDefinition::TableRef(..))
+                && let Some(mut table) = self.get_table_impl(name).cloned()
+            {
+                table.append_row_type_privilege(declaration);
+                self.catalog.store_table(name, &table);
+            }
+        }
+    }
+
+    fn append_schema_privilege(
+        &mut self,
+        name: &FullName,
+        declaration: &ObjectPrivilegeDeclaration,
+    ) {
+        if let Some(mut definition) = self.schema_definition(name.name().as_str()).cloned() {
+            definition.append_privilege(declaration);
+            self.catalog
+                .schemas
+                .insert(name.name().as_str(), definition);
+        }
+    }
+
+    fn append_registered_object_privilege(
+        &mut self,
+        identity: &OwnershipIdentity,
+        declaration: &ObjectPrivilegeDeclaration,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self
+            .ownership_definitions(identity.kind(), name)
+            .into_iter()
+            .find(|definition| definition.identity() == identity)
+        {
+            definition.append_privilege(declaration);
+            self.catalog.ownership.insert(&definition);
+        }
     }
 }
 
@@ -589,7 +632,7 @@ mod test_privilege_catalog_layers {
     use crate::{
         context::{ParseContext, TableInfoRead},
         names::FullName,
-        sem::PrivilegeOperation,
+        sem::{PrivilegeOperation, SemAst},
         test_helpers::{
             ownership::{apply_ownership_sql, ownership_context},
             schema_layer,
@@ -612,6 +655,16 @@ mod test_privilege_catalog_layers {
             apply_ownership_sql(child, "GRANT SELECT ON public.t, public.missing TO alice")?;
         assert_eq!(rejected.context().problems().len(), 1);
         let name = FullName::with_schema("public", "t");
+        let SemAst::ObjectPrivileges(change) = rejected.ast() else {
+            panic!("rejected privileges must retain a semantic statement");
+        };
+        assert!(!change.is_applicable());
+        assert_eq!(change.targets()[0].name(), &name);
+        assert_eq!(change.declaration().privileges()[0].name(), "select");
+        assert!(matches!(
+            change.problems(),
+            [::sql_fun_core::analysis_problem::PrivilegeProblem::MissingRelation(_)]
+        ));
         let original = context
             .get_table_impl(&name)
             .unwrap()
@@ -625,7 +678,7 @@ mod test_privilege_catalog_layers {
         assert_eq!(original.len(), 1);
         assert_eq!(history[0], original[0]);
         assert_eq!(
-            history[1].operation,
+            *history[1].operation(),
             PrivilegeOperation::Revoke(false, true)
         );
         Ok(())
@@ -634,7 +687,10 @@ mod test_privilege_catalog_layers {
 
 impl SchemaFileContext {
     pub(super) fn apply_role_membership(mut self, declaration: &RoleMembershipDeclaration) -> Self {
-        for name in &declaration.roles {
+        if !declaration.is_applicable() {
+            return self;
+        }
+        for name in declaration.roles() {
             if let Some(mut role) = self.role_by_name(name).cloned() {
                 role.append_membership(declaration);
                 if self.registered_role_by_name(name).is_some() {
@@ -655,11 +711,35 @@ mod test_privilege_definitions_across_layers {
     use crate::{
         context::{ParseContext, RoleInfoRead, TypeInfoRead},
         names::FullName,
+        sem::SemAst,
         test_helpers::{
             ownership::{apply_ownership_sql, ownership_context},
             schema_layer,
         },
     };
+
+    #[test]
+    fn rejected_membership_retains_roles_and_leaves_history_empty() -> testresult::TestResult {
+        let result = apply_ownership_sql(ownership_context(), "GRANT alice TO bob, missing")?;
+        let SemAst::RoleMembership(declaration) = result.ast() else {
+            panic!("rejected membership must retain a semantic statement");
+        };
+        assert!(!declaration.is_applicable());
+        assert_eq!(declaration.roles(), ["alice"]);
+        assert_eq!(declaration.members().len(), 2);
+        assert!(
+            matches!(declaration.problems(), [::sql_fun_core::analysis_problem::PrivilegeProblem::MissingRole(name)] if name == "missing")
+        );
+        assert!(
+            result
+                .context()
+                .role_by_name("alice")
+                .unwrap()
+                .membership_declarations()
+                .is_empty()
+        );
+        Ok(())
+    }
 
     #[test]
     fn retains_role_membership_and_builtin_type_facts_in_child_layers() -> testresult::TestResult {

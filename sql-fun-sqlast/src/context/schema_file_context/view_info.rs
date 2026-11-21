@@ -155,6 +155,42 @@ impl ViewInfoWrite for SchemaFileContext {
 }
 
 #[cfg(test)]
+mod test_replacement_preserves_view_privileges {
+    use crate::{
+        context::ViewInfoRead,
+        names::FullName,
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[test]
+    fn replacement_preserves_privilege_history() -> testresult::TestResult {
+        let context = apply_ownership_sql(
+            ownership_context(),
+            "CREATE VIEW public.v AS SELECT 1 AS id",
+        )?
+        .into_context();
+        let context =
+            apply_ownership_sql(context, "GRANT SELECT ON public.v TO PUBLIC")?.into_context();
+        let result =
+            apply_ownership_sql(context, "CREATE OR REPLACE VIEW public.v AS SELECT 2 AS id")?;
+        assert!(result.context().problems().is_empty());
+        let name = FullName::with_schema("public", "v");
+        assert_eq!(
+            result
+                .context()
+                .get_view_impl(&name)
+                .unwrap()
+                .ordinary_definition()
+                .unwrap()
+                .privilege_declarations()
+                .len(),
+            1
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
 mod test_set_operation_catalog {
     use crate::{
         ast::Dialect,

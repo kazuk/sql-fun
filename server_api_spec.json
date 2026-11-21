@@ -780,7 +780,7 @@
                   "type": "object",
                   "properties": {
                     "Privilege": {
-                      "type": "string"
+                      "$ref": "#/$defs/PrivilegeProblem"
                     }
                   },
                   "required": [
@@ -2724,6 +2724,250 @@
               "required": [
                 "code",
                 "message"
+              ]
+            },
+            "PrivilegeProblem": {
+              "description": "A failed privilege lookup or applicability check.",
+              "oneOf": [
+                {
+                  "description": "Named role absent from the catalog.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRole": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MissingRole"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "PUBLIC used where a regular role is required.",
+                  "type": "string",
+                  "const": "PublicNotAllowed"
+                },
+                {
+                  "description": "A role membership target has a column list.",
+                  "type": "object",
+                  "properties": {
+                    "GrantedRoleColumns": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "GrantedRoleColumns"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A relation is absent.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRelation": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "MissingRelation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A schema selector is absent.",
+                  "type": "object",
+                  "properties": {
+                    "MissingSchema": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MissingSchema"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No catalog definition is available for this class of targets.",
+                  "type": "object",
+                  "properties": {
+                    "UnsupportedTargets": {
+                      "type": "object",
+                      "properties": {
+                        "target_kind": {
+                          "description": "Requested target class.",
+                          "type": "string"
+                        },
+                        "targets": {
+                          "description": "Requested configuration parameter names or large-object identifiers.",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "target_kind",
+                        "targets"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "UnsupportedTargets"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No catalog target matches the identity and signature.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTarget": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "MissingTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Multiple catalog targets match an omitted signature.",
+                  "type": "object",
+                  "properties": {
+                    "AmbiguousTarget": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/OwnershipIdentity"
+                      }
+                    }
+                  },
+                  "required": [
+                    "AmbiguousTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The target exists under an incompatible object kind.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTargetKind": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "InvalidTargetKind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A routine signature contains unresolved argument types.",
+                  "type": "object",
+                  "properties": {
+                    "MissingArgumentTypes": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "description": "Requested routine.",
+                          "$ref": "#/$defs/OwnershipIdentity"
+                        },
+                        "types": {
+                          "description": "Unresolved type names.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/FullName"
+                          }
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "types"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingArgumentTypes"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Privilege incompatible with a target class.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidPrivilege": {
+                      "type": "object",
+                      "properties": {
+                        "privilege": {
+                          "description": "Written privilege.",
+                          "type": "string"
+                        },
+                        "target_kind": {
+                          "description": "Requested object class.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "privilege",
+                        "target_kind"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InvalidPrivilege"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Array types do not have independent privileges.",
+                  "type": "object",
+                  "properties": {
+                    "ArrayTarget": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "ArrayTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Column absent from the exact target relation.",
+                  "type": "object",
+                  "properties": {
+                    "MissingColumn": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "description": "Resolved target identity.",
+                          "$ref": "#/$defs/OwnershipIdentity"
+                        },
+                        "column": {
+                          "description": "Written column name.",
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "column"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Unavailable or repeated membership option.",
+                  "type": "object",
+                  "properties": {
+                    "MembershipOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MembershipOption"
+                  ],
+                  "additionalProperties": false
+                }
               ]
             },
             "TriggerProblem": {
@@ -5527,7 +5771,7 @@
                   "type": "object",
                   "properties": {
                     "Privilege": {
-                      "type": "string"
+                      "$ref": "#/$defs/PrivilegeProblem"
                     }
                   },
                   "required": [
@@ -7471,6 +7715,250 @@
               "required": [
                 "code",
                 "message"
+              ]
+            },
+            "PrivilegeProblem": {
+              "description": "A failed privilege lookup or applicability check.",
+              "oneOf": [
+                {
+                  "description": "Named role absent from the catalog.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRole": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MissingRole"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "PUBLIC used where a regular role is required.",
+                  "type": "string",
+                  "const": "PublicNotAllowed"
+                },
+                {
+                  "description": "A role membership target has a column list.",
+                  "type": "object",
+                  "properties": {
+                    "GrantedRoleColumns": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "GrantedRoleColumns"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A relation is absent.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRelation": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "MissingRelation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A schema selector is absent.",
+                  "type": "object",
+                  "properties": {
+                    "MissingSchema": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MissingSchema"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No catalog definition is available for this class of targets.",
+                  "type": "object",
+                  "properties": {
+                    "UnsupportedTargets": {
+                      "type": "object",
+                      "properties": {
+                        "target_kind": {
+                          "description": "Requested target class.",
+                          "type": "string"
+                        },
+                        "targets": {
+                          "description": "Requested configuration parameter names or large-object identifiers.",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "target_kind",
+                        "targets"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "UnsupportedTargets"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No catalog target matches the identity and signature.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTarget": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "MissingTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Multiple catalog targets match an omitted signature.",
+                  "type": "object",
+                  "properties": {
+                    "AmbiguousTarget": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/OwnershipIdentity"
+                      }
+                    }
+                  },
+                  "required": [
+                    "AmbiguousTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The target exists under an incompatible object kind.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTargetKind": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "InvalidTargetKind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A routine signature contains unresolved argument types.",
+                  "type": "object",
+                  "properties": {
+                    "MissingArgumentTypes": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "description": "Requested routine.",
+                          "$ref": "#/$defs/OwnershipIdentity"
+                        },
+                        "types": {
+                          "description": "Unresolved type names.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/FullName"
+                          }
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "types"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingArgumentTypes"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Privilege incompatible with a target class.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidPrivilege": {
+                      "type": "object",
+                      "properties": {
+                        "privilege": {
+                          "description": "Written privilege.",
+                          "type": "string"
+                        },
+                        "target_kind": {
+                          "description": "Requested object class.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "privilege",
+                        "target_kind"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InvalidPrivilege"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Array types do not have independent privileges.",
+                  "type": "object",
+                  "properties": {
+                    "ArrayTarget": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "ArrayTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Column absent from the exact target relation.",
+                  "type": "object",
+                  "properties": {
+                    "MissingColumn": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "description": "Resolved target identity.",
+                          "$ref": "#/$defs/OwnershipIdentity"
+                        },
+                        "column": {
+                          "description": "Written column name.",
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "column"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Unavailable or repeated membership option.",
+                  "type": "object",
+                  "properties": {
+                    "MembershipOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MembershipOption"
+                  ],
+                  "additionalProperties": false
+                }
               ]
             },
             "TriggerProblem": {
@@ -10166,7 +10654,7 @@
                   "type": "object",
                   "properties": {
                     "Privilege": {
-                      "type": "string"
+                      "$ref": "#/$defs/PrivilegeProblem"
                     }
                   },
                   "required": [
@@ -12110,6 +12598,250 @@
               "required": [
                 "code",
                 "message"
+              ]
+            },
+            "PrivilegeProblem": {
+              "description": "A failed privilege lookup or applicability check.",
+              "oneOf": [
+                {
+                  "description": "Named role absent from the catalog.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRole": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MissingRole"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "PUBLIC used where a regular role is required.",
+                  "type": "string",
+                  "const": "PublicNotAllowed"
+                },
+                {
+                  "description": "A role membership target has a column list.",
+                  "type": "object",
+                  "properties": {
+                    "GrantedRoleColumns": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "GrantedRoleColumns"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A relation is absent.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRelation": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "MissingRelation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A schema selector is absent.",
+                  "type": "object",
+                  "properties": {
+                    "MissingSchema": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MissingSchema"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No catalog definition is available for this class of targets.",
+                  "type": "object",
+                  "properties": {
+                    "UnsupportedTargets": {
+                      "type": "object",
+                      "properties": {
+                        "target_kind": {
+                          "description": "Requested target class.",
+                          "type": "string"
+                        },
+                        "targets": {
+                          "description": "Requested configuration parameter names or large-object identifiers.",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "target_kind",
+                        "targets"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "UnsupportedTargets"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No catalog target matches the identity and signature.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTarget": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "MissingTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Multiple catalog targets match an omitted signature.",
+                  "type": "object",
+                  "properties": {
+                    "AmbiguousTarget": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/OwnershipIdentity"
+                      }
+                    }
+                  },
+                  "required": [
+                    "AmbiguousTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The target exists under an incompatible object kind.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTargetKind": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "InvalidTargetKind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A routine signature contains unresolved argument types.",
+                  "type": "object",
+                  "properties": {
+                    "MissingArgumentTypes": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "description": "Requested routine.",
+                          "$ref": "#/$defs/OwnershipIdentity"
+                        },
+                        "types": {
+                          "description": "Unresolved type names.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/FullName"
+                          }
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "types"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingArgumentTypes"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Privilege incompatible with a target class.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidPrivilege": {
+                      "type": "object",
+                      "properties": {
+                        "privilege": {
+                          "description": "Written privilege.",
+                          "type": "string"
+                        },
+                        "target_kind": {
+                          "description": "Requested object class.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "privilege",
+                        "target_kind"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InvalidPrivilege"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Array types do not have independent privileges.",
+                  "type": "object",
+                  "properties": {
+                    "ArrayTarget": {
+                      "$ref": "#/$defs/OwnershipIdentity"
+                    }
+                  },
+                  "required": [
+                    "ArrayTarget"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Column absent from the exact target relation.",
+                  "type": "object",
+                  "properties": {
+                    "MissingColumn": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "description": "Resolved target identity.",
+                          "$ref": "#/$defs/OwnershipIdentity"
+                        },
+                        "column": {
+                          "description": "Written column name.",
+                          "$ref": "#/$defs/ColumnName"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "column"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Unavailable or repeated membership option.",
+                  "type": "object",
+                  "properties": {
+                    "MembershipOption": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MembershipOption"
+                  ],
+                  "additionalProperties": false
+                }
               ]
             },
             "TriggerProblem": {

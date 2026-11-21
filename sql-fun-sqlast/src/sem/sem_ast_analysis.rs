@@ -25,12 +25,10 @@ impl SemAst {
         }
         match ast {
             AstStatementNode::ObjectPrivileges(ast) => {
-                Ok(ObjectPrivilegeChange::analyze(ast, context)?
-                    .map_or_else(Self::unresolved_statement, Self::ObjectPrivileges))
+                ObjectPrivilegeChange::analyze(ast, context).map(Self::ObjectPrivileges)
             }
             AstStatementNode::RoleMembership(ast) => {
-                Ok(RoleMembershipDeclaration::analyze(ast, context)?
-                    .map_or_else(Self::unresolved_statement, Self::RoleMembership))
+                RoleMembershipDeclaration::analyze(ast, context).map(Self::RoleMembership)
             }
             AstStatementNode::ExtensionMembership(_) => {
                 todo!("ALTER EXTENSION membership interpretation (#1168)")
@@ -150,27 +148,24 @@ impl SemAst {
         }
         match ast {
             AstStatementNode::RoleMembership(ast) => {
-                let Some(declaration) = RoleMembershipDeclaration::analyze(ast, &mut context)?
-                else {
-                    return Ok(AstAndContextPair::new(
-                        Self::unresolved_statement(),
-                        context,
-                    ));
+                let declaration = RoleMembershipDeclaration::analyze(ast, &mut context)?;
+                let context = if declaration.is_applicable() {
+                    context.apply_role_membership(&declaration)?
+                } else {
+                    context
                 };
-                let context = context.apply_role_membership(&declaration)?;
                 Ok(AstAndContextPair::new(
                     Self::RoleMembership(declaration),
                     context,
                 ))
             }
             AstStatementNode::ObjectPrivileges(ast) => {
-                let Some(change) = ObjectPrivilegeChange::analyze(ast, &mut context)? else {
-                    return Ok(AstAndContextPair::new(
-                        Self::unresolved_statement(),
-                        context,
-                    ));
+                let change = ObjectPrivilegeChange::analyze(ast, &mut context)?;
+                let context = if change.is_applicable() {
+                    context.apply_object_privileges(&change)?
+                } else {
+                    context
                 };
-                let context = context.apply_object_privileges(&change)?;
                 Ok(AstAndContextPair::new(
                     Self::ObjectPrivileges(change),
                     context,

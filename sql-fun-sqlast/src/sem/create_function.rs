@@ -183,6 +183,11 @@ impl CreateFunction {
     pub const fn object_kind(&self) -> ObjectKind {
         self.object_kind
     }
+    pub(crate) fn retain_privilege_declarations(&mut self, previous: &Self) {
+        self.privilege_declarations
+            .clone_from(&previous.privilege_declarations);
+    }
+
     pub(crate) const fn set_builtin_properties(&mut self, aggregate: bool, returns_set: bool) {
         self.builtin_properties = Some((aggregate, returns_set));
     }

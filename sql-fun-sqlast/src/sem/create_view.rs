@@ -156,6 +156,8 @@ impl CreateView {
         self.lineage = ViewColumnLineage::from_query(query);
     }
     pub(crate) fn retain_relation_state(&mut self, previous: &Self) {
+        self.privilege_declarations
+            .clone_from(&previous.privilege_declarations);
         self.triggers = previous.triggers.clone();
         self.rules = previous.rules.clone();
         self.defaults = previous.defaults.clone();

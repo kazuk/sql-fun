@@ -129,8 +129,8 @@ mod application_tests {
         "fixed-size types must have storage PLAIN"
     )]
     #[case(
-        "CATEGORY = 'SS'",
-        "type category must be one printable ASCII character"
+        "CATEGORY = ''",
+        "type category must begin with a printable ASCII character"
     )]
     fn rejected_completion_retains_shell_and_allows_next_statement(
         #[case] options: &str,

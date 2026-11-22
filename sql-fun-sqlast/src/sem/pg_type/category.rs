@@ -24,15 +24,16 @@ impl TryFrom<char> for TypeCategory {
     }
 }
 
+// PostgreSQL CREATE TYPE uses the leading character of the CATEGORY value.
 impl TryFrom<&str> for TypeCategory {
     type Error = &'static str;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut chars = value.chars();
-        match (chars.next(), chars.next()) {
-            (Some(code), None) => Self::try_from(code),
-            _ => Err("type category must be one printable ASCII character"),
-        }
+        let code = value
+            .chars()
+            .next()
+            .ok_or("type category must begin with a printable ASCII character")?;
+        Self::try_from(code)
     }
 }
 
@@ -49,11 +50,11 @@ mod tests {
     #[rstest::rstest]
     #[case("S", Some('S'))]
     #[case(" ", Some(' '))]
-    #[case("SS", None)]
+    #[case("SS", Some('S'))]
     #[case("", None)]
     #[case("é", None)]
     #[case("\n", None)]
-    fn validates_the_whole_string(#[case] value: &str, #[case] expected: Option<char>) {
+    fn converts_postgres_category_option(#[case] value: &str, #[case] expected: Option<char>) {
         assert_eq!(
             TypeCategory::try_from(value).ok().map(TypeCategory::code),
             expected

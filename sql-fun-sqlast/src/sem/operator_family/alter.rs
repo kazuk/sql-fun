@@ -14,7 +14,7 @@ use crate::{
     sem::{AnalysisError, SemAst},
 };
 
-use super::{
+use crate::sem::operator_family::{
     FamilySlot, MemberKind, MemberOwner, OperatorFamily, OperatorFamilyKey,
     member::{resolve_family_member, resolve_family_types, validate_slot_number},
     report_family_problem, require_index_method,

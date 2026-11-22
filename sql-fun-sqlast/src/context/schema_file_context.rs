@@ -46,12 +46,12 @@ use crate::{
         ConflictArbiterInference, CreateExtension, CreateForeignDataWrapper, CreateIndex,
         CreateOperator, CreateRule, CreateSchema, CreateTrigger, CursorInfo, DatabaseCollation,
         ExtensionMembershipChange, FunctionTombstone, ImplicitChange, InsertConflict, Kind,
-        ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition, OperatorIdentity,
-        OperatorLinks, OverloadVariant as SemOverloadVariant, OwnedObjectDefinition,
-        OwnershipIdentity, ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity,
-        SemAst, SemScalarExpr, SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet,
-        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewTombstone,
-        ViewUpdateSupport,
+        ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition, OperatorFamily,
+        OperatorFamilyKey, OperatorIdentity, OperatorLinks, OverloadVariant as SemOverloadVariant,
+        OwnedObjectDefinition, OwnershipIdentity, ParameterConstraints, Role,
+        RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr, SourcePathWithSpan,
+        TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport, ViewInsertSupport,
+        ViewLike, ViewMergeSupport, ViewTombstone, ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -99,7 +99,7 @@ pub(super) struct SchemaCatalog {
     base: FrozenBaseContext,
     access_methods: std::collections::HashMap<String, AccessMethodDefinition>,
     operator_classes: Vec<OperatorClassDefinition>,
-    operator_families: std::collections::HashMap<crate::sem::OperatorFamilyKey, crate::sem::OperatorFamily>,
+    operator_families: std::collections::HashMap<OperatorFamilyKey, OperatorFamily>,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
     args: SqlFunArgs,
     metadata: ::sql_fun_core::SqlFunMetadata,
@@ -676,35 +676,44 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
 impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
     fn operator_class_for_family_type(
         &self,
-        key: &crate::sem::OperatorFamilyKey,
+        key: &OperatorFamilyKey,
         typ: &TypeReference,
     ) -> Option<&OperatorClassDefinition> {
-        self.base.operator_class_for_family_type(key, typ).or_else(|| {
-            self.operator_classes.iter().find(|class| class.belongs_to(key) && class.has_input(typ))
-        })
+        self.operator_classes
+            .iter()
+            .filter(|class| class.belongs_to(key) && class.has_input(typ))
+            .chain(self.base.operator_class_for_family_type(key, typ))
+            .min_by(|left, right| (left.name(), left.schema()).cmp(&(right.name(), right.schema())))
     }
 
     fn has_default_operator_class(&self, method: &str, typ: &TypeReference) -> bool {
-       self.operator_classes.iter().any(|class| {
-           class.default() && class.access_method() == method && class.has_input(typ)
-       }) || self.base.has_default_operator_class(method, typ)
+        self.operator_classes
+            .iter()
+            .any(|class| class.default() && class.access_method() == method && class.has_input(typ))
+            || self.base.has_default_operator_class(method, typ)
     }
 
-
-    fn operator_family(&self, key: &crate::sem::OperatorFamilyKey) -> Option<&crate::sem::OperatorFamily> {
-        self.operator_families.get(key).or_else(|| self.base.operator_family(key))
+    fn operator_family(&self, key: &OperatorFamilyKey) -> Option<&OperatorFamily> {
+        self.operator_families
+            .get(key)
+            .or_else(|| self.base.operator_family(key))
     }
 }
 
 impl crate::context::OperatorFamilyInfoWrite for SchemaFileContext {
-    fn publish_operator_class(mut self, class: &OperatorClassDefinition, family: &crate::sem::OperatorFamily) -> Self {
+    fn publish_operator_class(
+        mut self,
+        class: &OperatorClassDefinition,
+        family: &OperatorFamily,
+    ) -> Self {
         self.catalog.operator_classes.push(class.clone());
         self.publish_operator_family(family)
     }
 
-
-    fn publish_operator_family(mut self, family: &crate::sem::OperatorFamily) -> Self {
-        self.catalog.operator_families.insert(family.key.clone(), family.clone());
+    fn publish_operator_family(mut self, family: &OperatorFamily) -> Self {
+        self.catalog
+            .operator_families
+            .insert(family.key.clone(), family.clone());
         self
     }
 }

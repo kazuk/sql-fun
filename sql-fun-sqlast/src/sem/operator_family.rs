@@ -1,16 +1,20 @@
 //! PostgreSQL operator families and their effective membership.
 
+mod alter;
+pub(crate) mod member;
 pub(crate) mod seed;
+
+pub use alter::AlterOperatorFamily;
 
 use std::collections::HashMap;
 
 use crate::{
-    ast::Name,
+    ast::{Name, operator_family::CreateOperatorFamily as Syntax},
     context::{BaseParseContext, ParseContext},
-    names::FullName,
+    names::{FullName, SchemaName},
     sem::{
         AccessMethodKind, AnalysisError, AnalysisProblem, OperatorIdentity, TypeReference,
-        conflict_masters::lookup_postgres,
+        search_path::search_schemas,
     },
 };
 
@@ -24,7 +28,10 @@ pub struct OperatorFamilyKey {
 impl OperatorFamilyKey {
     /// Create an exact key from a schema-qualified name and method.
     pub fn new(name: FullName, method: &str) -> Self {
-        Self { name, method: method.to_owned() }
+        Self {
+            name,
+            method: method.to_owned(),
+        }
     }
 
     pub(crate) fn resolve(
@@ -33,10 +40,20 @@ impl OperatorFamilyKey {
         context: &impl BaseParseContext,
     ) -> Result<Option<Self>, AnalysisError> {
         let name = FullName::from_ast_name(name)?;
-        let lookup = lookup_postgres(context, &name, |name| {
-            context.operator_family(&Self::new(name.clone(), method)).is_some()
-        });
-        Ok(lookup.resolved_name().map(|name| Self::new(name.clone(), method)))
+        if name.catalog().is_some() {
+            return Ok(None);
+        }
+        let exists = |name| {
+            let key = Self::new(name, method);
+            context.operator_family(&key).map(|_| key)
+        };
+        if name.schema().is_some() {
+            return Ok(exists(name));
+        }
+        Ok(search_schemas(context, false)
+            .iter()
+            .filter(|schema| !schema.as_str().starts_with("pg_temp_"))
+            .find_map(|schema| exists(name.replace_schema(schema))))
     }
 }
 
@@ -53,14 +70,29 @@ impl OperatorFamily {
         &self.key
     }
 
-
     pub(crate) fn new(key: OperatorFamilyKey) -> Self {
-        Self { key, members: HashMap::new() }
+        Self {
+            key,
+            members: HashMap::new(),
+        }
     }
 
     pub(crate) fn insert(&mut self, slot: FamilySlot, member: FamilyMember) -> Result<(), String> {
-        if self.members.contains_key(&slot) {
-            return Err(format!("duplicate {:?} slot {} for ({}, {})", slot.kind, slot.number, slot.left, slot.right));
+        if let Some(existing) = self.members.get(&slot) {
+            let occupied = match &existing.object {
+                MemberObject::Operator(operator) => operator.name().to_string(),
+                MemberObject::Function { name, arguments } => {
+                    let arguments = arguments
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>();
+                    format!("{name}({})", arguments.join(", "))
+                }
+            };
+            return Err(format!(
+                "{:?} slot {} for ({}, {}) is already occupied by {occupied}",
+                slot.kind, slot.number, slot.left, slot.right
+            ));
         }
         if let MemberObject::Operator(operator) = &member.object
             && self.members.values().any(|existing| {
@@ -117,7 +149,9 @@ pub(crate) fn report_family_problem(
     context: &mut impl ParseContext,
     message: impl Into<String>,
 ) -> Result<(), AnalysisError> {
-    context.report_analysis_problem(AnalysisProblem::InvalidOperatorFamilyDeclaration(message.into()))
+    context.report_analysis_problem(AnalysisProblem::InvalidOperatorFamilyDeclaration(
+        message.into(),
+    ))
 }
 
 pub(crate) fn require_index_method(
@@ -127,7 +161,10 @@ pub(crate) fn require_index_method(
     match context.access_method(method) {
         Some(definition) if definition.kind() == AccessMethodKind::Index => Ok(true),
         Some(_) => {
-            report_family_problem(context, format!("access method {method:?} is not of type INDEX"))?;
+            report_family_problem(
+                context,
+                format!("access method {method:?} is not of type INDEX"),
+            )?;
             Ok(false)
         }
         None => {
@@ -146,19 +183,28 @@ pub(crate) fn creation_name(
         report_family_problem(context, "cross-database operator family or class reference")?;
         return Ok(None);
     }
-    let exists = |schema: &crate::names::SchemaName| {
-        matches!(schema.as_str(), "public" | "pg_catalog" | "information_schema")
-            || context.schema_definition(schema.as_str()).is_some()
+    let exists = |schema: &SchemaName| {
+        matches!(
+            schema.as_str(),
+            "public" | "pg_catalog" | "information_schema"
+        ) || context.schema_definition(schema.as_str()).is_some()
     };
     if let Some(schema) = name.schema() {
         if exists(schema) {
             return Ok(Some(name));
         }
         report_family_problem(context, format!("schema {schema} does not exist"))?;
-    } else if let Some(schema) = context.get_search_path().iter().find(|schema| exists(schema)) {
+    } else if let Some(schema) = context
+        .get_search_path()
+        .iter()
+        .find(|schema| exists(schema))
+    {
         return Ok(Some(name.replace_schema(schema)));
     } else {
-        report_family_problem(context, "no schema selected for operator family or class creation")?;
+        report_family_problem(
+            context,
+            "no schema selected for operator family or class creation",
+        )?;
     }
     Ok(None)
 }
@@ -176,7 +222,7 @@ impl CreateOperatorFamily {
     }
 
     pub(crate) fn analyze(
-        syntax: &crate::ast::operator_family::CreateOperatorFamily,
+        syntax: &Syntax,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
         let method = syntax.access_method();
@@ -188,10 +234,18 @@ impl CreateOperatorFamily {
         };
         let key = OperatorFamilyKey::new(name, method);
         if context.operator_family(&key).is_some() {
-            report_family_problem(context, format!("operator family {} already exists for access method {method:?}", key.name))?;
+            report_family_problem(
+                context,
+                format!(
+                    "operator family {} already exists for access method {method:?}",
+                    key.name
+                ),
+            )?;
             return Ok(Self { definition: None });
         }
-        Ok(Self { definition: Some(OperatorFamily::new(key)) })
+        Ok(Self {
+            definition: Some(OperatorFamily::new(key)),
+        })
     }
 
     pub(crate) fn apply<C: ParseContext>(&self, context: C) -> C {

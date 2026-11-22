@@ -1,0 +1,107 @@
+[
+  {
+    "name": "uses-declared-index-method",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING project_index AS OPERATOR 1 =",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "builtin-class-family-is-visible",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING btree FAMILY pg_catalog.integer_ops AS STORAGE integer",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-method",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING absent_method AS OPERATOR 1 =",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-method-kind",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING heap AS OPERATOR 1 =",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "exact-operator-required",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING btree AS OPERATOR 3 = (integer, text)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "exact-routine-required",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING btree AS FUNCTION 1 pg_catalog.btint4cmp(integer, smallint)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "default-already-registered",
+    "sql": "CREATE OPERATOR CLASS project_other DEFAULT FOR TYPE integer USING btree AS OPERATOR 3 =",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "family-slot-already-registered",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING btree FAMILY project_family AS OPERATOR 3 =",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "class-owned-member-cannot-be-dropped",
+    "sql": "ALTER OPERATOR FAMILY project_family USING btree DROP OPERATOR 3 (integer)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "conflict-target-uses-project-class",
+    "sql": "INSERT INTO operator_class_items VALUES (1) ON CONFLICT (id project_ops) DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

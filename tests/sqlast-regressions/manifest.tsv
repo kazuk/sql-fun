@@ -100,3 +100,4 @@ drop-view	project	drop-view.sql	10	17,18
 extension-membership	project	extension-membership.sql	3	17,18
 alter-function-parallel	project	alter-function-parallel.sql	7	17,18
 schema-base-types	project	schema-base-types.sql	4	17,18
+operator-classes	project	operator-classes.sql	10	17,18

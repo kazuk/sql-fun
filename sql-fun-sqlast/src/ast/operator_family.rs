@@ -121,7 +121,7 @@ mod test_alter_operator_family {
         parse_statements,
     };
 
-    use super::{AlterOperatorFamilyAction, OperatorFamilyMemberKind};
+    use crate::ast::operator_family::{AlterOperatorFamilyAction, OperatorFamilyMemberKind};
 
     #[test]
     fn retains_added_operator_and_support_signatures() {

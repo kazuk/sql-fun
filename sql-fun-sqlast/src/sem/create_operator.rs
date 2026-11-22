@@ -24,8 +24,16 @@ pub struct OperatorIdentity {
 }
 
 impl OperatorIdentity {
-    pub(crate) fn binary_signature(name: OperatorName, left: TypeReference, right: TypeReference) -> Self {
-        Self { name, left: Some(left), right }
+    pub(crate) fn binary_signature(
+        name: OperatorName,
+        left: TypeReference,
+        right: TypeReference,
+    ) -> Self {
+        Self {
+            name,
+            left: Some(left),
+            right,
+        }
     }
 
     pub(crate) fn resolve_binary(

@@ -13,8 +13,8 @@ mod frozen_base_context;
 mod function_info;
 mod index_info;
 mod object_info;
-mod operator_info;
 mod operator_family_info;
+mod operator_info;
 pub(crate) mod ownership;
 mod ownership_info;
 mod rule_info;
@@ -41,8 +41,8 @@ pub use self::{
     function_info::{FunctionInfoRead, FunctionInfoWrite},
     index_info::IndexInfoRead,
     object_info::{ExtensionInfoRead, ObjectInfoRead},
-    operator_info::OperatorInfoRead,
     operator_family_info::{OperatorFamilyInfoRead, OperatorFamilyInfoWrite},
+    operator_info::OperatorInfoRead,
     ownership_info::{OwnershipInfoRead, RoleInfoRead},
     rule_info::{RuleInfoRead, RuleInfoWrite},
     schema_file_context::SchemaFileContext,

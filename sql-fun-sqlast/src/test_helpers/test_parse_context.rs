@@ -21,11 +21,12 @@ use crate::{
         CreateIndex, CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs,
         CreateTrigger, CreateView, CursorInfo, DataSource, DropTable, DropView,
         ExtensionMembershipChange, FromClause, FunctionOverloadCollection, InsertArbiter,
-        InsertInferenceModifiers, Kind, OperatorDefinition, OverloadVariant, OwnedObjectDefinition,
-        OwnershipIdentity, ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup,
-        SourcePathWithSpan, TriggerIdentity, TypeDefinition, TypeReference, VariableSet,
-        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
-        WithClause, ownership::model_definitions, problem::TriggerProblem,
+        InsertInferenceModifiers, Kind, OperatorClassDefinition, OperatorDefinition,
+        OperatorFamily, OverloadVariant, OwnedObjectDefinition, OwnershipIdentity,
+        ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan,
+        TriggerIdentity, TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport,
+        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport, WithClause,
+        ownership::model_definitions, problem::TriggerProblem,
         search_path::expand_search_path_inst,
     },
     test_helpers::{ast_query, source_span},
@@ -483,12 +484,15 @@ impl DiagnosticContext for TestParseContext {
 impl<Constraints> crate::context::OperatorFamilyInfoRead for TestContext<Constraints> {}
 
 impl crate::context::OperatorFamilyInfoWrite for TestParseContext {
-    fn publish_operator_class(self, _class: &crate::sem::OperatorClassDefinition, _family: &crate::sem::OperatorFamily) -> Self {
+    fn publish_operator_class(
+        self,
+        _class: &OperatorClassDefinition,
+        _family: &OperatorFamily,
+    ) -> Self {
         self
     }
 
-
-    fn publish_operator_family(self, _family: &crate::sem::OperatorFamily) -> Self {
+    fn publish_operator_family(self, _family: &OperatorFamily) -> Self {
         self
     }
 }

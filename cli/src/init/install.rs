@@ -19,6 +19,7 @@ pub(crate) const REQUIRED: &[&str] = &[
     "casts.json",
     "collations.json",
     "operator_classes.json",
+    "operator_families.json",
 ];
 
 pub(crate) fn validate(path: &Path, version: &PostgresVersion) -> Result<(), anyhow::Error> {
@@ -70,6 +71,7 @@ pub(crate) fn validate(path: &Path, version: &PostgresVersion) -> Result<(), any
                 "functions.json",
                 "func_detail.json",
                 "operator_classes.json",
+                "operator_families.json",
             ]
             .contains(name)
             {

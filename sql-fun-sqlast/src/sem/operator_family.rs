@@ -1,5 +1,7 @@
 //! PostgreSQL operator families and their effective membership.
 
+pub(crate) mod seed;
+
 use std::collections::HashMap;
 
 use crate::{

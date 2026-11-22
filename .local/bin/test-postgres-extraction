@@ -522,6 +522,7 @@ def validate_supplied_server_init(binary, destination, connection, detected, req
 def validate_masters(directory):
     collations = json.loads((directory / "collations.json").read_text())
     classes = json.loads((directory / "operator_classes.json").read_text())
+    families = json.loads((directory / "operator_families.json").read_text())
     database = collations["database"]
     default = database["default_collation"]
     assert any(all(c[k] == default[k] for k in ("schema", "name", "encoding"))
@@ -533,6 +534,15 @@ def validate_masters(directory):
                and c["input_type"] == {"schema": "pg_catalog", "name": "int4"}
                and c["key_type"] is None for c in classes)
     assert any(c["key_type"] is not None for c in classes)
+    integer_family = next(f for f in families if
+                          (f["schema"], f["name"], f["access_method"]) == ("pg_catalog", "integer_ops", "btree"))
+    assert any(m["builtin"] and m["owner"] is None and m["number"] == 3
+               and m["operator"] == {"schema": "pg_catalog", "name": "="}
+               and m["left_type"]["name"] == "int4" and m["right_type"]["name"] == "int4"
+               for m in integer_family["operators"])
+    assert any(m["builtin"] and m["function"] == {"schema": "pg_catalog", "name": "btint4cmp"}
+               and [a["name"] for a in m["arguments"]] == ["int4", "int4"]
+               for m in integer_family["functions"])
     return collations, classes
 
 
@@ -641,7 +651,7 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert metadata["format_version"] == 1
     assert metadata["definition_schemas"] == sorted([schema, extension_schema])
     for filename, digest in payload(builtin).items():
-        if filename not in ("collations.json", "operator_classes.json"):
+        if filename not in ("collations.json", "operator_classes.json", "operator_families.json"):
             assert payload(selected)[filename] == digest, "additional scope changed existing catalogs"
     assert {c["schema"] for c in collations["collations"]} == {"pg_catalog", schema}
     encoding_variants = [c["encoding"] for c in collations["collations"]
@@ -653,6 +663,13 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert btree["input_type"] == {"schema": other, "name": "Type 雪"}
     assert btree["family"] == {"schema": other, "name": "Family 雪", "access_method": "btree"}
     assert not btree["default"]
+    families = json.loads((selected / "operator_families.json").read_text())
+    family = next(f for f in families if all(f[k] == v for k, v in btree["family"].items()))
+    class_identity = {"schema": schema, "name": "Same 雪", "access_method": "btree"}
+    assert len(family["operators"]) == 2
+    assert all(m["owner"] == class_identity and not m["builtin"] for m in family["operators"])
+    assert len(family["functions"]) == 1
+    assert family["functions"][0]["owner"] == class_identity
     assert any(c["schema"] == extension_schema for c in classes), "installed extension masters lost"
     assert not any(c["schema"] == other for c in classes), "references must not broaden selection"
     repeated = destination / f"{major}-selected-repeat"
@@ -664,7 +681,7 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     imported = destination / f"{major}-selected-imported"
     run(binary, "extract", "import-extensions", "--catalog", str(selected), "--bundle", str(bundle_file),
         "--output", str(imported), env=environment)
-    for name in ("collations.json", "operator_classes.json", "metadata.json"):
+    for name in ("collations.json", "operator_classes.json", "operator_families.json", "metadata.json"):
         assert (imported / name).read_bytes() == (selected / name).read_bytes()
     missing = destination / f"{major}-missing-schema"
     run(binary, "extract", "catalog", "--definition-schema", "unselected missing schema",

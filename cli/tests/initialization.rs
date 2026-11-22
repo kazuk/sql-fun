@@ -399,6 +399,7 @@ fn engine_setup_ignores_unrequested_project_metadata(
 #[rstest::rstest]
 #[case::collations("collations.json")]
 #[case::operator_classes("operator_classes.json")]
+#[case::operator_families("operator_families.json")]
 fn incomplete_master_generation_is_rejected(#[case] artifact: &str) {
     let project = InitializedProject::new();
     project.install_fixture("17");

@@ -46,6 +46,14 @@ impl PostgresBuiltinPaths {
         Self::path_exists_and_file(self.builtin_base_path.join("operator_classes.json"))
     }
 
+    /// Resolve the selected operator-family seed payload.
+    ///
+    /// # Errors
+    /// Returns an error when the required artifact is absent.
+    pub fn operator_families(&self) -> Result<PathBuf, SqlFunArgsError> {
+        Self::path_exists_and_file(self.builtin_base_path.join("operator_families.json"))
+    }
+
     /// returns type data file path
     ///
     /// # Errors

@@ -48,6 +48,8 @@ struct SeedSlot {
     right_type: SeedType,
     owner: Option<OperatorFamilyIdentity>,
     builtin: bool,
+    #[serde(default)]
+    family_owned: bool,
 }
 
 impl SeedSlot {
@@ -65,6 +67,8 @@ impl SeedSlot {
             MemberOwner::Builtin
         } else if let Some(owner) = &self.owner {
             MemberOwner::Class(owner.qualified_name())
+        } else if self.family_owned {
+            MemberOwner::Family
         } else {
             MemberOwner::Loose
         }

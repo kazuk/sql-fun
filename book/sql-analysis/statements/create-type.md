@@ -28,7 +28,11 @@ In PostgreSQL schema and extension analysis, a shell declaration
 can declare it as an argument or result. A subsequent base definition
 (`CREATE TYPE name (...)`) resolves its support functions and makes the
 completed type and its `name[]` array form available to subsequent analysis.
-A shell cannot serve as a table column type.
+A shell cannot serve as a table column type. Base definitions check the
+declared internal length, alignment, storage and pass-by-value combination
+before the completed type becomes available. Definitions using `LIKE` stop
+analysis because inherited layout validation is pending
+([#1211](https://github.com/kazuk/sql-fun/issues/1211)).
 
 Generated array catalog names such as `_name` are not registered for
 user-defined base types ([#1209](https://github.com/kazuk/sql-fun/issues/1209)).

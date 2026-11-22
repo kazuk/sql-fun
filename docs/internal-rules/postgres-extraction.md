@@ -193,6 +193,11 @@ catalog nulls. Its `default_collation` is an object with `schema`, `name`, and
 is not an object identity and is not serialized. No effective collation is
 chosen for an index or column here.
 
+The builtin function inventory includes the exact signatures of bootstrap
+support routines referenced by bootstrap operator-family members. These
+routines can have `internal` arguments or returns, as required by operator
+class and family declarations.
+
 ### Operator classes
 
 `operator_classes.json` is an array ordered by `(schema, name, access_method)`
@@ -206,6 +211,11 @@ with `C` string ordering. Each entry contains:
 | `input_type` | Object with exact type `schema` and `name` |
 | `default` | Boolean from `opcdefault` for this method/input type |
 | `key_type` | Type identity object, or null when `opckeytype = 0` |
+
+An ordinary array type identity carries its exact catalog name and an
+`array_element` object with the element schema and name. The class catalog uses
+that element identity with the ordinary array qualifier to compare input types.
+Re-extract older custom catalogs containing array operator classes.
 
 Class identity is `(schema, name, access_method)`; family identity also includes
 its method. Type identities use catalog namespace/name, including arrays,

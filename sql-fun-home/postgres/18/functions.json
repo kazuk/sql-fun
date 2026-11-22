@@ -3386,6 +3386,21 @@
     ]
   },
   {
+    "name": "bpchar_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "bpchar_sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "bpcharcmp",
     "overloads": [
       {
@@ -3703,6 +3718,72 @@
     ]
   },
   {
+    "name": "brin_bloom_add_value",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_bloom_add_value",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_bloom_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal",
+          "int4"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_bloom_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_bloom_opcinfo",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_bloom_opcinfo",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_bloom_options",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": false,
+        "kind": "f",
+        "name": "brin_bloom_options",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "brin_bloom_summary_in",
     "overloads": [
       {
@@ -3748,6 +3829,23 @@
     ]
   },
   {
+    "name": "brin_bloom_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_bloom_union",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "brin_desummarize_range",
     "overloads": [
       {
@@ -3758,6 +3856,446 @@
         "is_strict": true,
         "kind": "f",
         "name": "brin_desummarize_range",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_inclusion_add_value",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_inclusion_add_value",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_inclusion_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_inclusion_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_inclusion_opcinfo",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_inclusion_opcinfo",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_inclusion_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_inclusion_union",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_add_value",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_add_value",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_add_value",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_add_value",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal",
+          "int4"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_date",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_date",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_float4",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_float4",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_float8",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_float8",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_inet",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_inet",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_int2",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_int2",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_int4",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_int4",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_int8",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_int8",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_interval",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_interval",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_macaddr",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_macaddr",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_macaddr8",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_macaddr8",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_numeric",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_numeric",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_pg_lsn",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_pg_lsn",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_tid",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_tid",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_time",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_time",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_timestamp",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_timestamp",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_timetz",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_timetz",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_distance_uuid",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_distance_uuid",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_opcinfo",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_opcinfo",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_options",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": false,
+        "kind": "f",
+        "name": "brin_minmax_multi_options",
         "ret": "void",
         "returns_set": false
       }
@@ -3804,6 +4342,55 @@
         "kind": "f",
         "name": "brin_minmax_multi_summary_send",
         "ret": "bytea",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_multi_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_multi_union",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_opcinfo",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_opcinfo",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "brin_minmax_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "brin_minmax_union",
+        "ret": "bool",
         "returns_set": false
       }
     ]
@@ -3887,6 +4474,21 @@
     ]
   },
   {
+    "name": "btboolskipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btboolskipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "btbpchar_pattern_cmp",
     "overloads": [
       {
@@ -3903,6 +4505,21 @@
     ]
   },
   {
+    "name": "btbpchar_pattern_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btbpchar_pattern_sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "btcharcmp",
     "overloads": [
       {
@@ -3914,6 +4531,21 @@
         "kind": "f",
         "name": "btcharcmp",
         "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btcharskipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btcharskipsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -3966,6 +4598,21 @@
     ]
   },
   {
+    "name": "btfloat4sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btfloat4sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "btfloat84cmp",
     "overloads": [
       {
@@ -3993,6 +4640,21 @@
         "kind": "f",
         "name": "btfloat8cmp",
         "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btfloat8sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btfloat8sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -4046,6 +4708,36 @@
     ]
   },
   {
+    "name": "btint2skipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btint2skipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btint2sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btint2sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "btint42cmp",
     "overloads": [
       {
@@ -4089,6 +4781,36 @@
         "kind": "f",
         "name": "btint4cmp",
         "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btint4skipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btint4skipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btint4sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btint4sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -4142,6 +4864,36 @@
     ]
   },
   {
+    "name": "btint8skipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btint8skipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btint8sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btint8sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "btnamecmp",
     "overloads": [
       {
@@ -4153,6 +4905,21 @@
         "kind": "f",
         "name": "btnamecmp",
         "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btnamesortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btnamesortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -4185,6 +4952,36 @@
         "kind": "f",
         "name": "btoidcmp",
         "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btoidskipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btoidskipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "btoidsortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "btoidsortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -4291,6 +5088,21 @@
     ]
   },
   {
+    "name": "bttext_pattern_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "bttext_pattern_sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "bttextcmp",
     "overloads": [
       {
@@ -4318,6 +5130,21 @@
         "kind": "f",
         "name": "bttextnamecmp",
         "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "bttextsortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "bttextsortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -4416,6 +5243,21 @@
         "kind": "f",
         "name": "bytea_smaller",
         "ret": "bytea",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "bytea_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "bytea_sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -7281,6 +8123,21 @@
     ]
   },
   {
+    "name": "date_skipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "date_skipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "date_smaller",
     "overloads": [
       {
@@ -7292,6 +8149,21 @@
         "kind": "f",
         "name": "date_smaller",
         "ret": "date",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "date_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "date_sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -10346,6 +11218,24 @@
     ]
   },
   {
+    "name": "gin_cmp_prefix",
+    "overloads": [
+      {
+        "args": [
+          "text",
+          "text",
+          "int2",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_cmp_prefix",
+        "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "gin_cmp_tslexeme",
     "overloads": [
       {
@@ -10378,6 +11268,623 @@
     ]
   },
   {
+    "name": "gin_consistent_jsonb",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "jsonb",
+          "int4",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_consistent_jsonb",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_consistent_jsonb_path",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "jsonb",
+          "int4",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_consistent_jsonb_path",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_extract_jsonb",
+    "overloads": [
+      {
+        "args": [
+          "jsonb",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_extract_jsonb",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_extract_jsonb_path",
+    "overloads": [
+      {
+        "args": [
+          "jsonb",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_extract_jsonb_path",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_extract_jsonb_query",
+    "overloads": [
+      {
+        "args": [
+          "jsonb",
+          "internal",
+          "int2",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_extract_jsonb_query",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_extract_jsonb_query_path",
+    "overloads": [
+      {
+        "args": [
+          "jsonb",
+          "internal",
+          "int2",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_extract_jsonb_query_path",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_extract_tsquery",
+    "overloads": [
+      {
+        "args": [
+          "tsvector",
+          "internal",
+          "int2",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_extract_tsquery",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_extract_tsvector",
+    "overloads": [
+      {
+        "args": [
+          "tsvector",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_extract_tsvector",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_triconsistent_jsonb",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "jsonb",
+          "int4",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_triconsistent_jsonb",
+        "ret": "char",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_triconsistent_jsonb_path",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "jsonb",
+          "int4",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_triconsistent_jsonb_path",
+        "ret": "char",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_tsquery_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "tsvector",
+          "int4",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_tsquery_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gin_tsquery_triconsistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "tsvector",
+          "int4",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gin_tsquery_triconsistent",
+        "ret": "char",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "ginarrayconsistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "anyarray",
+          "int4",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "ginarrayconsistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "ginarrayextract",
+    "overloads": [
+      {
+        "args": [
+          "anyarray",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "ginarrayextract",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "ginarraytriconsistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "int2",
+          "anyarray",
+          "int4",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "ginarraytriconsistent",
+        "ret": "char",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "ginqueryarrayextract",
+    "overloads": [
+      {
+        "args": [
+          "anyarray",
+          "internal",
+          "int2",
+          "internal",
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "ginqueryarrayextract",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_box_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "box",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_box_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_box_distance",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "box",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_box_distance",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_box_penalty",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_box_penalty",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_box_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_box_picksplit",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_box_same",
+    "overloads": [
+      {
+        "args": [
+          "box",
+          "box",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_box_same",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_box_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_box_union",
+        "ret": "box",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_circle_compress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_circle_compress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_circle_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "circle",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_circle_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_circle_distance",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "circle",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_circle_distance",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_point_compress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_point_compress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_point_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "point",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_point_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_point_distance",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "point",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_point_distance",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_point_fetch",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_point_fetch",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_point_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_point_sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_poly_compress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_poly_compress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_poly_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "polygon",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_poly_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gist_poly_distance",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "polygon",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gist_poly_distance",
+        "ret": "float8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "gist_translate_cmptype_common",
     "overloads": [
       {
@@ -10388,6 +11895,236 @@
         "kind": "f",
         "name": "gist_translate_cmptype_common",
         "ret": "int2",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsquery_compress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsquery_compress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsquery_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "tsquery",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsquery_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsquery_penalty",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsquery_penalty",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsquery_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsquery_picksplit",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsquery_same",
+    "overloads": [
+      {
+        "args": [
+          "int8",
+          "int8",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsquery_same",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsquery_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsquery_union",
+        "ret": "int8",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_compress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsvector_compress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "tsvector",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsvector_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_decompress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsvector_decompress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_options",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": false,
+        "kind": "f",
+        "name": "gtsvector_options",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_penalty",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsvector_penalty",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsvector_picksplit",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_same",
+    "overloads": [
+      {
+        "args": [
+          "gtsvector",
+          "gtsvector",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsvector_same",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "gtsvector_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "gtsvector_union",
+        "ret": "gtsvector",
         "returns_set": false
       }
     ]
@@ -12696,6 +14433,121 @@
     ]
   },
   {
+    "name": "inet_gist_compress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_gist_compress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_gist_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "inet",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_gist_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_gist_fetch",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_gist_fetch",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_gist_penalty",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_gist_penalty",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_gist_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_gist_picksplit",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_gist_same",
+    "overloads": [
+      {
+        "args": [
+          "inet",
+          "inet",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_gist_same",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_gist_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_gist_union",
+        "ret": "inet",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "inet_in",
     "overloads": [
       {
@@ -12794,6 +14646,86 @@
         "kind": "f",
         "name": "inet_server_port",
         "ret": "int4",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_spg_choose",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_spg_choose",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_spg_config",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_spg_config",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_spg_inner_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_spg_inner_consistent",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_spg_leaf_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_spg_leaf_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "inet_spg_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "inet_spg_picksplit",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -20173,6 +22105,21 @@
     ]
   },
   {
+    "name": "macaddr_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "macaddr_sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "make_date",
     "overloads": [
       {
@@ -21201,6 +23148,40 @@
     ]
   },
   {
+    "name": "multirange_gist_compress",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "multirange_gist_compress",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "multirange_gist_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "anymultirange",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "multirange_gist_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "multirange_gt",
     "overloads": [
       {
@@ -22093,6 +24074,21 @@
     ]
   },
   {
+    "name": "network_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "network_sortsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "network_sub",
     "overloads": [
       {
@@ -22785,6 +24781,21 @@
         "kind": "f",
         "name": "numeric_smaller",
         "ret": "numeric",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "numeric_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "numeric_sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -31859,6 +33870,91 @@
     ]
   },
   {
+    "name": "range_gist_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "anyrange",
+          "int2",
+          "oid",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "range_gist_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "range_gist_penalty",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "range_gist_penalty",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "range_gist_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "range_gist_picksplit",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "range_gist_same",
+    "overloads": [
+      {
+        "args": [
+          "anyrange",
+          "anyrange",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "range_gist_same",
+        "ret": "internal",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "range_gist_union",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "range_gist_union",
+        "ret": "anyrange",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "range_gt",
     "overloads": [
       {
@@ -32160,6 +34256,21 @@
         "kind": "f",
         "name": "range_send",
         "ret": "bytea",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "range_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "range_sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -34272,6 +36383,166 @@
     ]
   },
   {
+    "name": "spg_bbox_quad_config",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_bbox_quad_config",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_box_quad_choose",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_box_quad_choose",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_box_quad_config",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_box_quad_config",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_box_quad_inner_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_box_quad_inner_consistent",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_box_quad_leaf_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_box_quad_leaf_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_box_quad_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_box_quad_picksplit",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_kd_choose",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_kd_choose",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_kd_config",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_kd_config",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_kd_inner_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_kd_inner_consistent",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_kd_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_kd_picksplit",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "spg_poly_quad_compress",
     "overloads": [
       {
@@ -34282,6 +36553,246 @@
         "kind": "f",
         "name": "spg_poly_quad_compress",
         "ret": "box",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_quad_choose",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_quad_choose",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_quad_config",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_quad_config",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_quad_inner_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_quad_inner_consistent",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_quad_leaf_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_quad_leaf_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_quad_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_quad_picksplit",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_range_quad_choose",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_range_quad_choose",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_range_quad_config",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_range_quad_config",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_range_quad_inner_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_range_quad_inner_consistent",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_range_quad_leaf_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_range_quad_leaf_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_range_quad_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_range_quad_picksplit",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_text_choose",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_text_choose",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_text_config",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_text_config",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_text_inner_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_text_inner_consistent",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_text_leaf_consistent",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_text_leaf_consistent",
+        "ret": "bool",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "spg_text_picksplit",
+    "overloads": [
+      {
+        "args": [
+          "internal",
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "spg_text_picksplit",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -36668,6 +39179,21 @@
     ]
   },
   {
+    "name": "timestamp_skipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "timestamp_skipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
     "name": "timestamp_smaller",
     "overloads": [
       {
@@ -36679,6 +39205,21 @@
         "kind": "f",
         "name": "timestamp_smaller",
         "ret": "timestamp",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "timestamp_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "timestamp_sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]
@@ -40159,6 +42700,36 @@
         "kind": "f",
         "name": "uuid_send",
         "ret": "bytea",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "uuid_skipsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "uuid_skipsupport",
+        "ret": "void",
+        "returns_set": false
+      }
+    ]
+  },
+  {
+    "name": "uuid_sortsupport",
+    "overloads": [
+      {
+        "args": [
+          "internal"
+        ],
+        "is_strict": true,
+        "kind": "f",
+        "name": "uuid_sortsupport",
+        "ret": "void",
         "returns_set": false
       }
     ]

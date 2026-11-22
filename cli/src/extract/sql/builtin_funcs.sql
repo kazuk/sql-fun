@@ -12,12 +12,20 @@ with base as (
   join pg_catalog.pg_namespace n on n.oid = p.pronamespace
   join pg_catalog.pg_type rt on rt.oid = p.prorettype
   where p.oid < 16384 and n.nspname = 'pg_catalog'
-    and rt.typname not in ('trigger', 'internal')
-    and not exists (
-      select 1
-      from unnest(p.proargtypes::oid[]) as t(oid)
-      join pg_catalog.pg_type at on at.oid = t.oid
-      where at.typname = 'internal'
+    and (
+      exists (
+        select 1 from pg_catalog.pg_amproc ap
+        where ap.amproc = p.oid and ap.oid < 16384
+      )
+      or (
+        rt.typname not in ('trigger', 'internal')
+        and not exists (
+          select 1
+          from unnest(p.proargtypes::oid[]) as t(oid)
+          join pg_catalog.pg_type at on at.oid = t.oid
+          where at.typname = 'internal'
+        )
+      )
     )
 ),
 args as (
@@ -55,7 +63,7 @@ grouped as (
 select coalesce(
   json_agg(
     json_build_object('name', proname, 'overloads', overloads)
-    order by proname
+    order by proname collate "C"
   ),
   '[]'::json
 )

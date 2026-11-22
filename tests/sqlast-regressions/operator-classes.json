@@ -106,5 +106,15 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "builtin-internal-sort-support",
+    "sql": "CREATE OPERATOR CLASS sorted_int4 FOR TYPE integer USING btree AS FUNCTION 2 pg_catalog.btint4sortsupport(internal)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
   }
 ]

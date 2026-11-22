@@ -23,7 +23,7 @@ pub(crate) mod conflict_masters;
 mod constraint;
 mod create_access_method;
 mod create_operator_class;
-pub use create_operator_class::CreateOperatorClass;
+pub use create_operator_class::{ClassFailure, CreateOperatorClass};
 pub(crate) mod operator_family;
 pub use operator_family::{
     AlterOperatorFamily, CreateOperatorFamily, OperatorFamily, OperatorFamilyKey,

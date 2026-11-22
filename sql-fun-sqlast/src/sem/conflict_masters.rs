@@ -49,6 +49,7 @@ impl CollationIdentity {
 pub struct CatalogTypeIdentity {
     schema: String,
     name: String,
+    array_element: Option<Box<Self>>,
 }
 
 impl CatalogTypeIdentity {
@@ -67,11 +68,17 @@ impl CatalogTypeIdentity {
         } else {
             local.to_owned()
         };
-        Self { schema, name }
+        Self {
+            schema,
+            name,
+            array_element: None,
+        }
     }
 
     pub(crate) fn type_reference(&self) -> TypeReference {
-        if self.schema == "pg_catalog" {
+        if let Some(element) = &self.array_element {
+            TypeReference::concrete_type_ref(&element.qualified_name(), true)
+        } else if self.schema == "pg_catalog" {
             TypeReference::from_master_type_name(&self.name)
         } else {
             TypeReference::concrete_type_ref(&self.qualified_name(), false)
@@ -339,6 +346,36 @@ impl OperatorClassDefinition {
     /// Exact schema-qualified catalog name, without display-string parsing.
     pub fn qualified_name(&self) -> FullName {
         FullName::with_schema(&self.schema, &self.name)
+    }
+}
+
+#[cfg(test)]
+mod test_extracted_class_input {
+    use crate::{
+        names::FullName,
+        sem::{OperatorClassDefinition, TypeReference},
+    };
+
+    #[test]
+    fn uses_catalog_array_element_even_when_the_name_has_no_underscore() -> testresult::TestResult {
+        let class: OperatorClassDefinition = serde_json::from_value(serde_json::json!({
+            "schema": "public", "name": "widgets", "access_method": "btree",
+            "family": {"schema": "public", "name": "widgets", "access_method": "btree"},
+            "input_type": {
+                "schema": "public", "name": "array_catalog_name",
+                "array_element": {"schema": "public", "name": "widget"}
+            },
+            "default": true, "key_type": null
+        }))?;
+        assert!(class.has_input(&TypeReference::concrete_type_ref(
+            &FullName::with_schema("public", "widget"),
+            true,
+        )));
+        assert!(!class.has_input(&TypeReference::concrete_type_ref(
+            &FullName::with_schema("public", "array_catalog_name"),
+            false,
+        )));
+        Ok(())
     }
 }
 

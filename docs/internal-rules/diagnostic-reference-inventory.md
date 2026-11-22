@@ -241,6 +241,11 @@ import binding (direct or grouped) as well as the conversion body. Its witness
 count increases from three to four solely because of the new import; no emitter
 or diagnostic classification is added.
 
+The #1220 operator-family member resolver reuses the existing routine lookup
+when a support function's signature is omitted. It imports `OwnershipLookup`
+and reads its resolved and ambiguous outcomes. A failed lookup reports the
+operator-family declaration diagnostic. This path emits no ownership code.
+
 The #1000 message-fragment formatter adds one `ArgumentTypeMismatch` match in
 `analysis_problem.rs`. It only describes an existing payload and does not
 construct or emit the excluded diagnostic; its witness count increases by one.

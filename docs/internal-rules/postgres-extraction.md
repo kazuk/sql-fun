@@ -238,13 +238,13 @@ signature. A type includes its exact catalog name and a nullable
 `array_element` qualified name for ordinary PostgreSQL arrays.
 
 Member entries include protected builtin slots, slots owned by selected
-classes, and independently added slots of families in selected schemas. `owner` is the
-class identity when PostgreSQL's internal dependency supplies it. Builtin
-slots retain a `builtin` flag and have no recorded class ownership in the
+classes, and independently added slots of families in selected schemas.
+`owner` is the class identity when PostgreSQL's internal dependency supplies it.
+Builtin slots retain a `builtin` flag and have no recorded class ownership in the
 stock PostgreSQL catalogs. An internal dependency on the family is recorded
 as `family_owned: true`. A member with no owner, a false builtin flag and no
-`family_owned` field represents loose membership. These facts allow semantic replay to preserve
-the visible slots and enforce ownership on later declarations.
+`family_owned` field represents loose membership. These facts allow semantic
+replay to preserve the visible slots and enforce ownership on later declarations.
 
 ## Extension bundle contract
 

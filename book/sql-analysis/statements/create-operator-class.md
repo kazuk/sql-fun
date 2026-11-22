@@ -2,8 +2,9 @@
 
 sql-fun analyzes PostgreSQL operator-class declarations in schema and extension
 scripts. The `USING` name must identify an existing index access method. Builtin
-methods and methods declared earlier in the script are available. The input type, referenced operators, and support routines must
-exist before the declaration.
+methods and methods declared earlier in the script are available. The input
+type, referenced operators, and support routines must exist before the
+declaration.
 
 An explicit `FAMILY` names an existing family for the same access method. When
 `FAMILY` is omitted, the class uses a family with the same name and schema,

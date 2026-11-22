@@ -1,7 +1,7 @@
 # CREATE OPERATOR
 
-sql-fun accepts PostgreSQL `CREATE OPERATOR` syntax during parsing. Analysis
-stops at the declaration and reports that semantic analysis is unsupported.
+sql-fun accepts PostgreSQL `CREATE OPERATOR` syntax during parsing. Semantic
+analysis is unimplemented and stops at the declaration.
 The declaration does not add an operator to the analysis catalog for use by
 later statements. This also affects schema initialization from extension scripts
 that declare operators, including the bundled `pg_trgm` installation script.

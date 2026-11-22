@@ -37,7 +37,7 @@ mod trigger;
 pub(crate) mod validation;
 
 pub(crate) use self::{
-    create_type::CreateType,
+    create_type::{BaseTypeOption, CreateType},
     ddl::{CompositeType, Domain, Function, Index, Schema, TableAs},
     deparse::render_full_name,
     document::{

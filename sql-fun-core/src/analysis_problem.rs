@@ -383,6 +383,13 @@ pub enum AnalysisProblem {
     Rule(RuleProblem),
     /// Invalid foreign-data wrapper declaration.
     ForeignDataWrapper(ForeignDataWrapperProblem),
+    /// A rejected PostgreSQL base type definition.
+    InvalidBaseType {
+        /// Qualified name of the declaration.
+        name: FullName,
+        /// Reason the declaration cannot be applied.
+        reason: String,
+    },
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -796,6 +803,7 @@ impl AnalysisProblem {
             Self::Privilege(_) => "invalid_privilege_declaration",
             Self::Rule(_) => "rule_invalid_definition",
             Self::ForeignDataWrapper(_) => "foreign_data_wrapper_invalid_definition",
+            Self::InvalidBaseType { .. } => "base_type_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
             Self::Insert(_) => "insert_semantics",
@@ -884,6 +892,7 @@ impl AnalysisProblem {
             | Self::OperatorNameSyntax(_)
             | Self::DropFunctionDependency(_)
             | Self::ForeignDataWrapper(_)
+            | Self::InvalidBaseType { .. }
             | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
             }
@@ -955,6 +964,9 @@ impl DiagnosticMessage for AnalysisProblem {
             }
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::ForeignDataWrapper(problem) => problem.diagnostic_message(),
+            Self::InvalidBaseType { name, reason } => {
+                format!("cannot define base type {name}: {reason}")
+            }
             Self::Ownership(problem) => problem.diagnostic_message(),
             Self::Privilege(problem) => problem.diagnostic_message(),
             Self::Trigger(problem) => problem.diagnostic_message(),

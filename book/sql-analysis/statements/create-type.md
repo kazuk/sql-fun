@@ -55,6 +55,7 @@ for deprecated-label linting
 ([#1084](https://github.com/kazuk/sql-fun/issues/1084)).
 
 ## Diagnostics
+- [base_type_invalid_definition](../../diagnostics/base_type_invalid_definition.md) reports a rejected base definition. An existing shell remains available for a later valid completion.
 
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): the
   enum/composite identity conflicts with an existing object in the relevant

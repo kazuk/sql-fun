@@ -382,6 +382,16 @@ pub enum SemAst {
     /// PostgreSQL shell or completed base type declaration.
     CreateBaseType(TypeDefinition),
 
+    /// A PostgreSQL shell or base declaration that cannot be applied.
+    RejectedBaseType {
+        /// Qualified name of the declaration.
+        name: FullName,
+        /// Whether the declaration attempted to complete a shell.
+        completion: bool,
+        /// Reason the declaration was rejected.
+        reason: String,
+    },
+
     /// `create function` / `create procedure` statement
     CreateFunction(CreateFunction),
 

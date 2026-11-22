@@ -1,9 +1,9 @@
 use crate::{
-    ast::{CreateType, Expr, Literal, SyntaxValue},
+    ast::{BaseTypeOption, CreateType, Expr, Literal, SyntaxValue},
     context::ParseContext,
     names::FullName,
     sem::{
-        AnalysisError, AstAndContextPair, SemAst, TypeDefinition, TypeReference,
+        AnalysisError, AnalysisProblem, AstAndContextPair, SemAst, TypeDefinition, TypeReference,
         pg_type::TypeCategory,
     },
 };
@@ -18,18 +18,45 @@ pub(super) fn analyze(
         return if context.permits_type_creation(&name)? {
             Ok(SemAst::CreateBaseType(TypeDefinition::Shell(reference)))
         } else {
-            Ok(SemAst::unresolved_statement())
+            Ok(rejected(name, false, invalid("type already exists")))
         };
     };
-    match context.get_type_impl(&name) {
-        Some(definition) if definition.is_shell() => {}
-        Some(_) => {
-            context.permits_type_creation(&name)?;
-            return Ok(SemAst::unresolved_statement());
-        }
-        None => return Err(invalid("a shell declaration is required")),
+    if context
+        .get_type_impl(&name)
+        .is_some_and(|definition| !definition.is_shell())
+    {
+        context.permits_type_creation(&name)?;
+        return Ok(rejected(name, true, invalid("type already exists")));
     }
+    match validate_definition(options, &name, &reference, context) {
+        Ok(definition) => Ok(SemAst::CreateBaseType(definition)),
+        Err(failure) => {
+            context.report_analysis_problem(AnalysisProblem::InvalidBaseType {
+                name: (&name).into(),
+                reason: failure.0.clone(),
+            })?;
+            Ok(rejected(name, true, failure))
+        }
+    }
+}
 
+fn rejected(name: FullName, completion: bool, failure: InvalidDefinition) -> SemAst {
+    SemAst::RejectedBaseType {
+        name,
+        completion,
+        reason: failure.0,
+    }
+}
+
+fn validate_definition(
+    options: &[BaseTypeOption],
+    name: &FullName,
+    reference: &TypeReference,
+    context: &impl ParseContext,
+) -> Result<TypeDefinition, InvalidDefinition> {
+    if context.get_type_impl(name).is_none() {
+        return Err(invalid("a shell declaration is required"));
+    }
     let mut support = std::collections::BTreeMap::new();
     let mut seen = std::collections::BTreeSet::new();
     let mut category = TypeCategory::try_from('U').expect("valid default category");
@@ -68,11 +95,9 @@ pub(super) fn analyze(
         }
     }
     for (role, routine) in support {
-        check_support_function(context, &reference, role, &routine)?;
+        check_support_function(context, reference, role, &routine)?;
     }
-    Ok(SemAst::CreateBaseType(TypeDefinition::base(
-        &name, category, collatable,
-    )))
+    Ok(TypeDefinition::base(name, category, collatable))
 }
 
 pub(super) fn apply<T: ParseContext>(
@@ -85,6 +110,48 @@ pub(super) fn apply<T: ParseContext>(
         context.insert_shell_or_base_type(name, definition);
     }
     Ok(AstAndContextPair::new(statement, context))
+}
+
+#[cfg(test)]
+mod application_tests {
+    use crate::{
+        context::{BaseParseContext, TypeInfoRead},
+        names::FullName,
+        sem::{AnalysisProblem, SemAst},
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[test]
+    fn rejected_completion_retains_shell_and_allows_next_statement() -> testresult::TestResult {
+        let context =
+            apply_ownership_sql(ownership_context(), "CREATE TYPE public.demo")?.into_context();
+        let attempt = apply_ownership_sql(
+            context,
+            "CREATE TYPE public.demo (INTERNALLENGTH = 4, STORAGE = extended)",
+        )?;
+        let name = FullName::with_schema("public", "demo");
+        assert!(matches!(
+            attempt.ast(),
+            SemAst::RejectedBaseType { name: rejected, completion: true, reason }
+                if rejected == &name && reason == "fixed-size types must have storage PLAIN"
+        ));
+        let context = attempt.into_context();
+        assert!(
+            context
+                .problems()
+                .iter()
+                .any(|problem| { matches!(problem, AnalysisProblem::InvalidBaseType { .. }) })
+        );
+        assert!(
+            context
+                .get_type_impl(&name)
+                .is_some_and(|definition| definition.is_shell())
+        );
+        assert!(context.get_type(&name).is_none());
+        let next = apply_ownership_sql(context, "CREATE TYPE public.other")?;
+        assert!(matches!(next.ast(), SemAst::CreateBaseType(_)));
+        Ok(())
+    }
 }
 
 struct TypeLayout {
@@ -106,7 +173,7 @@ impl Default for TypeLayout {
 }
 
 impl TypeLayout {
-    fn validate(&self) -> Result<(), AnalysisError> {
+    fn validate(&self) -> Result<(), InvalidDefinition> {
         if self.by_value {
             if !matches!(self.length, 1 | 2 | 4 | 8) || self.length != self.alignment {
                 return Err(invalid(
@@ -159,7 +226,7 @@ fn insert_support_function<'a>(
     support: &mut std::collections::BTreeMap<&'a str, FullName>,
     role: &'a str,
     value: Option<&SyntaxValue>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), InvalidDefinition> {
     support.insert(role, option_name(value)?);
     Ok(())
 }
@@ -167,7 +234,7 @@ fn insert_support_function<'a>(
 fn inherit_layout(
     context: &impl ParseContext,
     value: Option<&SyntaxValue>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), InvalidDefinition> {
     let target = option_name(value)?;
     if context.get_type(&target).is_none() {
         return Err(invalid(&format!("type {target} does not exist")));
@@ -178,7 +245,7 @@ fn inherit_layout(
 fn validate_element(
     context: &impl ParseContext,
     value: Option<&SyntaxValue>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), InvalidDefinition> {
     let target = option_name(value)?;
     let Some(definition) = context.get_type(&target) else {
         return Err(invalid(&format!("type {target} does not exist")));
@@ -193,7 +260,7 @@ fn validate_element(
     Ok(())
 }
 
-fn option_text(value: Option<&SyntaxValue>) -> Result<String, AnalysisError> {
+fn option_text(value: Option<&SyntaxValue>) -> Result<String, InvalidDefinition> {
     match value {
         Some(SyntaxValue::Type(ty)) => Ok(ty.name().parts().join(".")),
         Some(SyntaxValue::Expression(Expr::Column(name))) => Ok(name.parts().join(".")),
@@ -207,11 +274,11 @@ fn option_text(value: Option<&SyntaxValue>) -> Result<String, AnalysisError> {
     }
 }
 
-fn validate_text(value: Option<&SyntaxValue>) -> Result<(), AnalysisError> {
+fn validate_text(value: Option<&SyntaxValue>) -> Result<(), InvalidDefinition> {
     option_text(value).map(drop)
 }
 
-fn parse_category(value: Option<&SyntaxValue>) -> Result<TypeCategory, AnalysisError> {
+fn parse_category(value: Option<&SyntaxValue>) -> Result<TypeCategory, InvalidDefinition> {
     let text = option_text(value)?;
     let code = text
         .chars()
@@ -220,7 +287,7 @@ fn parse_category(value: Option<&SyntaxValue>) -> Result<TypeCategory, AnalysisE
     TypeCategory::try_from(code).map_err(invalid)
 }
 
-fn parse_length(value: Option<&SyntaxValue>) -> Result<i16, AnalysisError> {
+fn parse_length(value: Option<&SyntaxValue>) -> Result<i16, InvalidDefinition> {
     match value {
         Some(SyntaxValue::Expression(Expr::Literal(Literal::Integer(length)))) => {
             let length = i16::try_from(*length).map_err(|_| invalid("invalid internal length"))?;
@@ -235,7 +302,7 @@ fn parse_length(value: Option<&SyntaxValue>) -> Result<i16, AnalysisError> {
     }
 }
 
-fn parse_alignment(value: Option<&SyntaxValue>) -> Result<i16, AnalysisError> {
+fn parse_alignment(value: Option<&SyntaxValue>) -> Result<i16, InvalidDefinition> {
     match option_text(value)?.to_ascii_lowercase().as_str() {
         "char" | "pg_catalog.bpchar" => Ok(1),
         "int2" | "pg_catalog.int2" => Ok(2),
@@ -245,7 +312,7 @@ fn parse_alignment(value: Option<&SyntaxValue>) -> Result<i16, AnalysisError> {
     }
 }
 
-fn parse_storage(value: Option<&SyntaxValue>) -> Result<bool, AnalysisError> {
+fn parse_storage(value: Option<&SyntaxValue>) -> Result<bool, InvalidDefinition> {
     match option_text(value)?.to_ascii_lowercase().as_str() {
         "plain" => Ok(true),
         "external" | "extended" | "main" => Ok(false),
@@ -253,11 +320,11 @@ fn parse_storage(value: Option<&SyntaxValue>) -> Result<bool, AnalysisError> {
     }
 }
 
-fn validate_preferred(value: Option<&SyntaxValue>) -> Result<(), AnalysisError> {
+fn validate_preferred(value: Option<&SyntaxValue>) -> Result<(), InvalidDefinition> {
     option_boolean(value).map(drop)
 }
 
-fn option_boolean(value: Option<&SyntaxValue>) -> Result<bool, AnalysisError> {
+fn option_boolean(value: Option<&SyntaxValue>) -> Result<bool, InvalidDefinition> {
     match value {
         None => Ok(true),
         Some(SyntaxValue::Expression(Expr::Literal(Literal::Boolean(value)))) => Ok(*value),
@@ -267,10 +334,14 @@ fn option_boolean(value: Option<&SyntaxValue>) -> Result<bool, AnalysisError> {
     }
 }
 
-fn option_name(value: Option<&SyntaxValue>) -> Result<FullName, AnalysisError> {
+fn option_name(value: Option<&SyntaxValue>) -> Result<FullName, InvalidDefinition> {
     match value {
-        Some(SyntaxValue::Type(ty)) => FullName::from_ast_name(ty.name()),
-        Some(SyntaxValue::Expression(Expr::Column(name))) => FullName::from_ast_name(name),
+        Some(SyntaxValue::Type(ty)) => {
+            FullName::from_ast_name(ty.name()).map_err(|_| invalid("invalid qualified name"))
+        }
+        Some(SyntaxValue::Expression(Expr::Column(name))) => {
+            FullName::from_ast_name(name).map_err(|_| invalid("invalid qualified name"))
+        }
         _ => Err(invalid("expected a qualified name or identifier")),
     }
 }
@@ -280,7 +351,7 @@ fn check_support_function(
     base: &TypeReference,
     role: &str,
     routine: &FullName,
-) -> Result<(), AnalysisError> {
+) -> Result<(), InvalidDefinition> {
     let builtin =
         |name| TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", name), false);
     let (args, result, alternate) = match role {
@@ -316,11 +387,13 @@ fn check_support_function(
     }
 }
 
-fn invalid(message: &str) -> AnalysisError {
-    AnalysisError::unexpected_input_error(&format!("CREATE TYPE: {message}"))
+struct InvalidDefinition(String);
+
+fn invalid(message: &str) -> InvalidDefinition {
+    InvalidDefinition(message.to_owned())
 }
 
-fn parse_boolean(value: &str) -> Result<bool, AnalysisError> {
+fn parse_boolean(value: &str) -> Result<bool, InvalidDefinition> {
     match value.to_ascii_lowercase().as_str() {
         "true" | "on" => Ok(true),
         "false" | "off" => Ok(false),

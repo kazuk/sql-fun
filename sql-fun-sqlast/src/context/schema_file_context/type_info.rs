@@ -93,6 +93,9 @@ impl TypeInfoWrite for SchemaFileContext {
     fn insert_shell_or_base_type(&mut self, name: &FullName, definition: &TypeDefinition) {
         self.catalog.renamed_types.remove(name);
         self.catalog.types.replace_definition(name, definition);
+        if definition.is_shell() {
+            self.record_named_extension_member(ObjectKind::TYPE, name);
+        }
         // TODO(#1209): register PostgreSQL's generated name for the completed array
         // once catalog lookup can resolve that key to the existing T[] identity.
     }
@@ -101,6 +104,40 @@ impl TypeInfoWrite for SchemaFileContext {
         self.catalog.renamed_types.remove(name);
         self.catalog.types.insert_create_enum(name, create_enum);
         self.record_named_extension_member(ObjectKind::TYPE, name);
+    }
+}
+
+#[cfg(test)]
+mod shell_membership_tests {
+    use crate::{
+        ast::ObjectKind,
+        context::{ExtensionInfoRead, TypeInfoWrite},
+        names::FullName,
+        sem::{OwnershipIdentity, TypeDefinition, pg_type::TypeCategory},
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[test]
+    fn completing_shell_preserves_extension_membership() -> testresult::TestResult {
+        let mut context = ownership_context();
+        context.enter_extension_script("original_ext", Some("public"));
+        let mut context = apply_ownership_sql(context, "CREATE TYPE public.demo")?.into_context();
+        let name = FullName::with_schema("public", "demo");
+        let identity = OwnershipIdentity::named(ObjectKind::TYPE, &name);
+        assert_eq!(
+            context.extension_membership(&identity),
+            Some("original_ext")
+        );
+
+        context.enter_extension_script("other_ext", Some("public"));
+        let category = TypeCategory::try_from('U').expect("valid category");
+        context.insert_shell_or_base_type(&name, &TypeDefinition::base(&name, category, false));
+        assert_eq!(
+            context.extension_membership(&identity),
+            Some("original_ext")
+        );
+        assert_eq!(context.extension_membership_history(&identity).len(), 1);
+        Ok(())
     }
 }
 

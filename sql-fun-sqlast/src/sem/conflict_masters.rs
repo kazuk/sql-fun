@@ -1,4 +1,9 @@
-use crate::{ast::Dialect, context::BaseParseContext, names::FullName, sem::CatalogNameLookup};
+use crate::{
+    ast::Dialect,
+    context::BaseParseContext,
+    names::FullName,
+    sem::{CatalogNameLookup, OperatorFamilyKey, TypeReference},
+};
 
 /// Qualified collation identity, including encoding eligibility.
 #[derive(Debug, Clone, Eq, PartialEq, serde::Deserialize)]
@@ -47,16 +52,25 @@ pub struct CatalogTypeIdentity {
 }
 
 impl CatalogTypeIdentity {
-    fn from_reference(reference: &crate::sem::TypeReference) -> Self {
-        let name = reference.full_name().expect("resolved declaration type has a name");
-        let schema = name.schema().expect("resolved declaration type has a schema").as_str().to_owned();
+    fn from_reference(reference: &TypeReference) -> Self {
+        let name = reference
+            .full_name()
+            .expect("resolved declaration type has a name");
+        let schema = name
+            .schema()
+            .expect("resolved declaration type has a schema")
+            .as_str()
+            .to_owned();
         let local = name.name().as_str();
-        let name = if reference.is_array() == Some(true) { format!("_{local}") } else { local.to_owned() };
+        let name = if reference.is_array() == Some(true) {
+            format!("_{local}")
+        } else {
+            local.to_owned()
+        };
         Self { schema, name }
     }
 
-    pub(crate) fn type_reference(&self) -> crate::sem::TypeReference {
-        use crate::sem::TypeReference;
+    pub(crate) fn type_reference(&self) -> TypeReference {
         if self.schema == "pg_catalog" {
             TypeReference::from_master_type_name(&self.name)
         } else {
@@ -239,23 +253,32 @@ pub struct OperatorClassDefinition {
     default: bool,
     key_type: Option<CatalogTypeIdentity>,
     #[serde(skip)]
-    declared_input: Option<crate::sem::TypeReference>,
+    declared_input: Option<TypeReference>,
 }
 
 impl OperatorClassDefinition {
     pub(crate) fn from_declaration(
         name: &FullName,
-        family: &crate::sem::OperatorFamilyKey,
-        input: &crate::sem::TypeReference,
+        family: &OperatorFamilyKey,
+        input: &TypeReference,
         default: bool,
-        storage: Option<&crate::sem::TypeReference>,
+        storage: Option<&TypeReference>,
     ) -> Self {
         Self {
-            schema: name.schema().expect("class is qualified").as_str().to_owned(),
+            schema: name
+                .schema()
+                .expect("class is qualified")
+                .as_str()
+                .to_owned(),
             name: name.name().as_str().to_owned(),
             access_method: family.method.clone(),
             family: OperatorFamilyIdentity {
-                schema: family.name.schema().expect("family is qualified").as_str().to_owned(),
+                schema: family
+                    .name
+                    .schema()
+                    .expect("family is qualified")
+                    .as_str()
+                    .to_owned(),
                 name: family.name.name().as_str().to_owned(),
                 access_method: family.method.clone(),
             },
@@ -266,11 +289,11 @@ impl OperatorClassDefinition {
         }
     }
 
-    pub(crate) fn belongs_to(&self, key: &crate::sem::OperatorFamilyKey) -> bool {
+    pub(crate) fn belongs_to(&self, key: &OperatorFamilyKey) -> bool {
         self.family.access_method() == key.method && self.family.qualified_name() == key.name
     }
 
-    pub(crate) fn has_input(&self, typ: &crate::sem::TypeReference) -> bool {
+    pub(crate) fn has_input(&self, typ: &TypeReference) -> bool {
         match &self.declared_input {
             Some(input) => input == typ,
             None => self.input_type.type_reference() == *typ,
@@ -461,7 +484,7 @@ mod test_lookup_operator_class {
     }
 }
 
-pub(crate) fn lookup_postgres(
+fn lookup_postgres(
     context: &impl BaseParseContext,
     name: &FullName,
     exists: impl Fn(&FullName) -> bool,

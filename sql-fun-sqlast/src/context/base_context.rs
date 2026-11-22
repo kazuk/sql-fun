@@ -20,15 +20,16 @@ use crate::{
         AnalysisError, CastDefinition, CatalogNameLookup, CollationDefinition,
         ConflictArbiterInference, CreateFunction, CreateIndex, CreateSequence, CreateTable,
         CreateTrigger, DatabaseCollation, FunctionOverloadCollection, InsertConflict, Kind,
-        OperatorClassDefinition, OperatorDefinition, OverloadVariant, OwnedObjectDefinition, Role,
-        SourcePathWithSpan, TriggerIdentity, TypeCategory as SemTypeCategory, TypeDefinition,
-        TypeReference, ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport,
-        ViewUpdateSupport,
+        OperatorClassDefinition, OperatorDefinition, OperatorFamily, OperatorFamilyKey,
+        OverloadVariant, OwnedObjectDefinition, Role, SourcePathWithSpan, TriggerIdentity,
+        TypeCategory as SemTypeCategory, TypeDefinition, TypeReference, ViewDeleteSupport,
+        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
             lookup_operator_class as conflict_masters_lookup_operator_class,
         },
+        operator_family::seed as operator_family_seed,
         ownership::model_definitions,
     },
 };
@@ -51,7 +52,7 @@ pub struct BaseContext {
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
     masters: ConflictMasters,
-    operator_families: std::collections::HashMap<crate::sem::OperatorFamilyKey, crate::sem::OperatorFamily>,
+    operator_families: std::collections::HashMap<OperatorFamilyKey, OperatorFamily>,
 }
 
 #[derive(serde::Deserialize)]
@@ -216,7 +217,7 @@ impl BaseContext {
         let operator_families = if Dialect::from(metadata) == Dialect::sqlite() {
             Default::default()
         } else {
-            crate::sem::operator_family::seed::load(&paths.operator_families()?)?
+            operator_family_seed::load(&paths.operator_families()?)?
         };
 
         let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;
@@ -509,14 +510,13 @@ impl crate::context::ForeignDataWrapperInfoRead for BaseContext {}
 
 impl crate::context::AccessMethodInfoRead for BaseContext {}
 impl crate::context::OperatorFamilyInfoRead for BaseContext {
-    fn operator_family(&self, key: &crate::sem::OperatorFamilyKey) -> Option<&crate::sem::OperatorFamily> {
+    fn operator_family(&self, key: &OperatorFamilyKey) -> Option<&OperatorFamily> {
         self.operator_families.get(key)
     }
 
-
     fn operator_class_for_family_type(
         &self,
-        key: &crate::sem::OperatorFamilyKey,
+        key: &OperatorFamilyKey,
         typ: &TypeReference,
     ) -> Option<&OperatorClassDefinition> {
         self.masters.operator_class_for_family_type(key, typ)

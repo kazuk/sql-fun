@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-use super::{
+use crate::sem::operator_family::{
     FamilyMember, FamilySlot, MemberKind, MemberObject, MemberOwner, OperatorFamilyKey,
     report_family_problem,
 };

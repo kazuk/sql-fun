@@ -7,7 +7,7 @@ use crate::{
     sem::{AnalysisError, OperatorFamilyIdentity, OperatorIdentity, TypeReference},
 };
 
-use super::{
+use crate::sem::operator_family::{
     FamilyMember, FamilySlot, MemberKind, MemberObject, MemberOwner, OperatorFamily,
     OperatorFamilyKey,
 };

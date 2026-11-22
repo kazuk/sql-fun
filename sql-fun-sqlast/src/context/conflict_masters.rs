@@ -4,7 +4,7 @@ use crate::{
     names::FullName,
     sem::{
         AnalysisError, CatalogNameLookup, CollationDefinition, DatabaseCollation,
-        OperatorClassDefinition,
+        OperatorClassDefinition, OperatorFamilyKey, TypeReference,
     },
 };
 use std::{collections::HashSet, fs::File, io::BufReader, path::Path};
@@ -248,16 +248,19 @@ mod test_qualified_collation {
 impl ConflictMasters {
     pub(super) fn operator_class_for_family_type(
         &self,
-        key: &crate::sem::OperatorFamilyKey,
-        typ: &crate::sem::TypeReference,
+        key: &OperatorFamilyKey,
+        typ: &TypeReference,
     ) -> Option<&OperatorClassDefinition> {
-        self.operator_classes.iter().find(|class| class.belongs_to(key) && class.has_input(typ))
+        self.operator_classes
+            .iter()
+            .filter(|class| class.belongs_to(key) && class.has_input(typ))
+            .min_by(|left, right| (left.name(), left.schema()).cmp(&(right.name(), right.schema())))
     }
 
-    pub(super) fn has_default_operator_class(&self, method: &str, typ: &crate::sem::TypeReference) -> bool {
-        self.operator_classes.iter().any(|class| {
-            class.default() && class.access_method() == method && class.has_input(typ)
-        })
+    pub(super) fn has_default_operator_class(&self, method: &str, typ: &TypeReference) -> bool {
+        self.operator_classes
+            .iter()
+            .any(|class| class.default() && class.access_method() == method && class.has_input(typ))
     }
 
     /// Read an exact operator-class identity without selecting a default class.

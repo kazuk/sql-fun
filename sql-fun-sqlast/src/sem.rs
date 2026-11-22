@@ -25,7 +25,9 @@ mod create_access_method;
 mod create_operator_class;
 pub use create_operator_class::CreateOperatorClass;
 pub(crate) mod operator_family;
-pub use operator_family::{CreateOperatorFamily, OperatorFamily, OperatorFamilyKey};
+pub use operator_family::{
+    AlterOperatorFamily, CreateOperatorFamily, OperatorFamily, OperatorFamilyKey,
+};
 mod create_base_type;
 pub use self::create_base_type::RejectedBaseType;
 mod create_comp_type;
@@ -353,6 +355,8 @@ pub enum SemAst {
     CreateOperatorClass(Box<CreateOperatorClass>),
     /// PostgreSQL operator family declaration.
     CreateOperatorFamily(Box<CreateOperatorFamily>),
+    /// PostgreSQL operator family membership change.
+    AlterOperatorFamily(Box<AlterOperatorFamily>),
     /// An analyzed PostgreSQL foreign-data wrapper declaration.
     CreateForeignDataWrapper(Box<CreateForeignDataWrapper>),
     /// Resolved DROP TRIGGER, including explicit IF EXISTS no-op outcomes.

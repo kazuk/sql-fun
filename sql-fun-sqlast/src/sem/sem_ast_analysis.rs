@@ -6,13 +6,13 @@ use crate::{
     context::ParseContext,
     sem::{
         AlterFunctionParallel, AlterOwner, AlterSequence, AnalysisError, Comment,
-        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateForeignDataWrapper,
-        CreateFunction, CreateIndex, CreateOperator, CreateRule, CreateSchema, CreateSequence,
-        CreateTable, CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropFunction,
-        DropRule, DropTable, DropTrigger, DropView, EngineFeatureValidation,
-        ExtensionMembershipChange, InsertStatement, MergeStatement, ObjectPrivilegeChange,
-        ParameterConstraints, RelationAlteration, RoleMembershipDeclaration, SelectStatement,
-        SemAst, UpdateStatement, VariableSet,
+        CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum, CreateExtension,
+        CreateForeignDataWrapper, CreateFunction, CreateIndex, CreateOperator, CreateRule,
+        CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger, CreateView,
+        DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
+        EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
+        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
+        SelectStatement, SemAst, UpdateStatement, VariableSet,
     },
 };
 
@@ -48,9 +48,8 @@ impl SemAst {
             AstStatementNode::CreateOperator(ast) => Ok(Self::CreateOperator(Box::new(
                 CreateOperator::analyze(ast, context)?,
             ))),
-            AstStatementNode::CreateAccessMethod(_) => {
-                todo!("CREATE ACCESS METHOD semantic analysis (#1223)")
-            }
+            AstStatementNode::CreateAccessMethod(ast) => CreateAccessMethod::analyze(ast, context)
+                .map(|statement| Self::CreateAccessMethod(Box::new(statement))),
             AstStatementNode::CreateOperatorClass(_) => {
                 todo!("CREATE OPERATOR CLASS semantic analysis (#1220)")
             }
@@ -256,6 +255,9 @@ impl SemAst {
                 RelationAlteration::from_ast_and_apply(statement, context)
             }
             AstStatementNode::Domain(domain) => CreateDomain::from_ast_and_apply(domain, context),
+            AstStatementNode::CreateAccessMethod(ast) => {
+                CreateAccessMethod::analyze_and_apply(ast, context)
+            }
             AstStatementNode::CreateOperator(ast) => {
                 let statement = CreateOperator::analyze(ast, &mut context)?;
                 let context = context.apply_create_operator(&statement)?;

@@ -499,6 +499,8 @@ impl GetSourcePathWithSpanOpt for BaseContext {
 
 impl crate::context::ForeignDataWrapperInfoRead for BaseContext {}
 
+impl crate::context::AccessMethodInfoRead for BaseContext {}
+
 impl crate::context::TriggerInfoRead for BaseContext {
     fn trigger(&self, _identity: &TriggerIdentity) -> Option<&CreateTrigger> {
         None

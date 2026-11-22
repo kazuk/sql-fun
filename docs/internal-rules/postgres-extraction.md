@@ -38,6 +38,11 @@ are extraction inputs. The pinned integration images define the official
 reproduction environment. Verify both payload and metadata against committed
 artifacts in the installed-binary CI job.
 
+Bootstrap access methods are rendered in `schema.sql` from `pg_am`, with
+the method kind and the handler name qualified using its namespace in
+`pg_proc`. Schema analysis registers the declarations through the same
+path as project and extension SQL. The handler name is declaration data.
+
 ## Function row properties
 
 Each `functions.json` overload additionally records `kind` (`pg_proc.prokind`)

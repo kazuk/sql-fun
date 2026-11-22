@@ -128,6 +128,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [distinct_row_arity](distinct_row_arity.md)
 - [domain_base_type_not_found](domain_base_type_not_found.md)
 - [duplicate_alias](duplicate_alias.md)
+- [duplicate_access_method](duplicate_access_method.md)
 - [duplicate_def_elem_key](duplicate_def_elem_key.md)
 - [explicit_cast_not_defined](explicit_cast_not_defined.md)
 - [expression_type_not_known](expression_type_not_known.md)

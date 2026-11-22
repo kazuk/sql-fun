@@ -49,6 +49,10 @@ impl Renderer {
         for (name, source) in [
             ("domains", include_str!("templates/domains.hbs")),
             ("tables", include_str!("templates/tables.hbs")),
+            (
+                "access_methods",
+                include_str!("templates/access_methods.hbs"),
+            ),
             ("functions", include_str!("templates/functions.hbs")),
             ("views", include_str!("templates/views.hbs")),
         ] {

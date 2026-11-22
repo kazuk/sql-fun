@@ -508,6 +508,12 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::context::AccessMethodInfoRead for $context {
+            fn access_method(&self, name: &str) -> Option<&crate::sem::AccessMethodDefinition> {
+                self.$catalog().access_method(name)
+            }
+        }
+
         impl crate::context::TriggerInfoRead for $context {
             fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
                 self.$catalog().trigger_is_cancelled(identity)

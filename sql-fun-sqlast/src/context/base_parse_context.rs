@@ -9,10 +9,10 @@ use ::sql_fun_core::SqlFunArgs;
 use crate::{
     ast::ObjectKind,
     context::{
-        CastInfoRead, ConflictInfoRead, ForeignDataWrapperInfoRead, FunctionInfoRead,
-        GetSourcePathWithSpanOpt, IndexInfoRead, OperatorInfoRead, RuleInfoRead, SearchPathRead,
-        SequenceInfoRead, TableInfoRead, TransformationInfoRead, TriggerInfoRead, TypeInfoRead,
-        ViewInfoRead,
+        AccessMethodInfoRead, CastInfoRead, ConflictInfoRead, ForeignDataWrapperInfoRead,
+        FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorInfoRead, RuleInfoRead,
+        SearchPathRead, SequenceInfoRead, TableInfoRead, TransformationInfoRead, TriggerInfoRead,
+        TypeInfoRead, ViewInfoRead,
     },
     names::{FullName, OperatorName, TableName, ViewName},
     sem::{
@@ -44,6 +44,7 @@ pub trait BaseParseContext:
     + RuleInfoRead
     + ForeignDataWrapperInfoRead
     + TransformationInfoRead
+    + AccessMethodInfoRead
     + TriggerInfoRead
     + SequenceInfoRead
     + TypeInfoRead

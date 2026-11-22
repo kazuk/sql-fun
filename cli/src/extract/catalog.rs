@@ -186,6 +186,7 @@ fn extraction_sql(schemas: &DefinitionSchemas) -> Result<String, anyhow::Error> 
         include_str!("sql/builtin_columns.sql"),
         include_str!("sql/schema_functions.sql"),
         include_str!("sql/views.sql"),
+        include_str!("sql/access_methods.sql"),
         include_str!("sql/collations.sql"),
         include_str!("sql/operator_classes.sql"),
     ];
@@ -293,7 +294,7 @@ mod test_write_catalogs {
         for (_, marker) in &payloads[..7] {
             catalogs.push(serde_json::json!({"catalog":marker}));
         }
-        catalogs.extend(vec![serde_json::json!([]); 4]);
+        catalogs.extend(vec![serde_json::json!([]); 5]);
         for (_, marker) in &payloads[7..] {
             catalogs.push(serde_json::json!({"catalog":marker}));
         }
@@ -341,7 +342,7 @@ mod test_write_catalogs {
         #[case] prerelease: bool,
     ) {
         let directory = tempfile::tempdir().unwrap();
-        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 13]);
+        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 14]);
         let version: PostgresVersion = identity.parse().unwrap();
         write_catalogs(
             &results,
@@ -387,7 +388,7 @@ mod test_write_catalogs {
 
     #[rstest::rstest]
     fn rejects_each_truncated_catalog(
-        #[values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)] count: usize,
+        #[values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)] count: usize,
     ) {
         let directory = tempfile::tempdir().unwrap();
         let results = extraction_results(170_000, true, &vec![serde_json::json!([]); count]);
@@ -409,7 +410,7 @@ mod test_write_catalogs {
     #[test]
     fn rejects_surplus_results_before_writing_metadata() {
         let directory = tempfile::tempdir().unwrap();
-        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 14]);
+        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 15]);
         assert_eq!(
             write_catalogs(
                 &results,
@@ -441,7 +442,7 @@ mod test_write_catalogs {
             )
             .is_err()
         );
-        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 13]);
+        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 14]);
         let error = write_catalogs(
             &results,
             &identity,
@@ -504,6 +505,13 @@ fn render_schema(lines: &mut std::str::SplitTerminator<'_, char>) -> Result<Stri
         &["definition", "options", "declarations"],
     )?;
     schema.push_str(&renderer.render("views", &views)?);
+    let mut access_methods = next_catalog(lines)?;
+    type_fields(
+        &mut access_methods,
+        &["name", "handler_schema", "handler_name"],
+        &["kind"],
+    )?;
+    schema.push_str(&renderer.render("access_methods", &access_methods)?);
     Ok(schema)
 }
 
@@ -521,6 +529,7 @@ mod test_render_schema {
                 {"schema":"a", "table":"t", "column":"only", "data_type":"integer", "not_null":true, "default_expr":"1"},
                 {"schema":"z", "table":"t", "column":"first", "data_type":"integer", "not_null":false, "default_expr":null}
             ]),
+            serde_json::json!([]),
             serde_json::json!([]),
             serde_json::json!([]),
         ]);
@@ -547,6 +556,7 @@ CREATE TABLE "z"."t" (
             serde_json::json!([]),
             serde_json::json!([{"schema":"s", "name":"f", "arguments":"x integer", "result":"text"}]),
             serde_json::json!([{"schema":"s", "view":"v", "definition":"SELECT '<&>'::text AS x;", "options":"WITH (security_barrier=true)", "declarations":"", "rules":[]}]),
+            serde_json::json!([{"name":"odd method","kind":"INDEX","handler_schema":"s","handler_name":"handle"}]),
             serde_json::json!({"remaining":true}),
         ]);
         let mut lines = output.split_terminator('\0');
@@ -558,6 +568,7 @@ CREATE TABLE "z"."t" (
 CREATE FUNCTION "s"."f"(x integer) RETURNS text LANGUAGE sql AS '';
 CREATE VIEW "s"."v" WITH (security_barrier=true) AS SELECT '<&>'::text AS x;
 
+CREATE ACCESS METHOD "odd method" TYPE INDEX HANDLER "s"."handle";
 "#
             )
         );

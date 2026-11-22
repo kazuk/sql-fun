@@ -21,6 +21,7 @@ mod common_type;
 pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
 mod constraint;
+mod create_access_method;
 mod create_base_type;
 pub use self::create_base_type::RejectedBaseType;
 mod create_comp_type;
@@ -111,6 +112,7 @@ pub use self::{
         DropKnowledgeGap,
     },
     column_rename::ColumnRename,
+    create_access_method::{AccessMethodDefinition, CreateAccessMethod},
     create_foreign_data_wrapper::{CreateForeignDataWrapper, FdwRoutineBinding, FdwRoutineOutcome},
     create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
     create_trigger::{
@@ -163,6 +165,7 @@ pub(crate) use self::{
     },
 };
 pub use crate::AstAndContextPair;
+pub use crate::ast::create_access_method::AccessMethodKind;
 pub(crate) use crate::stack::with_stack;
 use crate::{
     StringSpan,
@@ -340,6 +343,8 @@ pub enum SemAst {
     CreateOperator(Box<CreateOperator>),
     /// A resolved CREATE TRIGGER statement.
     CreateTrigger(Box<CreateTrigger>),
+    /// Analyzed PostgreSQL access-method declaration.
+    CreateAccessMethod(Box<CreateAccessMethod>),
     /// An analyzed PostgreSQL foreign-data wrapper declaration.
     CreateForeignDataWrapper(Box<CreateForeignDataWrapper>),
     /// Resolved DROP TRIGGER, including explicit IF EXISTS no-op outcomes.

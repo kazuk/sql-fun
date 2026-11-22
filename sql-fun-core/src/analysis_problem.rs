@@ -442,6 +442,9 @@ pub enum AnalysisProblem {
     /// Argument type mismatch
     ArgumentTypeMismatch(FullName, usize),
 
+    /// An access-method name already exists in the database catalog.
+    DuplicateAccessMethod(String),
+
     /// duplicate def elem key
     DuplicateDefElemKey(DefElemKey),
 
@@ -838,6 +841,7 @@ impl AnalysisProblem {
             Self::ExtensionNotFound(..) => "extension_not_found",
             Self::NullabilityUnknown(..) => "nullability_unknown",
             Self::ArgumentTypeMismatch(..) => "argument_type_mismatch",
+            Self::DuplicateAccessMethod(_) => "duplicate_access_method",
             Self::DuplicateDefElemKey(..) => "duplicate_def_elem_key",
             Self::ExplicitCastNotDefined(..) => "explicit_cast_not_defined",
             Self::CoalesceExprTypeUnknown(..) => "coalesce_expr_type_unknown",
@@ -1058,6 +1062,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::NullabilityUnknown(name) => {
                 format!("nullability could not be determined for {name}")
             }
+            Self::DuplicateAccessMethod(name) => format!("access method {name:?} already exists"),
             Self::DuplicateDefElemKey(key) => format!("duplicate definition option: {key}"),
             Self::ExplicitCastNotDefined(source, target) => {
                 format!("explicit cast from {source} to {target} is not defined")

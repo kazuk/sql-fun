@@ -192,8 +192,65 @@ mod application_tests {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TypeLength {
+    Fixed(i16),
+    Variable,
+    NullTerminated,
+}
+
+impl TypeLength {
+    fn from_option(option: &BaseTypeOption) -> Result<Self, InvalidDefinition> {
+        match option.value() {
+            Some(SyntaxValue::Expression(Expr::Literal(Literal::Integer(length)))) => {
+                Self::from_integer(*length)
+            }
+            _ if option.text()?.eq_ignore_ascii_case("variable") => Ok(Self::Variable),
+            _ => Err(invalid("invalid internal length")),
+        }
+    }
+
+    fn from_integer(length: i32) -> Result<Self, InvalidDefinition> {
+        match i16::try_from(length) {
+            Ok(-1) => Ok(Self::Variable),
+            Ok(-2) => Ok(Self::NullTerminated),
+            Ok(bytes) if bytes > 0 => Ok(Self::Fixed(bytes)),
+            _ => Err(invalid("invalid internal length")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod length_tests {
+    use crate::{
+        ast::StatementNode, sem::create_base_type::TypeLength,
+        test_helpers::ownership::ownership_statement,
+    };
+
+    #[rstest::rstest]
+    #[case("4", Some(TypeLength::Fixed(4)))]
+    #[case("VARIABLE", Some(TypeLength::Variable))]
+    #[case("-1", Some(TypeLength::Variable))]
+    #[case("-2", Some(TypeLength::NullTerminated))]
+    #[case("0", None)]
+    #[case("-3", None)]
+    fn decodes_postgres_length_option(
+        #[case] length: &str,
+        #[case] expected: Option<TypeLength>,
+    ) -> testresult::TestResult {
+        let statement =
+            ownership_statement(&format!("CREATE TYPE demo (INTERNALLENGTH = {length})"))?;
+        let StatementNode::CreateType(declaration) = statement else {
+            panic!("expected CREATE TYPE");
+        };
+        let option = &declaration.definition().expect("base definition")[0];
+        assert_eq!(TypeLength::from_option(option).ok(), expected);
+        Ok(())
+    }
+}
+
 struct TypeLayout {
-    length: i16,
+    length: TypeLength,
     alignment: i16,
     by_value: bool,
     plain_storage: bool,
@@ -202,7 +259,7 @@ struct TypeLayout {
 impl Default for TypeLayout {
     fn default() -> Self {
         Self {
-            length: -1,
+            length: TypeLength::Variable,
             alignment: 4,
             by_value: false,
             plain_storage: true,
@@ -212,24 +269,8 @@ impl Default for TypeLayout {
 
 impl TypeLayout {
     fn set_length(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
-        self.length = Self::parse_length(option)?;
+        self.length = TypeLength::from_option(option)?;
         Ok(())
-    }
-
-    fn parse_length(option: &BaseTypeOption) -> Result<i16, InvalidDefinition> {
-        match option.value() {
-            Some(SyntaxValue::Expression(Expr::Literal(Literal::Integer(length)))) => {
-                let length =
-                    i16::try_from(*length).map_err(|_| invalid("invalid internal length"))?;
-                if length > 0 || matches!(length, -1 | -2) {
-                    Ok(length)
-                } else {
-                    Err(invalid("invalid internal length"))
-                }
-            }
-            _ if option.text()?.eq_ignore_ascii_case("variable") => Ok(-1),
-            _ => Err(invalid("invalid internal length")),
-        }
     }
 
     fn set_alignment(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
@@ -279,17 +320,18 @@ impl TypeLayout {
 
     fn validate(&self) -> Result<(), InvalidDefinition> {
         if self.by_value {
-            if !matches!(self.length, 1 | 2 | 4 | 8) || self.length != self.alignment {
+            if !matches!(self.length, TypeLength::Fixed(bytes @ (1 | 2 | 4 | 8)) if bytes == self.alignment)
+            {
                 return Err(invalid(
                     "invalid length or alignment for a passed-by-value type",
                 ));
             }
-        } else if (self.length == -1 && self.alignment < 4)
-            || (self.length == -2 && self.alignment != 1)
+        } else if (self.length == TypeLength::Variable && self.alignment < 4)
+            || (self.length == TypeLength::NullTerminated && self.alignment != 1)
         {
             return Err(invalid("invalid alignment for a variable-length type"));
         }
-        if self.length != -1 && !self.plain_storage {
+        if self.length != TypeLength::Variable && !self.plain_storage {
             return Err(invalid("fixed-size types must have storage PLAIN"));
         }
         Ok(())
@@ -298,19 +340,19 @@ impl TypeLayout {
 
 #[cfg(test)]
 mod layout_tests {
-    use crate::sem::create_base_type::TypeLayout;
+    use crate::sem::create_base_type::{TypeLayout, TypeLength};
 
     #[rstest::rstest]
-    #[case(4, 4, true, true, true)]
-    #[case(4, 8, true, true, false)]
-    #[case(-1, 4, true, true, false)]
-    #[case(-1, 2, false, true, false)]
-    #[case(-2, 1, false, true, true)]
-    #[case(-2, 4, false, true, false)]
-    #[case(4, 4, false, false, false)]
-    #[case(-1, 8, false, false, true)]
+    #[case(TypeLength::Fixed(4), 4, true, true, true)]
+    #[case(TypeLength::Fixed(4), 8, true, true, false)]
+    #[case(TypeLength::Variable, 4, true, true, false)]
+    #[case(TypeLength::Variable, 2, false, true, false)]
+    #[case(TypeLength::NullTerminated, 1, false, true, true)]
+    #[case(TypeLength::NullTerminated, 4, false, true, false)]
+    #[case(TypeLength::Fixed(4), 4, false, false, false)]
+    #[case(TypeLength::Variable, 8, false, false, true)]
     fn validates_layout_combinations(
-        #[case] length: i16,
+        #[case] length: TypeLength,
         #[case] alignment: i16,
         #[case] by_value: bool,
         #[case] plain_storage: bool,

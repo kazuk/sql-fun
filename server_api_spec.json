@@ -789,6 +789,33 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A rejected PostgreSQL base type definition.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidBaseType": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "description": "Qualified name of the declaration.",
+                          "$ref": "#/$defs/FullName"
+                        },
+                        "reason": {
+                          "description": "Reason the declaration cannot be applied.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "reason"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InvalidBaseType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -6022,6 +6049,33 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A rejected PostgreSQL base type definition.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidBaseType": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "description": "Qualified name of the declaration.",
+                          "$ref": "#/$defs/FullName"
+                        },
+                        "reason": {
+                          "description": "Reason the declaration cannot be applied.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "reason"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InvalidBaseType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -11143,6 +11197,33 @@
                   },
                   "required": [
                     "ForeignDataWrapper"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A rejected PostgreSQL base type definition.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidBaseType": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "description": "Qualified name of the declaration.",
+                          "$ref": "#/$defs/FullName"
+                        },
+                        "reason": {
+                          "description": "Reason the declaration cannot be applied.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "reason"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InvalidBaseType"
                   ],
                   "additionalProperties": false
                 },

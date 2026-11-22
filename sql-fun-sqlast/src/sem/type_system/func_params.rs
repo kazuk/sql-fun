@@ -16,7 +16,7 @@ use crate::{
     names::{FullName, TableName},
     sem::{
         AnalysisError, ColumnCollection, ParseContext, ScalarAnalysisContext, SemScalarExpr,
-        TypeReference,
+        TypeDefinition, TypeReference,
         create_comp_type::CompositeFieldDefinition,
         traversal::SemanticVisitor,
         type_system::{
@@ -534,11 +534,22 @@ impl FunctionParam {
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
         let name = Some(ast.name().clone());
-        let type_name = FullName::from_ast_name(ast.type_name().name())?;
-        let array = !ast.type_name().array_bounds().is_empty();
-        let param_type = context
-            .resolve_declared_type_name(&type_name, !array)
-            .map(|name| TypeReference::concrete_type_ref(&name, array));
+        let type_name = ast.type_name();
+        let param_type = if type_name.percent_type() {
+            TypeReference::from_percent_type(type_name, context)?
+        } else {
+            let name = FullName::from_ast_name(type_name.name())?;
+            let array = !type_name.array_bounds().is_empty();
+            context
+                .resolve_declared_type_name(&name, !array)
+                .filter(|name| {
+                    !array
+                        || context
+                            .get_declared_type(name)
+                            .is_some_and(TypeDefinition::has_postgres_array_type)
+                })
+                .map(|name| TypeReference::concrete_type_ref(&name, array))
+        };
         let default = ast
             .default()
             .as_ref()

@@ -181,6 +181,7 @@
   - [call_argument_missing_required](diagnostics/call_argument_missing_required.md)
   - [call_argument_assigned_twice](diagnostics/call_argument_assigned_twice.md)
   - [function_overload_resolution_failed](diagnostics/function_overload_resolution_failed.md)
+  - [invalid_function_signature](diagnostics/invalid_function_signature.md)
   - [implicit_cast_not_found](diagnostics/implicit_cast_not_found.md)
   - [incompatible_case_values](diagnostics/incompatible_case_values.md)
   - [incompatible_engine_version](diagnostics/incompatible_engine_version.md)

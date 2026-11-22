@@ -31,6 +31,25 @@ implemented; unresolved polymorphic call signatures retain the limitations
 described at the function-call page. Missing result/parameter facts do not prove
 that every valid routine declaration is rejected or fully checked.
 
+### Implicit shell types
+
+For PostgreSQL schema and extension analysis, a `LANGUAGE C` or
+`LANGUAGE internal` function can introduce a missing return type as a shell.
+The shell is registered with the function. A qualified return name selects its
+schema. An unqualified name uses the current creation schema, even if the
+function is declared in another schema. An existing scalar shell is reused.
+The parameter types must already resolve when the function is declared.
+
+On PostgreSQL 15–18, this also applies to `SETOF` and unresolved array return
+declarations such as `RETURNS missing_type[]`. The array fallback registers a
+shell named `missing_type`, and the function's return type refers to that
+shell. An existing array type resolves normally. An existing shell with the
+same name in the creation schema conflicts with the array fallback.
+
+A later [CREATE TYPE](create-type.md) can complete the shell used by the
+type's input and output routines. Failed function declarations in this path
+leave existing catalog entries intact.
+
 ### Custom aggregates
 
 `CREATE AGGREGATE` is legal PostgreSQL syntax but is not converted into an
@@ -50,23 +69,23 @@ complete agreement between explicit return declarations and output-parameter
 result shapes. Lack of sql-fun body validation does not determine when
 PostgreSQL validates a language-specific body.
 
-Unknown parameter type references and missing scalar return types can remain
-unresolved in overload metadata without the required missing-type diagnostic
-([#566](https://github.com/kazuk/sql-fun/issues/566)). A missing set-returning
-result type instead terminates analysis as described below.
+Unknown parameter type references and some missing scalar return types can
+remain unresolved in overload metadata without the required missing-type
+diagnostic ([#566](https://github.com/kazuk/sql-fun/issues/566)). An unresolved
+set-returning result type rejects the declaration.
 A returned declaration is therefore not proof that all declared type references
 and explicit-versus-derived outputs were validated. The OUT/INOUT/TABLE and
 procedure metadata support described above remains distinct from these gaps.
 
 ## Diagnostics
 
+- [invalid_function_signature](../../diagnostics/invalid_function_signature.md)
+  reports a rejected routine signature during implicit shell analysis.
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): a routine
   signature conflicts with an existing routine identity or replacement kind.
 
 Defaults use shared expression diagnostics. A missing set-returning result type
-terminates analysis; it is not currently a
-successful declaration or an emitted function-lookup diagnostic. Declaration
-analysis is not a complete body validator.
+reports `invalid_function_signature` when the declaration cannot create a shell.
 
 ## ALTER FUNCTION PARALLEL
 

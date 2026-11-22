@@ -36,10 +36,9 @@ analysis because inherited layout validation is pending
 
 Generated array catalog names such as `_name` are not registered for
 user-defined base types ([#1209](https://github.com/kazuk/sql-fun/issues/1209)).
-Declare the shell explicitly before its functions. Implicit shell creation in
-C-language function declarations remains unsupported
-([#1210](https://github.com/kazuk/sql-fun/issues/1210)). Range type declarations
-remain unsupported.
+An input routine can also introduce the shell through
+[CREATE FUNCTION](create-function.md). The completed type keeps the identity
+used by the support functions. Range type declarations remain unsupported.
 
 PostgreSQL ALTER TYPE operations that alter composite types remain unimplemented
 and can terminate analysis

@@ -2,14 +2,15 @@ use crate::{
     TrieMap,
     ast::ObjectKind,
     context::{
-        FunctionInfoRead, FunctionInfoWrite, OwnershipInfoRead, ParseContext, ViewInfoRead,
+        FunctionInfoRead, FunctionInfoWrite, OwnershipInfoRead, ParseContext, TypeInfoWrite,
+        ViewInfoRead,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::FullName,
     sem::{
         AlterFunctionParallel, AnalysisError, AnalysisProblem, CreateFunction, DropFunction,
         FunctionOverloadCollection, FunctionTombstone, OverloadVariant, OwnershipIdentity,
-        ViewTombstone, problem::CreationProblem,
+        TypeDefinition, ViewTombstone, problem::CreationProblem,
     },
 };
 
@@ -300,6 +301,8 @@ impl FunctionInfoWrite for SchemaFileContext {
         mut self,
         name: &FullName,
         create_function: &CreateFunction,
+        shell: Option<&TypeDefinition>,
+        preserves_rows: bool,
     ) -> Result<Self, AnalysisError> {
         let existing = OwnershipInfoRead::routine_definitions(&self, name);
         let mut candidates = Vec::new();
@@ -328,6 +331,9 @@ impl FunctionInfoWrite for SchemaFileContext {
             }
             candidates.push(candidate);
         }
+        if let Some(shell) = shell {
+            self.insert_shell_or_base_type(shell.full_name().expect("named shell"), shell);
+        }
         for candidate in candidates {
             self.catalog
                 .function_tombstones
@@ -337,7 +343,7 @@ impl FunctionInfoWrite for SchemaFileContext {
         for member in new_members {
             self.record_extension_member(&member);
         }
-        Ok(self)
+        self.apply_function_view_rows(create_function, preserves_rows)
     }
 }
 

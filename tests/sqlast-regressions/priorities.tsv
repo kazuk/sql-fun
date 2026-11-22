@@ -7,8 +7,8 @@ heavy	bounded-parameter-inference-17
 heavy	bounded-parameter-inference-18
 heavy	parameter-bindings-17
 heavy	parameter-bindings-18
-heavy	truth-tests-17
-heavy	truth-tests-18
+heavy	privilege-statements-18
+heavy	project-roles-17
 medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
@@ -17,6 +17,7 @@ medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	case-common-types-17
 medium	case-common-types-18
+medium	casts-17
 medium	collate-17
 medium	collate-18
 medium	column-renames-17
@@ -29,7 +30,6 @@ medium	distinctness-17
 medium	distinctness-18
 medium	domain-operators-17
 medium	domain-operators-18
-medium	drop-function-18
 medium	extension-membership-18
 medium	membership-17
 medium	membership-18
@@ -40,14 +40,13 @@ medium	named-variadic-calls-18
 medium	operator-names-17
 medium	operator-names-18
 medium	output-names-17
+medium	output-names-18
 medium	patterns-17
 medium	patterns-18
 medium	pilot-17
 medium	pilot-18
 medium	postgres18-syntax-17-17
 medium	privilege-statements-17
-medium	privilege-statements-18
-medium	project-roles-17
 medium	project-roles-18
 medium	project-roles-empty-17
 medium	project-roles-empty-18
@@ -71,7 +70,6 @@ medium	schema-domains-variadic-17
 medium	schema-domains-variadic-18
 medium	schema-domains-variadic-precedence-17
 medium	schema-domains-variadic-precedence-18
-medium	schema-domains-variadic-precedence-reverse-17
 medium	schema-domains-variadic-precedence-reverse-18
 medium	schema-expressions-17
 medium	schema-expressions-18
@@ -100,6 +98,8 @@ medium	table-checks-17
 medium	table-checks-18
 medium	table-renames-17
 medium	table-renames-18
+medium	truth-tests-17
+medium	truth-tests-18
 light	alter-constraint-17
 light	alter-constraint-18
 light	alter-constraint-18-18
@@ -118,7 +118,6 @@ light	arrays-records-18
 light	bootstrap-array-expressions-18
 light	case_semantic-17
 light	case_semantic-18
-light	casts-17
 light	casts-18
 light	coalesce_semantic-17
 light	coalesce_semantic-18
@@ -127,6 +126,7 @@ light	deprecated-references-18
 light	domain-operators-default-17
 light	domain-operators-default-18
 light	drop-function-17
+light	drop-function-18
 light	drop-view-17
 light	drop-view-18
 light	extension-membership-17
@@ -140,7 +140,6 @@ light	minmax-diagnostics-17
 light	minmax-diagnostics-18
 light	output-function-params-17
 light	output-function-params-18
-light	output-names-18
 light	postgres18-dump-constraints-18
 light	postgres18-syntax-18-18
 light	project-roles-omitted-17
@@ -161,6 +160,7 @@ light	schema-domains-order-forward-17
 light	schema-domains-order-forward-18
 light	schema-domains-order-reverse-17
 light	schema-domains-order-reverse-18
+light	schema-domains-variadic-precedence-reverse-17
 light	schema-enums-17
 light	schema-enums-18
 light	schema-expressions-array-catalog-shape-17

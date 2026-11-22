@@ -1,7 +1,8 @@
 //! Analysis owned by the semantic definitions in this module.
 
+use crate::sem::create_function::FunctionDeclarationOutcome;
 use crate::{
-    AstAndContextPair,
+    AstAndContextPair, StringSpan,
     ast::{
         Dialect, TypeName,
         ddl::{Function as AstFunction, FunctionOption as AstFunctionOption},
@@ -11,7 +12,7 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, CreateFunction,
         FunctionOverloadCollection, FunctionParam, OverloadVariant, SemAst, TypeDefinition,
-        TypeReference,
+        TypeReference, problem::CreationProblem,
     },
 };
 
@@ -41,32 +42,14 @@ impl ShellPolicy {
     }
 }
 
-#[derive(Default)]
-struct FunctionDeclaration {
-    shell: Option<TypeDefinition>,
-    rejected: bool,
-}
-
-impl FunctionDeclaration {
-    fn apply<TContext: ParseContext>(
-        &self,
-        function: &CreateFunction,
-        context: TContext,
-        preserves_rows: bool,
-    ) -> Result<TContext, AnalysisError> {
-        if self.rejected {
-            return Ok(context);
-        }
-        context.apply_create_function(function, self.shell.as_ref(), preserves_rows)
-    }
-
+impl FunctionDeclarationOutcome {
     fn reject(
         &mut self,
         name: &FullName,
         reason: String,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        self.rejected = true;
+        *self = Self::Rejected(reason.clone());
         context.report_analysis_problem(AnalysisProblem::invalid_function_signature(name, reason))
     }
 }
@@ -76,20 +59,56 @@ impl CreateFunction {
         ast: &AstFunction,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        Self::analyze_declaration(ast, context, &mut FunctionDeclaration::default())
+        context.begin_parameter_type_analysis();
+        let result = Self::analyze_declaration(ast, context);
+        context.finish_analysis(result)
     }
 
     fn analyze_declaration(
         ast: &AstFunction,
         context: &mut impl ParseContext,
-        declaration: &mut FunctionDeclaration,
     ) -> Result<Self, AnalysisError> {
-        context.begin_parameter_type_analysis();
-        let result = Self::from_ast_inner(ast, context, declaration);
-        if declaration.shell.is_some() && context.analysis_state().has_errors() {
-            declaration.rejected = true;
+        let mut outcome = FunctionDeclarationOutcome::default();
+        let mut function =
+            Self::from_ast_inner(ast, context, &mut outcome)?.with_replace(ast.replace());
+        if outcome.shell().is_some() && context.analysis_state().has_errors() {
+            outcome = FunctionDeclarationOutcome::Rejected("invalid routine signature".to_owned());
         }
-        context.finish_analysis(result)
+        if matches!(outcome, FunctionDeclarationOutcome::Applicable(_))
+            && let Some(conflict) = function.declaration_conflict(context)
+        {
+            outcome = FunctionDeclarationOutcome::Rejected(
+                "routine signature conflicts with an existing declaration".to_owned(),
+            );
+            context.report_analysis_problem(conflict)?;
+        }
+        function.outcome = outcome;
+        Ok(function)
+    }
+
+    fn declaration_conflict(&self, context: &impl ParseContext) -> Option<AnalysisProblem> {
+        let mut name = self.name().clone();
+        if name.schema().is_none() {
+            name = name.set_schema(context.get_default_schema()?);
+        }
+        let existing = context.routine_definitions(&name);
+        let mut candidates = Vec::new();
+        for candidate in self.split_definitions() {
+            if let Some(previous) = candidate.previous_definition(&existing, &candidates)
+                && (!self.replace() || !candidate.can_replace(previous))
+            {
+                let span = context
+                    .get_source_path_with_span()
+                    .map_or(StringSpan::default(), |source| *source.span());
+                return Some(AnalysisProblem::creation(CreationProblem::routine(
+                    &name,
+                    &candidate.ownership_identity(&name),
+                    &span,
+                )));
+            }
+            candidates.push(candidate);
+        }
+        None
     }
 }
 
@@ -97,7 +116,7 @@ impl CreateFunction {
     fn from_ast_inner(
         ast: &AstFunction,
         context: &mut impl ParseContext,
-        declaration: &mut FunctionDeclaration,
+        declaration: &mut FunctionDeclarationOutcome,
     ) -> Result<Self, AnalysisError> {
         let name = FullName::from_ast_name(ast.name())?;
         if ast.procedure() || ast.result_type().is_none() {
@@ -148,7 +167,7 @@ impl CreateFunction {
         }
         let ret_type =
             Self::resolve_return_type(result_type, &name, shell_policy, declaration, context)?;
-        if declaration.shell.is_some()
+        if declaration.shell().is_some()
             && ast
                 .parameters()
                 .iter()
@@ -176,7 +195,7 @@ impl CreateFunction {
         result: &TypeName,
         function: &FullName,
         shell_policy: ShellPolicy,
-        declaration: &mut FunctionDeclaration,
+        declaration: &mut FunctionDeclarationOutcome,
         context: &mut impl ParseContext,
     ) -> Result<Option<TypeReference>, AnalysisError> {
         let array = !result.array_bounds().is_empty();
@@ -219,7 +238,7 @@ impl CreateFunction {
             }
             return Ok(definition.type_reference().cloned());
         }
-        if declaration.rejected {
+        if matches!(declaration, FunctionDeclarationOutcome::Rejected(_)) {
             return Ok(None);
         }
         if shell_policy != ShellPolicy::Create {
@@ -244,20 +263,23 @@ impl CreateFunction {
             return Ok(None);
         };
         if !context.permits_type_creation(&name)? {
-            declaration.rejected = true;
+            *declaration =
+                FunctionDeclarationOutcome::Rejected(format!("type {name} already exists"));
             return Ok(None);
         }
         // PostgreSQL 15–18 bind a missing array return to the nominal shell,
         // with the SETOF flag independent of the array spelling.
         let reference = TypeReference::concrete_type_ref(&name, false);
-        declaration.shell = Some(TypeDefinition::Shell(reference.clone()));
+        *declaration = FunctionDeclarationOutcome::Applicable(Some(Box::new(
+            TypeDefinition::Shell(reference.clone()),
+        )));
         Ok(Some(reference))
     }
 
     fn shell_creation_name(
         name: &FullName,
         function: &FullName,
-        declaration: &mut FunctionDeclaration,
+        declaration: &mut FunctionDeclarationOutcome,
         context: &mut impl ParseContext,
     ) -> Result<Option<FullName>, AnalysisError> {
         let schema_exists = |schema: &SchemaName| {
@@ -375,9 +397,7 @@ impl CreateFunction {
         ast: &AstFunction,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let mut declaration = FunctionDeclaration::default();
-        let mut function = Self::analyze_declaration(ast, &mut context, &mut declaration)?
-            .with_replace(ast.replace());
+        let mut function = Self::from_ast(ast, &mut context)?;
         function.source = context.get_source_path_with_span().cloned();
         let preserves_rows = ast
             .result_type()
@@ -387,7 +407,7 @@ impl CreateFunction {
                 .options()
                 .iter()
                 .any(|option| matches!(option, AstFunctionOption::Window));
-        let context = declaration.apply(&function, context, preserves_rows)?;
+        let context = context.apply_create_function(&function, preserves_rows)?;
         Ok(AstAndContextPair::new(
             SemAst::create_function(&function),
             context,
@@ -397,14 +417,13 @@ impl CreateFunction {
 
 #[cfg(test)]
 mod implicit_shell_tests {
-    use crate::sem::create_function::ddl::FunctionDeclaration;
     use crate::{
         ast::{ObjectKind, StatementNode},
         context::{
             BaseParseContext, ExtensionInfoRead, FunctionInfoRead, OwnershipInfoRead, ParseContext,
         },
         names::FullName,
-        sem::{CreateFunction, OwnershipIdentity, TypeReference},
+        sem::{CreateFunction, OwnershipIdentity, SemAst, TypeReference},
         test_helpers::ownership::{apply_ownership_sql, ownership_context, ownership_statement},
     };
 
@@ -493,6 +512,12 @@ mod implicit_shell_tests {
             context,
             &format!("CREATE FUNCTION {signature} RETURNS {result} LANGUAGE internal AS 'int4in'"),
         )?;
+        let SemAst::CreateFunction(statement) = rejected.ast() else {
+            panic!("expected analyzed function declaration");
+        };
+        assert!(!statement.is_applicable());
+        assert!(statement.rejection_reason().is_some());
+        assert!(statement.implicit_shell().is_none());
         let context = rejected.context();
         let function = FullName::with_schema("public", "f");
         assert_eq!(context.routine_definitions(&function).len(), 1);
@@ -530,10 +555,12 @@ mod implicit_shell_tests {
             panic!("expected function declaration");
         };
         context.begin_parameter_type_analysis();
-        let mut declaration = FunctionDeclaration::default();
-        let function = CreateFunction::from_ast_inner(&ast, &mut context, &mut declaration)?;
-        let mut context = declaration.apply(&function, context, false)?;
+        let function = CreateFunction::analyze_declaration(&ast, &mut context)?;
+        assert!(!function.is_applicable());
+        assert!(function.rejection_reason().is_some());
+        assert!(function.implicit_shell().is_none());
         assert_eq!(context.analysis_state_mut().take_problems().len(), 1);
+        let context = context.apply_create_function(&function, false)?;
         assert!(context.problems().is_empty());
         let function = FullName::with_schema("public", "f");
         let definitions = context.routine_definitions(&function);
@@ -544,6 +571,29 @@ mod implicit_shell_tests {
             context
                 .get_declared_type(&FullName::with_schema("public", "shell_type"))
                 .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn analysis_only_retains_rejected_sql_declaration() -> testresult::TestResult {
+        let StatementNode::Function(ast) =
+            ownership_statement("CREATE FUNCTION f() RETURNS missing LANGUAGE sql AS 'SELECT 1'")?
+        else {
+            panic!("expected function declaration");
+        };
+        let mut context = ownership_context();
+        let function = CreateFunction::from_ast(&ast, &mut context)?;
+        assert!(!function.is_applicable());
+        assert_eq!(
+            function.rejection_reason(),
+            Some("return type missing does not exist")
+        );
+        assert!(function.implicit_shell().is_none());
+        assert!(
+            context
+                .routine_definitions(&FullName::with_schema("public", "f"))
+                .is_empty()
         );
         Ok(())
     }

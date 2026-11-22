@@ -1200,7 +1200,7 @@ impl TypeReference {
 impl TypeReference {
     pub(crate) fn from_percent_type(
         result: &TypeName,
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
     ) -> Result<Option<Self>, AnalysisError> {
         let Some((column, relation)) = result.name().parts().split_last() else {
             return Ok(None);

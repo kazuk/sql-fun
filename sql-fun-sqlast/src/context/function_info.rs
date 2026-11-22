@@ -3,7 +3,6 @@ use crate::{
     sem::{
         AlterFunctionParallel, AnalysisError, CreateFunction, DropFunction,
         FunctionOverloadCollection, FunctionTombstone, OverloadVariant, OwnershipIdentity,
-        TypeDefinition,
     },
 };
 
@@ -77,7 +76,6 @@ where
         self,
         name: &FullName,
         create_function: &CreateFunction,
-        shell: Option<&TypeDefinition>,
         preserves_rows: bool,
     ) -> Result<Self, AnalysisError>;
 }

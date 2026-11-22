@@ -48,6 +48,9 @@ impl SemAst {
             AstStatementNode::CreateOperator(ast) => Ok(Self::CreateOperator(Box::new(
                 CreateOperator::analyze(ast, context)?,
             ))),
+            AstStatementNode::CreateAccessMethod(_) => {
+                todo!("CREATE ACCESS METHOD semantic analysis (#1223)")
+            }
             AstStatementNode::CreateOperatorClass(_) => {
                 todo!("CREATE OPERATOR CLASS semantic analysis (#1220)")
             }
@@ -296,6 +299,7 @@ impl SemAst {
     /// CREATE TRIGGER analysis is not implemented yet (#602 / #555).
     /// ALTER DEFAULT PRIVILEGES and CREATE FOREIGN TABLE interpretation remains
     /// unimplemented (#955 / #956), after syntax-version checks succeed.
+    /// CREATE ACCESS METHOD analysis is unimplemented (#1223).
     /// CREATE OPERATOR CLASS analysis is unimplemented (#1220).
     ///
     /// # Errors

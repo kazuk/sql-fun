@@ -13,6 +13,7 @@ use crate::{
         TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
+        create_access_method::CreateAccessMethod,
         create_operator_class::CreateOperatorClass,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
@@ -826,6 +827,11 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 &variable_set,
                 tokens,
             )?));
+        }
+        if let Some(method) = value.as_create_am_stmt().as_inner() {
+            return Ok(Self::create_access_method(
+                CreateAccessMethod::try_from_with_tokens(&method, tokens)?,
+            ));
         }
         if let Some(class) = value.as_create_op_class_stmt().as_inner() {
             let class = CreateOperatorClass::try_from_with_tokens(&class, tokens)?;

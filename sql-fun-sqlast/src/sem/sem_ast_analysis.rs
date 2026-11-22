@@ -50,6 +50,12 @@ impl SemAst {
             ))),
             AstStatementNode::CreateAccessMethod(ast) => CreateAccessMethod::analyze(ast, context)
                 .map(|statement| Self::CreateAccessMethod(Box::new(statement))),
+            AstStatementNode::CreateOperatorFamily(_) => {
+                todo!("CREATE OPERATOR FAMILY semantic analysis")
+            }
+            AstStatementNode::AlterOperatorFamily(_) => {
+                todo!("ALTER OPERATOR FAMILY semantic analysis")
+            }
             AstStatementNode::CreateOperatorClass(ast) => CreateOperatorClass::analyze(ast, context)
                 .map(|statement| Self::CreateOperatorClass(Box::new(statement))),
             AstStatementNode::CreateType(ast) => ast.analyze(context),

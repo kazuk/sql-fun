@@ -17,6 +17,7 @@ use crate::{
         create_operator_class::CreateOperatorClass,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
+        operator_family::{AlterOperatorFamily, CreateOperatorFamily},
     },
     error::AnalysisError,
     stack::with_stack,
@@ -831,6 +832,16 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(method) = value.as_create_am_stmt().as_inner() {
             return Ok(Self::create_access_method(
                 CreateAccessMethod::try_from_with_tokens(&method, tokens)?,
+            ));
+        }
+        if let Some(family) = value.as_create_op_family_stmt().as_inner() {
+            return Ok(Self::create_operator_family(
+                CreateOperatorFamily::try_from(&family)?,
+            ));
+        }
+        if let Some(family) = value.as_alter_op_family_stmt().as_inner() {
+            return Ok(Self::alter_operator_family(
+                AlterOperatorFamily::try_from_with_tokens(&family, tokens)?,
             ));
         }
         if let Some(class) = value.as_create_op_class_stmt().as_inner() {

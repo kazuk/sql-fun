@@ -246,6 +246,14 @@ mod test_qualified_collation {
 }
 
 impl ConflictMasters {
+    pub(super) fn operator_class_for_family_type(
+        &self,
+        key: &crate::sem::OperatorFamilyKey,
+        typ: &crate::sem::TypeReference,
+    ) -> Option<&OperatorClassDefinition> {
+        self.operator_classes.iter().find(|class| class.belongs_to(key) && class.has_input(typ))
+    }
+
     pub(super) fn has_default_operator_class(&self, method: &str, typ: &crate::sem::TypeReference) -> bool {
         self.operator_classes.iter().any(|class| {
             class.default() && class.access_method() == method && class.has_input(typ)

@@ -108,6 +108,7 @@ pub(crate) enum MemberObject {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum MemberOwner {
     Builtin,
+    Family,
     Loose,
     Class(FullName),
 }

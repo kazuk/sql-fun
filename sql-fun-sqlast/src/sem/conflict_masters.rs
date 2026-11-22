@@ -266,6 +266,10 @@ impl OperatorClassDefinition {
         }
     }
 
+    pub(crate) fn belongs_to(&self, key: &crate::sem::OperatorFamilyKey) -> bool {
+        self.family.access_method() == key.method && self.family.qualified_name() == key.name
+    }
+
     pub(crate) fn has_input(&self, typ: &crate::sem::TypeReference) -> bool {
         match &self.declared_input {
             Some(input) => input == typ,

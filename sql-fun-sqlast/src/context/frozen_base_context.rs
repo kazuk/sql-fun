@@ -509,6 +509,14 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::OperatorFamilyInfoRead for $context {
+            fn operator_class_for_family_type(
+                &self,
+                key: &crate::sem::OperatorFamilyKey,
+                typ: &crate::sem::TypeReference,
+            ) -> Option<&crate::sem::OperatorClassDefinition> {
+                self.$catalog().operator_class_for_family_type(key, typ)
+            }
+
             fn has_default_operator_class(&self, method: &str, typ: &crate::sem::TypeReference) -> bool {
                 self.$catalog().has_default_operator_class(method, typ)
             }

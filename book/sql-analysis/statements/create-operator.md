@@ -33,11 +33,10 @@ builtin estimators such as `contsel` and `contjoinsel`. A declaration that
 calls for one of these missing estimators is rejected, including the first
 operator declaration in the bundled `pg_trgm` installation script. Follow
 [issue #1217](https://github.com/kazuk/sql-fun/issues/1217) for estimator
-metadata. The full script also reaches a separate parsing limitation at
-`CREATE OPERATOR CLASS gist_trgm_ops`. Follow
-[issue #1203](https://github.com/kazuk/sql-fun/issues/1203) for that statement
-and [issue #1150](https://github.com/kazuk/sql-fun/issues/1150) for full
-extension initialization.
+metadata. The full script also contains a
+[CREATE OPERATOR CLASS](create-operator-class.md) declaration for
+`gist_trgm_ops`. Follow [issue #1150](https://github.com/kazuk/sql-fun/issues/1150)
+for full extension initialization.
 
 For a token defined in multiple schemas, qualify the operator with
 `OPERATOR(schema.token)` to select its schema explicitly. Unqualified lookup

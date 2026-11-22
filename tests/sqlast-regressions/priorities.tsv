@@ -5,10 +5,10 @@ heavy	between-symmetric-17
 heavy	between-symmetric-18
 heavy	bounded-parameter-inference-17
 heavy	bounded-parameter-inference-18
-heavy	case-common-types-18
 heavy	parameter-bindings-17
 heavy	parameter-bindings-18
-heavy	project-roles-17
+heavy	privilege-statements-17
+heavy	privilege-statements-18
 medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
@@ -16,6 +16,7 @@ medium	arrays-consumers-18
 medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	case-common-types-17
+medium	case-common-types-18
 medium	collate-17
 medium	collate-18
 medium	column-renames-17
@@ -44,8 +45,7 @@ medium	patterns-18
 medium	pilot-17
 medium	pilot-18
 medium	postgres18-syntax-17-17
-medium	privilege-statements-17
-medium	privilege-statements-18
+medium	project-roles-17
 medium	project-roles-18
 medium	project-roles-empty-17
 medium	project-roles-empty-18

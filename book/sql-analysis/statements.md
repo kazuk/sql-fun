@@ -18,7 +18,8 @@ SQL parser can be analyzed or executed.
 - Types, routines, and operators: [CREATE TYPE](statements/create-type.md),
   [CREATE DOMAIN](statements/create-domain.md), and
   [CREATE FUNCTION](statements/create-function.md),
-  [CREATE OPERATOR](statements/create-operator.md), and
+  [CREATE OPERATOR](statements/create-operator.md),
+  [CREATE OPERATOR CLASS](statements/create-operator-class.md), and
   [ALTER FUNCTION PARALLEL](statements/create-function.md#alter-function-parallel).
 - Other schema statements: [sequences](statements/sequences.md),
   [CREATE SCHEMA](statements/create-schema.md),

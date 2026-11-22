@@ -10,6 +10,7 @@
 
 pub(crate) mod client_type;
 pub(crate) mod create_operator;
+mod create_operator_class;
 mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;
@@ -298,6 +299,7 @@ pub(crate) enum StatementNode {
     VariableSet(VariableSet),
     EnumType(EnumType),
     CreateOperator(CreateOperator),
+    CreateOperatorClass(Box<create_operator_class::CreateOperatorClass>),
     CreateType(CreateType),
     Sequence(Sequence),
     DropTable(DropTable),

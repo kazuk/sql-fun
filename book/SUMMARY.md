@@ -34,6 +34,7 @@
     - [CREATE DOMAIN](./sql-analysis/statements/create-domain.md)
     - [CREATE FUNCTION](./sql-analysis/statements/create-function.md)
     - [CREATE OPERATOR](./sql-analysis/statements/create-operator.md)
+    - [CREATE OPERATOR CLASS](./sql-analysis/statements/create-operator-class.md)
     - [CREATE SEQUENCE / ALTER SEQUENCE](./sql-analysis/statements/sequences.md)
     - [CREATE SCHEMA](./sql-analysis/statements/create-schema.md)
     - [ALTER ... OWNER TO](./sql-analysis/statements/alter-owner.md)

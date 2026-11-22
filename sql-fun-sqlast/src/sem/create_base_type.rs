@@ -58,16 +58,19 @@ pub struct RejectedBaseType {
 
 impl RejectedBaseType {
     /// The qualified name targeted by the rejected declaration.
+    #[must_use]
     pub const fn name(&self) -> &FullName {
         &self.name
     }
 
     /// Whether the declaration attempted to complete a shell.
+    #[must_use]
     pub const fn is_completion(&self) -> bool {
         self.completion
     }
 
     /// The reason the declaration could not be applied.
+    #[must_use]
     pub fn reason(&self) -> &str {
         &self.reason
     }

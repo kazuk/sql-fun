@@ -6,7 +6,7 @@ use crate::{
     names::FullName,
     sem::{
         AnalysisError, OperatorClassDefinition, OperatorFamily, OperatorFamilyKey, TypeReference,
-        operator_family::{creation_name, member::resolve_family_member, report_family_problem, require_index_method},
+        operator_family::{creation_name, member::resolve_family_member, MemberOwner, report_family_problem, require_index_method},
     },
 };
 
@@ -112,7 +112,7 @@ impl CreateOperatorClass {
                 storage = Some(typ);
                 continue;
             }
-            let Some((slot, member)) = resolve_family_member(member, method, Some(input), Some(name), context)? else {
+            let Some((slot, member)) = resolve_family_member(member, method, Some(input), MemberOwner::Class(name.clone()), context)? else {
                 return Ok(None);
             };
             if let Err(message) = family.insert(slot, member) {

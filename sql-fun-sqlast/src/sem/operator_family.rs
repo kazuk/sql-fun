@@ -152,3 +152,43 @@ pub(crate) fn creation_name(
     }
     Ok(None)
 }
+
+/// An analyzed standalone operator family declaration.
+#[derive(Clone, Debug)]
+pub struct CreateOperatorFamily {
+    definition: Option<OperatorFamily>,
+}
+
+impl CreateOperatorFamily {
+    /// Definition supplied by an applicable declaration.
+    pub const fn definition(&self) -> Option<&OperatorFamily> {
+        self.definition.as_ref()
+    }
+
+    pub(crate) fn analyze(
+        syntax: &crate::ast::operator_family::CreateOperatorFamily,
+        context: &mut impl ParseContext,
+    ) -> Result<Self, AnalysisError> {
+        let method = syntax.access_method();
+        if !require_index_method(method, context)? {
+            return Ok(Self { definition: None });
+        }
+        let Some(name) = creation_name(syntax.name(), context)? else {
+            return Ok(Self { definition: None });
+        };
+        let key = OperatorFamilyKey::new(name, method);
+        if context.operator_family(&key).is_some() {
+            report_family_problem(context, format!("operator family {} already exists for access method {method:?}", key.name))?;
+            return Ok(Self { definition: None });
+        }
+        Ok(Self { definition: Some(OperatorFamily::new(key)) })
+    }
+
+    pub(crate) fn apply<C: ParseContext>(&self, context: C) -> C {
+        if let Some(definition) = self.definition() {
+            context.publish_operator_family(definition)
+        } else {
+            context
+        }
+    }
+}

@@ -30,6 +30,10 @@ WITH selected_schemas AS (
   FROM pg_catalog.pg_depend d
   JOIN class_keys c ON c.oid = d.refobjid
   WHERE d.refclassid = 'pg_catalog.pg_opclass'::regclass AND d.deptype = 'i'
+), family_dependencies AS (
+  SELECT d.classid, d.objid, d.refobjid
+  FROM pg_catalog.pg_depend d
+  WHERE d.refclassid = 'pg_catalog.pg_opfamily'::regclass AND d.deptype = 'i'
 ), operator_members AS (
   SELECT m.amopfamily AS family, json_agg(json_build_object(
     'number', m.amopstrategy,
@@ -38,7 +42,9 @@ WITH selected_schemas AS (
     'order_family', CASE WHEN sort.oid IS NULL THEN NULL ELSE
       json_build_object('schema', sort.schema, 'name', sort.name, 'access_method', sort.access_method) END,
     'owner', own.identity, 'builtin', m.oid < 16384
-  ) ORDER BY m.amopstrategy, lt.identity::text COLLATE "C", rt.identity::text COLLATE "C") AS members
+  )::jsonb || CASE WHEN hard.objid IS NULL THEN '{}'::jsonb
+    ELSE '{"family_owned":true}'::jsonb END
+  ORDER BY m.amopstrategy, lt.identity::text COLLATE "C", rt.identity::text COLLATE "C") AS members
   FROM pg_catalog.pg_amop m
   JOIN family_keys f ON f.oid = m.amopfamily
   JOIN type_keys lt ON lt.oid = m.amoplefttype
@@ -47,6 +53,8 @@ WITH selected_schemas AS (
   JOIN pg_catalog.pg_namespace n ON n.oid = o.oprnamespace
   LEFT JOIN family_keys sort ON sort.oid = m.amopsortfamily
   LEFT JOIN owner_dependencies own ON own.classid = 'pg_catalog.pg_amop'::regclass AND own.objid = m.oid
+  LEFT JOIN family_dependencies hard
+    ON hard.classid = 'pg_catalog.pg_amop'::regclass AND hard.objid = m.oid AND hard.refobjid = f.oid
   WHERE m.oid < 16384 OR own.selected OR
     (own.identity IS NULL AND f.schema::text IN (SELECT name FROM selected_schemas))
   GROUP BY m.amopfamily
@@ -61,7 +69,9 @@ WITH selected_schemas AS (
       JOIN type_keys arg_type ON arg_type.oid = arg.type_oid
     ), '[]'::json),
     'owner', own.identity, 'builtin', m.oid < 16384
-  ) ORDER BY m.amprocnum, lt.identity::text COLLATE "C", rt.identity::text COLLATE "C") AS members
+  )::jsonb || CASE WHEN hard.objid IS NULL THEN '{}'::jsonb
+    ELSE '{"family_owned":true}'::jsonb END
+  ORDER BY m.amprocnum, lt.identity::text COLLATE "C", rt.identity::text COLLATE "C") AS members
   FROM pg_catalog.pg_amproc m
   JOIN family_keys f ON f.oid = m.amprocfamily
   JOIN type_keys lt ON lt.oid = m.amproclefttype
@@ -69,6 +79,8 @@ WITH selected_schemas AS (
   JOIN pg_catalog.pg_proc p ON p.oid = m.amproc
   JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
   LEFT JOIN owner_dependencies own ON own.classid = 'pg_catalog.pg_amproc'::regclass AND own.objid = m.oid
+  LEFT JOIN family_dependencies hard
+    ON hard.classid = 'pg_catalog.pg_amproc'::regclass AND hard.objid = m.oid AND hard.refobjid = f.oid
   WHERE m.oid < 16384 OR own.selected OR
     (own.identity IS NULL AND f.schema::text IN (SELECT name FROM selected_schemas))
   GROUP BY m.amprocfamily

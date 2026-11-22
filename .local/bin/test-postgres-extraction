@@ -626,6 +626,9 @@ CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE "other masters"."Type 雪"
  FUNCTION 1 btint4cmp(integer,integer);
 CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE integer USING hash AS
  OPERATOR 1 = (integer,integer), FUNCTION 1 hashint4(integer);
+CREATE OPERATOR FAMILY {quoted}.hard_support USING gist;
+ALTER OPERATOR FAMILY {quoted}.hard_support USING gist
+ ADD FUNCTION 2 (box,box) gist_box_union(internal,internal);
 CREATE COLLATION {quoted}."Name 雪" FROM pg_catalog."C";
 CREATE COLLATION "other masters"."Name 雪" FROM pg_catalog."C";
 CREATE COLLATION {quoted}."Encoding" (provider=libc, locale='C');
@@ -670,6 +673,8 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert all(m["owner"] == class_identity and not m["builtin"] for m in family["operators"])
     assert len(family["functions"]) == 1
     assert family["functions"][0]["owner"] == class_identity
+    hard = next(f for f in families if f["schema"] == schema and f["name"] == "hard_support")
+    assert hard["functions"][0]["family_owned"] and hard["functions"][0]["owner"] is None
     assert any(c["schema"] == extension_schema for c in classes), "installed extension masters lost"
     assert not any(c["schema"] == other for c in classes), "references must not broaden selection"
     repeated = destination / f"{major}-selected-repeat"

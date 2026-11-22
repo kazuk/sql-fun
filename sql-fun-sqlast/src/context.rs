@@ -73,8 +73,7 @@ use crate::{
         CreateTable, CursorInfo, ExtensionMembershipChange, InputTypeConstraint, Kind,
         ObjectPrivilegeChange, OwnedObjectDefinition, ParameterConstraints, Role,
         RoleMembershipDeclaration, SamplingMethodLookup, SelectStatement, SemScalarExpr,
-        TypeDefinition, VariableSet, parameter_resolution::ParameterResolution,
-        problem::CreationProblem,
+        VariableSet, parameter_resolution::ParameterResolution, problem::CreationProblem,
     },
 };
 
@@ -539,11 +538,13 @@ where
     fn apply_create_function(
         self,
         create_function: &CreateFunction,
-        shell: Option<&TypeDefinition>,
         preserves_rows: bool,
     ) -> Result<Self, AnalysisError> {
+        if !create_function.is_applicable() {
+            return Ok(self);
+        }
         let name = self.apply_default_schema(create_function.name())?;
-        self.apply_create_function_impl(&name, create_function, shell, preserves_rows)
+        self.apply_create_function_impl(&name, create_function, preserves_rows)
     }
 
     /// apply `set` statement to current schema

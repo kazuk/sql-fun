@@ -8,9 +8,9 @@ use crate::{
     },
     names::FullName,
     sem::{
-        AlterFunctionParallel, AnalysisError, AnalysisProblem, CreateFunction, DropFunction,
+        AlterFunctionParallel, AnalysisError, CreateFunction, DropFunction,
         FunctionOverloadCollection, FunctionTombstone, OverloadVariant, OwnershipIdentity,
-        TypeDefinition, ViewTombstone, problem::CreationProblem,
+        ViewTombstone,
     },
 };
 
@@ -301,7 +301,6 @@ impl FunctionInfoWrite for SchemaFileContext {
         mut self,
         name: &FullName,
         create_function: &CreateFunction,
-        shell: Option<&TypeDefinition>,
         preserves_rows: bool,
     ) -> Result<Self, AnalysisError> {
         let existing = OwnershipInfoRead::routine_definitions(&self, name);
@@ -311,16 +310,6 @@ impl FunctionInfoWrite for SchemaFileContext {
             let previous = candidate.previous_definition(&existing, &candidates);
             let is_new = previous.is_none();
             if let Some(previous) = previous {
-                if !create_function.replace() || !candidate.can_replace(previous) {
-                    self.report_analysis_problem(AnalysisProblem::creation(
-                        CreationProblem::routine(
-                            name,
-                            &candidate.ownership_identity(name),
-                            &self.creation_span(),
-                        ),
-                    ))?;
-                    return Ok(self);
-                }
                 candidate.retain_privilege_declarations(previous);
                 if let Some(owner) = previous.owner() {
                     candidate.change_owner(owner);
@@ -331,7 +320,7 @@ impl FunctionInfoWrite for SchemaFileContext {
             }
             candidates.push(candidate);
         }
-        if let Some(shell) = shell {
+        if let Some(shell) = create_function.implicit_shell() {
             self.insert_shell_or_base_type(shell.full_name().expect("named shell"), shell);
         }
         for candidate in candidates {

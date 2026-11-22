@@ -629,7 +629,6 @@ impl FunctionInfoWrite for TestParseContext {
         self,
         _name: &FullName,
         _create_function: &CreateFunction,
-        _shell: Option<&TypeDefinition>,
         _preserves_rows: bool,
     ) -> Result<Self, AnalysisError> {
         todo!()

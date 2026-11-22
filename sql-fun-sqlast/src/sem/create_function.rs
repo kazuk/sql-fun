@@ -6,7 +6,8 @@ use crate::{
     sem::{
         AlterFunctionParallel, ColumnCollection, FunctionOverloadCollection,
         ObjectPrivilegeDeclaration, OverloadVariant, OwnerSpecification, OwnershipIdentity,
-        ParallelSafety, ParseContext, SourcePathWithSpan, type_system::ArgumentBindingCollection,
+        ParallelSafety, ParseContext, SourcePathWithSpan, TypeDefinition,
+        type_system::ArgumentBindingCollection,
     },
 };
 
@@ -14,6 +15,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
     replace: bool,
+    outcome: FunctionDeclarationOutcome,
     parallel_safety: Option<ParallelSafety>,
     parallel_changes: Vec<AlterFunctionParallel>,
     source: Option<SourcePathWithSpan>,
@@ -25,6 +27,47 @@ pub struct CreateFunction {
     returning_columdef: Option<ColumnCollection>,
     builtin_properties: Option<(bool, bool)>,
     privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
+}
+
+#[derive(Debug, Clone)]
+enum FunctionDeclarationOutcome {
+    Applicable(Option<Box<TypeDefinition>>),
+    Rejected(String),
+}
+
+impl Default for FunctionDeclarationOutcome {
+    fn default() -> Self {
+        Self::Applicable(None)
+    }
+}
+
+impl CreateFunction {
+    /// Whether analysis accepted the declaration for catalog application.
+    pub const fn is_applicable(&self) -> bool {
+        matches!(self.outcome, FunctionDeclarationOutcome::Applicable(_))
+    }
+
+    /// Why the declaration was rejected, independent of diagnostic delivery.
+    pub fn rejection_reason(&self) -> Option<&str> {
+        match &self.outcome {
+            FunctionDeclarationOutcome::Applicable(_) => None,
+            FunctionDeclarationOutcome::Rejected(reason) => Some(reason),
+        }
+    }
+
+    /// The implicit shell to register together with this declaration, if any.
+    pub fn implicit_shell(&self) -> Option<&TypeDefinition> {
+        self.outcome.shell()
+    }
+}
+
+impl FunctionDeclarationOutcome {
+    fn shell(&self) -> Option<&TypeDefinition> {
+        match self {
+            Self::Applicable(shell) => shell.as_deref(),
+            Self::Rejected(_) => None,
+        }
+    }
 }
 
 impl CreateFunction {
@@ -107,6 +150,7 @@ impl CreateFunction {
     ) -> Self {
         Self {
             replace: false,
+            outcome: FunctionDeclarationOutcome::default(),
             parallel_safety: None,
             parallel_changes: Vec::new(),
             source: None,

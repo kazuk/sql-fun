@@ -139,14 +139,14 @@ validation, diagnostics and DDL application decisions.
 
 This scope is unconditional in ordinary `extract catalog` and does not depend
 on `--definition-schema`, add another option, or add initialization prompts.
-That existing option continues to select only collation/operator-class masters.
+That option selects additional collations, operator classes, and operator families.
 
 ## Additive master definitions
 
 Format 1 additionally produces `collations.json`, `operator_classes.json`, and
 `operator_families.json`.
 Existing payloads and metadata representations are unchanged. The production
-semantic loader now requires both masters for PostgreSQL catalog
+semantic loader requires all three masters for PostgreSQL catalog
 initialization, and installed-generation validation checks their presence and
 JSON structure. The semantic loader validates composite identities, encoding,
 default-collation provenance, and class/family method consistency before exposing

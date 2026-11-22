@@ -294,9 +294,8 @@ fn exact_support_function(
         RequestedIdentity::new(&OwnershipIdentity::named(ObjectKind::FUNCTION, &name), &[]);
     match requested.resolve_routine(context) {
         OwnershipLookup::Resolved(identity) => {
-            if let Some(function) = identity
-                .arguments()
-                .and_then(|arguments| context.find_exact_function(identity.name(), arguments))
+            if let Some(arguments) = identity.arguments()
+                && let Some(function) = context.find_exact_function(identity.name(), arguments)
             {
                 return Ok(Some(function));
             }
@@ -380,17 +379,13 @@ pub(crate) fn validate_slot_number(
 }
 
 fn postgres18(context: &impl ParseContext) -> bool {
-    context
-        .get_args()
-        .postgres_version(context.metadata())
-        .ok()
-        .and_then(|configured| {
-            configured
-                .to_string()
-                .parse::<::sql_fun_core::PostgresVersion>()
-                .ok()
-        })
-        .is_some_and(|version| version.major() >= 18)
+    let Ok(configured) = context.get_args().postgres_version(context.metadata()) else {
+        return false;
+    };
+    configured
+        .to_string()
+        .parse::<::sql_fun_core::PostgresVersion>()
+        .is_ok_and(|version| version.major() >= 18)
 }
 
 fn validate_support_signature(

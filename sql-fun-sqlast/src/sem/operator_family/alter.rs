@@ -50,9 +50,10 @@ impl AlterOperatorFamily {
         if !require_index_method(method, context)? {
             return Ok(statement);
         }
-        let family = OperatorFamilyKey::resolve(syntax.name(), method, context)?
-            .and_then(|key| context.operator_family(&key))
-            .cloned();
+        let family = match OperatorFamilyKey::resolve(syntax.name(), method, context)? {
+            Some(key) => context.operator_family(&key).cloned(),
+            None => None,
+        };
         let Some(mut family) = family else {
             report_family_problem(
                 context,

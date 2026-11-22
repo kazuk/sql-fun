@@ -24,7 +24,7 @@ pub struct OperatorIdentity {
 }
 
 impl OperatorIdentity {
-    pub(crate) fn binary_signature(
+    pub(crate) const fn binary_signature(
         name: OperatorName,
         left: TypeReference,
         right: TypeReference,

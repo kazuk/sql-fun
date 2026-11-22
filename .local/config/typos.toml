@@ -11,6 +11,7 @@ locale = "en"
 
 [default.extend-words]
 inh="inh"
+brin="brin"
 larg="larg"
 deferred="deferred"
 

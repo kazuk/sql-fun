@@ -483,6 +483,11 @@ impl DiagnosticContext for TestParseContext {
 impl<Constraints> crate::context::OperatorFamilyInfoRead for TestContext<Constraints> {}
 
 impl crate::context::OperatorFamilyInfoWrite for TestParseContext {
+    fn publish_operator_class(self, _class: &crate::sem::OperatorClassDefinition, _family: &crate::sem::OperatorFamily) -> Self {
+        self
+    }
+
+
     fn publish_operator_family(self, _family: &crate::sem::OperatorFamily) -> Self {
         self
     }

@@ -47,6 +47,23 @@ pub struct CatalogTypeIdentity {
 }
 
 impl CatalogTypeIdentity {
+    fn from_reference(reference: &crate::sem::TypeReference) -> Self {
+        let name = reference.full_name().expect("resolved declaration type has a name");
+        let schema = name.schema().expect("resolved declaration type has a schema").as_str().to_owned();
+        let local = name.name().as_str();
+        let name = if reference.is_array() == Some(true) { format!("_{local}") } else { local.to_owned() };
+        Self { schema, name }
+    }
+
+    pub(crate) fn type_reference(&self) -> crate::sem::TypeReference {
+        use crate::sem::TypeReference;
+        if self.schema == "pg_catalog" {
+            TypeReference::from_master_type_name(&self.name)
+        } else {
+            TypeReference::concrete_type_ref(&self.qualified_name(), false)
+        }
+    }
+
     /// Retained `schema` catalog property.
     pub fn schema(&self) -> &str {
         &self.schema
@@ -221,9 +238,41 @@ pub struct OperatorClassDefinition {
     input_type: CatalogTypeIdentity,
     default: bool,
     key_type: Option<CatalogTypeIdentity>,
+    #[serde(skip)]
+    declared_input: Option<crate::sem::TypeReference>,
 }
 
 impl OperatorClassDefinition {
+    pub(crate) fn from_declaration(
+        name: &FullName,
+        family: &crate::sem::OperatorFamilyKey,
+        input: &crate::sem::TypeReference,
+        default: bool,
+        storage: Option<&crate::sem::TypeReference>,
+    ) -> Self {
+        Self {
+            schema: name.schema().expect("class is qualified").as_str().to_owned(),
+            name: name.name().as_str().to_owned(),
+            access_method: family.method.clone(),
+            family: OperatorFamilyIdentity {
+                schema: family.name.schema().expect("family is qualified").as_str().to_owned(),
+                name: family.name.name().as_str().to_owned(),
+                access_method: family.method.clone(),
+            },
+            input_type: CatalogTypeIdentity::from_reference(input),
+            default,
+            key_type: storage.map(CatalogTypeIdentity::from_reference),
+            declared_input: Some(input.clone()),
+        }
+    }
+
+    pub(crate) fn has_input(&self, typ: &crate::sem::TypeReference) -> bool {
+        match &self.declared_input {
+            Some(input) => input == typ,
+            None => self.input_type.type_reference() == *typ,
+        }
+    }
+
     pub(crate) fn matches_name(&self, name: &FullName) -> bool {
         name.catalog().is_none()
             && name

@@ -292,6 +292,7 @@ impl RetainSqliteTypes for StatementNode {
             | Self::Extension(_)
             | Self::VariableSet(_)
             | Self::EnumType(_)
+            | Self::CreateOperator(_)
             | Self::CreateType(_)
             | Self::Sequence(_)
             | Self::AlterSequence(_)

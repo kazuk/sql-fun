@@ -45,6 +45,9 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
+            AstStatementNode::CreateOperator(_) => AnalysisError::raise_unexpected_input(
+                "CREATE OPERATOR semantic analysis is unsupported",
+            ),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")

@@ -3,15 +3,16 @@ use crate::{
     ast::{
         Access, AlterFunctionParallel, AlterOwner, AlterRelation, AlterSequence, BooleanExpr,
         BooleanOperator, Call, CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment,
-        CompositeType, CreateRule, CreateTrigger, CreateType, CurrentOf, DefaultPrivileges, Delete,
-        DomainConstraintTarget, DropBehavior, DropFunction, DropRule, DropTable, DropTrigger,
-        DropView, EnumType, Expr, Extension, ExtensionMembership, ForeignDataWrapper, ForeignTable,
-        Indirection, Insert, Literal, Merge, Name, NamedArgument, Notify, NullTest, ObjectArgument,
-        ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter,
-        Query, Role, RoleMembership, Sequence, Slice, SqlValue, StatementNode, Subquery,
-        SubqueryKind, SyntaxOption, Table, TableConstraint, TransformTarget, TruthTest,
-        TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
-        VariableSet, VariableSetKind as AstVariableSetKind, View, ViewCheckOption, Window,
+        CompositeType, CreateOperator, CreateRule, CreateTrigger, CreateType, CurrentOf,
+        DefaultPrivileges, Delete, DomainConstraintTarget, DropBehavior, DropFunction, DropRule,
+        DropTable, DropTrigger, DropView, EnumType, Expr, Extension, ExtensionMembership,
+        ForeignDataWrapper, ForeignTable, Indirection, Insert, Literal, Merge, Name, NamedArgument,
+        Notify, NullTest, ObjectArgument, ObjectKind, ObjectPrivileges, ObjectTarget, OperatorExpr,
+        OperatorKind, Order, Parameter, Query, Role, RoleMembership, Sequence, Slice, SqlValue,
+        StatementNode, Subquery, SubqueryKind, SyntaxOption, Table, TableConstraint,
+        TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
+        TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
+        View, ViewCheckOption, Window,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
@@ -825,14 +826,18 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 tokens,
             )?));
         }
-        if let Some(define) = value.as_define_stmt().as_inner()
-            && matches!(
-                define.get_kind().as_inner(),
-                Some(syn::ObjectType::ObjectType)
-            )
-        {
-            let create_type = CreateType::try_from_with_tokens(&define, tokens)?;
-            return Ok(Self::create_type(create_type));
+        if let Some(define) = value.as_define_stmt().as_inner() {
+            match define.get_kind().as_inner() {
+                Some(syn::ObjectType::ObjectOperator) => {
+                    let operator = CreateOperator::try_from_with_tokens(&define, tokens)?;
+                    return Ok(Self::CreateOperator(operator));
+                }
+                Some(syn::ObjectType::ObjectType) => {
+                    let create_type = CreateType::try_from_with_tokens(&define, tokens)?;
+                    return Ok(Self::create_type(create_type));
+                }
+                _ => {}
+            }
         }
         if let Some(enum_type) = value.as_create_enum_stmt().as_inner() {
             return Ok(Self::enum_type(EnumType::try_from(&enum_type)?));

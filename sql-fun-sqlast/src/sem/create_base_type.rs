@@ -77,7 +77,9 @@ fn validate_definition(
             | "subscript" => insert_support_function(&mut support, role, value)?,
             "like" => inherit_layout(context, value)?,
             "element" => validate_element(context, value)?,
-            "category" => category = parse_category(value)?,
+            "category" => {
+                category = TypeCategory::try_from(option_text(value)?.as_str()).map_err(invalid)?
+            }
             "collatable" => collatable = option_boolean(value)?,
             "preferred" => validate_preferred(value)?,
             "delimiter" | "default" => validate_text(value)?,
@@ -121,19 +123,28 @@ mod application_tests {
         test_helpers::ownership::{apply_ownership_sql, ownership_context},
     };
 
-    #[test]
-    fn rejected_completion_retains_shell_and_allows_next_statement() -> testresult::TestResult {
+    #[rstest::rstest]
+    #[case(
+        "INTERNALLENGTH = 4, STORAGE = extended",
+        "fixed-size types must have storage PLAIN"
+    )]
+    #[case(
+        "CATEGORY = 'SS'",
+        "type category must be one printable ASCII character"
+    )]
+    fn rejected_completion_retains_shell_and_allows_next_statement(
+        #[case] options: &str,
+        #[case] expected: &str,
+    ) -> testresult::TestResult {
         let context =
             apply_ownership_sql(ownership_context(), "CREATE TYPE public.demo")?.into_context();
-        let attempt = apply_ownership_sql(
-            context,
-            "CREATE TYPE public.demo (INTERNALLENGTH = 4, STORAGE = extended)",
-        )?;
+        let attempt =
+            apply_ownership_sql(context, &format!("CREATE TYPE public.demo ({options})"))?;
         let name = FullName::with_schema("public", "demo");
         assert!(matches!(
             attempt.ast(),
             SemAst::RejectedBaseType { name: rejected, completion: true, reason }
-                if rejected == &name && reason == "fixed-size types must have storage PLAIN"
+                if rejected == &name && reason == expected
         ));
         let context = attempt.into_context();
         assert!(
@@ -276,15 +287,6 @@ fn option_text(value: Option<&SyntaxValue>) -> Result<String, InvalidDefinition>
 
 fn validate_text(value: Option<&SyntaxValue>) -> Result<(), InvalidDefinition> {
     option_text(value).map(drop)
-}
-
-fn parse_category(value: Option<&SyntaxValue>) -> Result<TypeCategory, InvalidDefinition> {
-    let text = option_text(value)?;
-    let code = text
-        .chars()
-        .next()
-        .ok_or_else(|| invalid("CATEGORY requires a character"))?;
-    TypeCategory::try_from(code).map_err(invalid)
 }
 
 fn parse_length(value: Option<&SyntaxValue>) -> Result<i16, InvalidDefinition> {

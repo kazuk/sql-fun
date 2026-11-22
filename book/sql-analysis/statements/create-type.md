@@ -30,7 +30,9 @@ can declare it as an argument or result. A subsequent base definition
 completed type and its `name[]` array form available to subsequent analysis.
 A shell cannot serve as a table column type. Base definitions check the
 declared internal length, alignment, storage and pass-by-value combination
-before the completed type becomes available. Definitions using `LIKE` stop
+before the completed type becomes available. sql-fun requires `CATEGORY` to
+contain exactly one printable ASCII character. PostgreSQL 15–18 use the first
+character when a longer value is supplied. Definitions using `LIKE` stop
 analysis because inherited layout validation is pending
 ([#1211](https://github.com/kazuk/sql-fun/issues/1211)).
 

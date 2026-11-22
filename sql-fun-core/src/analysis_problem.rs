@@ -930,6 +930,10 @@ impl AnalysisProblem {
     }
 }
 
+fn coalesce_type_message(expressions: &ExpressionList) -> String {
+    format!("COALESCE operands do not have a common implicit result type: {expressions}")
+}
+
 impl DiagnosticMessage for AnalysisProblem {
     fn diagnostic_message(&self) -> String {
         match self {
@@ -1029,11 +1033,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::UnreachableCoalesceArgument(..) => {
                 "COALESCE argument is unreachable after a non-null operand".to_owned()
             }
-            Self::CoalesceExprTypeUnknown(expressions) => {
-                format!(
-                    "COALESCE operands do not have a common implicit result type: {expressions}"
-                )
-            }
+            Self::CoalesceExprTypeUnknown(expressions) => coalesce_type_message(expressions),
         }
     }
 

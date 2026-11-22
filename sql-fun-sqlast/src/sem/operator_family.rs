@@ -6,14 +6,14 @@ pub(crate) mod seed;
 
 pub use alter::AlterOperatorFamily;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     ast::{Name, operator_family::CreateOperatorFamily as Syntax},
     context::{BaseParseContext, ParseContext},
-    names::{FullName, SchemaName},
+    names::{FullName, OperatorName, SchemaName},
     sem::{
-        AccessMethodKind, AnalysisError, AnalysisProblem, OperatorIdentity, TypeReference,
+        AccessMethodKind, AnalysisError, AnalysisProblem, TypeReference,
         search_path::search_schemas,
     },
 };
@@ -80,7 +80,7 @@ impl OperatorFamily {
     pub(crate) fn insert(&mut self, slot: FamilySlot, member: FamilyMember) -> Result<(), String> {
         if let Some(existing) = self.members.get(&slot) {
             let occupied = match &existing.object {
-                MemberObject::Operator(operator) => operator.name().to_string(),
+                MemberObject::Operator(operator) => operator.to_string(),
                 MemberObject::Function { name, arguments } => {
                     let arguments = arguments
                         .iter()
@@ -95,8 +95,10 @@ impl OperatorFamily {
             ));
         }
         if let MemberObject::Operator(operator) = &member.object
-            && self.members.values().any(|existing| {
+            && self.members.iter().any(|(existing_slot, existing)| {
                 matches!(&existing.object, MemberObject::Operator(other) if operator == other)
+                    && slot.left == existing_slot.left
+                    && slot.right == existing_slot.right
                     && member.order_family.is_some() == existing.order_family.is_some()
             })
         {
@@ -117,23 +119,23 @@ pub(crate) enum MemberKind {
 pub(crate) struct FamilySlot {
     pub(crate) kind: MemberKind,
     pub(crate) number: i32,
-    pub(crate) left: TypeReference,
-    pub(crate) right: TypeReference,
+    pub(crate) left: Arc<TypeReference>,
+    pub(crate) right: Arc<TypeReference>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct FamilyMember {
     pub(crate) object: MemberObject,
-    pub(crate) order_family: Option<OperatorFamilyKey>,
+    pub(crate) order_family: Option<Box<OperatorFamilyKey>>,
     pub(crate) owner: MemberOwner,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum MemberObject {
-    Operator(OperatorIdentity),
+    Operator(OperatorName),
     Function {
         name: FullName,
-        arguments: Vec<TypeReference>,
+        arguments: Box<[Arc<TypeReference>]>,
     },
 }
 
@@ -142,7 +144,7 @@ pub(crate) enum MemberOwner {
     Builtin,
     Family,
     Loose,
-    Class(FullName),
+    Class(Box<FullName>),
 }
 
 pub(crate) fn report_family_problem(

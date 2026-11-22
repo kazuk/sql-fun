@@ -28,6 +28,8 @@ mod create_domain;
 mod create_enum_type;
 mod create_foreign_data_wrapper;
 mod create_function;
+mod create_operator;
+pub use create_operator::{CreateOperator, OperatorIdentity, OperatorLinks};
 mod create_index;
 mod create_rule;
 mod create_schema;
@@ -334,6 +336,8 @@ impl From<CreateIndex> for ImplicitChange {
 /// Semantic AST for top-level statement
 #[derive(Debug, Clone)]
 pub enum SemAst {
+    /// An analyzed PostgreSQL operator declaration.
+    CreateOperator(Box<CreateOperator>),
     /// A resolved CREATE TRIGGER statement.
     CreateTrigger(Box<CreateTrigger>),
     /// An analyzed PostgreSQL foreign-data wrapper declaration.
@@ -494,6 +498,7 @@ impl SemAst {
             Self::CreateCompType(composite) => composite.visit_references(visitor),
             Self::CreateIndex(index) => index.visit_references(visitor),
             Self::CreateFunction(function) => function.visit_references(visitor),
+            Self::CreateOperator(operator) => operator.visit_references(visitor),
             Self::CreateDomain(domain) => {
                 if let Some(reference) = domain.base_type() {
                     visitor.schema_type(reference)?;

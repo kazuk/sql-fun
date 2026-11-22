@@ -13,23 +13,48 @@ use ::sql_fun_core::IVec;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CreateOperator {
-    name: Name,
-    options: Vec<OperatorOption>,
+    pub(crate) name: Name,
+    pub(crate) options: Vec<OperatorOption>,
 }
 
 #[derive(Clone, Debug)]
-struct OperatorOption {
-    key: String,
-    value: Option<OperatorOptionValue>,
+pub(crate) struct OperatorOption {
+    pub(crate) key: String,
+    pub(crate) value: Option<OperatorOptionValue>,
     // Relative to the statement being converted.
-    location: Option<StringSpan>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
-enum OperatorOptionValue {
+pub(crate) enum OperatorOptionValue {
     Type(TypeName),
     Name(Name),
     Literal(Literal),
+}
+
+// Quoted relationship targets bypass the scanner's operator-token rules.
+pub(crate) fn valid_operator_token(token: &str) -> bool {
+    !token.is_empty()
+        && token.len() < 64
+        && token != "!="
+        && token
+            .bytes()
+            .all(|byte| b"+-*/<>=~!@#%^&|`?".contains(&byte))
+        && !token.contains("/*")
+        && !token.contains("--")
+        && (token.len() == 1
+            || !token.ends_with(['+', '-'])
+            || token.bytes().any(|byte| b"~!@#%^&|`?".contains(&byte)))
+}
+
+impl OperatorOption {
+    pub(crate) fn name(&self) -> Option<Name> {
+        match &self.value {
+            Some(OperatorOptionValue::Name(name)) => Some(name.clone()),
+            Some(OperatorOptionValue::Literal(Literal::String(value))) => Some(Name::local(value)),
+            _ => None,
+        }
+    }
 }
 
 impl TryFromWithTokens<&syn::DefineStmt> for CreateOperator {

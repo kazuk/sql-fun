@@ -1,11 +1,47 @@
 # CREATE OPERATOR
 
-sql-fun accepts PostgreSQL `CREATE OPERATOR` syntax during parsing. Semantic
-analysis is unimplemented. When analysis reaches the declaration, the server
-terminates and the CLI can report `EOF with missing responses`.
-The declaration does not add an operator to the analysis catalog for use by
-later statements. This also affects schema initialization from extension scripts
-that declare operators, including the bundled `pg_trgm` installation script.
-Follow [issue #1215](https://github.com/kazuk/sql-fun/issues/1215) for operator
-analysis and [issue #1150](https://github.com/kazuk/sql-fun/issues/1150) for
+PostgreSQL `CREATE OPERATOR` makes a binary or prefix operator available to
+later statements. Specify `RIGHTARG` for a prefix operator and both
+`LEFTARG` and `RIGHTARG` for a binary operator. The named implementation
+function must already be declared with those exact input types. Both
+`FUNCTION` and the historical spelling `PROCEDURE` name the implementation
+function. A schema can hold multiple overloads of a token with distinct
+operand types.
+
+```sql
+CREATE OPERATOR public.%% (
+    LEFTARG = integer,
+    RIGHTARG = integer,
+    FUNCTION = pg_catalog.int4pl
+);
+
+SELECT 1 OPERATOR(public.%%) 2;
+```
+
+A commutator or negator can refer to a later operator declaration. The
+referenced operator becomes callable once its own declaration completes.
+An invalid definition reports an
+[`invalid_operator_declaration` diagnostic](../../diagnostics/invalid_operator_declaration.md)
+and leaves the catalog unchanged.
+
+`RESTRICT` and `JOIN` require a selectivity estimator with the appropriate
+signature in the analysis catalog. The PostgreSQL 17.6 and 18.1 bundles omit
+builtin estimators such as `contsel` and `contjoinsel`. A declaration that
+calls for one of these missing estimators is rejected, including the first
+operator declaration in the bundled `pg_trgm` installation script. Follow
+[issue #1217](https://github.com/kazuk/sql-fun/issues/1217) for estimator
+metadata. The full script also reaches a separate parsing limitation at
+`CREATE OPERATOR CLASS gist_trgm_ops`. Follow
+[issue #1203](https://github.com/kazuk/sql-fun/issues/1203) for that statement
+and [issue #1150](https://github.com/kazuk/sql-fun/issues/1150) for full
 extension initialization.
+
+For a token defined in multiple schemas, qualify the operator with
+`OPERATOR(schema.token)` to select its schema explicitly. Unqualified lookup
+currently selects one schema's overloads for the token and operand count.
+Cross-schema overload lookup is tracked in
+[issue #797](https://github.com/kazuk/sql-fun/issues/797).
+
+PostgreSQL permits set-returning implementation functions. sql-fun reports
+those operator declarations as unsupported and does not register them.
+Follow [issue #1218](https://github.com/kazuk/sql-fun/issues/1218).

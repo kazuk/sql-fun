@@ -69,9 +69,9 @@ use crate::{
     names::{FullName, SchemaName, TableName},
     sem::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisState, Comment, CreateCompositeType,
-        CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CursorInfo, ExtensionMembershipChange, InputTypeConstraint, Kind,
-        ObjectPrivilegeChange, OwnedObjectDefinition, ParameterConstraints, Role,
+        CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateOperator,
+        CreateSchema, CreateTable, CursorInfo, ExtensionMembershipChange, InputTypeConstraint,
+        Kind, ObjectPrivilegeChange, OwnedObjectDefinition, ParameterConstraints, Role,
         RoleMembershipDeclaration, SamplingMethodLookup, SelectStatement, SemScalarExpr,
         VariableSet, parameter_resolution::ParameterResolution, problem::CreationProblem,
     },
@@ -105,6 +105,19 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Publish an analyzed operator declaration.
+    ///
+    /// # Errors
+    /// Returns an error when the context cannot publish an applicable declaration.
+    fn apply_create_operator(self, statement: &CreateOperator) -> Result<Self, AnalysisError> {
+        if statement.applicable() {
+            return AnalysisError::raise_unexpected_input(
+                "catalog does not support CREATE OPERATOR",
+            );
+        }
+        Ok(self)
+    }
+
     /// Extension whose installation or update script is being analyzed, if any.
     fn active_extension(&self) -> Option<&str> {
         None

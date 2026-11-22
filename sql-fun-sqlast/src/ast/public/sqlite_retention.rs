@@ -295,6 +295,8 @@ impl RetainSqliteTypes for StatementNode {
             | Self::CreateOperator(_)
             | Self::CreateAccessMethod(_)
             | Self::CreateOperatorClass(_)
+            | Self::CreateOperatorFamily(_)
+            | Self::AlterOperatorFamily(_)
             | Self::CreateType(_)
             | Self::Sequence(_)
             | Self::AlterSequence(_)

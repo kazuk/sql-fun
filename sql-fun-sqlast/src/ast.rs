@@ -11,7 +11,7 @@
 pub(crate) mod client_type;
 pub(crate) mod create_access_method;
 pub(crate) mod create_operator;
-mod create_operator_class;
+pub(crate) mod create_operator_class;
 mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;
@@ -23,6 +23,7 @@ mod foreign_data_wrapper;
 mod foreign_table;
 mod mutation;
 mod notify;
+pub(crate) mod operator_family;
 mod options;
 pub(crate) mod postgres;
 pub(crate) mod privileges;
@@ -302,6 +303,8 @@ pub(crate) enum StatementNode {
     CreateOperator(CreateOperator),
     CreateAccessMethod(Box<create_access_method::CreateAccessMethod>),
     CreateOperatorClass(Box<create_operator_class::CreateOperatorClass>),
+    CreateOperatorFamily(Box<operator_family::CreateOperatorFamily>),
+    AlterOperatorFamily(Box<operator_family::AlterOperatorFamily>),
     CreateType(CreateType),
     Sequence(Sequence),
     DropTable(DropTable),
@@ -397,6 +400,14 @@ impl StatementNode {
 
     const fn view(value: View) -> Self {
         Self::View(value)
+    }
+
+    fn create_operator_family(value: operator_family::CreateOperatorFamily) -> Self {
+        Self::CreateOperatorFamily(Box::new(value))
+    }
+
+    fn alter_operator_family(value: operator_family::AlterOperatorFamily) -> Self {
+        Self::AlterOperatorFamily(Box::new(value))
     }
 
     fn create_access_method(value: create_access_method::CreateAccessMethod) -> Self {

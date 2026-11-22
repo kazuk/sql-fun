@@ -5,9 +5,8 @@ use crate::{
     error::AnalysisError,
     syn::{self, ListOpt, Opt, ScanToken},
 };
-use sql_fun_core::IVec;
+use ::sql_fun_core::IVec;
 
-#[allow(dead_code, reason = "retained for operator class semantic analysis")]
 #[derive(Clone, Debug)]
 pub(crate) struct CreateOperatorClass {
     name: Name,
@@ -18,30 +17,89 @@ pub(crate) struct CreateOperatorClass {
     members: Vec<OperatorClassMember>,
 }
 
-#[allow(dead_code, reason = "retained for operator class semantic analysis")]
 #[derive(Clone, Debug)]
-enum OperatorClassMember {
+pub(crate) enum OperatorClassMember {
     Operator(OperatorClassOperator),
     Function(OperatorClassFunction),
     Storage(TypeName),
 }
 
-#[allow(dead_code, reason = "retained for operator class semantic analysis")]
 #[derive(Clone, Debug)]
-struct OperatorClassOperator {
+pub(crate) struct OperatorClassOperator {
     strategy: i32,
     name: Name,
     operands: Option<Vec<ObjectArgument>>,
     order_family: Option<Name>,
 }
 
-#[allow(dead_code, reason = "retained for operator class semantic analysis")]
 #[derive(Clone, Debug)]
-struct OperatorClassFunction {
+pub(crate) struct OperatorClassFunction {
     support: i32,
     name: Name,
     class_operands: Option<Vec<TypeName>>,
     arguments: Option<Vec<TypeName>>,
+}
+
+impl CreateOperatorClass {
+    pub(crate) fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) const fn is_default(&self) -> bool {
+        self.is_default
+    }
+
+    pub(crate) fn input_type(&self) -> &TypeName {
+        &self.input_type
+    }
+
+    pub(crate) fn access_method(&self) -> &str {
+        &self.access_method
+    }
+
+    pub(crate) fn family(&self) -> Option<&Name> {
+        self.family.as_ref()
+    }
+
+    pub(crate) fn members(&self) -> &[OperatorClassMember] {
+        &self.members
+    }
+}
+
+impl OperatorClassOperator {
+    pub(crate) const fn strategy(&self) -> i32 {
+        self.strategy
+    }
+
+    pub(crate) fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn operands(&self) -> Option<&[ObjectArgument]> {
+        self.operands.as_deref()
+    }
+
+    pub(crate) fn order_family(&self) -> Option<&Name> {
+        self.order_family.as_ref()
+    }
+}
+
+impl OperatorClassFunction {
+    pub(crate) const fn support(&self) -> i32 {
+        self.support
+    }
+
+    pub(crate) fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn class_operands(&self) -> Option<&[TypeName]> {
+        self.class_operands.as_deref()
+    }
+
+    pub(crate) fn arguments(&self) -> Option<&[TypeName]> {
+        self.arguments.as_deref()
+    }
 }
 
 #[cfg(test)]
@@ -186,6 +244,26 @@ CREATE OPERATOR CLASS "App".ops DEFAULT FOR TYPE int4 USING gist FAMILY "App".fa
     }
 }
 
+pub(crate) enum OperatorClassMemberKind {
+    Operator,
+    Function,
+    Storage,
+}
+
+impl TryFrom<i32> for OperatorClassMemberKind {
+    type Error = AnalysisError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        // PostgreSQL parsenodes.h OPCLASS_ITEM_* constants.
+        match value {
+            1 => Ok(Self::Operator),
+            2 => Ok(Self::Function),
+            3 => Ok(Self::Storage),
+            _ => AnalysisError::raise_unexpected_input("operator class member kind"),
+        }
+    }
+}
+
 impl TryFromWithTokens<&syn::Node> for OperatorClassMember {
     type Error = AnalysisError;
 
@@ -193,32 +271,24 @@ impl TryFromWithTokens<&syn::Node> for OperatorClassMember {
         value: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
-        // PostgreSQL parsenodes.h OPCLASS_ITEM_* constants.
-        const OPERATOR: i32 = 1;
-        const FUNCTION: i32 = 2;
-        const STORAGE: i32 = 3;
-
         let member = required(
             value.as_create_op_class_item().as_inner(),
             "operator class member",
         )?;
-        match member.get_itemtype() {
-            OPERATOR => {
+        match OperatorClassMemberKind::try_from(member.get_itemtype())? {
+            OperatorClassMemberKind::Operator => {
                 OperatorClassOperator::try_from_with_tokens(&member, tokens).map(Self::Operator)
             }
-            FUNCTION => {
+            OperatorClassMemberKind::Function => {
                 OperatorClassFunction::try_from_with_tokens(&member, tokens).map(Self::Function)
             }
-            STORAGE => {
+            OperatorClassMemberKind::Storage => {
                 let typ = required(
                     member.get_storedtype().as_inner(),
                     "operator class storage type",
                 )?;
                 TypeName::try_from_with_tokens(&typ, tokens).map(Self::Storage)
             }
-            _ => Err(AnalysisError::unexpected_input_error(
-                "operator class member kind",
-            )),
         }
     }
 }
@@ -277,7 +347,7 @@ fn optional_name(value: syn::NodeListOpt) -> Result<Option<Name>, AnalysisError>
     }
 }
 
-fn type_names(
+pub(crate) fn type_names(
     value: syn::NodeListOpt,
     tokens: &IVec<ScanToken>,
 ) -> Result<Vec<TypeName>, AnalysisError> {

@@ -943,6 +943,7 @@ impl DiagnosticMessage for BaseTypeProblem {
 
 impl AnalysisProblem {
     /// Report a base type declaration that cannot be applied.
+    #[must_use]
     pub fn invalid_base_type(name: &FullName, reason: &str) -> Self {
         Self::InvalidBaseType(BaseTypeProblem {
             name: name.clone(),

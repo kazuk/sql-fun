@@ -91,6 +91,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [array_index_type_mismatch](array_index_type_mismatch.md)
 - [array_missing_type_facts](array_missing_type_facts.md)
 - [array_subquery_columns](array_subquery_columns.md)
+- [base_type_invalid_definition](base_type_invalid_definition.md)
 - [binary_operator_overload_ambiguous](binary_operator_overload_ambiguous.md)
 - [binary_operator_overload_resolution_failed](binary_operator_overload_resolution_failed.md)
 - [call_argument_duplicate_name](call_argument_duplicate_name.md)

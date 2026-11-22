@@ -22,6 +22,8 @@ pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
 mod constraint;
 mod create_access_method;
+pub(crate) mod operator_family;
+pub use operator_family::{OperatorFamily, OperatorFamilyKey};
 mod create_base_type;
 pub use self::create_base_type::RejectedBaseType;
 mod create_comp_type;

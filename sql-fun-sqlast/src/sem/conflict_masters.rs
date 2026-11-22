@@ -408,7 +408,7 @@ mod test_lookup_operator_class {
     }
 }
 
-fn lookup_postgres(
+pub(crate) fn lookup_postgres(
     context: &impl BaseParseContext,
     name: &FullName,
     exists: impl Fn(&FullName) -> bool,

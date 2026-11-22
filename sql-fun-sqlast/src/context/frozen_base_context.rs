@@ -508,6 +508,12 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::context::OperatorFamilyInfoRead for $context {
+            fn operator_family(&self, key: &crate::sem::OperatorFamilyKey) -> Option<&crate::sem::OperatorFamily> {
+                self.$catalog().operator_family(key)
+            }
+        }
+
         impl crate::context::AccessMethodInfoRead for $context {
             fn access_method(&self, name: &str) -> Option<&crate::sem::AccessMethodDefinition> {
                 self.$catalog().access_method(name)

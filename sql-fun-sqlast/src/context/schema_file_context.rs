@@ -98,6 +98,7 @@ pub(super) struct SchemaCatalog {
     configured_roles: ConfiguredRoles,
     base: FrozenBaseContext,
     access_methods: std::collections::HashMap<String, AccessMethodDefinition>,
+    operator_families: std::collections::HashMap<crate::sem::OperatorFamilyKey, crate::sem::OperatorFamily>,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
     args: SqlFunArgs,
     metadata: ::sql_fun_core::SqlFunMetadata,
@@ -174,6 +175,7 @@ impl SchemaFileContext {
                 configured_roles: metadata.into(),
                 base: base.clone(),
                 access_methods: Default::default(),
+                operator_families: Default::default(),
                 triggers: std::collections::HashMap::new(),
                 args: args.clone(),
                 metadata: metadata.clone(),
@@ -665,6 +667,19 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
             ObjectKind::FOREIGN_DATA_WRAPPER,
             &FullName::from_local_name(definition.name()),
         );
+        self
+    }
+}
+
+impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
+    fn operator_family(&self, key: &crate::sem::OperatorFamilyKey) -> Option<&crate::sem::OperatorFamily> {
+        self.operator_families.get(key).or_else(|| self.base.operator_family(key))
+    }
+}
+
+impl crate::context::OperatorFamilyInfoWrite for SchemaFileContext {
+    fn publish_operator_family(mut self, family: &crate::sem::OperatorFamily) -> Self {
+        self.catalog.operator_families.insert(family.key.clone(), family.clone());
         self
     }
 }

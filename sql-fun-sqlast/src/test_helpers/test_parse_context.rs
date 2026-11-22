@@ -480,6 +480,14 @@ impl DiagnosticContext for TestParseContext {
     }
 }
 
+impl<Constraints> crate::context::OperatorFamilyInfoRead for TestContext<Constraints> {}
+
+impl crate::context::OperatorFamilyInfoWrite for TestParseContext {
+    fn publish_operator_family(self, _family: &crate::sem::OperatorFamily) -> Self {
+        self
+    }
+}
+
 impl<Constraints> crate::context::AccessMethodInfoRead for TestContext<Constraints> {
     fn access_method(&self, name: &str) -> Option<&AccessMethodDefinition> {
         self.access_methods.get(name)

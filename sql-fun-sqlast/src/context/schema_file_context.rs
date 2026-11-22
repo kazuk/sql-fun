@@ -41,16 +41,17 @@ use crate::{
     },
     names::{FullName, OperatorName, SchemaName, TableName as NamesTableName},
     sem::{
-        AlterIndex, AlterOwner, AnalysisError, AnalysisProblem, AnalysisState, CastDefinition,
-        CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
-        CreateForeignDataWrapper, CreateIndex, CreateOperator, CreateRule, CreateSchema,
-        CreateTrigger, CursorInfo, DatabaseCollation, ExtensionMembershipChange, FunctionTombstone,
-        ImplicitChange, InsertConflict, Kind, ObjectPrivilegeChange, OperatorClassDefinition,
-        OperatorDefinition, OperatorIdentity, OperatorLinks, OverloadVariant as SemOverloadVariant,
-        OwnedObjectDefinition, OwnershipIdentity, ParameterConstraints, Role,
-        RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr, SourcePathWithSpan,
-        TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport, ViewInsertSupport,
-        ViewLike, ViewMergeSupport, ViewTombstone, ViewUpdateSupport,
+        AccessMethodDefinition, AlterIndex, AlterOwner, AnalysisError, AnalysisProblem,
+        AnalysisState, CastDefinition, CatalogNameLookup, CollationDefinition, Comment,
+        ConflictArbiterInference, CreateExtension, CreateForeignDataWrapper, CreateIndex,
+        CreateOperator, CreateRule, CreateSchema, CreateTrigger, CursorInfo, DatabaseCollation,
+        ExtensionMembershipChange, FunctionTombstone, ImplicitChange, InsertConflict, Kind,
+        ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition, OperatorIdentity,
+        OperatorLinks, OverloadVariant as SemOverloadVariant, OwnedObjectDefinition,
+        OwnershipIdentity, ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity,
+        SemAst, SemScalarExpr, SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet,
+        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewTombstone,
+        ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -96,6 +97,7 @@ pub(super) struct SchemaCatalog {
     foreign_data_wrappers: std::collections::HashMap<String, CreateForeignDataWrapper>,
     configured_roles: ConfiguredRoles,
     base: FrozenBaseContext,
+    access_methods: std::collections::HashMap<String, AccessMethodDefinition>,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
     args: SqlFunArgs,
     metadata: ::sql_fun_core::SqlFunMetadata,
@@ -171,6 +173,7 @@ impl SchemaFileContext {
                 foreign_data_wrappers: Default::default(),
                 configured_roles: metadata.into(),
                 base: base.clone(),
+                access_methods: Default::default(),
                 triggers: std::collections::HashMap::new(),
                 args: args.clone(),
                 metadata: metadata.clone(),
@@ -662,6 +665,25 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
             ObjectKind::FOREIGN_DATA_WRAPPER,
             &FullName::from_local_name(definition.name()),
         );
+        self
+    }
+}
+
+impl crate::context::AccessMethodInfoRead for SchemaCatalog {
+    fn access_method(&self, name: &str) -> Option<&AccessMethodDefinition> {
+        if let Some(definition) = self.access_methods.get(name) {
+            Some(definition)
+        } else {
+            self.base.access_method(name)
+        }
+    }
+}
+
+impl crate::context::AccessMethodInfoWrite for SchemaFileContext {
+    fn register_access_method(mut self, definition: &AccessMethodDefinition) -> Self {
+        self.catalog
+            .access_methods
+            .insert(definition.name().to_owned(), definition.clone());
         self
     }
 }

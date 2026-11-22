@@ -9,23 +9,38 @@ use crate::{
     syn::{self, Opt, ScanToken, Token},
 };
 
-#[allow(
-    dead_code,
-    reason = "retained for access method semantic analysis (#1223)"
-)]
 #[derive(Clone, Debug)]
 pub(crate) struct CreateAccessMethod {
     name: String,
     kind: AccessMethodKind,
     handler: Name,
+    #[cfg_attr(not(test), allow(dead_code, reason = "retained source location"))]
     name_span: Option<StringSpan>,
+    #[cfg_attr(not(test), allow(dead_code, reason = "retained source location"))]
     handler_span: Option<StringSpan>,
 }
 
+/// Kind of PostgreSQL access method.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum AccessMethodKind {
+pub enum AccessMethodKind {
+    /// Access method for tables.
     Table,
+    /// Access method for indexes.
     Index,
+}
+
+impl CreateAccessMethod {
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) const fn kind(&self) -> AccessMethodKind {
+        self.kind
+    }
+
+    pub(crate) fn handler(&self) -> &[String] {
+        self.handler.parts()
+    }
 }
 
 impl TryFrom<&str> for AccessMethodKind {

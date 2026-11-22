@@ -1155,6 +1155,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "An access-method name already exists in the database catalog.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateAccessMethod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateAccessMethod"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "duplicate def elem key",
                   "type": "object",
                   "properties": {
@@ -6478,6 +6491,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "An access-method name already exists in the database catalog.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateAccessMethod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateAccessMethod"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "duplicate def elem key",
                   "type": "object",
                   "properties": {
@@ -11689,6 +11715,19 @@
                   },
                   "required": [
                     "ArgumentTypeMismatch"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An access-method name already exists in the database catalog.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateAccessMethod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateAccessMethod"
                   ],
                   "additionalProperties": false
                 },

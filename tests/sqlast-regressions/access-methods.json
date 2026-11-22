@@ -1,0 +1,26 @@
+[
+  {
+    "name": "handler-name-is-declaration-data",
+    "sql": "CREATE ACCESS METHOD custom_method TYPE INDEX HANDLER missing_schema.missing_handler",
+    "expected": {
+      "diagnostics": ["query_deparse"],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-builtin-across-kinds",
+    "sql": "CREATE ACCESS METHOD heap TYPE INDEX HANDLER missing_handler",
+    "expected": {
+      "diagnostics": ["duplicate_access_method", "query_deparse"],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-project-method-across-kinds",
+    "sql": "CREATE ACCESS METHOD project_method TYPE INDEX HANDLER missing_handler",
+    "expected": {
+      "diagnostics": ["duplicate_access_method", "query_deparse"],
+      "columns": []
+    }
+  }
+]

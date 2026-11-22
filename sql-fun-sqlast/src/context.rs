@@ -1,5 +1,6 @@
 //! Catalog contexts, shared interfaces, and services for SQL analysis.
 
+mod access_method_info;
 mod base_context;
 mod base_parse_context;
 mod cast_info;
@@ -28,6 +29,7 @@ mod type_info;
 mod view_info;
 
 pub use self::{
+    access_method_info::{AccessMethodInfoRead, AccessMethodInfoWrite},
     base_context::{BaseContext, PgBuiltInFunctions, PgBuiltinCasts, PgBuiltinOperators},
     base_parse_context::BaseParseContext,
     cast_info::CastInfoRead,
@@ -92,6 +94,7 @@ pub trait ParseContext:
     + RuleInfoWrite
     + ForeignDataWrapperInfoWrite
     + TransformationInfoWrite
+    + AccessMethodInfoWrite
     + TriggerInfoWrite
     + SequenceInfoWrite
     + TypeInfoWrite

@@ -1,0 +1,3 @@
+{{#each this}}
+CREATE ACCESS METHOD {{ident name}} TYPE {{sql kind}} HANDLER {{ident handler_schema}}.{{ident handler_name}};
+{{/each}}

@@ -9,7 +9,7 @@
 #![allow(dead_code)]
 
 pub(crate) mod client_type;
-mod create_access_method;
+pub(crate) mod create_access_method;
 pub(crate) mod create_operator;
 mod create_operator_class;
 mod create_type;

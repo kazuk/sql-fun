@@ -3932,3 +3932,10 @@ CREATE VIEW "information_schema"."user_mappings" AS  SELECT authorization_identi
     foreign_server_name
    FROM information_schema._pg_user_mappings;
 
+CREATE ACCESS METHOD "brin" TYPE INDEX HANDLER "pg_catalog"."brinhandler";
+CREATE ACCESS METHOD "btree" TYPE INDEX HANDLER "pg_catalog"."bthandler";
+CREATE ACCESS METHOD "gin" TYPE INDEX HANDLER "pg_catalog"."ginhandler";
+CREATE ACCESS METHOD "gist" TYPE INDEX HANDLER "pg_catalog"."gisthandler";
+CREATE ACCESS METHOD "hash" TYPE INDEX HANDLER "pg_catalog"."hashhandler";
+CREATE ACCESS METHOD "heap" TYPE TABLE HANDLER "pg_catalog"."heap_tableam_handler";
+CREATE ACCESS METHOD "spgist" TYPE INDEX HANDLER "pg_catalog"."spghandler";

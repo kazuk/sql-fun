@@ -8,7 +8,7 @@ CREATE TYPE public.base_value (
   OUTPUT = public.base_value_out,
   INTERNALLENGTH = VARIABLE,
   STORAGE = extended,
-  CATEGORY = 'S',
+  CATEGORY = 'SS',
   COLLATABLE = true
 );
 CREATE TABLE public.base_values (

@@ -193,11 +193,6 @@ catalog nulls. Its `default_collation` is an object with `schema`, `name`, and
 is not an object identity and is not serialized. No effective collation is
 chosen for an index or column here.
 
-The builtin function inventory includes the exact signatures of bootstrap
-support routines referenced by bootstrap operator-family members. These
-routines can have `internal` arguments or returns, as required by operator
-class and family declarations.
-
 ### Operator classes
 
 `operator_classes.json` is an array ordered by `(schema, name, access_method)`
@@ -243,18 +238,18 @@ record with its identity and member arrays. The members are ordered by slot
 number and canonical operand identities.
 
 - Operator row `[strategy, left, right, operator, order_family, owner]`
-- Support row `[support_number, left, right, function, arguments, owner]`
+- Support row `[support_number, left, right, function, owner]`
 - Type `[schema, name, is_array]`. For a true array flag, schema and name
-  identify the element. Associated slot types and function arguments retain
-  their own type identities.
+  identify the element. The support row records the associated slot types.
 - Operator, function, and ordering family identities use `[schema, name]`.
   Ordering families use B-tree. A search operator has a null ordering family.
 - Ownership is null for a protected builtin member, `{"class":[schema,name]}`
   for class ownership in the same method, `"family"` for a hard dependency on
   the family, and `"loose"` for an independently removable member.
 
-The loader shares canonical type references across member slots and function
-signatures. Operator identities use the operands already present in the slot.
+The loader shares canonical type references across member slots. Operator
+identities use the operands already present in the slot. Support routine names
+identify members in diagnostics.
 Ordering and class ownership allocate their qualified identities only when
 present. Re-extract a catalog with the older expanded family member objects.
 

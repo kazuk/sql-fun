@@ -6,7 +6,7 @@ use crate::{
     context::ParseContext,
     sem::{
         AlterFunctionParallel, AlterOwner, AlterSequence, AnalysisError, Comment,
-        CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum, CreateExtension,
+        CreateOperatorClass, CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum, CreateExtension,
         CreateForeignDataWrapper, CreateFunction, CreateIndex, CreateOperator, CreateRule,
         CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTrigger, CreateView,
         DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
@@ -50,9 +50,8 @@ impl SemAst {
             ))),
             AstStatementNode::CreateAccessMethod(ast) => CreateAccessMethod::analyze(ast, context)
                 .map(|statement| Self::CreateAccessMethod(Box::new(statement))),
-            AstStatementNode::CreateOperatorClass(_) => {
-                todo!("CREATE OPERATOR CLASS semantic analysis (#1220)")
-            }
+            AstStatementNode::CreateOperatorClass(ast) => CreateOperatorClass::analyze(ast, context)
+                .map(|statement| Self::CreateOperatorClass(Box::new(statement))),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
@@ -257,6 +256,11 @@ impl SemAst {
             AstStatementNode::Domain(domain) => CreateDomain::from_ast_and_apply(domain, context),
             AstStatementNode::CreateAccessMethod(ast) => {
                 CreateAccessMethod::analyze_and_apply(ast, context)
+            }
+            AstStatementNode::CreateOperatorClass(ast) => {
+                let statement = CreateOperatorClass::analyze(ast, &mut context)?;
+                let context = statement.apply(context);
+                Ok(AstAndContextPair::new(Self::CreateOperatorClass(Box::new(statement)), context))
             }
             AstStatementNode::CreateOperator(ast) => {
                 let statement = CreateOperator::analyze(ast, &mut context)?;

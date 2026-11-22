@@ -126,3 +126,29 @@ pub(crate) fn require_index_method(
         }
     }
 }
+
+pub(crate) fn creation_name(
+    name: &Name,
+    context: &mut impl ParseContext,
+) -> Result<Option<FullName>, AnalysisError> {
+    let name = FullName::from_ast_name(name)?;
+    if name.catalog().is_some() {
+        report_family_problem(context, "cross-database operator family or class reference")?;
+        return Ok(None);
+    }
+    let exists = |schema: &crate::names::SchemaName| {
+        matches!(schema.as_str(), "public" | "pg_catalog" | "information_schema")
+            || context.schema_definition(schema.as_str()).is_some()
+    };
+    if let Some(schema) = name.schema() {
+        if exists(schema) {
+            return Ok(Some(name));
+        }
+        report_family_problem(context, format!("schema {schema} does not exist"))?;
+    } else if let Some(schema) = context.get_search_path().iter().find(|schema| exists(schema)) {
+        return Ok(Some(name.replace_schema(schema)));
+    } else {
+        report_family_problem(context, "no schema selected for operator family or class creation")?;
+    }
+    Ok(None)
+}

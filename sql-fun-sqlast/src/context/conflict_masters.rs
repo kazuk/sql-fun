@@ -246,6 +246,12 @@ mod test_qualified_collation {
 }
 
 impl ConflictMasters {
+    pub(super) fn has_default_operator_class(&self, method: &str, typ: &crate::sem::TypeReference) -> bool {
+        self.operator_classes.iter().any(|class| {
+            class.default() && class.access_method() == method && class.has_input(typ)
+        })
+    }
+
     /// Read an exact operator-class identity without selecting a default class.
     pub fn operator_class(
         &self,

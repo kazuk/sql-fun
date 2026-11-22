@@ -22,6 +22,8 @@ pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
 mod constraint;
 mod create_access_method;
+mod create_operator_class;
+pub use create_operator_class::CreateOperatorClass;
 pub(crate) mod operator_family;
 pub use operator_family::{OperatorFamily, OperatorFamilyKey};
 mod create_base_type;
@@ -347,6 +349,8 @@ pub enum SemAst {
     CreateTrigger(Box<CreateTrigger>),
     /// Analyzed PostgreSQL access-method declaration.
     CreateAccessMethod(Box<CreateAccessMethod>),
+    /// PostgreSQL operator class declaration.
+    CreateOperatorClass(Box<CreateOperatorClass>),
     /// An analyzed PostgreSQL foreign-data wrapper declaration.
     CreateForeignDataWrapper(Box<CreateForeignDataWrapper>),
     /// Resolved DROP TRIGGER, including explicit IF EXISTS no-op outcomes.

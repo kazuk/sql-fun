@@ -98,6 +98,7 @@ pub(super) struct SchemaCatalog {
     configured_roles: ConfiguredRoles,
     base: FrozenBaseContext,
     access_methods: std::collections::HashMap<String, AccessMethodDefinition>,
+    operator_classes: std::collections::HashMap<(FullName, String), OperatorClassDefinition>,
     operator_families: std::collections::HashMap<crate::sem::OperatorFamilyKey, crate::sem::OperatorFamily>,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
     args: SqlFunArgs,
@@ -175,6 +176,7 @@ impl SchemaFileContext {
                 configured_roles: metadata.into(),
                 base: base.clone(),
                 access_methods: Default::default(),
+                operator_classes: Default::default(),
                 operator_families: Default::default(),
                 triggers: std::collections::HashMap::new(),
                 args: args.clone(),
@@ -672,12 +674,25 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
 }
 
 impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
+    fn has_default_operator_class(&self, method: &str, typ: &TypeReference) -> bool {
+       self.operator_classes.values().any(|class| {
+           class.default() && class.access_method() == method && class.has_input(typ)
+       }) || self.base.has_default_operator_class(method, typ)
+    }
+
+
     fn operator_family(&self, key: &crate::sem::OperatorFamilyKey) -> Option<&crate::sem::OperatorFamily> {
         self.operator_families.get(key).or_else(|| self.base.operator_family(key))
     }
 }
 
 impl crate::context::OperatorFamilyInfoWrite for SchemaFileContext {
+    fn publish_operator_class(mut self, class: &OperatorClassDefinition, family: &crate::sem::OperatorFamily) -> Self {
+        self.catalog.operator_classes.insert((class.qualified_name(), class.access_method().to_owned()), class.clone());
+        self.publish_operator_family(family)
+    }
+
+
     fn publish_operator_family(mut self, family: &crate::sem::OperatorFamily) -> Self {
         self.catalog.operator_families.insert(family.key.clone(), family.clone());
         self
@@ -1424,7 +1439,7 @@ impl crate::context::ConflictInfoRead for SchemaCatalog {
         name: &FullName,
         method: &str,
     ) -> Option<&OperatorClassDefinition> {
-        self.base.operator_class_definition(name, method)
+        self.operator_classes.get(&(name.clone(), method.to_owned())).or_else(|| self.base.operator_class_definition(name, method))
     }
     fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {
         self.base.lookup_sqlite_collation(name)

@@ -43,7 +43,11 @@ used by the support functions. Range type declarations remain unsupported.
 PostgreSQL ALTER TYPE operations that alter composite types remain unimplemented
 and can terminate analysis
 ([#543](https://github.com/kazuk/sql-fun/issues/543)). CREATE TYPE metadata does
-not establish ALTER TYPE catalog transitions. SQLite/Turso CREATE/DROP TYPE
+not establish ALTER TYPE catalog transitions. The
+`ALTER TYPE … SET (RECEIVE = …, SEND = …)` form for a base type stops analysis
+during SQL conversion, including in the bundled `ltree` update script
+([#1199](https://github.com/kazuk/sql-fun/issues/1199)).
+SQLite/Turso CREATE/DROP TYPE
 operations are separately listed in the [statement support
 inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
 

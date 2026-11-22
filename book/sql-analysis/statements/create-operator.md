@@ -20,6 +20,9 @@ SELECT 1 OPERATOR(public.%%) 2;
 
 A commutator or negator can refer to a later operator declaration. The
 referenced operator becomes callable once its own declaration completes.
+Completion preserves existing relationships. Related operators must return
+the same type. These checks follow the corrected PostgreSQL rules, including
+when analysis uses an older builtin bundle.
 An invalid definition reports an
 [`invalid_operator_declaration` diagnostic](../../diagnostics/invalid_operator_declaration.md)
 and leaves the catalog unchanged.

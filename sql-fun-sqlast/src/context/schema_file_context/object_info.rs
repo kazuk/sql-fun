@@ -199,12 +199,49 @@ mod test_extension_membership_history {
         ast::ObjectKind,
         context::{ExtensionInfoRead, MutSourcePathWithSpan, OwnershipInfoRead, ParseContext},
         names::FullName,
-        sem::{OwnershipIdentity, SourcePathWithSpan},
+        sem::{OwnershipIdentity, PgBuiltInType, SourcePathWithSpan},
         test_helpers::{
             ownership::{apply_ownership_sql, ownership_context},
             schema_layer,
         },
     };
+
+    #[test]
+    fn declared_operator_overloads_retain_extension_membership() -> testresult::TestResult {
+        let mut context = ownership_context();
+        context.enter_extension_script("operator_probe", Some("public"));
+        for sql in [
+            "CREATE FUNCTION identity(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+            "CREATE FUNCTION identity(integer, integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+            "CREATE OPERATOR %% (RIGHTARG=integer, FUNCTION=identity)",
+            "CREATE OPERATOR %% (LEFTARG=integer, RIGHTARG=integer, FUNCTION=identity, COMMUTATOR='@#@#')",
+        ] {
+            context = apply_ownership_sql(context, sql)?.into_context();
+        }
+        assert!(context.problems().is_empty());
+        let catalog = context.freeze();
+        let name = FullName::with_schema("public", "%%");
+        let operand = PgBuiltInType::int4();
+        for left in [None, Some(operand.clone())] {
+            let member = OwnershipIdentity::with_arguments(
+                ObjectKind::OPERATOR,
+                &name,
+                &[left, Some(operand.clone())],
+            );
+            assert_eq!(
+                catalog.extension_membership(&member),
+                Some("operator_probe")
+            );
+            assert_eq!(catalog.extension_membership_history(&member).len(), 1);
+        }
+        let shell = OwnershipIdentity::with_arguments(
+            ObjectKind::OPERATOR,
+            &FullName::with_schema("public", "@#@#"),
+            &[Some(operand.clone()), Some(operand)],
+        );
+        assert!(catalog.extension_membership_history(&shell).is_empty());
+        Ok(())
+    }
 
     #[test]
     fn update_masks_the_parent_membership_and_retains_the_member() -> testresult::TestResult {

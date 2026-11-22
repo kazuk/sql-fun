@@ -950,25 +950,22 @@ impl ParseContext for SchemaFileContext {
         self.catalog
             .operator_links
             .insert(identity.clone(), links.clone());
-        for (related, commutator) in [(&links.commutator, true), (&links.negator, false)] {
-            if let Some(related) = related
+        for commutator in [true, false] {
+            if let Some(related) = links.target(commutator)
                 && related != identity
             {
-                let mut links = self
+                let links = self
                     .catalog
                     .operator_links(related)
                     .cloned()
                     .unwrap_or_default();
-                let reciprocal = if commutator {
-                    &mut links.commutator
-                } else {
-                    &mut links.negator
-                };
-                if reciprocal.is_none() {
-                    *reciprocal = Some(identity.clone());
-                }
-                self.catalog.operator_links.insert(related.clone(), links);
+                self.catalog
+                    .operator_links
+                    .insert(related.clone(), links.with_reciprocal(commutator, identity));
             }
+        }
+        if let Some(member) = identity.extension_member() {
+            self.record_extension_member(&member);
         }
         Ok(self)
     }

@@ -48,6 +48,9 @@ impl SemAst {
             AstStatementNode::CreateOperator(ast) => Ok(Self::CreateOperator(Box::new(
                 CreateOperator::analyze(ast, context)?,
             ))),
+            AstStatementNode::CreateOperatorClass(_) => Err(AnalysisError::unexpected_input_error(
+                "CREATE OPERATOR CLASS semantic analysis is unsupported",
+            )),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")

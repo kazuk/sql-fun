@@ -13,6 +13,7 @@ use crate::{
         TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
+        create_operator_class::CreateOperatorClass,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
@@ -427,7 +428,7 @@ impl ObjectTarget {
 }
 
 impl ObjectArgument {
-    fn try_from_node(
+    pub(super) fn try_from_node(
         argument: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -825,6 +826,10 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 &variable_set,
                 tokens,
             )?));
+        }
+        if let Some(class) = value.as_create_op_class_stmt().as_inner() {
+            let class = CreateOperatorClass::try_from_with_tokens(&class, tokens)?;
+            return Ok(Self::CreateOperatorClass(Box::new(class)));
         }
         if let Some(define) = value.as_define_stmt().as_inner() {
             match define.get_kind().as_inner() {

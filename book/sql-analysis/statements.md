@@ -15,9 +15,10 @@ SQL parser can be analyzed or executed.
   [ALTER INDEX](statements/alter-index.md).
 - Write behavior: [CREATE/DROP RULE](statements/rules.md) and
   [CREATE/DROP TRIGGER](statements/triggers.md).
-- Types and routines: [CREATE TYPE](statements/create-type.md),
+- Types, routines, and operators: [CREATE TYPE](statements/create-type.md),
   [CREATE DOMAIN](statements/create-domain.md), and
-  [CREATE FUNCTION](statements/create-function.md) and
+  [CREATE FUNCTION](statements/create-function.md),
+  [CREATE OPERATOR](statements/create-operator.md), and
   [ALTER FUNCTION PARALLEL](statements/create-function.md#alter-function-parallel).
 - Other schema statements: [sequences](statements/sequences.md),
   [CREATE SCHEMA](statements/create-schema.md),

@@ -9,6 +9,7 @@
 #![allow(dead_code)]
 
 pub(crate) mod client_type;
+mod create_operator;
 mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;
@@ -37,6 +38,7 @@ mod trigger;
 pub(crate) mod validation;
 
 pub(crate) use self::{
+    create_operator::CreateOperator,
     create_type::{BaseTypeOption, CreateType},
     ddl::{CompositeType, Domain, Function, Index, Schema, TableAs},
     deparse::render_full_name,
@@ -295,6 +297,7 @@ pub(crate) enum StatementNode {
     ExtensionMembership(ExtensionMembership),
     VariableSet(VariableSet),
     EnumType(EnumType),
+    CreateOperator(CreateOperator),
     CreateType(CreateType),
     Sequence(Sequence),
     DropTable(DropTable),

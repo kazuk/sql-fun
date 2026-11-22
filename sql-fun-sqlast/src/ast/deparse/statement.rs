@@ -29,6 +29,7 @@ impl SqlEmit for StatementNode {
             Self::Extension(v) => v.emit(writer),
             Self::VariableSet(v) => v.emit(writer),
             Self::EnumType(v) => v.emit(writer),
+            Self::CreateOperator(_) => writer.unsupported("CREATE OPERATOR"),
             Self::CreateType(_) => writer.unsupported("CREATE TYPE"),
             Self::Sequence(v) => v.emit(writer),
             Self::DropTable(v) => v.emit(writer),

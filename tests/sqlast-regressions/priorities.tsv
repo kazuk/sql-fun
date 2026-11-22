@@ -7,8 +7,8 @@ heavy	bounded-parameter-inference-17
 heavy	bounded-parameter-inference-18
 heavy	parameter-bindings-17
 heavy	parameter-bindings-18
-heavy	privilege-statements-17
 heavy	privilege-statements-18
+heavy	project-roles-18
 medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
@@ -30,6 +30,7 @@ medium	distinctness-18
 medium	domain-operators-17
 medium	domain-operators-18
 medium	extension-membership-18
+medium	foreign-data-wrapper-18
 medium	membership-17
 medium	membership-18
 medium	minmax-metadata-17
@@ -45,8 +46,8 @@ medium	patterns-18
 medium	pilot-17
 medium	pilot-18
 medium	postgres18-syntax-17-17
+medium	privilege-statements-17
 medium	project-roles-17
-medium	project-roles-18
 medium	project-roles-empty-17
 medium	project-roles-empty-18
 medium	recursive-ctes-17
@@ -90,7 +91,6 @@ medium	schema-views-mechanisms-18
 medium	schema-views-precedence-17
 medium	schema-views-precedence-18
 medium	serial-family-17
-medium	serial-family-18
 medium	set-operations-17
 medium	set-operations-18
 medium	table-additions-17
@@ -135,7 +135,6 @@ light	drop-view-17
 light	drop-view-18
 light	extension-membership-17
 light	foreign-data-wrapper-17
-light	foreign-data-wrapper-18
 light	membership-comparisons-17
 light	membership-comparisons-18
 light	metadata-overloads-17
@@ -186,6 +185,7 @@ light	schema-views-automatic-17
 light	schema-views-automatic-18
 light	schema-views-special-17
 light	schema-views-special-18
+light	serial-family-18
 light	serial-original-17
 light	serial-original-18
 light	table-foreign-keys-17

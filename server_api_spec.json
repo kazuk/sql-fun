@@ -1168,6 +1168,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL operator family or class declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidOperatorFamilyDeclaration": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidOperatorFamilyDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "duplicate def elem key",
                   "type": "object",
                   "properties": {
@@ -6504,6 +6517,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL operator family or class declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidOperatorFamilyDeclaration": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidOperatorFamilyDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "duplicate def elem key",
                   "type": "object",
                   "properties": {
@@ -11728,6 +11754,19 @@
                   },
                   "required": [
                     "DuplicateAccessMethod"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid PostgreSQL operator family or class declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidOperatorFamilyDeclaration": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidOperatorFamilyDeclaration"
                   ],
                   "additionalProperties": false
                 },

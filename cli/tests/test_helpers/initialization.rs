@@ -161,6 +161,7 @@ impl InitializedProject {
             "casts.json",
             "collations.json",
             "operator_classes.json",
+            "operator_families.json",
         ] {
             std::fs::copy(source.join(name), target.join(name)).unwrap();
         }
@@ -183,6 +184,7 @@ impl InitializedProject {
             "casts.json",
             "collations.json",
             "operator_classes.json",
+            "operator_families.json",
         ] {
             assert_eq!(
                 std::fs::read(self.home().join("postgres").join(version).join(name)).unwrap(),

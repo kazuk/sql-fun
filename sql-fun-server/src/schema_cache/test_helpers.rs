@@ -35,6 +35,11 @@ impl SchemaProject {
         for name in ["functions.json", "func_detail.json"] {
             std::fs::write(builtin.join(name), "[]").unwrap();
         }
+        std::fs::write(
+            builtin.join("operator_families.json"),
+            r#"[{"schema":"pg_catalog","name":"integer_ops","access_method":"btree","operators":[],"functions":[]}]"#,
+        )
+        .unwrap();
         for name in ["left_unary_op.json", "right_unary_op.json", "casts.json"] {
             std::fs::write(builtin.join(name), "{}").unwrap();
         }

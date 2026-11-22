@@ -33,7 +33,8 @@ impl InstallationFixture {
                 "pg_type.json"
                 | "functions.json"
                 | "func_detail.json"
-                | "operator_classes.json" => "[]",
+                | "operator_classes.json"
+                | "operator_families.json" => "[]",
                 _ => "{}",
             };
             fs::write(candidate.join(name), content).unwrap();

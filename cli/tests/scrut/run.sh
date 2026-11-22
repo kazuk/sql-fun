@@ -33,7 +33,7 @@ done
 printf '%s\n' '{"intentionally_unused":[]}' >"$SQL_FUN_API_FIXTURE/home/postgres/17/binary_op.json"
 printf '%s\n' '[{"schema":"pg_catalog","name":"int4","collatable":false}]' >"$SQL_FUN_API_FIXTURE/home/postgres/17/pg_type.json"
 printf '%s\n' '-- synthetic builtin' >"$SQL_FUN_API_FIXTURE/home/postgres/17/schema.sql"
-for catalog in collations operator_classes; do
+for catalog in collations operator_classes operator_families; do
   cp "$api_fixture_source/$catalog.json" "$SQL_FUN_API_FIXTURE/home/postgres/17/$catalog.json"
 done
 api_dump_hash=$(sha256sum "$SQL_FUN_API_FIXTURE/schema.sql")

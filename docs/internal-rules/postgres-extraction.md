@@ -143,7 +143,8 @@ That existing option continues to select only collation/operator-class masters.
 
 ## Additive master definitions
 
-Format 1 additionally produces `collations.json` and `operator_classes.json`.
+Format 1 additionally produces `collations.json`, `operator_classes.json`, and
+`operator_families.json`.
 Existing payloads and metadata representations are unchanged. The production
 semantic loader now requires both masters for PostgreSQL catalog
 initialization, and installed-generation validation checks their presence and
@@ -213,14 +214,36 @@ referenced family belongs to the same method and preserve type identities even
 outside selected namespaces. Null `key_type` means no distinct storage type,
 not a missing reference. Matching and default selection are consumer work.
 
-Neither payload exports OIDs as portable identities. Database locale/provider,
+These payloads use qualified names as portable identities. Database locale/provider,
 server encoding/build, installed definitions and selected namespaces are inputs
-to reproduction. Existing pinned-image CI reproduces both new files, alongside
+to reproduction. Existing pinned-image CI reproduces these files, alongside
 all previously committed payloads and metadata. Producer-side offline checks
 cover identity uniqueness/order, relationship shapes and default provenance;
 real-server extraction checks cover explicit scope, legal unusual names,
 encoding properties, cross-schema references and installed extension masters.
 These checks do not claim production conflict-target lookup support.
+
+### Operator families
+
+`operator_families.json` contains families ordered by
+`(schema, name, access_method)` using C collation. It contains builtin
+families, families in explicitly selected definition schemas, and families
+referenced by selected classes. Each family contains `operators` and
+`functions` arrays ordered by slot number and qualified operand identities.
+
+Operator slots record the qualified operator name and nullable ordering family.
+Support slots record the qualified routine name and ordered argument types.
+Both retain the slot's left and right type independently of the support routine
+signature. A type includes its exact catalog name and a nullable
+`array_element` qualified name for ordinary PostgreSQL arrays.
+
+Member entries include protected builtin slots, slots owned by selected
+classes, and loose slots of families in selected schemas. `owner` is the
+class identity when PostgreSQL's internal dependency supplies it. Builtin
+slots retain a `builtin` flag and have no recorded class ownership in the
+stock PostgreSQL catalogs. A member with no owner and a false builtin flag
+represents loose membership. These facts allow semantic replay to preserve
+the visible slots and enforce ownership on later declarations.
 
 ## Extension bundle contract
 

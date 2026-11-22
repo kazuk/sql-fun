@@ -2,10 +2,10 @@
 
 Use `sql-fun extract` to obtain builtin catalogs for PostgreSQL 17 or 18.
 It writes `schema.sql`, catalog JSON files, and `metadata.json` to the directory
-you specify. Outputs include `collations.json` and `operator_classes.json` for
-collation and index operator-class definitions. Docker extraction also exports
-and imports the server installation's
-extension SQL and control files. Extracted builtin views retain their options,
+you specify. Outputs include `collations.json`, `operator_classes.json`, and
+`operator_families.json`. Refresh older generations to analyze operator family
+and class declarations against existing catalog members. Docker extraction also
+exports and imports the server installation's extension SQL and control files. Extracted builtin views retain their options,
 column defaults and write rules/triggers. Function metadata distinguishes scalar,
 aggregate/window and set-returning functions so view-write analysis can reject
 row-expanding projections. Refresh older builtin generations before relying on

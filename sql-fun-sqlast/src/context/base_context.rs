@@ -514,6 +514,14 @@ impl crate::context::OperatorFamilyInfoRead for BaseContext {
     }
 
 
+    fn operator_class_for_family_type(
+        &self,
+        key: &crate::sem::OperatorFamilyKey,
+        typ: &TypeReference,
+    ) -> Option<&OperatorClassDefinition> {
+        self.masters.operator_class_for_family_type(key, typ)
+    }
+
     fn has_default_operator_class(&self, method: &str, typ: &TypeReference) -> bool {
         self.masters.has_default_operator_class(method, typ)
     }

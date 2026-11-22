@@ -112,7 +112,7 @@ impl CreateOperatorClass {
                 storage = Some(typ);
                 continue;
             }
-            let Some((slot, member)) = resolve_family_member(member, method, Some(input), MemberOwner::Class(name.clone()), context)? else {
+            let Some((slot, member)) = resolve_family_member(member, &family.key, Some(input), MemberOwner::Class(name.clone()), context)? else {
                 return Ok(None);
             };
             if let Err(message) = family.insert(slot, member) {

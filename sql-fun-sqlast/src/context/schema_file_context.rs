@@ -98,7 +98,7 @@ pub(super) struct SchemaCatalog {
     configured_roles: ConfiguredRoles,
     base: FrozenBaseContext,
     access_methods: std::collections::HashMap<String, AccessMethodDefinition>,
-    operator_classes: std::collections::HashMap<(FullName, String), OperatorClassDefinition>,
+    operator_classes: Vec<OperatorClassDefinition>,
     operator_families: std::collections::HashMap<crate::sem::OperatorFamilyKey, crate::sem::OperatorFamily>,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
     args: SqlFunArgs,
@@ -674,8 +674,18 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
 }
 
 impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
+    fn operator_class_for_family_type(
+        &self,
+        key: &crate::sem::OperatorFamilyKey,
+        typ: &TypeReference,
+    ) -> Option<&OperatorClassDefinition> {
+        self.base.operator_class_for_family_type(key, typ).or_else(|| {
+            self.operator_classes.iter().find(|class| class.belongs_to(key) && class.has_input(typ))
+        })
+    }
+
     fn has_default_operator_class(&self, method: &str, typ: &TypeReference) -> bool {
-       self.operator_classes.values().any(|class| {
+       self.operator_classes.iter().any(|class| {
            class.default() && class.access_method() == method && class.has_input(typ)
        }) || self.base.has_default_operator_class(method, typ)
     }
@@ -688,7 +698,7 @@ impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
 
 impl crate::context::OperatorFamilyInfoWrite for SchemaFileContext {
     fn publish_operator_class(mut self, class: &OperatorClassDefinition, family: &crate::sem::OperatorFamily) -> Self {
-        self.catalog.operator_classes.insert((class.qualified_name(), class.access_method().to_owned()), class.clone());
+        self.catalog.operator_classes.push(class.clone());
         self.publish_operator_family(family)
     }
 
@@ -1439,7 +1449,10 @@ impl crate::context::ConflictInfoRead for SchemaCatalog {
         name: &FullName,
         method: &str,
     ) -> Option<&OperatorClassDefinition> {
-        self.operator_classes.get(&(name.clone(), method.to_owned())).or_else(|| self.base.operator_class_definition(name, method))
+        self.operator_classes
+            .iter()
+            .find(|class| class.matches_name(name) && class.access_method() == method)
+            .or_else(|| self.base.operator_class_definition(name, method))
     }
     fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {
         self.base.lookup_sqlite_collation(name)

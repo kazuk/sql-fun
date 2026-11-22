@@ -2,6 +2,16 @@ use crate::sem::{OperatorClassDefinition, OperatorFamily, OperatorFamilyKey, Typ
 
 /// Read access to the effective operator family catalog.
 pub trait OperatorFamilyInfoRead {
+    /// First registered class for this family and exact input type.
+    fn operator_class_for_family_type(
+        &self,
+        _key: &OperatorFamilyKey,
+        _typ: &TypeReference,
+    ) -> Option<&OperatorClassDefinition> {
+        None
+    }
+
+
     /// Whether the effective catalog has a default class for the method and input type.
     fn has_default_operator_class(&self, _method: &str, _typ: &TypeReference) -> bool {
         false

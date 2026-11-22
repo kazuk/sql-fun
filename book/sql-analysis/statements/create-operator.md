@@ -51,5 +51,5 @@ Follow [issue #1218](https://github.com/kazuk/sql-fun/issues/1218).
 The `ALTER OPERATOR … SET` form for changing selectivity estimators and
 `DROP OPERATOR` fail during SQL analysis. These forms occur in bundled
 extension update scripts, including `cube` and `intarray`, respectively.
-Follow [issue #1199](https://github.com/kazuk/sql-fun/issues/1199) for the
+Follow [issue #1199](https://github.com/kazuk/sql-fun/issues/1199#issuecomment-7077560718) for the
 conversion work.

@@ -21,19 +21,54 @@ pub(crate) struct CreateOperatorClass {
 #[allow(dead_code, reason = "retained for operator class semantic analysis")]
 #[derive(Clone, Debug)]
 enum OperatorClassMember {
-    Operator {
-        strategy: i32,
-        name: Name,
-        operands: Option<Vec<ObjectArgument>>,
-        order_family: Option<Name>,
-    },
-    Function {
-        support: i32,
-        name: Name,
-        class_operands: Option<Vec<TypeName>>,
-        arguments: Option<Vec<TypeName>>,
-    },
+    Operator(OperatorClassOperator),
+    Function(OperatorClassFunction),
     Storage(TypeName),
+}
+
+#[allow(dead_code, reason = "retained for operator class semantic analysis")]
+#[derive(Clone, Debug)]
+struct OperatorClassOperator {
+    strategy: i32,
+    name: Name,
+    operands: Option<Vec<ObjectArgument>>,
+    order_family: Option<Name>,
+}
+
+#[allow(dead_code, reason = "retained for operator class semantic analysis")]
+#[derive(Clone, Debug)]
+struct OperatorClassFunction {
+    support: i32,
+    name: Name,
+    class_operands: Option<Vec<TypeName>>,
+    arguments: Option<Vec<TypeName>>,
+}
+
+#[cfg(test)]
+impl OperatorClassMember {
+    fn as_operator(&self) -> Option<&OperatorClassOperator> {
+        if let Self::Operator(operator) = self {
+            Some(operator)
+        } else {
+            None
+        }
+    }
+
+    fn as_function(&self) -> Option<&OperatorClassFunction> {
+        if let Self::Function(function) = self {
+            Some(function)
+        } else {
+            None
+        }
+    }
+
+    fn as_storage(&self) -> Option<&TypeName> {
+        if let Self::Storage(typ) = self {
+            Some(typ)
+        } else {
+            None
+        }
+    }
 }
 
 impl TryFromWithTokens<&syn::CreateOpClassStmt> for CreateOperatorClass {
@@ -59,6 +94,98 @@ impl TryFromWithTokens<&syn::CreateOpClassStmt> for CreateOperatorClass {
     }
 }
 
+#[cfg(test)]
+mod test_create_operator_class_conversion {
+    use crate::{
+        ast::{Dialect, StatementKind, StatementNode},
+        parse_statements,
+    };
+
+    #[test]
+    fn preserves_operator_class_structure_and_type_locations() {
+        let sql = r#"SELECT 1;
+CREATE OPERATOR CLASS "App".ops DEFAULT FOR TYPE int4 USING gist FAMILY "App".family AS
+    OPERATOR 1 = FOR SEARCH,
+    OPERATOR 2 "App".!! (NONE, int4) FOR ORDER BY pg_catalog.integer_ops,
+    FUNCTION 3 (bigint, smallint) "App".support (internal, integer),
+    FUNCTION 4 "App".empty (),
+    FUNCTION 5 "App".unspecified,
+    STORAGE bytea;"#;
+        let statement = parse_statements(sql, Dialect::postgres())
+            .nth(1)
+            .unwrap()
+            .unwrap();
+        assert_eq!(statement.kind(), StatementKind::CreateOperatorClass);
+        let StatementNode::CreateOperatorClass(class) = statement.node() else {
+            panic!("expected CREATE OPERATOR CLASS");
+        };
+        assert_eq!(class.name.0, ["App", "ops"]);
+        assert!(class.is_default);
+        assert_eq!(class.access_method, "gist");
+        assert_eq!(class.family.as_ref().unwrap().0, ["App", "family"]);
+
+        let statement_sql = statement.span().get_from(sql).unwrap();
+        assert!(
+            statement_sql
+                .trim_start()
+                .starts_with("CREATE OPERATOR CLASS")
+        );
+        assert_eq!(
+            class.input_type.location.unwrap().get_from(statement_sql),
+            Some("int4")
+        );
+
+        assert_eq!(class.members.len(), 6);
+        let search = class.members[0].as_operator().unwrap();
+        assert_eq!(search.strategy, 1);
+        assert_eq!(search.name.0, ["="]);
+        assert!(search.operands.is_none());
+        assert!(search.order_family.is_none());
+
+        let ordering = class.members[1].as_operator().unwrap();
+        assert_eq!(ordering.strategy, 2);
+        assert_eq!(ordering.name.0, ["App", "!!"]);
+        assert_eq!(
+            ordering.order_family.as_ref().unwrap().0,
+            ["pg_catalog", "integer_ops"]
+        );
+        let operands = ordering.operands.as_ref().unwrap();
+        assert_eq!(operands.len(), 2);
+        assert!(operands[0].type_name().is_none());
+        assert_eq!(
+            operands[1]
+                .type_name()
+                .as_ref()
+                .unwrap()
+                .location
+                .unwrap()
+                .get_from(statement_sql),
+            Some("int4")
+        );
+        let support = class.members[2].as_function().unwrap();
+        assert_eq!(support.support, 3);
+        assert_eq!(support.name.0, ["App", "support"]);
+        let class_operands = support.class_operands.as_ref().unwrap();
+        assert_eq!(class_operands[0].name.0, ["pg_catalog", "int8"]);
+        assert_eq!(class_operands[1].name.0, ["pg_catalog", "int2"]);
+        let arguments = support.arguments.as_ref().unwrap();
+        assert_eq!(arguments.len(), 2);
+        assert_eq!(arguments[0].name.0, ["internal"]);
+        assert_eq!(arguments[1].name.0, ["pg_catalog", "int4"]);
+
+        let empty = class.members[3].as_function().unwrap();
+        assert_eq!(empty.support, 4);
+        assert!(empty.class_operands.is_none());
+        assert!(empty.arguments.as_ref().unwrap().is_empty());
+
+        let unspecified = class.members[4].as_function().unwrap();
+        assert_eq!(unspecified.support, 5);
+        assert!(unspecified.class_operands.is_none());
+        assert!(unspecified.arguments.is_none());
+        assert_eq!(class.members[5].as_storage().unwrap().name.0, ["bytea"]);
+    }
+}
+
 impl TryFromWithTokens<&syn::Node> for OperatorClassMember {
     type Error = AnalysisError;
 
@@ -76,9 +203,19 @@ impl TryFromWithTokens<&syn::Node> for OperatorClassMember {
             "operator class member",
         )?;
         match member.get_itemtype() {
-            OPERATOR => Self::operator(&member, tokens),
-            FUNCTION => Self::function(&member, tokens),
-            STORAGE => Self::storage(&member, tokens),
+            OPERATOR => {
+                OperatorClassOperator::try_from_with_tokens(&member, tokens).map(Self::Operator)
+            }
+            FUNCTION => {
+                OperatorClassFunction::try_from_with_tokens(&member, tokens).map(Self::Function)
+            }
+            STORAGE => {
+                let typ = required(
+                    member.get_storedtype().as_inner(),
+                    "operator class storage type",
+                )?;
+                TypeName::try_from_with_tokens(&typ, tokens).map(Self::Storage)
+            }
             _ => Err(AnalysisError::unexpected_input_error(
                 "operator class member kind",
             )),
@@ -86,21 +223,27 @@ impl TryFromWithTokens<&syn::Node> for OperatorClassMember {
     }
 }
 
-impl OperatorClassMember {
-    fn operator(
+impl TryFromWithTokens<&syn::CreateOpClassItem> for OperatorClassOperator {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         member: &syn::CreateOpClassItem,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         let object = required(member.get_name().as_inner(), "operator class operator")?;
-        Ok(Self::Operator {
+        Ok(Self {
             strategy: member.get_number(),
             name: Name::try_from(object.get_objname())?,
             operands: object_arguments(object.get_objargs(), tokens)?,
             order_family: optional_name(member.get_order_family())?,
         })
     }
+}
 
-    fn function(
+impl TryFromWithTokens<&syn::CreateOpClassItem> for OperatorClassFunction {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         member: &syn::CreateOpClassItem,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -114,7 +257,7 @@ impl OperatorClassMember {
             Some(type_names(object.get_objargs(), tokens)?)
         };
         let class_operands = type_names(member.get_class_args(), tokens)?;
-        Ok(Self::Function {
+        Ok(Self {
             support: member.get_number(),
             name: Name::try_from(object.get_objname())?,
             class_operands: if class_operands.is_empty() {
@@ -124,17 +267,6 @@ impl OperatorClassMember {
             },
             arguments,
         })
-    }
-
-    fn storage(
-        member: &syn::CreateOpClassItem,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        let typ = required(
-            member.get_storedtype().as_inner(),
-            "operator class storage type",
-        )?;
-        TypeName::try_from_with_tokens(&typ, tokens).map(Self::Storage)
     }
 }
 
@@ -174,152 +306,4 @@ fn object_arguments(
                 .collect::<Result<_, _>>()
         })
         .transpose()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use crate::{
-        SqlFileSnapshot,
-        ast::{Dialect, StatementKind, StatementNode, create_operator_class::OperatorClassMember},
-        parse_statements::{parse_statements, split_postgres_statements},
-    };
-
-    #[test]
-    fn preserves_operator_class_structure_and_type_locations() {
-        let sql = r#"SELECT 1;
-CREATE OPERATOR CLASS "App".ops DEFAULT FOR TYPE int4 USING gist FAMILY "App".family AS
-    OPERATOR 1 = FOR SEARCH,
-    OPERATOR 2 "App".!! (NONE, int4) FOR ORDER BY pg_catalog.integer_ops,
-    FUNCTION 3 (bigint, smallint) "App".support (internal, integer),
-    FUNCTION 4 "App".empty (),
-    FUNCTION 5 "App".unspecified,
-    STORAGE bytea;"#;
-        let statement = parse_statements(sql, Dialect::postgres())
-            .nth(1)
-            .unwrap()
-            .unwrap();
-        assert_eq!(statement.kind(), StatementKind::CreateOperatorClass);
-        let StatementNode::CreateOperatorClass(class) = statement.node() else {
-            panic!("expected CREATE OPERATOR CLASS");
-        };
-        assert_eq!(class.name.0, ["App", "ops"]);
-        assert!(class.is_default);
-        assert_eq!(class.access_method, "gist");
-        assert_eq!(class.family.as_ref().unwrap().0, ["App", "family"]);
-
-        let statement_sql = statement.span().get_from(sql).unwrap();
-        assert!(
-            statement_sql
-                .trim_start()
-                .starts_with("CREATE OPERATOR CLASS")
-        );
-        assert_eq!(
-            class.input_type.location.unwrap().get_from(statement_sql),
-            Some("int4")
-        );
-
-        let [
-            OperatorClassMember::Operator {
-                strategy: 1,
-                name: search,
-                operands: None,
-                order_family: None,
-            },
-            OperatorClassMember::Operator {
-                strategy: 2,
-                name: ordering,
-                operands: Some(operands),
-                order_family: Some(order_family),
-            },
-            OperatorClassMember::Function {
-                support: 3,
-                name: support,
-                class_operands: Some(class_operands),
-                arguments: Some(arguments),
-            },
-            OperatorClassMember::Function {
-                support: 4,
-                class_operands: None,
-                arguments: Some(empty),
-                ..
-            },
-            OperatorClassMember::Function {
-                support: 5,
-                class_operands: None,
-                arguments: None,
-                ..
-            },
-            OperatorClassMember::Storage(storage),
-        ] = class.members.as_slice()
-        else {
-            panic!("unexpected member order or structure: {:?}", class.members);
-        };
-        assert_eq!(search.0, ["="]);
-        assert_eq!(ordering.0, ["App", "!!"]);
-        assert_eq!(order_family.0, ["pg_catalog", "integer_ops"]);
-        assert_eq!(operands.len(), 2);
-        assert!(operands[0].type_name().is_none());
-        assert_eq!(
-            operands[1]
-                .type_name()
-                .as_ref()
-                .unwrap()
-                .location
-                .unwrap()
-                .get_from(statement_sql),
-            Some("int4")
-        );
-        assert_eq!(support.0, ["App", "support"]);
-        assert_eq!(class_operands[0].name.0, ["pg_catalog", "int8"]);
-        assert_eq!(class_operands[1].name.0, ["pg_catalog", "int2"]);
-        assert_eq!(arguments.len(), 2);
-        assert_eq!(arguments[0].name.0, ["internal"]);
-        assert_eq!(arguments[1].name.0, ["pg_catalog", "int4"]);
-        assert!(empty.is_empty());
-        assert_eq!(storage.name.0, ["bytea"]);
-    }
-
-    #[test]
-    fn converts_operator_classes_from_bundled_extension_paths() {
-        for version in ["17", "18"] {
-            let extension_dir = Path::new(env!("SQL_FUN_HOME"))
-                .join("postgres")
-                .join(version)
-                .join("extension");
-            for (script, expected_count) in [
-                ("btree_gin--1.0.sql", 23),
-                ("btree_gin--1.0--1.1.sql", 1),
-                ("btree_gin--1.1--1.2.sql", 1),
-                ("btree_gin--1.2--1.3.sql", 4),
-                ("pg_trgm--1.3.sql", 2),
-            ] {
-                let source = SqlFileSnapshot::read(&extension_dir.join(script))
-                    .unwrap()
-                    .postgres_text();
-                let mut names = Vec::new();
-                for sql in split_postgres_statements(&source).unwrap() {
-                    // Select only operator classes from scripts that also contain other DDL.
-                    let Some(start) = sql.find("CREATE OPERATOR CLASS ") else {
-                        continue;
-                    };
-                    let statement = parse_statements(&sql[start..], Dialect::postgres())
-                        .next()
-                        .unwrap()
-                        .unwrap_or_else(|error| panic!("{version}/{script}: {error}: {sql}"));
-                    let StatementNode::CreateOperatorClass(class) = statement.node() else {
-                        panic!("expected CREATE OPERATOR CLASS in {version}/{script}");
-                    };
-                    names.push(class.name.0.join("."));
-                }
-                assert_eq!(names.len(), expected_count, "{version}/{script}: {names:?}");
-                if script == "btree_gin--1.0.sql" {
-                    assert_eq!(names[0], "int2_ops");
-                } else if script == "pg_trgm--1.3.sql" {
-                    assert_eq!(names[0], "gist_trgm_ops");
-                }
-            }
-        }
-    }
 }

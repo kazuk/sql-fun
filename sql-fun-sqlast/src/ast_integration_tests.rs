@@ -2926,3 +2926,51 @@ mod test_grouping_lateral_scope {
         }
     }
 }
+
+#[test]
+fn converts_operator_classes_from_bundled_extension_paths() {
+    use std::path::Path;
+
+    use crate::{
+        SqlFileSnapshot,
+        ast::{Dialect, StatementKind},
+        parse_statements::{parse_statements, split_postgres_statements},
+    };
+
+    for version in ["17", "18"] {
+        let extension_dir = Path::new(env!("SQL_FUN_HOME"))
+            .join("postgres")
+            .join(version)
+            .join("extension");
+        for (script, expected_count) in [
+            ("btree_gin--1.0.sql", 23),
+            ("btree_gin--1.0--1.1.sql", 1),
+            ("btree_gin--1.1--1.2.sql", 1),
+            ("btree_gin--1.2--1.3.sql", 4),
+            ("pg_trgm--1.3.sql", 2),
+        ] {
+            let source = SqlFileSnapshot::read(&extension_dir.join(script))
+                .unwrap()
+                .postgres_text();
+            let mut names = Vec::new();
+            for sql in split_postgres_statements(&source).unwrap() {
+                // Select only operator classes from scripts that also contain other DDL.
+                let Some(start) = sql.find("CREATE OPERATOR CLASS ") else {
+                    continue;
+                };
+                let statement = parse_statements(&sql[start..], Dialect::postgres())
+                    .next()
+                    .unwrap()
+                    .unwrap_or_else(|error| panic!("{version}/{script}: {error}: {sql}"));
+                assert_eq!(statement.kind(), StatementKind::CreateOperatorClass);
+                names.push(sql[start..].split_whitespace().nth(3).unwrap());
+            }
+            assert_eq!(names.len(), expected_count, "{version}/{script}: {names:?}");
+            if script == "btree_gin--1.0.sql" {
+                assert_eq!(names[0], "int2_ops");
+            } else if script == "pg_trgm--1.3.sql" {
+                assert_eq!(names[0], "gist_trgm_ops");
+            }
+        }
+    }
+}

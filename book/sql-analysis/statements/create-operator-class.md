@@ -1,9 +1,9 @@
 # CREATE OPERATOR CLASS
 
-sql-fun recognizes PostgreSQL `CREATE OPERATOR CLASS` declarations. Analysis
-stops with an unsupported-operation error when it reaches one in SQL input
-or a schema or extension script. The declaration does not register a class
-that later statements can use.
+sql-fun recognizes PostgreSQL `CREATE OPERATOR CLASS` declarations. Its
+analysis server panics and exits when analysis reaches one in SQL input or
+in a schema or extension script. The CLI reports `EOF with missing responses`,
+and the declaration is never registered.
 
 This limitation affects bundled extensions such as `btree_gin`. Follow
 [issue #1220](https://github.com/kazuk/sql-fun/issues/1220) for operator-class

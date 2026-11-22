@@ -48,9 +48,9 @@ impl SemAst {
             AstStatementNode::CreateOperator(ast) => Ok(Self::CreateOperator(Box::new(
                 CreateOperator::analyze(ast, context)?,
             ))),
-            AstStatementNode::CreateOperatorClass(_) => Err(AnalysisError::unexpected_input_error(
-                "CREATE OPERATOR CLASS semantic analysis is unsupported",
-            )),
+            AstStatementNode::CreateOperatorClass(_) => {
+                todo!("CREATE OPERATOR CLASS semantic analysis (#1220)")
+            }
             AstStatementNode::CreateType(ast) => ast.analyze(context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
@@ -296,6 +296,7 @@ impl SemAst {
     /// CREATE TRIGGER analysis is not implemented yet (#602 / #555).
     /// ALTER DEFAULT PRIVILEGES and CREATE FOREIGN TABLE interpretation remains
     /// unimplemented (#955 / #956), after syntax-version checks succeed.
+    /// CREATE OPERATOR CLASS analysis is unimplemented (#1220).
     ///
     /// # Errors
     ///

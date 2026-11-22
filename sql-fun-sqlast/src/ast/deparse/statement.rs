@@ -2,6 +2,9 @@ use crate::{
     ast::{
         CreateTableMode, PartitionBound, PartitionDatum, PartitionSpec, StatementNode,
         SyntaxOption, Table, TableExtras,
+        create_operator::{
+            CreateOperator, OperatorOption, OperatorOptionValue, valid_operator_token,
+        },
         deparse::{DeparseError, SqlEmit, SqlWriter},
     },
     stack::with_stack,
@@ -29,7 +32,7 @@ impl SqlEmit for StatementNode {
             Self::Extension(v) => v.emit(writer),
             Self::VariableSet(v) => v.emit(writer),
             Self::EnumType(v) => v.emit(writer),
-            Self::CreateOperator(_) => writer.unsupported("CREATE OPERATOR"),
+            Self::CreateOperator(operator) => operator.emit(writer),
             Self::CreateType(_) => writer.unsupported("CREATE TYPE"),
             Self::Sequence(v) => v.emit(writer),
             Self::DropTable(v) => v.emit(writer),
@@ -50,6 +53,51 @@ impl SqlEmit for StatementNode {
             Self::AlterRelation(v) => v.emit(writer),
         })
         .map_err(|error| error.context(&self.kind().to_string()))
+    }
+}
+
+impl SqlEmit for CreateOperator {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("CREATE OPERATOR")?;
+        let Some((token, qualifiers)) = self.name.parts().split_last() else {
+            return writer.invalid("CREATE OPERATOR", "operator name is required");
+        };
+        if !valid_operator_token(token) {
+            return writer.invalid("CREATE OPERATOR", "operator contains invalid punctuation");
+        }
+        writer.sql("CREATE OPERATOR ");
+        if !qualifiers.is_empty() {
+            writer.names(qualifiers, ".")?;
+            writer.sql(".");
+        }
+        writer.sql(token);
+        writer.sql(" (");
+        writer.list(&self.options, ", ")?;
+        writer.sql(")");
+        Ok(())
+    }
+}
+
+impl SqlEmit for OperatorOption {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.ident(&self.key)?;
+        let Some(value) = &self.value else {
+            return Ok(());
+        };
+        writer.sql(" = ");
+        match value {
+            OperatorOptionValue::Type(value) => value.emit(writer),
+            OperatorOptionValue::Literal(value) => value.emit(writer),
+            OperatorOptionValue::Name(value)
+                if matches!(self.key.as_str(), "commutator" | "negator") =>
+            {
+                match value.parts() {
+                    [token] => writer.string(token),
+                    _ => value.emit_operator(writer),
+                }
+            }
+            OperatorOptionValue::Name(value) => value.emit(writer),
+        }
     }
 }
 

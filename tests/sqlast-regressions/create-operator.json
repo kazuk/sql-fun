@@ -1,0 +1,140 @@
+[
+  {
+    "name": "unqualified-binary",
+    "sql": "SELECT 'a'::text %% 'b'::text AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified-overload",
+    "sql": "SELECT 1 OPERATOR(public.%%) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "prefix",
+    "sql": "SELECT OPERATOR(public.%%) 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "strict-null",
+    "sql": "SELECT NULL::text %% 'b'::text AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate",
+    "sql": "CREATE OPERATOR %% (LEFTARG=integer, RIGHTARG=integer, FUNCTION=int4pl)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-signature",
+    "sql": "CREATE OPERATOR !!! (RIGHTARG=bigint, FUNCTION=int4um)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "postfix",
+    "sql": "CREATE OPERATOR !!! (LEFTARG=integer, FUNCTION=int4um)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "unknown-type",
+    "sql": "CREATE OPERATOR !!! (RIGHTARG=absent_type, FUNCTION=int4um)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "with-estimators",
+    "sql": "SELECT 1 OPERATOR(public.@#@#) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "valid-declaration",
+    "sql": "CREATE OPERATOR public.!!! (RIGHTARG=integer, FUNCTION=pg_catalog.int4um)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

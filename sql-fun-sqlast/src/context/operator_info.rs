@@ -1,7 +1,15 @@
-use crate::{names::OperatorName, sem::OperatorDefinition};
+use crate::{
+    names::OperatorName,
+    sem::{OperatorDefinition, OperatorIdentity, OperatorLinks},
+};
 
 /// get operator definition
 pub trait OperatorInfoRead {
+    /// Read declaration links for an exact signature, including an operator shell.
+    fn operator_links(&self, _identity: &OperatorIdentity) -> Option<&OperatorLinks> {
+        None
+    }
+
     /// A catalog guarantee that the operator returns a non-null value when
     /// both operands are non-null. Strictness alone does not provide this.
     /// `None` means no guarantee is available, including custom implementations.

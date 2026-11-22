@@ -355,6 +355,13 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::OperatorInfoRead for $context {
+            fn operator_links(
+                &self,
+                identity: &$crate::sem::OperatorIdentity,
+            ) -> Option<&$crate::sem::OperatorLinks> {
+                crate::context::OperatorInfoRead::operator_links(self.$catalog(), identity)
+            }
+
             fn operator_result_is_not_null(
                 &self,
                 name: &crate::names::OperatorName,

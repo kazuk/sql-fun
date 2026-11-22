@@ -7,12 +7,12 @@ use crate::{
     sem::{
         AlterFunctionParallel, AlterOwner, AlterSequence, AnalysisError, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateForeignDataWrapper,
-        CreateFunction, CreateIndex, CreateRule, CreateSchema, CreateSequence, CreateTable,
-        CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropFunction, DropRule,
-        DropTable, DropTrigger, DropView, EngineFeatureValidation, ExtensionMembershipChange,
-        InsertStatement, MergeStatement, ObjectPrivilegeChange, ParameterConstraints,
-        RelationAlteration, RoleMembershipDeclaration, SelectStatement, SemAst, UpdateStatement,
-        VariableSet,
+        CreateFunction, CreateIndex, CreateOperator, CreateRule, CreateSchema, CreateSequence,
+        CreateTable, CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropFunction,
+        DropRule, DropTable, DropTrigger, DropView, EngineFeatureValidation,
+        ExtensionMembershipChange, InsertStatement, MergeStatement, ObjectPrivilegeChange,
+        ParameterConstraints, RelationAlteration, RoleMembershipDeclaration, SelectStatement,
+        SemAst, UpdateStatement, VariableSet,
     },
 };
 
@@ -45,9 +45,9 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
-            AstStatementNode::CreateOperator(_) => {
-                todo!("CREATE OPERATOR semantic analysis (#1215)")
-            }
+            AstStatementNode::CreateOperator(ast) => Ok(Self::CreateOperator(Box::new(
+                CreateOperator::analyze(ast, context)?,
+            ))),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
@@ -250,6 +250,14 @@ impl SemAst {
                 RelationAlteration::from_ast_and_apply(statement, context)
             }
             AstStatementNode::Domain(domain) => CreateDomain::from_ast_and_apply(domain, context),
+            AstStatementNode::CreateOperator(ast) => {
+                let statement = CreateOperator::analyze(ast, &mut context)?;
+                let context = context.apply_create_operator(&statement)?;
+                Ok(AstAndContextPair::new(
+                    Self::CreateOperator(Box::new(statement)),
+                    context,
+                ))
+            }
             AstStatementNode::Function(function) => {
                 CreateFunction::from_ast_and_apply(function, context)
             }

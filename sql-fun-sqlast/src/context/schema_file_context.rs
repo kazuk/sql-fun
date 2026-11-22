@@ -43,13 +43,14 @@ use crate::{
     sem::{
         AlterIndex, AlterOwner, AnalysisError, AnalysisProblem, AnalysisState, CastDefinition,
         CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
-        CreateForeignDataWrapper, CreateIndex, CreateRule, CreateSchema, CreateTrigger, CursorInfo,
-        DatabaseCollation, ExtensionMembershipChange, FunctionTombstone, ImplicitChange,
-        InsertConflict, Kind, ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition,
-        OverloadVariant as SemOverloadVariant, OwnedObjectDefinition, OwnershipIdentity,
-        ParameterConstraints, Role, RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr,
-        SourcePathWithSpan, TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport,
-        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewTombstone, ViewUpdateSupport,
+        CreateForeignDataWrapper, CreateIndex, CreateOperator, CreateRule, CreateSchema,
+        CreateTrigger, CursorInfo, DatabaseCollation, ExtensionMembershipChange, FunctionTombstone,
+        ImplicitChange, InsertConflict, Kind, ObjectPrivilegeChange, OperatorClassDefinition,
+        OperatorDefinition, OperatorIdentity, OperatorLinks, OverloadVariant as SemOverloadVariant,
+        OwnedObjectDefinition, OwnershipIdentity, ParameterConstraints, Role,
+        RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr, SourcePathWithSpan,
+        TriggerIdentity, TypeReference, VariableSet, ViewDeleteSupport, ViewInsertSupport,
+        ViewLike, ViewMergeSupport, ViewTombstone, ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -116,6 +117,7 @@ pub(super) struct SchemaCatalog {
     // Concrete TypeReference spelling preserves canonical FullName + array identity.
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
+    operator_links: std::collections::HashMap<OperatorIdentity, OperatorLinks>,
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
     indexes: TrieMap<CreateIndex>,
@@ -188,6 +190,7 @@ impl SchemaFileContext {
                 views: ViewInformationCollection::default(),
                 casts: TrieMap::default(),
                 binary_operators: TrieMap::default(),
+                operator_links: Default::default(),
                 left_unary_operators: TrieMap::default(),
                 right_unary_operators: TrieMap::default(),
                 indexes: TrieMap::default(),
@@ -469,6 +472,14 @@ mod test_index_lookup {
 }
 
 impl OperatorInfoRead for SchemaCatalog {
+    fn operator_links(&self, identity: &OperatorIdentity) -> Option<&OperatorLinks> {
+        if let Some(links) = self.operator_links.get(identity) {
+            Some(links)
+        } else {
+            self.base.operator_links(identity)
+        }
+    }
+
     fn operator_result_is_not_null(&self, name: &OperatorName) -> Option<bool> {
         if !name.is_valid() || self.binary_operators.get(&name.to_name_string()).is_some() {
             None
@@ -913,6 +924,55 @@ mod test_parameter_type_hint_write {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn apply_create_operator(mut self, statement: &CreateOperator) -> Result<Self, AnalysisError> {
+        let Some((identity, mut definition)) = statement.definition() else {
+            return Ok(self);
+        };
+        let name = identity.name().to_name_string();
+        let previous = self
+            .catalog
+            .get_operator_op(identity.name(), identity.binary(), true);
+        match (&mut definition, previous) {
+            (OperatorDefinition::Binary(new), Some(OperatorDefinition::Binary(old))) => {
+                new.extend_from_slice(old)
+            }
+            (OperatorDefinition::RightUnary(new), Some(OperatorDefinition::RightUnary(old))) => {
+                new.extend_from_slice(old)
+            }
+            _ => {}
+        }
+        if identity.binary() {
+            self.catalog.binary_operators.insert(&name, definition);
+        } else {
+            self.catalog.right_unary_operators.insert(&name, definition);
+        }
+        let links = statement.links();
+        self.catalog
+            .operator_links
+            .insert(identity.clone(), links.clone());
+        for (related, commutator) in [(&links.commutator, true), (&links.negator, false)] {
+            if let Some(related) = related
+                && related != identity
+            {
+                let mut links = self
+                    .catalog
+                    .operator_links(related)
+                    .cloned()
+                    .unwrap_or_default();
+                let reciprocal = if commutator {
+                    &mut links.commutator
+                } else {
+                    &mut links.negator
+                };
+                if reciprocal.is_none() {
+                    *reciprocal = Some(identity.clone());
+                }
+                self.catalog.operator_links.insert(related.clone(), links);
+            }
+        }
+        Ok(self)
+    }
+
     fn active_extension(&self) -> Option<&str> {
         self.active_extension.as_deref()
     }

@@ -97,10 +97,13 @@
     }
   },
   {
-    "name": "conflict-target-uses-project-class",
-    "sql": "INSERT INTO operator_class_items VALUES (1) ON CONFLICT (id project_ops) DO NOTHING",
+    "name": "schema-class-visible-to-later-statement",
+    "sql": "CREATE OPERATOR CLASS project_ops FOR TYPE integer USING btree AS STORAGE integer",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "invalid_operator_family_declaration",
+        "query_deparse"
+      ],
       "columns": []
     }
   }

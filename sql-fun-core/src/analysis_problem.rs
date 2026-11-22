@@ -998,6 +998,10 @@ fn coalesce_type_message(expressions: &ExpressionList) -> String {
 }
 
 impl DiagnosticMessage for AnalysisProblem {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "exhaustive dispatch for diagnostic variants"
+    )]
     fn diagnostic_message(&self) -> String {
         match self {
             Self::RowSecurityRequiresTable => "row-security actions require ALTER TABLE".to_owned(),
@@ -1032,7 +1036,8 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::ForeignDataWrapper(problem) => problem.diagnostic_message(),
             Self::InvalidFunctionSignature(problem) => problem.diagnostic_message(),
-            Self::InvalidOperatorDeclaration(message, _) => message.clone(),
+            Self::InvalidOperatorDeclaration(message, _)
+            | Self::InvalidOperatorFamilyDeclaration(message) => message.clone(),
             Self::InvalidBaseType(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),
             Self::Privilege(problem) => problem.diagnostic_message(),
@@ -1065,7 +1070,6 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::NullabilityUnknown(name) => {
                 format!("nullability could not be determined for {name}")
             }
-            Self::InvalidOperatorFamilyDeclaration(message) => message.clone(),
             Self::DuplicateAccessMethod(name) => format!("access method {name:?} already exists"),
             Self::DuplicateDefElemKey(key) => format!("duplicate definition option: {key}"),
             Self::ExplicitCastNotDefined(source, target) => {

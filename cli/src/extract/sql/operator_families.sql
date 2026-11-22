@@ -58,11 +58,6 @@ WITH selected_schemas AS (
 ), function_members AS (
   SELECT m.amprocfamily AS family, json_agg(json_build_array(
     m.amprocnum, lt.identity, rt.identity, json_build_array(n.nspname, p.proname),
-    COALESCE((
-      SELECT json_agg(arg_type.identity ORDER BY arg.position)
-      FROM unnest(p.proargtypes) WITH ORDINALITY arg(type_oid, position)
-      JOIN type_keys arg_type ON arg_type.oid = arg.type_oid
-    ), '[]'::json),
     CASE WHEN m.oid < 16384 THEN NULL
       WHEN own.identity IS NOT NULL THEN json_build_object('class', own.identity)
       WHEN hard.objid IS NOT NULL THEN '"family"'::json ELSE '"loose"'::json END

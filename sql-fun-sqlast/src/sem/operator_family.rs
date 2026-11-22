@@ -81,13 +81,7 @@ impl OperatorFamily {
         if let Some(existing) = self.members.get(&slot) {
             let occupied = match &existing.object {
                 MemberObject::Operator(operator) => operator.to_string(),
-                MemberObject::Function { name, arguments } => {
-                    let arguments = arguments
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>();
-                    format!("{name}({})", arguments.join(", "))
-                }
+                MemberObject::Function(name) => name.to_string(),
             };
             return Err(format!(
                 "{:?} slot {} for ({}, {}) is already occupied by {occupied}",
@@ -133,10 +127,7 @@ pub(crate) struct FamilyMember {
 #[derive(Clone, Debug)]
 pub(crate) enum MemberObject {
     Operator(OperatorName),
-    Function {
-        name: FullName,
-        arguments: Box<[Arc<TypeReference>]>,
-    },
+    Function(FullName),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

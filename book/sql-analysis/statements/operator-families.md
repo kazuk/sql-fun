@@ -13,8 +13,9 @@ this way. Dropping an independent membership leaves the operator or routine
 itself available. If any requested change fails, the entire statement leaves
 the family unchanged.
 
-For `ADD FUNCTION`, sql-fun resolves the routine by its SQL signature.
-PostgreSQL checks the native access method’s calling contract.
+For `ADD FUNCTION`, sql-fun records the routine name. Supply associated
+types explicitly when they cannot be derived from the SQL signature.
+PostgreSQL checks the named routine and its native calling contract.
 
 See PostgreSQL's [ALTER OPERATOR FAMILY documentation](https://www.postgresql.org/docs/18/sql-alteropfamily.html)
 for additional forms.

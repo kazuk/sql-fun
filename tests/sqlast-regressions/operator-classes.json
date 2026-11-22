@@ -53,11 +53,10 @@
     }
   },
   {
-    "name": "exact-routine-required",
-    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING btree AS FUNCTION 1 pg_catalog.btint4cmp(integer, smallint)",
+    "name": "written-support-routine-supplies-slot-types",
+    "sql": "CREATE OPERATOR CLASS project_other FOR TYPE integer USING btree AS FUNCTION 1 unavailable_support(integer, smallint)",
     "expected": {
       "diagnostics": [
-        "invalid_operator_family_declaration",
         "query_deparse"
       ],
       "columns": []
@@ -120,6 +119,16 @@
   {
     "name": "native-support-call-contract-is-outside-sql-analysis",
     "sql": "CREATE OPERATOR CLASS sort_contract FOR TYPE integer USING btree AS FUNCTION 2 pg_catalog.btint4cmp(integer, integer)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "omitted-signature-can-supply-slot-types",
+    "sql": "CREATE OPERATOR CLASS implicit_pair FOR TYPE integer USING btree AS FUNCTION 1 pg_catalog.btint4cmp",
     "expected": {
       "diagnostics": [
         "query_deparse"

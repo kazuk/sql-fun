@@ -538,7 +538,7 @@ def validate_masters(directory):
                           (f["schema"], f["name"], f["access_method"]) == ("pg_catalog", "integer_ops", "btree"))
     int4 = ["pg_catalog", "int4", False]
     assert [3, int4, int4, ["pg_catalog", "="], None, None] in integer_family["operators"]
-    assert [1, int4, int4, ["pg_catalog", "btint4cmp"], [int4, int4], None] in integer_family["functions"]
+    assert [1, int4, int4, ["pg_catalog", "btint4cmp"], None] in integer_family["functions"]
     return collations, classes
 
 

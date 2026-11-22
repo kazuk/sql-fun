@@ -12,8 +12,8 @@ use crate::{
     context::ParseContext,
     names::{FullName, OperatorName},
     sem::{
-        AnalysisError, ExactFunction, OperatorIdentity, OwnershipIdentity, OwnershipLookup,
-        PgBuiltInType, TypeReference, ownership::RequestedIdentity,
+        AnalysisError, OperatorIdentity, OwnershipIdentity, PgBuiltInType, TypeReference,
+        ownership::RequestedIdentity,
     },
 };
 
@@ -231,22 +231,8 @@ fn resolve_function(
     if !validate_slot_number(MemberKind::Function, number, method, context)? {
         return Ok(None);
     }
-    let Some(function) = exact_support_function(syntax, context)? else {
-        return Ok(None);
-    };
-    let Some(arguments) = function
-        .overload()
-        .identity_arguments()
-        .into_iter()
-        .collect::<Option<Vec<_>>>()
-    else {
-        return reject(
-            context,
-            "index support function has an unresolved argument type",
-        );
-    };
-    let Some((left, right)) = support_types(syntax, method, &arguments, default_input, context)?
-    else {
+    let name = FullName::from_ast_name(syntax.name())?;
+    let Some((left, right)) = support_types(syntax, method, &name, default_input, context)? else {
         return Ok(None);
     };
     let slot = FamilySlot {
@@ -258,74 +244,56 @@ fn resolve_function(
     Ok(Some((
         slot,
         FamilyMember {
-            object: MemberObject::Function {
-                name: function.name().clone(),
-                arguments: arguments.into_iter().map(Arc::new).collect(),
-            },
+            object: MemberObject::Function(name),
             order_family: None,
             owner,
         },
     )))
 }
 
-fn exact_support_function(
-    syntax: &OperatorClassFunction,
-    context: &mut impl ParseContext,
-) -> Result<Option<ExactFunction>, AnalysisError> {
-    let name = FullName::from_ast_name(syntax.name())?;
-    if let Some(types) = syntax.arguments() {
-        let mut arguments = Vec::with_capacity(types.len());
-        for ty in types {
-            let Some(ty) = resolve_type(ty, context)? else {
-                return Ok(None);
-            };
-            arguments.push(Some(ty));
-        }
-        if let Some(function) = context.find_exact_function(&name, &arguments) {
-            return Ok(Some(function));
-        }
-        return reject(
-            context,
-            format!("support function {name} with the declared argument types does not exist"),
-        );
-    }
-    let requested =
-        RequestedIdentity::new(&OwnershipIdentity::named(ObjectKind::FUNCTION, &name), &[]);
-    match requested.resolve_routine(context) {
-        OwnershipLookup::Resolved(identity) => {
-            if let Some(arguments) = identity.arguments()
-                && let Some(function) = context.find_exact_function(identity.name(), arguments)
-            {
-                return Ok(Some(function));
-            }
-            reject(context, format!("support function {name} does not exist"))
-        }
-        OwnershipLookup::Ambiguous(_) => reject(
-            context,
-            format!("support function name {name} is not unique"),
-        ),
-        _ => reject(context, format!("support function {name} does not exist")),
-    }
-}
-
 fn support_types(
     syntax: &OperatorClassFunction,
     method: &str,
-    arguments: &[TypeReference],
+    name: &FullName,
     default_input: Option<&TypeReference>,
     context: &mut impl ParseContext,
 ) -> Result<Option<(TypeReference, TypeReference)>, AnalysisError> {
     if let Some(types) = syntax.class_operands() {
         return resolve_family_types(types, context);
     }
-    let inferred = match (method, syntax.support(), arguments) {
-        ("btree", 1, [left, right]) => Some((left, right)),
-        ("btree", 3, [left, _, offset, _, _]) => Some((left, offset)),
-        ("hash", 1 | 2, [left, ..]) => Some((left, left)),
-        _ => default_input.map(|ty| (ty, ty)),
+    let positions = match (method, syntax.support()) {
+        ("btree", 1) => (0, 1),
+        ("btree", 3) => (0, 2),
+        ("hash", 1 | 2) => (0, 0),
+        _ => {
+            if let Some(ty) = default_input {
+                return Ok(Some((ty.clone(), ty.clone())));
+            }
+            return reject(
+                context,
+                "associated data types must be specified for index support function",
+            );
+        }
     };
-    if let Some((left, right)) = inferred {
-        return Ok(Some((left.clone(), right.clone())));
+    if let Some(types) = syntax.arguments() {
+        if let (Some(left), Some(right)) = (types.get(positions.0), types.get(positions.1)) {
+            let left = resolve_type(left, context)?;
+            let right = resolve_type(right, context)?;
+            return Ok(left.zip(right));
+        }
+    } else {
+        // When the SQL omits the signature, a uniquely known SQL declaration
+        // can still provide the types associated with this family slot.
+        let requested =
+            RequestedIdentity::new(&OwnershipIdentity::named(ObjectKind::FUNCTION, name), &[]);
+        let lookup = requested.resolve_routine(context);
+        if let Some(identity) = lookup.identity()
+            && let Some(types) = identity.arguments()
+            && let (Some(Some(left)), Some(Some(right))) =
+                (types.get(positions.0), types.get(positions.1))
+        {
+            return Ok(Some((left.clone(), right.clone())));
+        }
     }
     reject(
         context,

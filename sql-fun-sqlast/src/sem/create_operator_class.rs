@@ -385,7 +385,7 @@ mod tests {
         let result = apply_ownership_sql(
             context,
             "CREATE OPERATOR CLASS rejected FOR TYPE integer USING project_method
-             FAMILY project_family AS FUNCTION 2 missing(integer), STORAGE integer",
+             FAMILY project_family AS FUNCTION 2 (missing_type) support, STORAGE integer",
         )?;
         let SemAst::CreateOperatorClass(class) = result.ast() else {
             panic!("expected operator class");

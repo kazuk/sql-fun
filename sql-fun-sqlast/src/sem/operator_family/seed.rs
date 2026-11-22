@@ -71,14 +71,7 @@ struct SeedOperator(
 );
 
 #[derive(serde::Deserialize)]
-struct SeedFunction(
-    i32,
-    SeedType,
-    SeedType,
-    QualifiedName,
-    Vec<SeedType>,
-    Option<SeedOwner>,
-);
+struct SeedFunction(i32, SeedType, SeedType, QualifiedName, Option<SeedOwner>);
 
 #[derive(serde::Deserialize)]
 struct SeedFamily {
@@ -117,7 +110,7 @@ impl SeedFamily {
                 },
             )?;
         }
-        for SeedFunction(number, left, right, function, arguments, dependency) in self.functions {
+        for SeedFunction(number, left, right, function, dependency) in self.functions {
             family.insert(
                 FamilySlot {
                     kind: MemberKind::Function,
@@ -126,10 +119,7 @@ impl SeedFamily {
                     right: right.intern(types),
                 },
                 FamilyMember {
-                    object: MemberObject::Function {
-                        name: function.full_name(),
-                        arguments: arguments.iter().map(|arg| arg.intern(types)).collect(),
-                    },
+                    object: MemberObject::Function(function.full_name()),
                     order_family: None,
                     owner: owner(dependency),
                 },

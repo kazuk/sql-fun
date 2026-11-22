@@ -385,6 +385,8 @@ pub enum AnalysisProblem {
     ForeignDataWrapper(ForeignDataWrapperProblem),
     /// A rejected PostgreSQL base type definition.
     InvalidBaseType(BaseTypeProblem),
+    /// A function declaration has an invalid signature.
+    InvalidFunctionSignature(FunctionSignatureProblem),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -798,6 +800,7 @@ impl AnalysisProblem {
             Self::Privilege(_) => "invalid_privilege_declaration",
             Self::Rule(_) => "rule_invalid_definition",
             Self::ForeignDataWrapper(_) => "foreign_data_wrapper_invalid_definition",
+            Self::InvalidFunctionSignature(_) => "invalid_function_signature",
             Self::InvalidBaseType(_) => "base_type_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
@@ -887,6 +890,7 @@ impl AnalysisProblem {
             | Self::OperatorNameSyntax(_)
             | Self::DropFunctionDependency(_)
             | Self::ForeignDataWrapper(_)
+            | Self::InvalidFunctionSignature(_)
             | Self::InvalidBaseType(_)
             | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
@@ -952,6 +956,31 @@ impl AnalysisProblem {
     }
 }
 
+/// The function and reason a declaration cannot be applied.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct FunctionSignatureProblem {
+    name: FullName,
+    reason: String,
+}
+
+impl DiagnosticMessage for FunctionSignatureProblem {
+    fn diagnostic_message(&self) -> String {
+        format!("cannot declare function {}: {}", self.name, self.reason)
+    }
+}
+
+impl AnalysisProblem {
+    /// Report a function declaration with a signature that cannot be registered.
+    #[must_use]
+    pub fn invalid_function_signature(name: impl Into<FullName>, reason: String) -> Self {
+        Self::InvalidFunctionSignature(FunctionSignatureProblem {
+            name: name.into(),
+            reason,
+        })
+    }
+}
+
 fn coalesce_type_message(expressions: &ExpressionList) -> String {
     format!("COALESCE operands do not have a common implicit result type: {expressions}")
 }
@@ -990,6 +1019,7 @@ impl DiagnosticMessage for AnalysisProblem {
             }
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::ForeignDataWrapper(problem) => problem.diagnostic_message(),
+            Self::InvalidFunctionSignature(problem) => problem.diagnostic_message(),
             Self::InvalidBaseType(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),
             Self::Privilege(problem) => problem.diagnostic_message(),

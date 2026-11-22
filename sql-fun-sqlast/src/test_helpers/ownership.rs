@@ -3,8 +3,11 @@
 use crate::{
     ast::{StatementNode, TryFromWithTokens},
     context::{MutSourcePathWithSpan, ParseContext, SchemaFileContext},
-    names::SchemaName,
-    sem::{AnalysisError, AstAndContextPair, OwnedObjectDefinition, PgBuiltInType, Role, SemAst},
+    names::{FullName, SchemaName},
+    sem::{
+        AnalysisError, AstAndContextPair, OwnedObjectDefinition, PgBuiltInType, Role, SemAst,
+        TypeReference,
+    },
     test_helpers::{SynBuilder, TestParseContext, create_cache_context, schema_layer, source_span},
 };
 
@@ -18,6 +21,7 @@ pub(crate) fn ownership_context() -> SchemaFileContext {
         PgBuiltInType::int4(),
         PgBuiltInType::int8(),
         PgBuiltInType::text(),
+        TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "cstring"), false),
     ] {
         inventory.setup_type(reference);
     }

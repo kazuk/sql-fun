@@ -1,7 +1,7 @@
 use crate::{
-    ast::{Dialect, TypeName},
+    ast::{Dialect, Name, TypeName},
     context::{BaseParseContext, ParseContext},
-    names::{FullName, TableName},
+    names::{ColumnName, FullName, TableName, ViewName},
     sem::{
         AnalysisError, AnalysisProblem, CastContext as SemCastContext,
         ColumnCollection as SemColumnCollection,
@@ -1194,5 +1194,30 @@ impl TypeReference {
     #[must_use]
     pub fn canonicalize_error(&self) -> AnalysisError {
         todo!()
+    }
+}
+
+impl TypeReference {
+    pub(crate) fn from_percent_type(
+        result: &TypeName,
+        context: &impl BaseParseContext,
+    ) -> Result<Option<Self>, AnalysisError> {
+        let Some((column, relation)) = result.name().parts().split_last() else {
+            return Ok(None);
+        };
+        let relation = FullName::from_ast_name(&Name::from_parts(relation))?;
+        let column = ColumnName::from(column.as_str());
+        if let Some(table) = context.get_table(&TableName::from(relation.clone())) {
+            let Some(definition) = table.get_column_def(&column) else {
+                return Ok(None);
+            };
+            return Ok(definition.get_type().cloned());
+        }
+        if let Some(view) = context.get_view(&ViewName::from_full_name(&relation))
+            && let Some(definition) = view.get_column_def(&column)
+        {
+            return Ok(definition.get_type().cloned());
+        }
+        Ok(None)
     }
 }

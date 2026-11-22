@@ -25,5 +25,52 @@
         }
       ]
     }
+  },
+  {
+    "name": "completed_implicit_shell_type_and_array_are_visible",
+    "sql": "SELECT item, items FROM public.implicit_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "item",
+          "type": {
+            "schema_name": "public",
+            "local_name": "implicit_value",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "items",
+          "type": {
+            "schema_name": "public",
+            "local_name": "implicit_value",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_parameter_rejects_implicit_shell_declaration",
+    "sql": "CREATE FUNCTION public.bad_signature(public.missing_arg) RETURNS public.missing_result LANGUAGE internal AS 'textin'",
+    "expected": {
+      "diagnostics": [
+        "invalid_function_signature"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "unresolved_pseudo_type_array_conflicts_with_existing_builtin",
+    "sql": "CREATE FUNCTION public.bad_array() RETURNS pg_catalog.internal[] LANGUAGE internal AS 'textin'",
+    "expected": {
+      "diagnostics": [
+        "conflicting_creation"
+      ],
+      "columns": []
+    }
   }
 ]

@@ -379,6 +379,32 @@ impl TypeDefinition {
         matches!(self, Self::Shell(_))
     }
 
+    pub(crate) fn has_postgres_array_type(&self) -> bool {
+        match self {
+            Self::Shell(_) => false,
+            Self::Builtin(definition) => {
+                let Some(name) = definition.reference.full_name() else {
+                    return false;
+                };
+                if name
+                    .schema()
+                    .is_none_or(|schema| schema.as_str() != "pg_catalog")
+                {
+                    return true;
+                }
+                // The builtin inventory omits ordinary generated arrays. The
+                // PostgreSQL 15–18 catalogs have these exceptions by category.
+                match definition.category.map(TypeCategory::code) {
+                    Some('P') => matches!(name.name().as_str(), "cstring" | "record"),
+                    Some('Z') => name.name().as_str() == "char",
+                    Some('X') => false,
+                    _ => true,
+                }
+            }
+            _ => true,
+        }
+    }
+
     pub(crate) fn base(name: &FullName, category: TypeCategory, collatable: bool) -> Self {
         Self::Base(BuiltinTypeDefinition {
             reference: TypeReference::concrete_type_ref(name, false),

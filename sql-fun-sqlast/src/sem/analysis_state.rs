@@ -41,6 +41,12 @@ impl AnalysisState {
     pub(crate) const fn has_problems(&self) -> bool {
         !self.problems.is_empty()
     }
+    pub(crate) fn has_errors(&self) -> bool {
+        self.problems.iter().any(|problem| {
+            problem.severity() == ::sql_fun_core::analysis_problem::DiagnosticSeverity::Error
+        })
+    }
+
     pub(crate) fn begin(&mut self) {
         *self = Self {
             active: true,

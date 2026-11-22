@@ -802,6 +802,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A function declaration has an invalid signature.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidFunctionSignature": {
+                      "$ref": "#/$defs/FunctionSignatureProblem"
+                    }
+                  },
+                  "required": [
+                    "InvalidFunctionSignature"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -2883,6 +2896,22 @@
                 },
                 "reason": {
                   "description": "Reason the declaration cannot be applied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
+              ]
+            },
+            "FunctionSignatureProblem": {
+              "description": "The function and reason a declaration cannot be applied.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "reason": {
                   "type": "string"
                 }
               },
@@ -6066,6 +6095,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A function declaration has an invalid signature.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidFunctionSignature": {
+                      "$ref": "#/$defs/FunctionSignatureProblem"
+                    }
+                  },
+                  "required": [
+                    "InvalidFunctionSignature"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -8147,6 +8189,22 @@
                 },
                 "reason": {
                   "description": "Reason the declaration cannot be applied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
+              ]
+            },
+            "FunctionSignatureProblem": {
+              "description": "The function and reason a declaration cannot be applied.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "reason": {
                   "type": "string"
                 }
               },
@@ -11222,6 +11280,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A function declaration has an invalid signature.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidFunctionSignature": {
+                      "$ref": "#/$defs/FunctionSignatureProblem"
+                    }
+                  },
+                  "required": [
+                    "InvalidFunctionSignature"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -13303,6 +13374,22 @@
                 },
                 "reason": {
                   "description": "Reason the declaration cannot be applied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
+              ]
+            },
+            "FunctionSignatureProblem": {
+              "description": "The function and reason a declaration cannot be applied.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/FullName"
+                },
+                "reason": {
                   "type": "string"
                 }
               },

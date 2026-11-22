@@ -793,21 +793,7 @@
                   "type": "object",
                   "properties": {
                     "InvalidBaseType": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "description": "Qualified name of the declaration.",
-                          "$ref": "#/$defs/FullName"
-                        },
-                        "reason": {
-                          "description": "Reason the declaration cannot be applied.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "name",
-                        "reason"
-                      ]
+                      "$ref": "#/$defs/BaseTypeProblem"
                     }
                   },
                   "required": [
@@ -2885,6 +2871,24 @@
                   "type": "string",
                   "const": "Validator"
                 }
+              ]
+            },
+            "BaseTypeProblem": {
+              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "description": "Qualified name of the declaration.",
+                  "$ref": "#/$defs/FullName"
+                },
+                "reason": {
+                  "description": "Reason the declaration cannot be applied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
               ]
             },
             "OwnershipProblem": {
@@ -6053,21 +6057,7 @@
                   "type": "object",
                   "properties": {
                     "InvalidBaseType": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "description": "Qualified name of the declaration.",
-                          "$ref": "#/$defs/FullName"
-                        },
-                        "reason": {
-                          "description": "Reason the declaration cannot be applied.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "name",
-                        "reason"
-                      ]
+                      "$ref": "#/$defs/BaseTypeProblem"
                     }
                   },
                   "required": [
@@ -8145,6 +8135,24 @@
                   "type": "string",
                   "const": "Validator"
                 }
+              ]
+            },
+            "BaseTypeProblem": {
+              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "description": "Qualified name of the declaration.",
+                  "$ref": "#/$defs/FullName"
+                },
+                "reason": {
+                  "description": "Reason the declaration cannot be applied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
               ]
             },
             "OwnershipProblem": {
@@ -11205,21 +11213,7 @@
                   "type": "object",
                   "properties": {
                     "InvalidBaseType": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "description": "Qualified name of the declaration.",
-                          "$ref": "#/$defs/FullName"
-                        },
-                        "reason": {
-                          "description": "Reason the declaration cannot be applied.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "name",
-                        "reason"
-                      ]
+                      "$ref": "#/$defs/BaseTypeProblem"
                     }
                   },
                   "required": [
@@ -13297,6 +13291,24 @@
                   "type": "string",
                   "const": "Validator"
                 }
+              ]
+            },
+            "BaseTypeProblem": {
+              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "description": "Qualified name of the declaration.",
+                  "$ref": "#/$defs/FullName"
+                },
+                "reason": {
+                  "description": "Reason the declaration cannot be applied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
               ]
             },
             "OwnershipProblem": {

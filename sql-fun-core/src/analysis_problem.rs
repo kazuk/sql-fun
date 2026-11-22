@@ -384,12 +384,7 @@ pub enum AnalysisProblem {
     /// Invalid foreign-data wrapper declaration.
     ForeignDataWrapper(ForeignDataWrapperProblem),
     /// A rejected PostgreSQL base type definition.
-    InvalidBaseType {
-        /// Qualified name of the declaration.
-        name: FullName,
-        /// Reason the declaration cannot be applied.
-        reason: String,
-    },
+    InvalidBaseType(BaseTypeProblem),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -803,7 +798,7 @@ impl AnalysisProblem {
             Self::Privilege(_) => "invalid_privilege_declaration",
             Self::Rule(_) => "rule_invalid_definition",
             Self::ForeignDataWrapper(_) => "foreign_data_wrapper_invalid_definition",
-            Self::InvalidBaseType { .. } => "base_type_invalid_definition",
+            Self::InvalidBaseType(_) => "base_type_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
             Self::Insert(_) => "insert_semantics",
@@ -892,7 +887,7 @@ impl AnalysisProblem {
             | Self::OperatorNameSyntax(_)
             | Self::DropFunctionDependency(_)
             | Self::ForeignDataWrapper(_)
-            | Self::InvalidBaseType { .. }
+            | Self::InvalidBaseType(_)
             | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
             }
@@ -926,6 +921,32 @@ impl AnalysisProblem {
             Self::ParameterConstraint(problem) => problem.render_metadata(),
             Self::NameResolution(problem) => return problem.render_metadata(),
             _ => return None,
+        })
+    }
+}
+
+/// Diagnostic facts for a rejected PostgreSQL base type declaration.
+#[derive(Clone, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct BaseTypeProblem {
+    /// Qualified name of the declaration.
+    name: FullName,
+    /// Reason the declaration cannot be applied.
+    reason: String,
+}
+
+impl DiagnosticMessage for BaseTypeProblem {
+    fn diagnostic_message(&self) -> String {
+        format!("cannot define base type {}: {}", self.name, self.reason)
+    }
+}
+
+impl AnalysisProblem {
+    /// Report a base type declaration that cannot be applied.
+    pub fn invalid_base_type(name: &FullName, reason: &str) -> Self {
+        Self::InvalidBaseType(BaseTypeProblem {
+            name: name.clone(),
+            reason: reason.to_owned(),
         })
     }
 }
@@ -968,9 +989,7 @@ impl DiagnosticMessage for AnalysisProblem {
             }
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::ForeignDataWrapper(problem) => problem.diagnostic_message(),
-            Self::InvalidBaseType { name, reason } => {
-                format!("cannot define base type {name}: {reason}")
-            }
+            Self::InvalidBaseType(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),
             Self::Privilege(problem) => problem.diagnostic_message(),
             Self::Trigger(problem) => problem.diagnostic_message(),

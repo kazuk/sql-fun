@@ -18,7 +18,11 @@ pub(super) fn analyze(
         return if context.permits_type_creation(&name)? {
             Ok(SemAst::CreateBaseType(TypeDefinition::Shell(reference)))
         } else {
-            Ok(rejected(name, false, invalid("type already exists")))
+            Ok(SemAst::rejected_base_type(
+                name,
+                false,
+                invalid("type already exists"),
+            ))
         };
     };
     if context
@@ -26,25 +30,56 @@ pub(super) fn analyze(
         .is_some_and(|definition| !definition.is_shell())
     {
         context.permits_type_creation(&name)?;
-        return Ok(rejected(name, true, invalid("type already exists")));
+        return Ok(SemAst::rejected_base_type(
+            name,
+            true,
+            invalid("type already exists"),
+        ));
     }
     match validate_definition(options, &name, &reference, context) {
         Ok(definition) => Ok(SemAst::CreateBaseType(definition)),
         Err(failure) => {
-            context.report_analysis_problem(AnalysisProblem::InvalidBaseType {
-                name: (&name).into(),
-                reason: failure.0.clone(),
-            })?;
-            Ok(rejected(name, true, failure))
+            context.report_analysis_problem(AnalysisProblem::invalid_base_type(
+                &(&name).into(),
+                &failure.0,
+            ))?;
+            Ok(SemAst::rejected_base_type(name, true, failure))
         }
     }
 }
 
-fn rejected(name: FullName, completion: bool, failure: InvalidDefinition) -> SemAst {
-    SemAst::RejectedBaseType {
-        name,
-        completion,
-        reason: failure.0,
+/// A shell or base declaration rejected during semantic analysis.
+#[derive(Debug, Clone)]
+pub struct RejectedBaseType {
+    name: FullName,
+    completion: bool,
+    reason: String,
+}
+
+impl RejectedBaseType {
+    /// The qualified name targeted by the rejected declaration.
+    pub const fn name(&self) -> &FullName {
+        &self.name
+    }
+
+    /// Whether the declaration attempted to complete a shell.
+    pub const fn is_completion(&self) -> bool {
+        self.completion
+    }
+
+    /// The reason the declaration could not be applied.
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+impl SemAst {
+    fn rejected_base_type(name: FullName, completion: bool, failure: InvalidDefinition) -> Self {
+        Self::RejectedBaseType(RejectedBaseType {
+            name,
+            completion,
+            reason: failure.0,
+        })
     }
 }
 
@@ -143,15 +178,15 @@ mod application_tests {
         let name = FullName::with_schema("public", "demo");
         assert!(matches!(
             attempt.ast(),
-            SemAst::RejectedBaseType { name: rejected, completion: true, reason }
-                if rejected == &name && reason == expected
+            SemAst::RejectedBaseType(rejected)
+                if rejected.name() == &name && rejected.is_completion() && rejected.reason() == expected
         ));
         let context = attempt.into_context();
         assert!(
             context
                 .problems()
                 .iter()
-                .any(|problem| { matches!(problem, AnalysisProblem::InvalidBaseType { .. }) })
+                .any(|problem| { matches!(problem, AnalysisProblem::InvalidBaseType(_)) })
         );
         assert!(
             context

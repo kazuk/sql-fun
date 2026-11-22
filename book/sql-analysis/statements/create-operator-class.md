@@ -14,8 +14,8 @@ classes unchanged.
 
 Later [INSERT](insert.md) statements can resolve explicit conflict-target
 operator classes. [CREATE INDEX](create-index.md) has its own analysis limits.
-PostgreSQL runs native access-method handlers and checks handler-dependent
-requirements when executing and using the declaration.
+sql-fun resolves the support routine by its SQL signature. PostgreSQL checks
+whether that routine satisfies the native access method’s calling contract.
 
 The PostgreSQL 18 parser rejects the legacy `RECHECK` clause even when analysis
 uses a PostgreSQL 17 catalog. Remove the clause from older scripts before

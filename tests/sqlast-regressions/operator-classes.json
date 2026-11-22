@@ -116,5 +116,15 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "native-support-call-contract-is-outside-sql-analysis",
+    "sql": "CREATE OPERATOR CLASS sort_contract FOR TYPE integer USING btree AS FUNCTION 2 pg_catalog.btint4cmp(integer, integer)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
   }
 ]

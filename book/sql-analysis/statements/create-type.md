@@ -46,7 +46,7 @@ and can terminate analysis
 not establish ALTER TYPE catalog transitions. The
 `ALTER TYPE … SET (RECEIVE = …, SEND = …)` form for a base type stops analysis
 during SQL conversion, including in the bundled `ltree` update script
-([#1199](https://github.com/kazuk/sql-fun/issues/1199)).
+([#1199](https://github.com/kazuk/sql-fun/issues/1199#issuecomment-7077560718)).
 SQLite/Turso CREATE/DROP TYPE
 operations are separately listed in the [statement support
 inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).

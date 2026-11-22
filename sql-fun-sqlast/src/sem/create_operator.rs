@@ -28,6 +28,19 @@ impl OperatorIdentity {
         Self { name, left: Some(left), right }
     }
 
+    pub(crate) fn resolve_binary(
+        name: &OperatorName,
+        left: &TypeReference,
+        right: &TypeReference,
+        context: &impl ParseContext,
+    ) -> Option<(Self, TypeReference)> {
+        expand_operator_search_path(context, name, |candidate| {
+            let identity = Self::binary_signature(candidate.clone(), left.clone(), right.clone());
+            let returns = identity.result_type(context)?.clone();
+            Some((identity, returns))
+        })
+    }
+
     pub(crate) const fn name(&self) -> &OperatorName {
         &self.name
     }

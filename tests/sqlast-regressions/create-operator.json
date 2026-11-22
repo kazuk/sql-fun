@@ -136,5 +136,15 @@
       "diagnostics": [],
       "columns": []
     }
+  },
+  {
+    "name": "commutator-result-mismatch",
+    "sql": "CREATE OPERATOR public.!!! (LEFTARG=integer, RIGHTARG=integer, FUNCTION=int4pl, COMMUTATOR=OPERATOR(pg_catalog.=))",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
   }
 ]

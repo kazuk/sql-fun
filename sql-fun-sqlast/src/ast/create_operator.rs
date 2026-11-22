@@ -13,16 +13,16 @@ use ::sql_fun_core::IVec;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CreateOperator {
-    pub(crate) name: Name,
-    pub(crate) options: Vec<OperatorOption>,
+    name: Name,
+    options: Vec<OperatorOption>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct OperatorOption {
-    pub(crate) key: String,
-    pub(crate) value: Option<OperatorOptionValue>,
+    key: String,
+    value: Option<OperatorOptionValue>,
     // Relative to the statement being converted.
-    pub(crate) location: Option<StringSpan>,
+    location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
@@ -30,6 +30,30 @@ pub(crate) enum OperatorOptionValue {
     Type(TypeName),
     Name(Name),
     Literal(Literal),
+}
+
+impl CreateOperator {
+    pub(crate) const fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn options(&self) -> &[OperatorOption] {
+        &self.options
+    }
+}
+
+impl OperatorOption {
+    pub(crate) fn key(&self) -> &str {
+        &self.key
+    }
+
+    pub(crate) const fn value(&self) -> Option<&OperatorOptionValue> {
+        self.value.as_ref()
+    }
+
+    pub(crate) const fn location(&self) -> Option<StringSpan> {
+        self.location
+    }
 }
 
 // Quoted relationship targets bypass the scanner's operator-token rules.

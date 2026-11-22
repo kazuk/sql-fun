@@ -59,7 +59,7 @@ impl SqlEmit for StatementNode {
 impl SqlEmit for CreateOperator {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("CREATE OPERATOR")?;
-        let Some((token, qualifiers)) = self.name.parts().split_last() else {
+        let Some((token, qualifiers)) = self.name().parts().split_last() else {
             return writer.invalid("CREATE OPERATOR", "operator name is required");
         };
         if !valid_operator_token(token) {
@@ -72,7 +72,7 @@ impl SqlEmit for CreateOperator {
         }
         writer.sql(token);
         writer.sql(" (");
-        writer.list(&self.options, ", ")?;
+        writer.list(self.options(), ", ")?;
         writer.sql(")");
         Ok(())
     }
@@ -80,17 +80,15 @@ impl SqlEmit for CreateOperator {
 
 impl SqlEmit for OperatorOption {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-        writer.ident(&self.key)?;
-        let Some(value) = &self.value else {
+        writer.ident(self.key())?;
+        let Some(value) = self.value() else {
             return Ok(());
         };
         writer.sql(" = ");
         match value {
             OperatorOptionValue::Type(value) => value.emit(writer),
             OperatorOptionValue::Literal(value) => value.emit(writer),
-            OperatorOptionValue::Name(value)
-                if matches!(self.key.as_str(), "commutator" | "negator") =>
-            {
+            OperatorOptionValue::Name(value) if matches!(self.key(), "commutator" | "negator") => {
                 match value.parts() {
                     [token] => writer.string(token),
                     _ => value.emit_operator(writer),

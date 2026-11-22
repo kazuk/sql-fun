@@ -255,9 +255,6 @@ fn resolve_function(
         left: Arc::new(left),
         right: Arc::new(right),
     };
-    if !validate_support_signature(method, &slot, &arguments, &function, default_input, context)? {
-        return Ok(None);
-    }
     Ok(Some((
         slot,
         FamilyMember {
@@ -388,71 +385,6 @@ fn postgres18(context: &impl ParseContext) -> bool {
         .to_string()
         .parse::<::sql_fun_core::PostgresVersion>()
         .is_ok_and(|version| version.major() >= 18)
-}
-
-fn validate_support_signature(
-    method: &str,
-    slot: &FamilySlot,
-    args: &[TypeReference],
-    function: &ExactFunction,
-    declared_input: Option<&TypeReference>,
-    context: &mut impl ParseContext,
-) -> Result<bool, AnalysisError> {
-    let builtin =
-        |name| TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", name), false);
-    let returns = function.overload().ret_type();
-    let number = slot.number;
-    let same_type = slot.left == slot.right;
-    if matches!(
-        (method, number),
-        ("btree" | "brin", 5) | ("hash", 3) | ("gist", 10) | ("gin" | "spgist", 7)
-    ) {
-        if !same_type || declared_input.is_some_and(|ty| ty != slot.left.as_ref()) {
-            report_family_problem(
-                context,
-                "associated data types for index options support must match the class input type, when declared, and each other",
-            )?;
-            return Ok(false);
-        }
-        if args != [builtin("internal")] || returns.as_ref() != Some(&builtin("void")) {
-            report_family_problem(
-                context,
-                "index options support functions must accept internal and return void",
-            )?;
-            return Ok(false);
-        }
-        return Ok(true);
-    }
-    let problem = match (method, number) {
-        ("btree", 1) if args.len() != 2 || returns.as_ref() != Some(&PgBuiltInType::int4()) => {
-            "ordering comparison functions must take two arguments and return integer"
-        }
-        ("btree", 3) if args.len() != 5 || returns.as_ref() != Some(&PgBuiltInType::bool()) => {
-            "ordering in_range functions must take five arguments and return boolean"
-        }
-        ("btree", 4)
-            if args.len() != 1
-                || returns.as_ref() != Some(&PgBuiltInType::bool())
-                || !same_type =>
-        {
-            "ordering equal image functions must take one argument, return boolean, and support a single type"
-        }
-        ("btree", 2 | 6)
-            if args != [builtin("internal")] || returns.as_ref() != Some(&builtin("void")) =>
-        {
-            "ordering sort and skip support functions must accept internal and return void"
-        }
-        ("btree", 6) if !same_type => "ordering skip support functions must support a single type",
-        ("hash", 1) if args.len() != 1 || returns.as_ref() != Some(&PgBuiltInType::int4()) => {
-            "hash function 1 must take one argument and return integer"
-        }
-        ("hash", 2) if args.len() != 2 || returns.as_ref() != Some(&PgBuiltInType::int8()) => {
-            "hash function 2 must take two arguments and return bigint"
-        }
-        _ => return Ok(true),
-    };
-    report_family_problem(context, problem)?;
-    Ok(false)
 }
 
 fn reject<T>(

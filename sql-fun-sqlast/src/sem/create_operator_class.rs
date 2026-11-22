@@ -257,7 +257,7 @@ impl CreateOperatorClass {
                 member,
                 &family.key,
                 Some(input),
-                MemberOwner::Class(name.clone()),
+                MemberOwner::Class(Box::new(name.clone())),
                 context,
             )?
             else {

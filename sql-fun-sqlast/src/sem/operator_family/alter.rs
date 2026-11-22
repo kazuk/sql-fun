@@ -1,5 +1,7 @@
 //! PostgreSQL ALTER OPERATOR FAMILY ADD and DROP analysis.
 
+use std::sync::Arc;
+
 use crate::{
     AstAndContextPair,
     ast::{
@@ -119,8 +121,8 @@ impl AlterOperatorFamily {
             let slot = FamilySlot {
                 kind,
                 number,
-                left,
-                right,
+                left: Arc::new(left),
+                right: Arc::new(right),
             };
             if let Err(problem) = family.remove_loose_member(&slot) {
                 report_family_problem(context, problem)?;
@@ -224,8 +226,8 @@ mod test_operator_family_layers {
         let slot = FamilySlot {
             kind: MemberKind::Operator,
             number: 3,
-            left: int.clone(),
-            right: int,
+            left: int.clone().into(),
+            right: int.into(),
         };
         let mut layer = child(parent.clone());
         layer.set_search_path(&[SchemaName::from("public")]);

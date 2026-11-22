@@ -254,13 +254,13 @@ fn write_catalogs(
         write_json(&output.join(filename), &next_catalog(&mut lines)?)?;
     }
     std::fs::write(output.join("schema.sql"), render_schema(&mut lines)?)?;
-    for filename in [
-        "collations.json",
-        "operator_classes.json",
-        "operator_families.json",
-    ] {
+    for filename in ["collations.json", "operator_classes.json"] {
         write_json(&output.join(filename), &next_catalog(&mut lines)?)?;
     }
+    write_family_rows(
+        &output.join("operator_families.json"),
+        &next_catalog(&mut lines)?,
+    )?;
     anyhow::ensure!(lines.next().is_none(), "unexpected psql catalog result");
     let mut metadata = serde_json::json!({
         "format_version": 1, "server_version_num": version,
@@ -294,7 +294,6 @@ mod test_write_catalogs {
             ("casts.json", "casts"),
             ("collations.json", "collations"),
             ("operator_classes.json", "operator classes"),
-            ("operator_families.json", "operator families"),
         ];
         let mut catalogs = Vec::new();
         for (_, marker) in &payloads[..7] {
@@ -304,6 +303,7 @@ mod test_write_catalogs {
         for (_, marker) in &payloads[7..] {
             catalogs.push(serde_json::json!({"catalog":marker}));
         }
+        catalogs.push(serde_json::json!([{"name":"family","operators":[]}]));
         let results = extraction_results(170_002, true, &catalogs);
         let directory = tempfile::tempdir().unwrap();
         let provenance = serde_json::json!({"source":"unit test"});
@@ -322,6 +322,10 @@ mod test_write_catalogs {
                     .unwrap();
             assert_eq!(actual, serde_json::json!({"catalog":marker}), "{filename}");
         }
+        assert_eq!(
+            std::fs::read_to_string(directory.path().join("operator_families.json")).unwrap(),
+            "[\n{\"name\":\"family\",\"operators\":[]}\n]\n"
+        );
         let metadata: serde_json::Value =
             serde_json::from_slice(&std::fs::read(directory.path().join("metadata.json")).unwrap())
                 .unwrap();
@@ -808,6 +812,29 @@ mod test_type_row {
     ) {
         assert!(type_row(&mut row, &identifiers, &fragments).is_err());
     }
+}
+
+// One complete family per line keeps large member inventories diffable.
+fn write_family_rows(path: &Path, value: &Value) -> Result<(), anyhow::Error> {
+    use std::io::{BufWriter, Write as _};
+
+    let rows = value
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("expected operator family rows"))?;
+    let mut writer = BufWriter::new(std::fs::File::create(path)?);
+    writeln!(writer, "[")?;
+    for (index, row) in rows.iter().enumerate() {
+        if index != 0 {
+            writeln!(writer, ",")?;
+        }
+        serde_json::to_writer(&mut writer, row)?;
+    }
+    if !rows.is_empty() {
+        writeln!(writer)?;
+    }
+    writeln!(writer, "]")?;
+    writer.flush()?;
+    Ok(())
 }
 
 pub(super) fn write_json(path: &Path, value: &Value) -> Result<(), anyhow::Error> {

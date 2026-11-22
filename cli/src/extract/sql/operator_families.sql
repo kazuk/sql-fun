@@ -9,17 +9,16 @@ WITH selected_schemas AS (
   JOIN pg_catalog.pg_am a ON a.oid = f.opfmethod
 ), class_keys AS (
   SELECT c.oid, c.opcfamily,
-    json_build_object('schema', n.nspname, 'name', c.opcname, 'access_method', a.amname) AS identity,
+    json_build_array(n.nspname, c.opcname) AS identity,
     (c.oid < 16384 AND n.nspname = 'pg_catalog')
       OR n.nspname::text IN (SELECT name FROM selected_schemas) AS selected
   FROM pg_catalog.pg_opclass c
   JOIN pg_catalog.pg_namespace n ON n.oid = c.opcnamespace
   JOIN pg_catalog.pg_am a ON a.oid = c.opcmethod
 ), type_keys AS (
-  SELECT t.oid, json_build_object(
-    'schema', n.nspname, 'name', t.typname,
-    'array_element', CASE WHEN el.oid IS NULL THEN NULL ELSE
-      json_build_object('schema', en.nspname, 'name', el.typname) END
+  SELECT t.oid, json_build_array(
+    COALESCE(en.nspname, n.nspname), COALESCE(el.typname, t.typname),
+    el.oid IS NOT NULL
   ) AS identity
   FROM pg_catalog.pg_type t
   JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
@@ -35,15 +34,13 @@ WITH selected_schemas AS (
   FROM pg_catalog.pg_depend d
   WHERE d.refclassid = 'pg_catalog.pg_opfamily'::regclass AND d.deptype = 'i'
 ), operator_members AS (
-  SELECT m.amopfamily AS family, json_agg(json_build_object(
-    'number', m.amopstrategy,
-    'left_type', lt.identity, 'right_type', rt.identity,
-    'operator', json_build_object('schema', n.nspname, 'name', o.oprname),
-    'order_family', CASE WHEN sort.oid IS NULL THEN NULL ELSE
-      json_build_object('schema', sort.schema, 'name', sort.name, 'access_method', sort.access_method) END,
-    'owner', own.identity, 'builtin', m.oid < 16384
-  )::jsonb || CASE WHEN hard.objid IS NULL THEN '{}'::jsonb
-    ELSE '{"family_owned":true}'::jsonb END
+  SELECT m.amopfamily AS family, json_agg(json_build_array(
+    m.amopstrategy, lt.identity, rt.identity, json_build_array(n.nspname, o.oprname),
+    CASE WHEN sort.oid IS NOT NULL THEN json_build_array(sort.schema, sort.name) END,
+    CASE WHEN m.oid < 16384 THEN NULL
+      WHEN own.identity IS NOT NULL THEN json_build_object('class', own.identity)
+      WHEN hard.objid IS NOT NULL THEN '"family"'::json ELSE '"loose"'::json END
+  )
   ORDER BY m.amopstrategy, lt.identity::text COLLATE "C", rt.identity::text COLLATE "C") AS members
   FROM pg_catalog.pg_amop m
   JOIN family_keys f ON f.oid = m.amopfamily
@@ -59,18 +56,17 @@ WITH selected_schemas AS (
     (own.identity IS NULL AND f.schema::text IN (SELECT name FROM selected_schemas))
   GROUP BY m.amopfamily
 ), function_members AS (
-  SELECT m.amprocfamily AS family, json_agg(json_build_object(
-    'number', m.amprocnum,
-    'left_type', lt.identity, 'right_type', rt.identity,
-    'function', json_build_object('schema', n.nspname, 'name', p.proname),
-    'arguments', COALESCE((
+  SELECT m.amprocfamily AS family, json_agg(json_build_array(
+    m.amprocnum, lt.identity, rt.identity, json_build_array(n.nspname, p.proname),
+    COALESCE((
       SELECT json_agg(arg_type.identity ORDER BY arg.position)
       FROM unnest(p.proargtypes) WITH ORDINALITY arg(type_oid, position)
       JOIN type_keys arg_type ON arg_type.oid = arg.type_oid
     ), '[]'::json),
-    'owner', own.identity, 'builtin', m.oid < 16384
-  )::jsonb || CASE WHEN hard.objid IS NULL THEN '{}'::jsonb
-    ELSE '{"family_owned":true}'::jsonb END
+    CASE WHEN m.oid < 16384 THEN NULL
+      WHEN own.identity IS NOT NULL THEN json_build_object('class', own.identity)
+      WHEN hard.objid IS NOT NULL THEN '"family"'::json ELSE '"loose"'::json END
+  )
   ORDER BY m.amprocnum, lt.identity::text COLLATE "C", rt.identity::text COLLATE "C") AS members
   FROM pg_catalog.pg_amproc m
   JOIN family_keys f ON f.oid = m.amprocfamily

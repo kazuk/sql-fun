@@ -238,23 +238,25 @@ These checks do not claim production conflict-target lookup support.
 `operator_families.json` contains families ordered by
 `(schema, name, access_method)` using C collation. It contains builtin
 families, families in explicitly selected definition schemas, and families
-referenced by selected classes. Each family contains `operators` and
-`functions` arrays ordered by slot number and qualified operand identities.
+referenced by selected classes. Each JSON array line contains one family
+record with its identity and member arrays. The members are ordered by slot
+number and canonical operand identities.
 
-Operator slots record the qualified operator name and nullable ordering family.
-Support slots record the qualified routine name and ordered argument types.
-Both retain the slot's left and right type independently of the support routine
-signature. A type includes its exact catalog name and a nullable
-`array_element` qualified name for ordinary PostgreSQL arrays.
+- Operator row `[strategy, left, right, operator, order_family, owner]`
+- Support row `[support_number, left, right, function, arguments, owner]`
+- Type `[schema, name, is_array]`. For a true array flag, schema and name
+  identify the element. Associated slot types and function arguments retain
+  their own type identities.
+- Operator, function, and ordering family identities use `[schema, name]`.
+  Ordering families use B-tree. A search operator has a null ordering family.
+- Ownership is null for a protected builtin member, `{"class":[schema,name]}`
+  for class ownership in the same method, `"family"` for a hard dependency on
+  the family, and `"loose"` for an independently removable member.
 
-Member entries include protected builtin slots, slots owned by selected
-classes, and independently added slots of families in selected schemas.
-`owner` is the class identity when PostgreSQL's internal dependency supplies it.
-Builtin slots retain a `builtin` flag and have no recorded class ownership in the
-stock PostgreSQL catalogs. An internal dependency on the family is recorded
-as `family_owned: true`. A member with no owner, a false builtin flag and no
-`family_owned` field represents loose membership. These facts allow semantic
-replay to preserve the visible slots and enforce ownership on later declarations.
+The loader shares canonical type references across member slots and function
+signatures. Operator identities use the operands already present in the slot.
+Ordering and class ownership allocate their qualified identities only when
+present. Re-extract a catalog with the older expanded family member objects.
 
 ## Extension bundle contract
 

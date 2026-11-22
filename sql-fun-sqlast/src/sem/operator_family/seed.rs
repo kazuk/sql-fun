@@ -1,142 +1,142 @@
-//! Read the operator-family catalog extracted from PostgreSQL.
+//! Read the compact operator-family catalog extracted from PostgreSQL.
 
-use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::BufReader,
+    path::Path,
+    sync::Arc,
+};
 
 use crate::{
     names::{FullName, OperatorName},
-    sem::{AnalysisError, OperatorFamilyIdentity, OperatorIdentity, TypeReference},
-};
-
-use crate::sem::operator_family::{
-    FamilyMember, FamilySlot, MemberKind, MemberObject, MemberOwner, OperatorFamily,
-    OperatorFamilyKey,
+    sem::{
+        AnalysisError, OperatorFamilyKey, TypeReference,
+        operator_family::{
+            FamilyMember, FamilySlot, MemberKind, MemberObject, MemberOwner, OperatorFamily,
+        },
+    },
 };
 
 #[derive(serde::Deserialize)]
-struct QualifiedName {
-    schema: String,
-    name: String,
-}
+struct QualifiedName(String, String);
 
 impl QualifiedName {
     fn full_name(&self) -> FullName {
-        FullName::with_schema(&self.schema, &self.name)
+        FullName::with_schema(&self.0, &self.1)
     }
 }
 
 #[derive(serde::Deserialize)]
-struct SeedType {
-    #[serde(flatten)]
-    name: QualifiedName,
-    array_element: Option<QualifiedName>,
-}
+struct SeedType(String, String, bool);
 
 impl SeedType {
-    fn reference(&self) -> TypeReference {
-        if let Some(element) = &self.array_element {
-            TypeReference::concrete_type_ref(&element.full_name(), true)
-        } else {
-            TypeReference::concrete_type_ref(&self.name.full_name(), false)
+    fn intern(&self, types: &mut HashSet<Arc<TypeReference>>) -> Arc<TypeReference> {
+        let reference =
+            TypeReference::concrete_type_ref(&FullName::with_schema(&self.0, &self.1), self.2);
+        if let Some(shared) = types.get(&reference) {
+            return shared.clone();
         }
+        let shared = Arc::new(reference);
+        types.insert(shared.clone());
+        shared
     }
 }
 
 #[derive(serde::Deserialize)]
-struct SeedSlot {
-    number: i32,
-    left_type: SeedType,
-    right_type: SeedType,
-    owner: Option<OperatorFamilyIdentity>,
-    builtin: bool,
-    #[serde(default)]
-    family_owned: bool,
+#[serde(rename_all = "snake_case")]
+enum SeedOwner {
+    Family,
+    Loose,
+    Class(QualifiedName),
 }
 
-impl SeedSlot {
-    fn slot(&self, kind: MemberKind) -> FamilySlot {
-        FamilySlot {
-            kind,
-            number: self.number,
-            left: self.left_type.reference(),
-            right: self.right_type.reference(),
-        }
-    }
-
-    fn owner(&self) -> MemberOwner {
-        if self.builtin {
-            MemberOwner::Builtin
-        } else if let Some(owner) = &self.owner {
-            MemberOwner::Class(owner.qualified_name())
-        } else if self.family_owned {
-            MemberOwner::Family
-        } else {
-            MemberOwner::Loose
-        }
+fn owner(seed: Option<SeedOwner>) -> MemberOwner {
+    match seed {
+        None => MemberOwner::Builtin,
+        Some(SeedOwner::Family) => MemberOwner::Family,
+        Some(SeedOwner::Loose) => MemberOwner::Loose,
+        Some(SeedOwner::Class(name)) => MemberOwner::Class(Box::new(name.full_name())),
     }
 }
 
 #[derive(serde::Deserialize)]
-struct SeedOperator {
-    #[serde(flatten)]
-    slot: SeedSlot,
-    operator: QualifiedName,
-    order_family: Option<OperatorFamilyIdentity>,
-}
+struct SeedOperator(
+    i32,
+    SeedType,
+    SeedType,
+    QualifiedName,
+    Option<QualifiedName>,
+    Option<SeedOwner>,
+);
 
 #[derive(serde::Deserialize)]
-struct SeedFunction {
-    #[serde(flatten)]
-    slot: SeedSlot,
-    function: QualifiedName,
-    arguments: Vec<SeedType>,
-}
+struct SeedFunction(
+    i32,
+    SeedType,
+    SeedType,
+    QualifiedName,
+    Vec<SeedType>,
+    Option<SeedOwner>,
+);
 
 #[derive(serde::Deserialize)]
 struct SeedFamily {
-    #[serde(flatten)]
-    identity: OperatorFamilyIdentity,
+    schema: String,
+    name: String,
+    access_method: String,
     operators: Vec<SeedOperator>,
     functions: Vec<SeedFunction>,
 }
 
 impl SeedFamily {
-    fn into_family(self) -> Result<OperatorFamily, String> {
-        let mut family = OperatorFamily::new(key(&self.identity));
-        for operator in self.operators {
-            let slot = operator.slot.slot(MemberKind::Operator);
-            let identity = OperatorIdentity::binary_signature(
-                OperatorName::from_full_name(&operator.operator.full_name()),
-                slot.left.clone(),
-                slot.right.clone(),
-            );
+    fn into_family(
+        self,
+        types: &mut HashSet<Arc<TypeReference>>,
+    ) -> Result<OperatorFamily, String> {
+        let mut family = OperatorFamily::new(OperatorFamilyKey::new(
+            FullName::with_schema(&self.schema, &self.name),
+            &self.access_method,
+        ));
+        for SeedOperator(number, left, right, operator, order_family, dependency) in self.operators
+        {
             family.insert(
-                slot,
+                FamilySlot {
+                    kind: MemberKind::Operator,
+                    number,
+                    left: left.intern(types),
+                    right: right.intern(types),
+                },
                 FamilyMember {
-                    object: MemberObject::Operator(identity),
-                    order_family: operator.order_family.as_ref().map(key),
-                    owner: operator.slot.owner(),
+                    object: MemberObject::Operator(OperatorName::from_full_name(
+                        &operator.full_name(),
+                    )),
+                    order_family: order_family
+                        .map(|name| Box::new(OperatorFamilyKey::new(name.full_name(), "btree"))),
+                    owner: owner(dependency),
                 },
             )?;
         }
-        for function in self.functions {
+        for SeedFunction(number, left, right, function, arguments, dependency) in self.functions {
             family.insert(
-                function.slot.slot(MemberKind::Function),
+                FamilySlot {
+                    kind: MemberKind::Function,
+                    number,
+                    left: left.intern(types),
+                    right: right.intern(types),
+                },
                 FamilyMember {
                     object: MemberObject::Function {
-                        name: function.function.full_name(),
-                        arguments: function.arguments.iter().map(SeedType::reference).collect(),
+                        name: function.full_name(),
+                        arguments: arguments.iter().map(|arg| arg.intern(types)).collect(),
                     },
                     order_family: None,
-                    owner: function.slot.owner(),
+                    owner: owner(dependency),
                 },
             )?;
         }
         Ok(family)
     }
-}
-
-fn key(identity: &OperatorFamilyIdentity) -> OperatorFamilyKey {
-    OperatorFamilyKey::new(identity.qualified_name(), identity.access_method())
 }
 
 pub(crate) fn load(
@@ -149,8 +149,11 @@ pub(crate) fn load(
     let rows: Vec<SeedFamily> =
         serde_json::from_reader(reader).map_err(|error| invalid_seed(&error))?;
     let mut families = HashMap::new();
+    let mut types = HashSet::new();
     for row in rows {
-        let family = row.into_family().map_err(|error| invalid_seed(&error))?;
+        let family = row
+            .into_family(&mut types)
+            .map_err(|error| invalid_seed(&error))?;
         if families.insert(family.key.clone(), family).is_some() {
             return Err(invalid_seed(&"duplicate operator family"));
         }

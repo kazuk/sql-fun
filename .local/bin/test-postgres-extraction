@@ -536,13 +536,9 @@ def validate_masters(directory):
     assert any(c["key_type"] is not None for c in classes)
     integer_family = next(f for f in families if
                           (f["schema"], f["name"], f["access_method"]) == ("pg_catalog", "integer_ops", "btree"))
-    assert any(m["builtin"] and m["owner"] is None and m["number"] == 3
-               and m["operator"] == {"schema": "pg_catalog", "name": "="}
-               and m["left_type"]["name"] == "int4" and m["right_type"]["name"] == "int4"
-               for m in integer_family["operators"])
-    assert any(m["builtin"] and m["function"] == {"schema": "pg_catalog", "name": "btint4cmp"}
-               and [a["name"] for a in m["arguments"]] == ["int4", "int4"]
-               for m in integer_family["functions"])
+    int4 = ["pg_catalog", "int4", False]
+    assert [3, int4, int4, ["pg_catalog", "="], None, None] in integer_family["operators"]
+    assert [1, int4, int4, ["pg_catalog", "btint4cmp"], [int4, int4], None] in integer_family["functions"]
     return collations, classes
 
 
@@ -681,14 +677,13 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert btree_family["functions"] == []
     hash_class = next(c for c in named if c["access_method"] == "hash")
     hash_family = next(f for f in families if all(f[k] == v for k, v in hash_class["family"].items()))
-    class_identity = {"schema": schema, "name": "Same 雪", "access_method": "hash"}
-    assert len(hash_family["operators"]) == 1
-    assert hash_family["operators"][0]["owner"] == class_identity
-    assert not hash_family["operators"][0]["builtin"]
-    assert len(hash_family["functions"]) == 1
-    assert hash_family["functions"][0]["owner"] == class_identity
+    class_owner = {"class": [schema, "Same 雪"]}
+    [hash_operator] = hash_family["operators"]
+    assert hash_operator[-1] == class_owner
+    [hash_function] = hash_family["functions"]
+    assert hash_function[-1] == class_owner
     hard = next(f for f in families if f["schema"] == schema and f["name"] == "hard_support")
-    assert hard["functions"][0]["family_owned"] and hard["functions"][0]["owner"] is None
+    assert hard["functions"][0][-1] == "family"
     assert any(c["schema"] == extension_schema for c in classes), "installed extension masters lost"
     assert not any(c["schema"] == other for c in classes), "references must not broaden selection"
     repeated = destination / f"{major}-selected-repeat"

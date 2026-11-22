@@ -1,5 +1,7 @@
 //! Binding and validation shared by operator family and class declarations.
 
+use std::sync::Arc;
+
 use crate::{
     ast::{
         ObjectArgument, ObjectKind, TypeName,
@@ -61,13 +63,13 @@ impl FamilyMember {
                 if slot.left == slot.right
                     && (slot.kind == MemberKind::Operator || slot.number == 1) =>
             {
-                if declared_input == Some(&slot.left) {
+                if declared_input == Some(slot.left.as_ref()) {
                     return;
                 }
                 context
                     .operator_class_for_family_type(family, &slot.left)
                     .map_or(MemberOwner::Loose, |class| {
-                        MemberOwner::Class(class.qualified_name())
+                        MemberOwner::Class(Box::new(class.qualified_name()))
                     })
             }
             "btree" | "hash" => MemberOwner::Loose,
@@ -207,12 +209,12 @@ fn resolve_operator(
         FamilySlot {
             kind: MemberKind::Operator,
             number,
-            left,
-            right,
+            left: Arc::new(left),
+            right: Arc::new(right),
         },
         FamilyMember {
-            object: MemberObject::Operator(operator),
-            order_family,
+            object: MemberObject::Operator(operator.name().clone()),
+            order_family: order_family.map(Box::new),
             owner,
         },
     )))
@@ -250,8 +252,8 @@ fn resolve_function(
     let slot = FamilySlot {
         kind: MemberKind::Function,
         number,
-        left,
-        right,
+        left: Arc::new(left),
+        right: Arc::new(right),
     };
     if !validate_support_signature(method, &slot, &arguments, &function, default_input, context)? {
         return Ok(None);
@@ -261,7 +263,7 @@ fn resolve_function(
         FamilyMember {
             object: MemberObject::Function {
                 name: function.name().clone(),
-                arguments,
+                arguments: arguments.into_iter().map(Arc::new).collect(),
             },
             order_family: None,
             owner,
@@ -405,7 +407,7 @@ fn validate_support_signature(
         (method, number),
         ("btree" | "brin", 5) | ("hash", 3) | ("gist", 10) | ("gin" | "spgist", 7)
     ) {
-        if !same_type || declared_input.is_some_and(|ty| ty != &slot.left) {
+        if !same_type || declared_input.is_some_and(|ty| ty != slot.left.as_ref()) {
             report_family_problem(
                 context,
                 "associated data types for index options support must match the class input type, when declared, and each other",

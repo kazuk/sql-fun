@@ -22,6 +22,7 @@ pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
 mod constraint;
 mod create_base_type;
+pub use self::create_base_type::RejectedBaseType;
 mod create_comp_type;
 mod create_domain;
 mod create_enum_type;
@@ -383,14 +384,7 @@ pub enum SemAst {
     CreateBaseType(TypeDefinition),
 
     /// A PostgreSQL shell or base declaration that cannot be applied.
-    RejectedBaseType {
-        /// Qualified name of the declaration.
-        name: FullName,
-        /// Whether the declaration attempted to complete a shell.
-        completion: bool,
-        /// Reason the declaration was rejected.
-        reason: String,
-    },
+    RejectedBaseType(RejectedBaseType),
 
     /// `create function` / `create procedure` statement
     CreateFunction(CreateFunction),

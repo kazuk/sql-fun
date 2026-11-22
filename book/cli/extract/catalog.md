@@ -14,7 +14,7 @@ sql-fun extract catalog [OPTIONS] --output <OUTPUT>
 | `--docker-image <IMAGE>` | PostgreSQL image reference; conflicts with the connection source. |
 | `--docker-host-address <ADDRESS>` | Address used to reach the published port; default `127.0.0.1`. Requires `--docker-image`. |
 | `--docker-bind-address <ADDRESS>` | Host interface on which the port is published; default `127.0.0.1`. Requires `--docker-image`. |
-| `--definition-schema <NAME>` | Include additional collation and operator-class definitions from this exact schema. Repeatable. |
+| `--definition-schema <NAME>` | Include additional collations, operator classes, and operator families from this exact schema. Repeatable. |
 | `--output <PATH>` | Required new or empty output directory. |
 | `--timeout-seconds <SECONDS>` | Extraction/readiness timeout; positive integer, default `120`. |
 | `-h`, `--help` | Print help. |

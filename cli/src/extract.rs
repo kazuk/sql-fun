@@ -56,7 +56,7 @@ struct CatalogArgs {
     /// Address on the Docker host on which to publish the `PostgreSQL` port.
     #[arg(long, default_value = "127.0.0.1", requires = "docker_image")]
     docker_bind_address: String,
-    /// Include additional collation/operator-class definitions from this exact schema (repeatable).
+    /// Include additional collations, operator classes, and operator families from this exact schema (repeatable).
     #[arg(long = "definition-schema")]
     definition_schemas: Vec<String>,
     /// Destination containing schema.sql, catalog JSON, and metadata.json.

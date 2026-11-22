@@ -22,7 +22,8 @@ pub struct OperatorFamilyKey {
 }
 
 impl OperatorFamilyKey {
-    pub(crate) fn new(name: FullName, method: &str) -> Self {
+    /// Create an exact key from a schema-qualified name and method.
+    pub fn new(name: FullName, method: &str) -> Self {
         Self { name, method: method.to_owned() }
     }
 
@@ -47,6 +48,12 @@ pub struct OperatorFamily {
 }
 
 impl OperatorFamily {
+    /// Exact identity of this family.
+    pub const fn key(&self) -> &OperatorFamilyKey {
+        &self.key
+    }
+
+
     pub(crate) fn new(key: OperatorFamilyKey) -> Self {
         Self { key, members: HashMap::new() }
     }

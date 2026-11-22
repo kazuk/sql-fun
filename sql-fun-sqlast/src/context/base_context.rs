@@ -51,6 +51,7 @@ pub struct BaseContext {
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
     masters: ConflictMasters,
+    operator_families: std::collections::HashMap<crate::sem::OperatorFamilyKey, crate::sem::OperatorFamily>,
 }
 
 #[derive(serde::Deserialize)]
@@ -212,6 +213,12 @@ impl BaseContext {
             ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
         };
 
+        let operator_families = if Dialect::from(metadata) == Dialect::sqlite() {
+            Default::default()
+        } else {
+            crate::sem::operator_family::seed::load(&paths.operator_families()?)?
+        };
+
         let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;
         Ok(Self {
             configured_roles: metadata.into(),
@@ -219,6 +226,7 @@ impl BaseContext {
             metadata: metadata.clone(),
             functions,
             masters,
+            operator_families,
             types: builtin_type_data,
             binary_ordered_types,
             casts,
@@ -501,6 +509,11 @@ impl crate::context::ForeignDataWrapperInfoRead for BaseContext {}
 
 impl crate::context::AccessMethodInfoRead for BaseContext {}
 impl crate::context::OperatorFamilyInfoRead for BaseContext {
+    fn operator_family(&self, key: &crate::sem::OperatorFamilyKey) -> Option<&crate::sem::OperatorFamily> {
+        self.operator_families.get(key)
+    }
+
+
     fn has_default_operator_class(&self, method: &str, typ: &TypeReference) -> bool {
         self.masters.has_default_operator_class(method, typ)
     }

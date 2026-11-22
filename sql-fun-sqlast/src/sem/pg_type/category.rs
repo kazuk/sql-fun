@@ -24,6 +24,18 @@ impl TryFrom<char> for TypeCategory {
     }
 }
 
+impl TryFrom<&str> for TypeCategory {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut chars = value.chars();
+        match (chars.next(), chars.next()) {
+            (Some(code), None) => Self::try_from(code),
+            _ => Err("type category must be one printable ASCII character"),
+        }
+    }
+}
+
 impl From<TypeCategory> for char {
     fn from(category: TypeCategory) -> Self {
         category.code()
@@ -33,6 +45,20 @@ impl From<TypeCategory> for char {
 #[cfg(test)]
 mod tests {
     use crate::sem::pg_type::category::TypeCategory;
+
+    #[rstest::rstest]
+    #[case("S", Some('S'))]
+    #[case(" ", Some(' '))]
+    #[case("SS", None)]
+    #[case("", None)]
+    #[case("é", None)]
+    #[case("\n", None)]
+    fn validates_the_whole_string(#[case] value: &str, #[case] expected: Option<char>) {
+        assert_eq!(
+            TypeCategory::try_from(value).ok().map(TypeCategory::code),
+            expected
+        );
+    }
 
     #[rstest::rstest]
     #[case::internal('Z')]

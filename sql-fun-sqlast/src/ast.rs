@@ -9,6 +9,7 @@
 #![allow(dead_code)]
 
 pub(crate) mod client_type;
+mod create_access_method;
 pub(crate) mod create_operator;
 mod create_operator_class;
 mod create_type;
@@ -299,6 +300,7 @@ pub(crate) enum StatementNode {
     VariableSet(VariableSet),
     EnumType(EnumType),
     CreateOperator(CreateOperator),
+    CreateAccessMethod(Box<create_access_method::CreateAccessMethod>),
     CreateOperatorClass(Box<create_operator_class::CreateOperatorClass>),
     CreateType(CreateType),
     Sequence(Sequence),
@@ -395,6 +397,10 @@ impl StatementNode {
 
     const fn view(value: View) -> Self {
         Self::View(value)
+    }
+
+    fn create_access_method(value: create_access_method::CreateAccessMethod) -> Self {
+        Self::CreateAccessMethod(Box::new(value))
     }
 
     const fn extension(value: Extension) -> Self {

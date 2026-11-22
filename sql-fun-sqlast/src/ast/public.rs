@@ -155,6 +155,8 @@ pub enum StatementKind {
     BaseType,
     /// A PostgreSQL operator declaration.
     CreateOperator,
+    /// A PostgreSQL access method declaration.
+    CreateAccessMethod,
     /// A PostgreSQL operator class declaration.
     CreateOperatorClass,
     /// A sequence definition.
@@ -216,6 +218,7 @@ impl std::fmt::Display for StatementKind {
             Self::VariableSet => "configuration statement",
             Self::EnumType => "CREATE TYPE AS ENUM",
             Self::CreateOperator => "CREATE OPERATOR",
+            Self::CreateAccessMethod => "CREATE ACCESS METHOD",
             Self::CreateOperatorClass => "CREATE OPERATOR CLASS",
             Self::ShellType | Self::BaseType => "CREATE TYPE",
             Self::Sequence => "CREATE SEQUENCE",
@@ -431,6 +434,7 @@ impl StatementNode {
             Self::VariableSet(_) => StatementKind::variable_set(),
             Self::EnumType(_) => StatementKind::enum_type(),
             Self::CreateOperator(_) => StatementKind::CreateOperator,
+            Self::CreateAccessMethod(_) => StatementKind::CreateAccessMethod,
             Self::CreateOperatorClass(_) => StatementKind::CreateOperatorClass,
             Self::CreateType(value) => value.kind(),
             Self::Sequence(_) => StatementKind::sequence(),

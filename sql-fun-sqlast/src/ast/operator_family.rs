@@ -19,7 +19,7 @@ pub(crate) struct CreateOperatorFamily {
 }
 
 impl CreateOperatorFamily {
-    pub(crate) fn name(&self) -> &Name {
+    pub(crate) const fn name(&self) -> &Name {
         &self.name
     }
 
@@ -70,7 +70,7 @@ pub(crate) struct AlterOperatorFamily {
 }
 
 impl AlterOperatorFamily {
-    pub(crate) fn name(&self) -> &Name {
+    pub(crate) const fn name(&self) -> &Name {
         &self.name
     }
 
@@ -78,7 +78,7 @@ impl AlterOperatorFamily {
         &self.access_method
     }
 
-    pub(crate) fn action(&self) -> &AlterOperatorFamilyAction {
+    pub(crate) const fn action(&self) -> &AlterOperatorFamilyAction {
         &self.action
     }
 }

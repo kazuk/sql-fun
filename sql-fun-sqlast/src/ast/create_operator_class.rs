@@ -41,7 +41,7 @@ pub(crate) struct OperatorClassFunction {
 }
 
 impl CreateOperatorClass {
-    pub(crate) fn name(&self) -> &Name {
+    pub(crate) const fn name(&self) -> &Name {
         &self.name
     }
 
@@ -49,7 +49,7 @@ impl CreateOperatorClass {
         self.is_default
     }
 
-    pub(crate) fn input_type(&self) -> &TypeName {
+    pub(crate) const fn input_type(&self) -> &TypeName {
         &self.input_type
     }
 
@@ -57,7 +57,7 @@ impl CreateOperatorClass {
         &self.access_method
     }
 
-    pub(crate) fn family(&self) -> Option<&Name> {
+    pub(crate) const fn family(&self) -> Option<&Name> {
         self.family.as_ref()
     }
 
@@ -71,7 +71,7 @@ impl OperatorClassOperator {
         self.strategy
     }
 
-    pub(crate) fn name(&self) -> &Name {
+    pub(crate) const fn name(&self) -> &Name {
         &self.name
     }
 
@@ -79,7 +79,7 @@ impl OperatorClassOperator {
         self.operands.as_deref()
     }
 
-    pub(crate) fn order_family(&self) -> Option<&Name> {
+    pub(crate) const fn order_family(&self) -> Option<&Name> {
         self.order_family.as_ref()
     }
 }
@@ -89,7 +89,7 @@ impl OperatorClassFunction {
         self.support
     }
 
-    pub(crate) fn name(&self) -> &Name {
+    pub(crate) const fn name(&self) -> &Name {
         &self.name
     }
 

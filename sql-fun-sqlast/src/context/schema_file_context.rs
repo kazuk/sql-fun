@@ -694,9 +694,11 @@ impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
     }
 
     fn operator_family(&self, key: &OperatorFamilyKey) -> Option<&OperatorFamily> {
-        self.operator_families
-            .get(key)
-            .or_else(|| self.base.operator_family(key))
+        if let Some(family) = self.operator_families.get(key) {
+            Some(family)
+        } else {
+            self.base.operator_family(key)
+        }
     }
 }
 
@@ -1458,10 +1460,15 @@ impl crate::context::ConflictInfoRead for SchemaCatalog {
         name: &FullName,
         method: &str,
     ) -> Option<&OperatorClassDefinition> {
-        self.operator_classes
+        if let Some(class) = self
+            .operator_classes
             .iter()
             .find(|class| class.matches_name(name) && class.access_method() == method)
-            .or_else(|| self.base.operator_class_definition(name, method))
+        {
+            Some(class)
+        } else {
+            self.base.operator_class_definition(name, method)
+        }
     }
     fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {
         self.base.lookup_sqlite_collation(name)

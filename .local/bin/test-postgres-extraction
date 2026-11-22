@@ -624,7 +624,9 @@ CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE "other masters"."Type 雪"
  USING btree FAMILY "other masters"."Family 雪" AS
  OPERATOR 1 < (integer,integer), OPERATOR 3 = (integer,integer),
  FUNCTION 1 btint4cmp(integer,integer);
-CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE integer USING hash AS
+CREATE OPERATOR FAMILY "other masters"."Family 雪" USING hash;
+CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE integer
+ USING hash FAMILY "other masters"."Family 雪" AS
  OPERATOR 1 = (integer,integer), FUNCTION 1 hashint4(integer);
 CREATE OPERATOR CLASS {quoted}.array_ops DEFAULT
  FOR TYPE "other masters"."Type 雪"[] USING btree AS
@@ -673,12 +675,18 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert array_class["default"]
     assert array_class["input_type"]["array_element"] == {"schema": other, "name": "Type 雪"}
     families = json.loads((selected / "operator_families.json").read_text())
-    family = next(f for f in families if all(f[k] == v for k, v in btree["family"].items()))
-    class_identity = {"schema": schema, "name": "Same 雪", "access_method": "btree"}
-    assert len(family["operators"]) == 2
-    assert all(m["owner"] == class_identity and not m["builtin"] for m in family["operators"])
-    assert len(family["functions"]) == 1
-    assert family["functions"][0]["owner"] == class_identity
+    btree_family = next(f for f in families if all(f[k] == v for k, v in btree["family"].items()))
+    # Integer members are loose because the family has no class for integer.
+    assert btree_family["operators"] == []
+    assert btree_family["functions"] == []
+    hash_class = next(c for c in named if c["access_method"] == "hash")
+    hash_family = next(f for f in families if all(f[k] == v for k, v in hash_class["family"].items()))
+    class_identity = {"schema": schema, "name": "Same 雪", "access_method": "hash"}
+    assert len(hash_family["operators"]) == 1
+    assert hash_family["operators"][0]["owner"] == class_identity
+    assert not hash_family["operators"][0]["builtin"]
+    assert len(hash_family["functions"]) == 1
+    assert hash_family["functions"][0]["owner"] == class_identity
     hard = next(f for f in families if f["schema"] == schema and f["name"] == "hard_support")
     assert hard["functions"][0]["family_owned"] and hard["functions"][0]["owner"] is None
     assert any(c["schema"] == extension_schema for c in classes), "installed extension masters lost"

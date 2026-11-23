@@ -635,22 +635,34 @@ impl<C: ParseContext> Declaration<'_, C> {
         }
         let target = requested.or(inherited);
         if let Some(target) = &target {
-            if let Some(links) = self.context.operator_links(target)
-                && let Some(reciprocal) = links.target(commutator)
-                && reciprocal != identity
-            {
-                self.reject(
-                    "the referenced operator already has a different reciprocal relationship",
-                    location,
-                )?;
-            }
-            if let (Some(result), Some(other_result)) = (result, target.result_type(self.context))
-                && result != other_result
-            {
-                self.reject("related operators must have the same return type", location)?;
-            }
+            self.validate_relationship(identity, result, target, commutator, location)?;
         }
         Ok(target)
+    }
+
+    fn validate_relationship(
+        &mut self,
+        identity: &OperatorIdentity,
+        result: Option<&TypeReference>,
+        target: &OperatorIdentity,
+        commutator: bool,
+        location: Option<StringSpan>,
+    ) -> Result<(), AnalysisError> {
+        if let Some(links) = self.context.operator_links(target)
+            && let Some(reciprocal) = links.target(commutator)
+            && reciprocal != identity
+        {
+            self.reject(
+                "the referenced operator already has a different reciprocal relationship",
+                location,
+            )?;
+        }
+        if let (Some(result), Some(other_result)) = (result, target.result_type(self.context))
+            && result != other_result
+        {
+            self.reject("related operators must have the same return type", location)?;
+        }
+        Ok(())
     }
 
     fn link(

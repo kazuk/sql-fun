@@ -304,6 +304,14 @@ impl<C: ParseContext> Declaration<'_, C> {
                 option.location(),
             );
         }
+        let result = identity.result_type(self.context).cloned();
+        self.validate_relationship(
+            identity,
+            result.as_ref(),
+            &related,
+            commutator,
+            option.location(),
+        )?;
         if &related != identity {
             let reciprocal = if let Some((_, settings)) =
                 updates.iter_mut().find(|(target, _)| target == &related)
@@ -321,15 +329,6 @@ impl<C: ParseContext> Declaration<'_, C> {
             if !reciprocal.flags_and_links_known {
                 return self.reject(
                     "referenced operator settings are missing from the catalog",
-                    option.location(),
-                );
-            }
-            if reciprocal
-                .target(commutator)
-                .is_some_and(|current| current != identity)
-            {
-                return self.reject(
-                    "the referenced operator already has a different reciprocal relationship",
                     option.location(),
                 );
             }

@@ -330,5 +330,25 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "alter-commutator-result-mismatch",
+    "sql": "ALTER OPERATOR public.%% (integer, integer) SET (COMMUTATOR = OPERATOR(public.?@))",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-negator-result-mismatch",
+    "sql": "ALTER OPERATOR public.?@ (integer, integer) SET (NEGATOR = OPERATOR(public.%%))",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
   }
 ]

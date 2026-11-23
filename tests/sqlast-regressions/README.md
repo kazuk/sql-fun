@@ -102,8 +102,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1739 inputs for PostgreSQL 17 and 1735 for
-PostgreSQL 18 (3474 total). These count positive contract inputs separately from
+manifest totals are 1741 inputs for PostgreSQL 17 and 1737 for
+PostgreSQL 18 (3478 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 

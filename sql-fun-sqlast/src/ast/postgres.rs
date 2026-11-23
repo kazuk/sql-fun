@@ -833,9 +833,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         if let Some(cast) = value.as_create_cast_stmt().as_inner() {
-            return Ok(Self::CreateCast(Box::new(
-                CreateCast::try_from_with_tokens(&cast, tokens)?,
-            )));
+            return Ok(Self::create_cast(CreateCast::try_from_with_tokens(
+                &cast, tokens,
+            )?));
         }
         if let Some(method) = value.as_create_am_stmt().as_inner() {
             return Ok(Self::create_access_method(

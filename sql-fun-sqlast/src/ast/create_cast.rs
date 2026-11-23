@@ -71,8 +71,6 @@ impl TryFromWithTokens<&syn::CreateCastStmt> for CreateCast {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
-
     use crate::{
         ast::{
             Dialect, StatementKind, StatementNode,
@@ -81,7 +79,7 @@ mod tests {
         parse_statements,
     };
 
-    #[rstest]
+    #[rstest::rstest]
     #[case(
         "CREATE CAST (citext AS text)    WITHOUT FUNCTION AS IMPLICIT",
         "citext",
@@ -132,7 +130,7 @@ mod tests {
         }
     }
 
-    #[rstest]
+    #[rstest::rstest]
     #[case(
         "CREATE CAST (text[] AS hstore)\n  WITH FUNCTION hstore(text[]);",
         &["hstore"]

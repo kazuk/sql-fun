@@ -271,6 +271,18 @@ impl CreateFunction {
             .map_or_else(|| self.is_table_function(), |(_, returns_set)| returns_set)
     }
 
+    pub(crate) fn is_ordinary_scalar_cast_function(&self, context: &impl ParseContext) -> bool {
+        if self.object_kind != ObjectKind::FUNCTION || self.catalog_returns_set() {
+            return false;
+        }
+        if self.builtin_properties.is_some() {
+            return self.overloads.get_at(0).is_some_and(|signature| {
+                context.function_preserves_view_rows(&self.name, signature)
+            });
+        }
+        true
+    }
+
     pub(crate) fn split_definitions(&self) -> Vec<Self> {
         let mut definitions = Vec::new();
         for overload in &self.overloads {

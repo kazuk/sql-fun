@@ -29,6 +29,9 @@ SELECT coalesce(json_agg(json_build_object(
   'schema', nspname,
   'name', typname,
   'category', CASE WHEN typisdefined THEN typcategory::text ELSE NULL END,
+  'length', CASE WHEN typisdefined THEN typlen ELSE NULL END,
+  'alignment', CASE WHEN typisdefined THEN typalign::text ELSE NULL END,
+  'by_value', CASE WHEN typisdefined THEN typbyval ELSE NULL END,
   'collatable', CASE WHEN typisdefined THEN typcollation <> 0 ELSE NULL END
 ) ORDER BY
   CASE WHEN is_bootstrap THEN 0 ELSE 1 END,

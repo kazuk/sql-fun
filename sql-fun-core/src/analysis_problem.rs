@@ -395,6 +395,10 @@ pub enum AnalysisProblem {
     InvalidOperatorDeclaration(String, Option<StringSpan>),
     /// Invalid PostgreSQL text search template declaration.
     InvalidTextSearchTemplate(String, Option<StringSpan>),
+    /// A CREATE CAST declaration cannot be applied.
+    InvalidCastDeclaration(String, Option<StringSpan>),
+    /// A domain cast is recorded but ignored by PostgreSQL coercion.
+    IgnoredDomainCast(String, Option<StringSpan>),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -573,7 +577,9 @@ impl AnalysisProblem {
         match self {
             Self::AlterColumn(problem) => problem.reason().severity(),
             Self::Index(problem) => problem.severity(),
-            Self::Lint(_) | Self::UnreachableCoalesceArgument(..) => DiagnosticSeverity::Warning,
+            Self::Lint(_) | Self::UnreachableCoalesceArgument(..) | Self::IgnoredDomainCast(..) => {
+                DiagnosticSeverity::Warning
+            }
             _ => DiagnosticSeverity::Error,
         }
     }
@@ -814,6 +820,8 @@ impl AnalysisProblem {
             Self::InvalidFunctionSignature(_) => "invalid_function_signature",
             Self::InvalidTextSearchTemplate(..) => "invalid_text_search_template",
             Self::InvalidOperatorDeclaration(..) => "invalid_operator_declaration",
+            Self::InvalidCastDeclaration(..) => "invalid_cast_declaration",
+            Self::IgnoredDomainCast(..) => "ignored_domain_cast",
             Self::InvalidBaseType(_) => "base_type_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
@@ -878,7 +886,9 @@ impl AnalysisProblem {
         match self {
             Self::Lint(problem) => problem.span(),
             Self::InvalidTextSearchTemplate(_, span)
-            | Self::InvalidOperatorDeclaration(_, span) => *span,
+            | Self::InvalidOperatorDeclaration(_, span)
+            | Self::InvalidCastDeclaration(_, span)
+            | Self::IgnoredDomainCast(_, span) => *span,
             Self::NameResolution(problem) => problem.statement_relative_span(),
             Self::CallArgument(problem) => problem.statement_relative_span(),
             _ => None,
@@ -910,6 +920,8 @@ impl AnalysisProblem {
             | Self::InvalidFunctionSignature(_)
             | Self::InvalidTextSearchTemplate(..)
             | Self::InvalidOperatorDeclaration(..)
+            | Self::InvalidCastDeclaration(..)
+            | Self::IgnoredDomainCast(..)
             | Self::InvalidBaseType(_)
             | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
@@ -1046,6 +1058,8 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::InvalidFunctionSignature(problem) => problem.diagnostic_message(),
             Self::InvalidTextSearchTemplate(message, _)
             | Self::InvalidOperatorDeclaration(message, _)
+            | Self::InvalidCastDeclaration(message, _)
+            | Self::IgnoredDomainCast(message, _)
             | Self::InvalidOperatorFamilyDeclaration(message) => message.clone(),
             Self::InvalidBaseType(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),

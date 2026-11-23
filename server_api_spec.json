@@ -866,6 +866,66 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A CREATE CAST declaration cannot be applied.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidCastDeclaration": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidCastDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A domain cast is recorded but ignored by PostgreSQL coercion.",
+                  "type": "object",
+                  "properties": {
+                    "IgnoredDomainCast": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "IgnoredDomainCast"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -6248,6 +6308,66 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A CREATE CAST declaration cannot be applied.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidCastDeclaration": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidCastDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A domain cast is recorded but ignored by PostgreSQL coercion.",
+                  "type": "object",
+                  "properties": {
+                    "IgnoredDomainCast": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "IgnoredDomainCast"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -11518,6 +11638,66 @@
                   },
                   "required": [
                     "InvalidTextSearchTemplate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A CREATE CAST declaration cannot be applied.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidCastDeclaration": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidCastDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A domain cast is recorded but ignored by PostgreSQL coercion.",
+                  "type": "object",
+                  "properties": {
+                    "IgnoredDomainCast": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "IgnoredDomainCast"
                   ],
                   "additionalProperties": false
                 },

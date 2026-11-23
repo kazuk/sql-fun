@@ -6,6 +6,7 @@ mod builtin_ope;
 pub use self::{
     builtin_casts::PgBuiltinCasts, builtin_fun::PgBuiltInFunctions, builtin_ope::PgBuiltinOperators,
 };
+use crate::sem::pg_type::PhysicalTypeLayout;
 use crate::{
     TrieMap,
     ast::{Dialect, ObjectKind},
@@ -64,6 +65,9 @@ struct BuiltinTypeInfo {
     category: Option<SemTypeCategory>,
     #[serde(deserialize_with = "crate::sem::pg_type::deserialize_collatable")]
     collatable: Option<bool>,
+    length: Option<i16>,
+    alignment: Option<char>,
+    by_value: Option<bool>,
 }
 
 #[cfg(test)]
@@ -83,7 +87,14 @@ mod builtin_type_info_tests {
 impl From<&BuiltinTypeInfo> for TypeDefinition {
     fn from(info: &BuiltinTypeInfo) -> Self {
         let name = FullName::with_schema(&info.schema, &info.name);
-        Self::builtin_with_category(&name, info.category, info.collatable)
+        let definition = Self::builtin_with_category(&name, info.category, info.collatable);
+        if let (Some(length), Some(alignment), Some(by_value)) =
+            (info.length, info.alignment, info.by_value)
+        {
+            definition.with_physical_layout(PhysicalTypeLayout::new(length, alignment, by_value))
+        } else {
+            definition
+        }
     }
 }
 
@@ -136,6 +147,11 @@ mod builtin_type_conversion_tests {
                 record.name
             );
             let definition = TypeDefinition::from(&record);
+            assert!(
+                definition.physical_layout().is_some(),
+                "defined builtin: {}",
+                record.name
+            );
             let name = FullName::with_schema(&record.schema, &record.name);
             context.set_get_type_impl_result(&name, &definition);
             for lookup in [name, FullName::from_local_name(&record.name)] {

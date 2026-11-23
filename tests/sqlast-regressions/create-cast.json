@@ -1,0 +1,232 @@
+[
+  {
+    "name": "function-explicit",
+    "sql": "SELECT value::public.cast_explicit AS result FROM public.cast_inputs",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "public",
+            "local_name": "cast_explicit",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "binary-explicit",
+    "sql": "SELECT 1::oid::float4 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "float4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "inout-assignment",
+    "sql": "INSERT INTO public.cast_outputs SELECT value FROM public.cast_inputs RETURNING value AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "public",
+            "local_name": "cast_assignment",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "inout-implicit-call",
+    "sql": "SELECT public.consume_cast(value) AS result FROM public.cast_inputs",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "implicit-call-with-parameter",
+    "sql": "SELECT public.consume_cast($1::public.cast_source) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "builtin-binary-compatible-function-input",
+    "sql": "SELECT 'one'::varchar::public.cast_source AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "public",
+            "local_name": "cast_source",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema-binary-compatible-function-input",
+    "sql": "SELECT 1::oid::public.cast_source AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "public",
+            "local_name": "cast_source",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid-physical-layout",
+    "sql": "CREATE CAST (uuid AS macaddr8) WITHOUT FUNCTION",
+    "expected": {
+      "diagnostics": [
+        "invalid_cast_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "builtin-pair-already-exists",
+    "sql": "CREATE CAST (varchar AS text) WITH INOUT",
+    "expected": {
+      "diagnostics": [
+        "invalid_cast_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-function-arguments",
+    "sql": "CREATE CAST (text AS public.cast_source) WITH FUNCTION public.float_to_source(float4)",
+    "expected": {
+      "diagnostics": [
+        "invalid_cast_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "assignment-is-not-implicit",
+    "sql": "SELECT public.consume_assignment(value) AS result FROM public.cast_inputs",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema-base-type-layout",
+    "sql": "SELECT 'one'::public.cast_text::text AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "implicit-call-infers-parameter",
+    "sql": "SELECT public.consume_source($1) AS source_result, public.consume_cast($1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "source_result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain-cast-warning",
+    "sql": "CREATE CAST (public.cast_domain AS public.cast_explicit) WITH INOUT",
+    "expected": {
+      "diagnostics": [
+        "ignored_domain_cast",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  }
+]

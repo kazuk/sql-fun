@@ -6,7 +6,7 @@ use crate::{
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, AstAndContextPair, SemAst, TypeDefinition, TypeReference,
-        pg_type::TypeCategory,
+        pg_type::{PhysicalTypeLayout, TypeCategory},
     },
 };
 
@@ -85,7 +85,10 @@ impl CreateType {
         }
         layout.validate()?;
         support.validate(context, reference)?;
-        Ok(TypeDefinition::base(name, category, collatable))
+        Ok(
+            TypeDefinition::base(name, category, collatable)
+                .with_physical_layout(layout.physical()),
+        )
     }
 }
 
@@ -268,6 +271,22 @@ impl Default for TypeLayout {
 }
 
 impl TypeLayout {
+    fn physical(&self) -> PhysicalTypeLayout {
+        let length = match self.length {
+            TypeLength::Fixed(bytes) => bytes,
+            TypeLength::Variable => -1,
+            TypeLength::NullTerminated => -2,
+        };
+        let alignment = match self.alignment {
+            1 => 'c',
+            2 => 's',
+            4 => 'i',
+            8 => 'd',
+            _ => unreachable!("validated type alignment"),
+        };
+        PhysicalTypeLayout::new(length, alignment, self.by_value)
+    }
+
     fn set_length(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
         self.length = TypeLength::from_option(option)?;
         Ok(())

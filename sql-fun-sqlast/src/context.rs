@@ -69,6 +69,7 @@ pub(crate) use self::{
     type_hint::ParameterTypeHints,
 };
 
+use crate::sem::cast::CreateCast;
 use crate::{
     AstAndContextPair, CacheContext, StringSpan,
     ast::Dialect,
@@ -115,6 +116,14 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Publish an analyzed cast declaration.
+    ///
+    /// # Errors
+    /// Returns an error if this context has no writable cast catalog.
+    fn apply_create_cast(self, _statement: &CreateCast) -> Result<Self, AnalysisError> {
+        AnalysisError::raise_unexpected_input("catalog does not support CREATE CAST")
+    }
+
     /// Publish an analyzed operator declaration.
     ///
     /// # Errors

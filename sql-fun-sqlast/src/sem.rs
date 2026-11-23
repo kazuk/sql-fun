@@ -11,7 +11,8 @@ mod alter_seq;
 mod alter_table;
 mod analysis_state;
 mod ast;
-mod cast;
+pub(crate) mod cast;
+pub use cast::CreateCast;
 mod client_type;
 mod column_addition;
 mod column_constraints;
@@ -353,6 +354,8 @@ impl From<CreateIndex> for ImplicitChange {
 pub enum SemAst {
     /// An analyzed PostgreSQL operator declaration.
     CreateOperator(Box<CreateOperator>),
+    /// A PostgreSQL cast declaration.
+    CreateCast(Box<CreateCast>),
     /// PostgreSQL ALTER OPERATOR SET.
     AlterOperator(Box<AlterOperator>),
     /// A resolved CREATE TRIGGER statement.
@@ -526,6 +529,11 @@ impl SemAst {
             Self::CreateIndex(index) => index.visit_references(visitor),
             Self::CreateFunction(function) => function.visit_references(visitor),
             Self::CreateOperator(operator) => operator.visit_references(visitor),
+            Self::CreateCast(cast) => {
+                let (source, target, _) = cast.entry();
+                visitor.schema_type(source)?;
+                visitor.schema_type(target)
+            }
             Self::AlterOperator(operator) => operator.visit_references(visitor),
             Self::CreateDomain(domain) => {
                 if let Some(reference) = domain.base_type() {

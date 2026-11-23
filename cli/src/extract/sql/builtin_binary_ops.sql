@@ -4,12 +4,25 @@ with ops as (
     l.typname as left_type,
     r.typname as right_type,
     res.typname as result,
-    coalesce(p.proisstrict, false) as strict
+    coalesce(p.proisstrict, false) as strict,
+    json_build_object(
+      'restriction', restriction.proname,
+      'join', join_estimator.proname,
+      'join_arity', join_estimator.pronargs,
+      'commutator', commutator.oprname,
+      'negator', negator.oprname,
+      'hashes', o.oprcanhash,
+      'merges', o.oprcanmerge
+    ) as settings
   from pg_catalog.pg_operator o
   join pg_catalog.pg_type l on l.oid = o.oprleft
   join pg_catalog.pg_type r on r.oid = o.oprright
   join pg_catalog.pg_type res on res.oid = o.oprresult
   left join pg_catalog.pg_proc p on p.oid = o.oprcode
+  left join pg_catalog.pg_proc restriction on restriction.oid = o.oprrest
+  left join pg_catalog.pg_proc join_estimator on join_estimator.oid = o.oprjoin
+  left join pg_catalog.pg_operator commutator on commutator.oid = o.oprcom
+  left join pg_catalog.pg_operator negator on negator.oid = o.oprnegate
   where o.oid < 16384 and o.oprleft <> 0 and o.oprright <> 0
 ),
 grouped as (
@@ -20,7 +33,8 @@ grouped as (
         'left', left_type,
         'right', right_type,
         'result', result,
-        'strict', strict
+        'strict', strict,
+        'settings', settings
       )
       order by left_type, right_type
     ) as entries

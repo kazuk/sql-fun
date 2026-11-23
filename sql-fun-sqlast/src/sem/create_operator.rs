@@ -1,12 +1,15 @@
 //! PostgreSQL operator declaration analysis.
 
+mod alter;
+pub use alter::AlterOperator;
+
 use crate::{
     StringSpan,
     ast::{
         Literal, ObjectKind,
         create_operator::{self as ast, OperatorOption, OperatorOptionValue},
     },
-    context::ParseContext,
+    context::{BaseParseContext, ParseContext},
     names::{FullName, OperatorName, SchemaName},
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ExactFunction,
@@ -24,28 +27,30 @@ pub struct OperatorIdentity {
 }
 
 impl OperatorIdentity {
-    pub(crate) const fn binary_signature(
-        name: OperatorName,
-        left: TypeReference,
-        right: TypeReference,
-    ) -> Self {
-        Self {
-            name,
-            left: Some(left),
-            right,
-        }
-    }
-
     pub(crate) fn resolve_binary(
         name: &OperatorName,
         left: &TypeReference,
         right: &TypeReference,
         context: &impl ParseContext,
     ) -> Option<(Self, TypeReference)> {
+        let (identity, result) = Self::resolve(name, Some(left), right, context)?;
+        Some((identity, result.clone()))
+    }
+
+    fn resolve<'a>(
+        name: &OperatorName,
+        left: Option<&TypeReference>,
+        right: &TypeReference,
+        context: &'a impl ParseContext,
+    ) -> Option<(Self, &'a TypeReference)> {
         expand_operator_search_path(context, name, |candidate| {
-            let identity = Self::binary_signature(candidate.clone(), left.clone(), right.clone());
-            let returns = identity.result_type(context)?.clone();
-            Some((identity, returns))
+            let identity = Self {
+                name: candidate.clone(),
+                left: left.cloned(),
+                right: right.clone(),
+            };
+            let result = identity.result_type(context)?;
+            Some((identity, result))
         })
     }
 
@@ -64,6 +69,38 @@ impl OperatorIdentity {
             .cloned()
             .map(Some)
             .collect()
+    }
+
+    pub(crate) fn builtin_signature(
+        name: &str,
+        left: Option<TypeReference>,
+        right: TypeReference,
+    ) -> Self {
+        Self {
+            name: OperatorName::from_parts(Some("pg_catalog"), name),
+            left,
+            right,
+        }
+    }
+
+    pub(crate) fn builtin_settings<'a>(
+        &self,
+        context: &'a impl BaseParseContext,
+    ) -> Option<&'a OperatorLinks> {
+        match context.get_operator_op(&self.name, self.binary(), true)? {
+            OperatorDefinition::Binary(overloads) => overloads
+                .iter()
+                .find(|entry| {
+                    self.left.as_ref() == Some(entry.left_arg_type())
+                        && &self.right == entry.right_arg_type()
+                })?
+                .settings(),
+            OperatorDefinition::RightUnary(overloads) => overloads
+                .iter()
+                .find(|entry| &self.right == entry.arg_type())?
+                .settings(),
+            OperatorDefinition::LeftUnary(_) => None,
+        }
     }
 
     pub(crate) fn extension_member(&self) -> Option<OwnershipIdentity> {
@@ -111,14 +148,41 @@ impl OperatorIdentity {
     }
 }
 
-/// Links retained for subsequent operator declarations, including shells.
-#[derive(Clone, Debug, Default)]
+type EstimatorIdentity = (FullName, usize);
+
+/// Operator settings retained for subsequent declarations, including links to shells.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct OperatorLinks {
     commutator: Option<OperatorIdentity>,
     negator: Option<OperatorIdentity>,
+    // Outer None marks older catalogs that omit the setting entirely.
+    restriction: Option<Option<EstimatorIdentity>>,
+    join: Option<Option<EstimatorIdentity>>,
+    hashes: bool,
+    merges: bool,
+    flags_and_links_known: bool,
 }
 
 impl OperatorLinks {
+    pub(crate) const fn new(
+        restriction: Option<EstimatorIdentity>,
+        join: Option<EstimatorIdentity>,
+        commutator: Option<OperatorIdentity>,
+        negator: Option<OperatorIdentity>,
+        hashes: bool,
+        merges: bool,
+    ) -> Self {
+        Self {
+            restriction: Some(restriction),
+            join: Some(join),
+            commutator,
+            negator,
+            hashes,
+            merges,
+            flags_and_links_known: true,
+        }
+    }
+
     pub(crate) const fn target(&self, commutator: bool) -> Option<&OperatorIdentity> {
         if commutator {
             self.commutator.as_ref()
@@ -225,12 +289,14 @@ impl CreateOperator {
         };
         let restriction = analysis.estimator(option(ast, &["restrict"]), false)?;
         let join = analysis.estimator(option(ast, &["join"]), true)?;
-        let links = analysis.attributes(
+        let mut links = analysis.attributes(
             ast,
             identity.as_ref(),
             implementation.as_ref(),
             join.is_some(),
         )?;
+        links.restriction = Some(restriction.as_ref().map(estimator_identity));
+        links.join = Some(join.as_ref().map(estimator_identity));
         Ok(Self {
             identity,
             implementation,
@@ -246,6 +312,10 @@ fn option<'a>(ast: &'a ast::CreateOperator, keys: &[&str]) -> Option<&'a Operato
     ast.options()
         .iter()
         .rfind(|option| keys.contains(&option.key()))
+}
+
+fn estimator_identity(function: &ExactFunction) -> EstimatorIdentity {
+    (function.name().clone(), function.overload().params().len())
 }
 
 fn builtin(name: &str) -> TypeReference {
@@ -320,7 +390,12 @@ impl<C: ParseContext> Declaration<'_, C> {
         let negator = option(ast, &["negator"]);
         let hashes = self.flag(ast, &["hashes"])?;
         let merges = self.flag(ast, &["merges", "sort1", "sort2", "ltcmp", "gtcmp"])?;
-        let mut links = OperatorLinks::default();
+        let mut links = OperatorLinks {
+            hashes,
+            merges,
+            flags_and_links_known: true,
+            ..Default::default()
+        };
         if let Some(identity) = identity {
             if identity.result_type(self.context).is_some() {
                 self.reject("this operator signature is already defined", None)?;
@@ -497,6 +572,10 @@ impl<C: ParseContext> Declaration<'_, C> {
         let Some(option) = option(ast, keys) else {
             return Ok(false);
         };
+        self.flag_value(option)
+    }
+
+    fn flag_value(&mut self, option: &OperatorOption) -> Result<bool, AnalysisError> {
         match option.value() {
             _ if !matches!(option.key(), "hashes" | "merges") => Ok(true),
             None => Ok(true),

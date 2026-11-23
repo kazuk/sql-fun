@@ -3,6 +3,15 @@
     {
       "input": "tsquery",
       "result": "tsquery",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -10,11 +19,29 @@
     {
       "input": "path",
       "result": "int4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "polygon",
       "result": "int4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -22,31 +49,85 @@
     {
       "input": "float4",
       "result": "float4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "float8",
       "result": "float8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int2",
       "result": "int2",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int4",
       "result": "int4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int8",
       "result": "int8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "numeric",
       "result": "numeric",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -54,36 +135,99 @@
     {
       "input": "float4",
       "result": "float4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "float8",
       "result": "float8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int2",
       "result": "int2",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int4",
       "result": "int4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int8",
       "result": "int8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "interval",
       "result": "interval",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "numeric",
       "result": "numeric",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -91,11 +235,29 @@
     {
       "input": "line",
       "result": "bool",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "lseg",
       "result": "bool",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -103,11 +265,29 @@
     {
       "input": "line",
       "result": "bool",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "lseg",
       "result": "bool",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -115,31 +295,85 @@
     {
       "input": "float4",
       "result": "float4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "float8",
       "result": "float8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int2",
       "result": "int2",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int4",
       "result": "int4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int8",
       "result": "int8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "numeric",
       "result": "numeric",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -147,11 +381,29 @@
     {
       "input": "lseg",
       "result": "float8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "path",
       "result": "float8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -159,21 +411,57 @@
     {
       "input": "box",
       "result": "point",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "circle",
       "result": "point",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "lseg",
       "result": "point",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "polygon",
       "result": "point",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -181,6 +469,15 @@
     {
       "input": "float8",
       "result": "float8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -188,6 +485,15 @@
     {
       "input": "float8",
       "result": "float8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ],
@@ -195,36 +501,99 @@
     {
       "input": "bit",
       "result": "bit",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "inet",
       "result": "inet",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int2",
       "result": "int2",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int4",
       "result": "int4",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "int8",
       "result": "int8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "macaddr",
       "result": "macaddr",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     },
     {
       "input": "macaddr8",
       "result": "macaddr8",
+      "settings": {
+        "commutator": null,
+        "hashes": false,
+        "join": null,
+        "join_arity": null,
+        "merges": false,
+        "negator": null,
+        "restriction": null
+      },
       "strict": true
     }
   ]

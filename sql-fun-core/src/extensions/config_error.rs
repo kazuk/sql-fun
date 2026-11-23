@@ -30,13 +30,8 @@ pub enum ExtensionConfigError {
     ConflictingSelections(String, String),
 
     /// A required extension could not be resolved.
-    #[error("Cannot resolve required extension ({chain}): {source}")]
-    RequiredExtension {
-        /// Chain of requiring script paths ending with the prerequisite name.
-        chain: String,
-        /// Underlying path or control resolution error.
-        source: Box<Self>,
-    },
+    #[error(transparent)]
+    RequiredExtension(RequiredExtensionError),
 
     /// The script dependencies have no valid execution order.
     #[error("Cyclic extension script dependency: {0}")]
@@ -59,7 +54,22 @@ pub enum ExtensionConfigError {
     ExtensionSqlNotExist(String, ExtensionVersion, PathBuf),
 }
 
+/// Failure to resolve an extension prerequisite, with its dependency chain.
+#[derive(thiserror::Error, Debug)]
+#[error("Cannot resolve required extension ({chain}): {source}")]
+pub struct RequiredExtensionError {
+    chain: String,
+    source: Box<ExtensionConfigError>,
+}
+
 impl ExtensionConfigError {
+    pub(super) fn required_extension(chain: String, source: Self) -> Self {
+        Self::RequiredExtension(RequiredExtensionError {
+            chain,
+            source: Box::new(source),
+        })
+    }
+
     pub(super) fn missing_default_version<T>(name: &str, choices: String) -> Result<T, Self> {
         Err(Self::MissingDefaultVersion(name.to_owned(), choices))
     }

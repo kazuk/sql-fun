@@ -16,10 +16,13 @@ pub(crate) enum TypeProjection {
     ArrayElement,
     ConstructArray,
     Array,
-    Member {
-        name: String,
-        definitions: Vec<(TypeReference, TypeReference)>,
-    },
+    Member(MemberProjection),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct MemberProjection {
+    name: String,
+    definitions: Vec<(TypeReference, TypeReference)>,
 }
 
 impl TypeProjection {
@@ -36,20 +39,28 @@ impl TypeProjection {
     }
 
     pub(crate) fn member(name: &str) -> Self {
-        Self::Member {
+        Self::Member(MemberProjection {
             name: name.to_owned(),
             definitions: Vec::new(),
-        }
+        })
     }
 
     pub(super) fn retain_owned(&mut self, source: &TypeReference) {
-        if let Self::Member { definitions, .. } = self
+        if let Self::Member(MemberProjection { definitions, .. }) = self
             && source.type_definition().is_some()
         {
             let key = Self::identity(source);
             if !definitions.iter().any(|(ty, _)| ty == &key) {
                 definitions.push((key, source.clone()));
             }
+        }
+    }
+
+    fn member_name(&self) -> Option<&str> {
+        if let Self::Member(member) = self {
+            Some(&member.name)
+        } else {
+            None
         }
     }
 
@@ -69,14 +80,14 @@ impl TypeProjection {
         context: &impl ParseContext,
         source: &TypeReference,
     ) -> Option<TypeReference> {
-        if !matches!(self, Self::Member { .. }) || source.is_array() != Some(false) {
+        if !matches!(self, Self::Member(_)) || source.is_array() != Some(false) {
             return self.project(source);
         }
         if let Some(columns) = source.row_columns(context) {
             // Resolve domain/table row fields while the catalog is available,
             // retaining the source identity for correlated input assignments.
             let owned = TypeReference::dynamic(&TypeDefinition::implicit_composite(&columns));
-            if let Self::Member { definitions, .. } = self {
+            if let Self::Member(MemberProjection { definitions, .. }) = self {
                 if let Some((_, retained)) = definitions.iter_mut().find(|(ty, _)| ty == source) {
                     *retained = owned;
                 } else {
@@ -88,7 +99,7 @@ impl TypeProjection {
     }
 
     pub(super) fn project(&self, source: &TypeReference) -> Option<TypeReference> {
-        if let Self::Member { name, definitions } = self {
+        if let Self::Member(MemberProjection { name, definitions }) = self {
             if source.is_array() != Some(false) {
                 return None;
             }
@@ -112,7 +123,7 @@ impl TypeProjection {
             Self::ConstructArray => unreachable!("array construction handled above"),
             Self::ArrayElement => Some(source.element_type()),
             Self::Array => Some(source.clone()),
-            Self::Member { .. } => unreachable!("member projection handled above"),
+            Self::Member(_) => unreachable!("member projection handled above"),
         }
     }
 
@@ -157,7 +168,7 @@ impl StructuralConstraint {
         domains: &[InputTypeConstraint],
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        if let TypeProjection::Member { name, .. } = &self.projection
+        if let Some(name) = self.projection.member_name()
             && let Some(sources) = domains[self.source].admissible_types()
             && sources
                 .iter()
@@ -180,9 +191,7 @@ impl StructuralConstraint {
             let mut changed = domains[self.source].intersect(&sources);
             changed |= domains[self.result].intersect(&results);
             changed
-        } else if !domains[self.result].is_any()
-            && !matches!(self.projection, TypeProjection::Member { .. })
-        {
+        } else if !domains[self.result].is_any() && self.projection.member_name().is_none() {
             let mut sources = domains[self.result].preimage(&self.projection);
             if matches!(self.projection, TypeProjection::ConstructArray) {
                 // ARRAY[array_value] has the same SQL array identity. Its source

@@ -1,0 +1,22 @@
+id: no-struct-enum-variant
+snapshots:
+  "enum Example { Empty {} }":
+    labels:
+    - source: Empty {}
+      style: primary
+      start: 15
+      end: 23
+    - source: "{}"
+      style: secondary
+      start: 21
+      end: 23
+  "enum Example { Named { name: String, version: String } }":
+    labels:
+    - source: "Named { name: String, version: String }"
+      style: primary
+      start: 15
+      end: 54
+    - source: "{ name: String, version: String }"
+      style: secondary
+      start: 21
+      end: 54

@@ -41,12 +41,26 @@ pub enum ConstraintAction {
     /// Validate the existing constraint.
     Validate,
     /// Remove the constraint according to the requested DROP options.
-    Drop {
-        /// Permit a missing constraint.
-        if_exists: bool,
-        /// Request removal of dependent objects.
-        cascade: bool,
-    },
+    Drop(DropConstraintOptions),
+}
+
+/// Options on DROP CONSTRAINT.
+#[derive(Debug, Clone)]
+pub struct DropConstraintOptions {
+    if_exists: bool,
+    cascade: bool,
+}
+
+impl DropConstraintOptions {
+    /// Whether a missing constraint is permitted.
+    pub const fn if_exists(&self) -> bool {
+        self.if_exists
+    }
+
+    /// Whether dependent objects are removed as well.
+    pub const fn cascade(&self) -> bool {
+        self.cascade
+    }
 }
 
 /// Completed lookup of the constraint declaration.
@@ -89,6 +103,11 @@ fn is_postgres18_or_later(context: &impl ParseContext) -> bool {
 }
 
 impl ConstraintAction {
+    /// Remove a constraint with the given existence and dependency options.
+    pub const fn drop_constraint(if_exists: bool, cascade: bool) -> Self {
+        Self::Drop(DropConstraintOptions { if_exists, cascade })
+    }
+
     fn from_ast<'ast>(
         command: &'ast PostgresAlterCommand,
         context: &impl ParseContext,
@@ -113,10 +132,7 @@ impl ConstraintAction {
             AlterOperation::ValidateConstraint => (command.name().as_str(), Self::Validate),
             AlterOperation::DropConstraint => (
                 command.name().as_str(),
-                Self::Drop {
-                    if_exists: command.missing_ok(),
-                    cascade: command.cascade(),
-                },
+                Self::drop_constraint(command.missing_ok(), command.cascade()),
             ),
             _ => return AnalysisError::raise_unexpected_input("constraint change"),
         };
@@ -380,10 +396,7 @@ impl AlterConstraint {
             ConstraintTarget::Missing
                 if matches!(
                     action,
-                    ConstraintAction::Drop {
-                        if_exists: true,
-                        ..
-                    }
+                    ConstraintAction::Drop(options) if options.if_exists()
                 ) =>
             {
                 return Ok(NoOp);
@@ -403,7 +416,7 @@ impl AlterConstraint {
             _ => {}
         }
         let reason = match action {
-            ConstraintAction::Drop { .. } => return Ok(Valid),
+            ConstraintAction::Drop(_) => return Ok(Valid),
             ConstraintAction::Alter(None) => return Ok(NoOp),
             ConstraintAction::Alter(Some(deferrability)) => {
                 if let Some(current) = target.foreign_key_deferrability() {
@@ -494,7 +507,7 @@ mod tests {
         );
         assert!(matches!(
             change.action(),
-            ConstraintAction::Drop { cascade: true, .. }
+            ConstraintAction::Drop(options) if options.cascade()
         ));
         let context = fk::apply(
             analyzed.into_context(),

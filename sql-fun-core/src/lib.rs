@@ -95,7 +95,7 @@ pub use self::{
     extensions::{
         ExtensionConfigError, ExtensionNameVersionPair, ExtensionScript, ExtensionScriptSettings,
         ExtensionVersion, PostgresExtensionsCollection, PostgresExtensionsParseError,
-        ScheduledExtensionScript,
+        RequiredExtensionError, ScheduledExtensionScript,
     },
     highlighter::TerminalColor,
     lookup_result::LookupResult,

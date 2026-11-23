@@ -8,7 +8,7 @@ mod script_inventory;
 mod test_helpers;
 
 pub use self::{
-    config_error::ExtensionConfigError,
+    config_error::{ExtensionConfigError, RequiredExtensionError},
     control_file::ExtensionScriptSettings,
     dependency_schedule::ScheduledExtensionScript,
     extension_collection::{

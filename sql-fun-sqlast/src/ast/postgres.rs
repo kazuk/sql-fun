@@ -253,7 +253,7 @@ impl ObjectTarget {
         Self::try_from_object_with_args(&signature, tokens)
     }
 
-    fn try_from_object_with_args(
+    pub(super) fn try_from_object_with_args(
         object: &syn::ObjectWithArgs,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -830,6 +830,11 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 &variable_set,
                 tokens,
             )?));
+        }
+        if let Some(cast) = value.as_create_cast_stmt().as_inner() {
+            return Ok(Self::CreateCast(Box::new(
+                super::create_cast::CreateCast::try_from_with_tokens(&cast, tokens)?,
+            )));
         }
         if let Some(method) = value.as_create_am_stmt().as_inner() {
             return Ok(Self::create_access_method(

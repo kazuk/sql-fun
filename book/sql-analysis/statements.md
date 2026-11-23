@@ -16,6 +16,7 @@ SQL parser can be analyzed or executed.
 - Write behavior: [CREATE/DROP RULE](statements/rules.md) and
   [CREATE/DROP TRIGGER](statements/triggers.md).
 - Types, routines, and operators: [CREATE TYPE](statements/create-type.md),
+  [CREATE CAST](statements/create-cast.md),
   [CREATE DOMAIN](statements/create-domain.md),
   [CREATE FUNCTION](statements/create-function.md),
   [CREATE OPERATOR](statements/create-operator.md),

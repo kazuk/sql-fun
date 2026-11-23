@@ -10,6 +10,7 @@
 
 pub(crate) mod client_type;
 pub(crate) mod create_access_method;
+mod create_cast;
 pub(crate) mod create_operator;
 pub(crate) mod create_operator_class;
 mod create_text_search_template;
@@ -304,6 +305,8 @@ pub(crate) enum StatementNode {
     CreateOperator(CreateOperator),
     CreateTextSearchTemplate(create_text_search_template::CreateTextSearchTemplate),
     AlterOperator(Box<AlterOperator>),
+    #[allow(dead_code, reason = "CREATE CAST interpretation is deferred to #1237")]
+    CreateCast(Box<create_cast::CreateCast>),
     CreateAccessMethod(Box<create_access_method::CreateAccessMethod>),
     CreateOperatorClass(Box<create_operator_class::CreateOperatorClass>),
     CreateOperatorFamily(Box<operator_family::CreateOperatorFamily>),

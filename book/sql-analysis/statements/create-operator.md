@@ -48,8 +48,12 @@ PostgreSQL permits set-returning implementation functions. sql-fun reports
 those operator declarations as unsupported and does not register them.
 Follow [issue #1218](https://github.com/kazuk/sql-fun/issues/1218).
 
-The `ALTER OPERATOR … SET` form for changing selectivity estimators and
-`DROP OPERATOR` fail during SQL analysis. These forms occur in bundled
-extension update scripts, including `cube` and `intarray`, respectively.
-Follow [issue #1199](https://github.com/kazuk/sql-fun/issues/1199#issuecomment-7077560718) for the
-conversion work.
+sql-fun parses `ALTER OPERATOR … SET` declarations, including the estimator
+updates in the bundled `cube`, `pg_trgm`, and `seg` scripts. Analysis stops at
+these declarations before applying the new settings. Follow
+[issue #1232](https://github.com/kazuk/sql-fun/issues/1232) for operator setting
+analysis and catalog updates.
+
+`DROP OPERATOR`, which occurs in the bundled `intarray` update script, still
+fails during statement conversion. Follow
+[issue #1229](https://github.com/kazuk/sql-fun/issues/1229).

@@ -14,6 +14,7 @@ use crate::{
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
         create_access_method::CreateAccessMethod,
+        create_operator::AlterOperator,
         create_operator_class::CreateOperatorClass,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
@@ -838,6 +839,10 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             return Ok(Self::create_operator_family(
                 CreateOperatorFamily::try_from(&family)?,
             ));
+        }
+        if let Some(operator) = value.as_alter_operator_stmt().as_inner() {
+            let operator = AlterOperator::try_from_with_tokens(&operator, tokens)?;
+            return Ok(Self::AlterOperator(Box::new(operator)));
         }
         if let Some(family) = value.as_alter_op_family_stmt().as_inner() {
             return Ok(Self::alter_operator_family(

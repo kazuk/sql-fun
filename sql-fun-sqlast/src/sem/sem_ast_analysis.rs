@@ -46,6 +46,9 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
+            AstStatementNode::AlterOperator(_) => {
+                AnalysisError::raise_unexpected_input("ALTER OPERATOR SET semantic analysis")
+            }
             AstStatementNode::CreateOperator(ast) => Ok(Self::CreateOperator(Box::new(
                 CreateOperator::analyze(ast, context)?,
             ))),

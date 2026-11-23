@@ -41,7 +41,7 @@ mod trigger;
 pub(crate) mod validation;
 
 pub(crate) use self::{
-    create_operator::CreateOperator,
+    create_operator::{AlterOperator, CreateOperator},
     create_type::{BaseTypeOption, CreateType},
     ddl::{CompositeType, Domain, Function, Index, Schema, TableAs},
     deparse::render_full_name,
@@ -301,6 +301,7 @@ pub(crate) enum StatementNode {
     VariableSet(VariableSet),
     EnumType(EnumType),
     CreateOperator(CreateOperator),
+    AlterOperator(Box<AlterOperator>),
     CreateAccessMethod(Box<create_access_method::CreateAccessMethod>),
     CreateOperatorClass(Box<create_operator_class::CreateOperatorClass>),
     CreateOperatorFamily(Box<operator_family::CreateOperatorFamily>),

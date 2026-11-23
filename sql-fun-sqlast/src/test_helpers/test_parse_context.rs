@@ -24,9 +24,9 @@ use crate::{
         InsertInferenceModifiers, Kind, OperatorClassDefinition, OperatorDefinition,
         OperatorFamily, OverloadVariant, OwnedObjectDefinition, OwnershipIdentity,
         ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup, SourcePathWithSpan,
-        TriggerIdentity, TypeDefinition, TypeReference, VariableSet, ViewDeleteSupport,
-        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport, WithClause,
-        ownership::model_definitions, problem::TriggerProblem,
+        TextSearchTemplateDefinition, TriggerIdentity, TypeDefinition, TypeReference, VariableSet,
+        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
+        WithClause, ownership::model_definitions, problem::TriggerProblem,
         search_path::expand_search_path_inst,
     },
     test_helpers::{ast_query, source_span},
@@ -41,6 +41,7 @@ pub struct TestContext<Constraints> {
     ownership: OwnershipCatalog,
     extension_memberships: HashMap<OwnershipIdentity, Vec<ExtensionMembershipChange>>,
     access_methods: HashMap<String, AccessMethodDefinition>,
+    text_search_templates: HashMap<FullName, TextSearchTemplateDefinition>,
     foreign_data_wrappers: HashMap<String, CreateForeignDataWrapper>,
     triggers: HashMap<TriggerIdentity, Option<CreateTrigger>>,
     masters: Option<ConflictMasters>,
@@ -503,9 +504,23 @@ impl<Constraints> crate::context::AccessMethodInfoRead for TestContext<Constrain
     }
 }
 
+impl<Constraints> crate::context::TextSearchTemplateInfoRead for TestContext<Constraints> {
+    fn text_search_template(&self, name: &FullName) -> Option<&TextSearchTemplateDefinition> {
+        self.text_search_templates.get(name)
+    }
+}
+
 impl crate::context::AccessMethodInfoWrite for TestParseContext {
     fn register_access_method(mut self, definition: &AccessMethodDefinition) -> Self {
         self.access_methods
+            .insert(definition.name().to_owned(), definition.clone());
+        self
+    }
+}
+
+impl crate::context::TextSearchTemplateInfoWrite for TestParseContext {
+    fn register_text_search_template(mut self, definition: &TextSearchTemplateDefinition) -> Self {
+        self.text_search_templates
             .insert(definition.name().to_owned(), definition.clone());
         self
     }
@@ -815,6 +830,7 @@ impl ParseContext for TestParseContext {
             extension_memberships: self.extension_memberships,
             triggers: self.triggers,
             access_methods: self.access_methods,
+            text_search_templates: self.text_search_templates,
             foreign_data_wrappers: self.foreign_data_wrappers,
             masters: self.masters,
             function_set_properties: self.function_set_properties,

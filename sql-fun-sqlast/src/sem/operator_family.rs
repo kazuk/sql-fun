@@ -11,10 +11,10 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{
     ast::{Name, operator_family::CreateOperatorFamily as Syntax},
     context::{BaseParseContext, ParseContext},
-    names::{FullName, OperatorName, SchemaName},
+    names::{FullName, OperatorName},
     sem::{
         AccessMethodKind, AnalysisError, AnalysisProblem, TypeReference,
-        search_path::search_schemas,
+        search_path::{postgres_creation_schema, search_schemas},
     },
 };
 
@@ -176,29 +176,14 @@ pub(crate) fn creation_name(
         report_family_problem(context, "cross-database operator family or class reference")?;
         return Ok(None);
     }
-    let exists = |schema: &SchemaName| {
-        matches!(
-            schema.as_str(),
-            "public" | "pg_catalog" | "information_schema"
-        ) || context.schema_definition(schema.as_str()).is_some()
-    };
-    if let Some(schema) = name.schema() {
-        if exists(schema) {
-            return Ok(Some(name));
-        }
-        report_family_problem(context, format!("schema {schema} does not exist"))?;
-    } else if let Some(schema) = context
-        .get_search_path()
-        .iter()
-        .find(|schema| exists(schema))
-    {
-        return Ok(Some(name.replace_schema(schema)));
-    } else {
-        report_family_problem(
-            context,
-            "no schema selected for operator family or class creation",
-        )?;
+    if let Some(schema) = postgres_creation_schema(context, name.schema()) {
+        return Ok(Some(name.replace_schema(&schema)));
     }
+    let problem = name.schema().map_or_else(
+        || "no schema selected for operator family or class creation".to_owned(),
+        |schema| format!("schema {schema} does not exist"),
+    );
+    report_family_problem(context, problem)?;
     Ok(None)
 }
 

@@ -393,6 +393,8 @@ pub enum AnalysisProblem {
     InvalidFunctionSignature(FunctionSignatureProblem),
     /// A CREATE OPERATOR declaration cannot be applied.
     InvalidOperatorDeclaration(String, Option<StringSpan>),
+    /// Invalid PostgreSQL text search template declaration.
+    InvalidTextSearchTemplate(String, Option<StringSpan>),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -810,6 +812,7 @@ impl AnalysisProblem {
             Self::Rule(_) => "rule_invalid_definition",
             Self::ForeignDataWrapper(_) => "foreign_data_wrapper_invalid_definition",
             Self::InvalidFunctionSignature(_) => "invalid_function_signature",
+            Self::InvalidTextSearchTemplate(..) => "invalid_text_search_template",
             Self::InvalidOperatorDeclaration(..) => "invalid_operator_declaration",
             Self::InvalidBaseType(_) => "base_type_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
@@ -874,7 +877,8 @@ impl AnalysisProblem {
     pub fn statement_relative_span(&self) -> Option<StringSpan> {
         match self {
             Self::Lint(problem) => problem.span(),
-            Self::InvalidOperatorDeclaration(_, span) => *span,
+            Self::InvalidTextSearchTemplate(_, span)
+            | Self::InvalidOperatorDeclaration(_, span) => *span,
             Self::NameResolution(problem) => problem.statement_relative_span(),
             Self::CallArgument(problem) => problem.statement_relative_span(),
             _ => None,
@@ -904,6 +908,7 @@ impl AnalysisProblem {
             | Self::DropFunctionDependency(_)
             | Self::ForeignDataWrapper(_)
             | Self::InvalidFunctionSignature(_)
+            | Self::InvalidTextSearchTemplate(..)
             | Self::InvalidOperatorDeclaration(..)
             | Self::InvalidBaseType(_)
             | Self::CrossDatabaseOperatorReference(_) => {
@@ -1039,7 +1044,8 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::ForeignDataWrapper(problem) => problem.diagnostic_message(),
             Self::InvalidFunctionSignature(problem) => problem.diagnostic_message(),
-            Self::InvalidOperatorDeclaration(message, _)
+            Self::InvalidTextSearchTemplate(message, _)
+            | Self::InvalidOperatorDeclaration(message, _)
             | Self::InvalidOperatorFamilyDeclaration(message) => message.clone(),
             Self::InvalidBaseType(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),

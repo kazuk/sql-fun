@@ -13,20 +13,20 @@ use ::sql_fun_core::IVec;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CreateTextSearchTemplate {
-    name: Name,
-    options: Vec<TemplateOption>,
+    pub(crate) name: Name,
+    pub(crate) options: Vec<TemplateOption>,
 }
 
 #[derive(Clone, Debug)]
-struct TemplateOption {
-    key: String,
-    value: Option<TemplateOptionValue>,
+pub(crate) struct TemplateOption {
+    pub(crate) key: String,
+    pub(crate) value: Option<TemplateOptionValue>,
     // Relative to the statement being converted.
-    location: Option<StringSpan>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
-enum TemplateOptionValue {
+pub(crate) enum TemplateOptionValue {
     Name(Name),
     Literal(Literal),
 }

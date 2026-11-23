@@ -217,9 +217,28 @@ analysis ([#1098](https://github.com/kazuk/sql-fun/issues/1098)). Notification
 delivery and SQL rendering are not supported. For NOTIFY within a rule, see
 [CREATE RULE](statements/rules.md).
 
-PostgreSQL `CREATE TEXT SEARCH TEMPLATE` passes syntax conversion. Schema
-loading stops at semantic analysis for this declaration, and the template
-is unavailable to subsequent dictionary declarations
-([#1236](https://github.com/kazuk/sql-fun/issues/1236)).
+## PostgreSQL text search templates
+
+Schema analysis registers valid `CREATE TEXT SEARCH TEMPLATE` declarations
+from project schemas and extension scripts. An unqualified template is
+created in the first existing schema in the active search path. An
+unqualified callback is resolved through the active routine search path.
+
+`LEXIZE` is required and takes four `internal` arguments. Optional `INIT`
+takes one `internal` argument. Both callbacks must return `internal`, and
+their input signatures must match exactly. The options may appear in
+either order. If an option is repeated, every occurrence must resolve and
+the last binding is used.
+
+SQL analysis resolves callback identities without executing the routines.
+The shipped catalog omits builtin text search template definitions and
+callbacks such as `pg_catalog.dsimple_lexize`. Analysis cannot resolve an
+omitted callback or detect a collision with an omitted builtin template
+([#1241](https://github.com/kazuk/sql-fun/issues/1241)).
+
+Query SQL rendering for this declaration is unsupported. Schema loading
+stops at a subsequent `CREATE TEXT SEARCH DICTIONARY` declaration such as
+the one in `dict_int`, `dict_xsyn`, or `unaccent`.
+[Dictionary declaration support (#1240)](https://github.com/kazuk/sql-fun/issues/1240).
 
 [fdw-diagnostic]: ../diagnostics/foreign_data_wrapper_invalid_definition.md

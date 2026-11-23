@@ -517,3 +517,8 @@ Issue #1172 covers single-action ALTER FUNCTION PARALLEL in
 and use of altered routines in subsequent schema statements and queries
 through the source and installed runners. Rust tests cover stored modes,
 source history and layer isolation.
+
+Issue #1236 uses the `text-search-templates` project schema on PostgreSQL 17/18.
+The fixture checks exact callback signatures, qualified names, required options,
+and duplicate template diagnostics in the source and installed checks. Rust
+coverage checks binding order and catalog isolation.

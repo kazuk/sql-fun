@@ -23,6 +23,7 @@ mod search_path;
 mod sequence_info;
 mod source;
 mod table_info;
+mod text_search_template_info;
 mod transformation_info;
 mod trigger_info;
 mod type_hint;
@@ -53,6 +54,7 @@ pub use self::{
         MutSourcePathWithSpan, SourceAccessService,
     },
     table_info::{TableInfoRead, TableInfoWrite},
+    text_search_template_info::{TextSearchTemplateInfoRead, TextSearchTemplateInfoWrite},
     transformation_info::{TransformationInfoRead, TransformationInfoWrite},
     trigger_info::{TriggerInfoRead, TriggerInfoWrite},
     type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite},
@@ -98,6 +100,7 @@ pub trait ParseContext:
     + ForeignDataWrapperInfoWrite
     + TransformationInfoWrite
     + AccessMethodInfoWrite
+    + TextSearchTemplateInfoWrite
     + OperatorFamilyInfoWrite
     + TriggerInfoWrite
     + SequenceInfoWrite

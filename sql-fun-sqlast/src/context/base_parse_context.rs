@@ -12,7 +12,8 @@ use crate::{
         AccessMethodInfoRead, CastInfoRead, ConflictInfoRead, ForeignDataWrapperInfoRead,
         FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorFamilyInfoRead,
         OperatorInfoRead, RuleInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead,
-        TransformationInfoRead, TriggerInfoRead, TypeInfoRead, ViewInfoRead,
+        TextSearchTemplateInfoRead, TransformationInfoRead, TriggerInfoRead, TypeInfoRead,
+        ViewInfoRead,
     },
     names::{FullName, OperatorName, TableName, ViewName},
     sem::{
@@ -45,6 +46,7 @@ pub trait BaseParseContext:
     + ForeignDataWrapperInfoRead
     + TransformationInfoRead
     + AccessMethodInfoRead
+    + TextSearchTemplateInfoRead
     + OperatorFamilyInfoRead
     + TriggerInfoRead
     + SequenceInfoRead

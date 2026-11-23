@@ -66,6 +66,33 @@ where
     None
 }
 
+/// Select an existing schema for a PostgreSQL declaration.
+pub(crate) fn postgres_creation_schema(
+    context: &impl BaseParseContext,
+    requested: Option<&SchemaName>,
+) -> Option<SchemaName> {
+    let exists = |schema: &SchemaName| {
+        matches!(
+            schema.as_str(),
+            "public" | "pg_catalog" | "information_schema"
+        ) || context.schema_definition(schema.as_str()).is_some()
+    };
+
+    if let Some(schema) = requested {
+        if exists(schema) {
+            Some(schema.clone())
+        } else {
+            None
+        }
+    } else {
+        context
+            .get_search_path()
+            .iter()
+            .find(|schema| exists(schema))
+            .cloned()
+    }
+}
+
 pub(crate) fn search_schemas(
     context: &(impl BaseParseContext + ?Sized),
     temporary: bool,

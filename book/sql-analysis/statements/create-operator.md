@@ -49,8 +49,8 @@ those operator declarations as unsupported and does not register them.
 Follow [issue #1218](https://github.com/kazuk/sql-fun/issues/1218).
 
 sql-fun parses `ALTER OPERATOR … SET` declarations, including the estimator
-updates in the bundled `cube`, `pg_trgm`, and `seg` scripts. Analysis stops at
-these declarations before applying the new settings. Follow
+updates in the bundled `cube`, `pg_trgm`, and `seg` scripts. Semantic
+analysis panics on these declarations before applying the new settings. Follow
 [issue #1232](https://github.com/kazuk/sql-fun/issues/1232) for operator setting
 analysis and catalog updates.
 

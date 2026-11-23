@@ -46,6 +46,11 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
+            AstStatementNode::CreateTextSearchTemplate(_) => {
+                todo!(
+                    "CREATE TEXT SEARCH TEMPLATE semantic analysis and catalog application (#1236)"
+                )
+            }
             AstStatementNode::AlterOperator(ast) => Ok(Self::AlterOperator(Box::new(
                 AlterOperator::analyze(ast, context)?,
             ))),
@@ -342,6 +347,7 @@ impl SemAst {
     /// ALTER DEFAULT PRIVILEGES and CREATE FOREIGN TABLE interpretation remains
     /// unimplemented (#955 / #956), after syntax-version checks succeed.
     /// CREATE ACCESS METHOD analysis is unimplemented (#1223).
+    /// CREATE TEXT SEARCH TEMPLATE analysis and application are unimplemented (#1236).
     /// ALTER OPERATOR SET analysis is unimplemented (#1232).
     /// CREATE OPERATOR CLASS analysis is unimplemented (#1220).
     ///

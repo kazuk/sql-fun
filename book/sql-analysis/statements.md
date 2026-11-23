@@ -216,4 +216,9 @@ analysis ([#1098](https://github.com/kazuk/sql-fun/issues/1098)). Notification
 delivery and SQL rendering are not supported. For NOTIFY within a rule, see
 [CREATE RULE](statements/rules.md).
 
+PostgreSQL `CREATE TEXT SEARCH TEMPLATE` passes syntax conversion. Schema
+loading stops at semantic analysis for this declaration, and the template
+is unavailable to subsequent dictionary declarations
+([#1236](https://github.com/kazuk/sql-fun/issues/1236)).
+
 [fdw-diagnostic]: ../diagnostics/foreign_data_wrapper_invalid_definition.md

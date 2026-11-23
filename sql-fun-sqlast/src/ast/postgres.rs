@@ -16,6 +16,7 @@ use crate::{
         create_access_method::CreateAccessMethod,
         create_operator::AlterOperator,
         create_operator_class::CreateOperatorClass,
+        create_text_search_template::CreateTextSearchTemplate,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
         operator_family::{AlterOperatorFamily, CreateOperatorFamily},
@@ -858,6 +859,10 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 Some(syn::ObjectType::ObjectOperator) => {
                     let operator = CreateOperator::try_from_with_tokens(&define, tokens)?;
                     return Ok(Self::CreateOperator(operator));
+                }
+                Some(syn::ObjectType::ObjectTstemplate) => {
+                    let template = CreateTextSearchTemplate::try_from_with_tokens(&define, tokens)?;
+                    return Ok(Self::CreateTextSearchTemplate(template));
                 }
                 Some(syn::ObjectType::ObjectType) => {
                     let create_type = CreateType::try_from_with_tokens(&define, tokens)?;

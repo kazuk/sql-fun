@@ -34,6 +34,7 @@ impl SqlEmit for StatementNode {
             Self::VariableSet(v) => v.emit(writer),
             Self::EnumType(v) => v.emit(writer),
             Self::CreateOperator(operator) => operator.emit(writer),
+            Self::CreateTextSearchTemplate(_) => writer.unsupported("CREATE TEXT SEARCH TEMPLATE"),
             Self::AlterOperator(operator) => operator.emit(writer),
             Self::CreateAccessMethod(_) => writer.unsupported("CREATE ACCESS METHOD"),
             Self::CreateOperatorClass(_) => writer.unsupported("CREATE OPERATOR CLASS"),

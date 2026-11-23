@@ -12,6 +12,7 @@ pub(crate) mod client_type;
 pub(crate) mod create_access_method;
 pub(crate) mod create_operator;
 pub(crate) mod create_operator_class;
+mod create_text_search_template;
 mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;
@@ -301,6 +302,7 @@ pub(crate) enum StatementNode {
     VariableSet(VariableSet),
     EnumType(EnumType),
     CreateOperator(CreateOperator),
+    CreateTextSearchTemplate(create_text_search_template::CreateTextSearchTemplate),
     AlterOperator(Box<AlterOperator>),
     CreateAccessMethod(Box<create_access_method::CreateAccessMethod>),
     CreateOperatorClass(Box<create_operator_class::CreateOperatorClass>),

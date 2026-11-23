@@ -1,6 +1,6 @@
 use crate::{
     names::OperatorName,
-    sem::{TypeReference, parameter_resolution::Signature},
+    sem::{OperatorLinks, TypeReference, parameter_resolution::Signature},
 };
 
 /// Binary operators
@@ -10,9 +10,20 @@ pub struct BinaryOperatorDefinition {
     right_arg_type: TypeReference,
     result_type: TypeReference,
     strict: bool,
+    #[serde(skip)]
+    settings: Option<Box<OperatorLinks>>,
 }
 
 impl BinaryOperatorDefinition {
+    pub(crate) fn with_settings(mut self, settings: Option<OperatorLinks>) -> Self {
+        self.settings = settings.map(Box::new);
+        self
+    }
+
+    pub(crate) fn settings(&self) -> Option<&OperatorLinks> {
+        self.settings.as_deref()
+    }
+
     fn diagnostic_signature(&self) -> ::sql_fun_core::analysis_problem::OperatorSignature {
         ::sql_fun_core::analysis_problem::OperatorSignature::new(
             &[(&self.left_arg_type).into(), (&self.right_arg_type).into()],
@@ -34,6 +45,7 @@ impl BinaryOperatorDefinition {
             right_arg_type: right_arg_type.clone(),
             result_type: result_type.clone(),
             strict,
+            settings: None,
         }
     }
 
@@ -68,9 +80,20 @@ pub struct UnaryOperatorDefinition {
     arg_type: TypeReference,
     result_type: TypeReference,
     strict: bool,
+    #[serde(skip)]
+    settings: Option<Box<OperatorLinks>>,
 }
 
 impl UnaryOperatorDefinition {
+    pub(crate) fn with_settings(mut self, settings: Option<OperatorLinks>) -> Self {
+        self.settings = settings.map(Box::new);
+        self
+    }
+
+    pub(crate) fn settings(&self) -> Option<&OperatorLinks> {
+        self.settings.as_deref()
+    }
+
     fn diagnostic_signature(&self) -> ::sql_fun_core::analysis_problem::OperatorSignature {
         ::sql_fun_core::analysis_problem::OperatorSignature::new(
             &[(&self.arg_type).into()],
@@ -86,6 +109,7 @@ impl UnaryOperatorDefinition {
             arg_type: arg_type.clone(),
             result_type: result_type.clone(),
             strict,
+            settings: None,
         }
     }
 

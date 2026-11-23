@@ -72,12 +72,13 @@ use crate::{
     ast::Dialect,
     names::{FullName, SchemaName, TableName},
     sem::{
-        AlterIndex, AlterOwner, AnalysisError, AnalysisState, Comment, CreateCompositeType,
-        CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateOperator,
-        CreateSchema, CreateTable, CursorInfo, ExtensionMembershipChange, InputTypeConstraint,
-        Kind, ObjectPrivilegeChange, OwnedObjectDefinition, ParameterConstraints, Role,
-        RoleMembershipDeclaration, SamplingMethodLookup, SelectStatement, SemScalarExpr,
-        VariableSet, parameter_resolution::ParameterResolution, problem::CreationProblem,
+        AlterIndex, AlterOperator, AlterOwner, AnalysisError, AnalysisState, Comment,
+        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
+        CreateIndex, CreateOperator, CreateSchema, CreateTable, CursorInfo,
+        ExtensionMembershipChange, InputTypeConstraint, Kind, ObjectPrivilegeChange,
+        OwnedObjectDefinition, ParameterConstraints, Role, RoleMembershipDeclaration,
+        SamplingMethodLookup, SelectStatement, SemScalarExpr, VariableSet,
+        parameter_resolution::ParameterResolution, problem::CreationProblem,
     },
 };
 
@@ -119,6 +120,19 @@ where
         if statement.applicable() {
             return AnalysisError::raise_unexpected_input(
                 "catalog does not support CREATE OPERATOR",
+            );
+        }
+        Ok(self)
+    }
+
+    /// Apply a validated ALTER OPERATOR SET statement.
+    ///
+    /// # Errors
+    /// Returns an error when the context cannot apply a valid statement.
+    fn apply_alter_operator(self, statement: &AlterOperator) -> Result<Self, AnalysisError> {
+        if statement.applicable() {
+            return AnalysisError::raise_unexpected_input(
+                "catalog does not support ALTER OPERATOR",
             );
         }
         Ok(self)

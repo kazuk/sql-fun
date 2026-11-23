@@ -21,9 +21,10 @@ use crate::{
         ConflictArbiterInference, CreateFunction, CreateIndex, CreateSequence, CreateTable,
         CreateTrigger, DatabaseCollation, FunctionOverloadCollection, InsertConflict, Kind,
         OperatorClassDefinition, OperatorDefinition, OperatorFamily, OperatorFamilyKey,
-        OverloadVariant, OwnedObjectDefinition, Role, SourcePathWithSpan, TriggerIdentity,
-        TypeCategory as SemTypeCategory, TypeDefinition, TypeReference, ViewDeleteSupport,
-        ViewInsertSupport, ViewLike, ViewMergeSupport, ViewUpdateSupport,
+        OperatorIdentity, OperatorLinks, OverloadVariant, OwnedObjectDefinition, Role,
+        SourcePathWithSpan, TriggerIdentity, TypeCategory as SemTypeCategory, TypeDefinition,
+        TypeReference, ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport,
+        ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -454,6 +455,10 @@ impl FunctionInfoRead for BaseContext {
 }
 
 impl OperatorInfoRead for BaseContext {
+    fn operator_links(&self, identity: &OperatorIdentity) -> Option<&OperatorLinks> {
+        identity.builtin_settings(self)
+    }
+
     fn operator_result_is_not_null(&self, name: &OperatorName) -> Option<bool> {
         // The shipped equality/inequality implementations return a boolean for non-null
         // operands. This guarantee does not extend to arbitrary SQL functions.

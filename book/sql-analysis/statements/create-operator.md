@@ -48,11 +48,27 @@ PostgreSQL permits set-returning implementation functions. sql-fun reports
 those operator declarations as unsupported and does not register them.
 Follow [issue #1218](https://github.com/kazuk/sql-fun/issues/1218).
 
-sql-fun parses `ALTER OPERATOR … SET` declarations, including the estimator
-updates in the bundled `cube`, `pg_trgm`, and `seg` scripts. Semantic
-analysis panics on these declarations before applying the new settings. Follow
-[issue #1232](https://github.com/kazuk/sql-fun/issues/1232) for operator setting
-analysis and catalog updates.
+## ALTER OPERATOR SET
+
+`ALTER OPERATOR … SET (...)` updates the existing overload with the exact
+operand types. For a prefix operator, specify `NONE` for the left operand.
+An unqualified target uses the first matching signature on the search path.
+
+`RESTRICT` and `JOIN` set selectivity estimators by name. Use `NONE` to clear
+an estimator. Omitted settings retain their previous values. Estimator
+functions must be available in the analysis catalog, with the same signature
+requirements as for `CREATE OPERATOR`. The missing builtin estimator
+metadata tracked in [issue #1217](https://github.com/kazuk/sql-fun/issues/1217)
+also affects ALTER declarations in extension scripts.
+
+PostgreSQL 17 and 18 also allow adding a `COMMUTATOR` or `NEGATOR` and enabling
+`HASHES` or `MERGES`. Linking two operators updates the reciprocal
+relationship. Repeating an existing setting is allowed. Replacing an
+existing link or disabling an enabled flag reports
+[`invalid_operator_declaration`](../../diagnostics/invalid_operator_declaration.md)
+and leaves the catalog unchanged. Builtin operators require a catalog bundle
+that includes the initial planner settings to validate changes to these four
+attributes.
 
 `DROP OPERATOR`, which occurs in the bundled `intarray` update script, still
 fails during statement conversion. Follow

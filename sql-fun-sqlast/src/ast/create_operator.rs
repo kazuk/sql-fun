@@ -354,14 +354,24 @@ impl OperatorOption {
 }
 
 #[derive(Clone, Debug)]
-#[allow(
-    dead_code,
-    reason = "retained for subsequent ALTER OPERATOR semantic analysis"
-)]
 pub(crate) struct AlterOperator {
     name: Name,
     operands: [ObjectArgument; 2],
     options: Vec<OperatorOption>,
+}
+
+impl AlterOperator {
+    pub(crate) const fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) const fn operands(&self) -> &[ObjectArgument; 2] {
+        &self.operands
+    }
+
+    pub(crate) fn options(&self) -> &[OperatorOption] {
+        &self.options
+    }
 }
 
 impl TryFromWithTokens<&syn::AlterOperatorStmt> for AlterOperator {

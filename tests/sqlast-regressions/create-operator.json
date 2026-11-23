@@ -146,5 +146,189 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "alter-cube-le",
+    "sql": "ALTER OPERATOR <= (cube, cube) SET (RESTRICT = scalarlesel, JOIN = scalarlejoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-cube-ge",
+    "sql": "ALTER OPERATOR >= (cube, cube) SET (RESTRICT = scalargesel, JOIN = scalargejoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-seg-le",
+    "sql": "ALTER OPERATOR <= (seg, seg) SET (RESTRICT = scalarlesel, JOIN = scalarlejoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-seg-ge",
+    "sql": "ALTER OPERATOR >= (seg, seg) SET (RESTRICT = scalargesel, JOIN = scalargejoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-trgm-similarity",
+    "sql": "ALTER OPERATOR % (text, text) SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-trgm-word",
+    "sql": "ALTER OPERATOR <% (text, text) SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-trgm-word-reverse",
+    "sql": "ALTER OPERATOR %> (text, text) SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-trgm-strict-word",
+    "sql": "ALTER OPERATOR <<% (text, text) SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-trgm-strict-word-reverse",
+    "sql": "ALTER OPERATOR %>> (text, text) SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-prefix-estimator",
+    "sql": "ALTER OPERATOR public.?# (NONE, integer) SET (RESTRICT = public.operator_restrict)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-prefix-join",
+    "sql": "ALTER OPERATOR public.?# (NONE, integer) SET (JOIN = public.operator_join)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-builtin-reset",
+    "sql": "ALTER OPERATOR pg_catalog.= (integer, integer) SET (RESTRICT = NONE)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-builtin-enabled-hashes",
+    "sql": "ALTER OPERATOR pg_catalog.= (integer, integer) SET (HASHES = off)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-builtin-enabled-merges",
+    "sql": "ALTER OPERATOR pg_catalog.= (integer, integer) SET (MERGES = false)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-existing-commutator",
+    "sql": "ALTER OPERATOR public.@#@# (integer, integer) SET (COMMUTATOR = OPERATOR(public.@#@#))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-negator",
+    "sql": "ALTER OPERATOR public.@#@# (integer, integer) SET (NEGATOR = OPERATOR(public.?@))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-self-negation",
+    "sql": "ALTER OPERATOR public.@#@# (integer, integer) SET (NEGATOR = OPERATOR(public.@#@#))",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-missing-signature",
+    "sql": "ALTER OPERATOR public.@#@# (smallint, smallint) SET (RESTRICT = NONE)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-missing-estimator",
+    "sql": "ALTER OPERATOR public.@#@# (integer, integer) SET (RESTRICT = public.no_estimator)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-immutable-function",
+    "sql": "ALTER OPERATOR public.@#@# (integer, integer) SET (FUNCTION = pg_catalog.int4eq)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-unknown-setting",
+    "sql": "ALTER OPERATOR public.@#@# (integer, integer) SET (unknown_setting = true)",
+    "expected": {
+      "diagnostics": [
+        "invalid_operator_declaration"
+      ],
+      "columns": []
+    }
   }
 ]

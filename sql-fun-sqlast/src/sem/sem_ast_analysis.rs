@@ -5,8 +5,8 @@ use crate::{
     ast::{Statement as AstStatement, StatementNode as AstStatementNode},
     context::ParseContext,
     sem::{
-        AlterFunctionParallel, AlterOperatorFamily, AlterOwner, AlterSequence, AnalysisError,
-        Comment, CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum,
+        AlterFunctionParallel, AlterOperator, AlterOperatorFamily, AlterOwner, AlterSequence,
+        AnalysisError, Comment, CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum,
         CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex, CreateOperator,
         CreateOperatorClass, CreateOperatorFamily, CreateRule, CreateSchema, CreateSequence,
         CreateTable, CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropFunction,
@@ -46,9 +46,9 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
-            AstStatementNode::AlterOperator(_) => {
-                todo!("ALTER OPERATOR SET semantic analysis (#1232)")
-            }
+            AstStatementNode::AlterOperator(ast) => Ok(Self::AlterOperator(Box::new(
+                AlterOperator::analyze(ast, context)?,
+            ))),
             AstStatementNode::CreateOperator(ast) => Ok(Self::CreateOperator(Box::new(
                 CreateOperator::analyze(ast, context)?,
             ))),
@@ -287,6 +287,14 @@ impl SemAst {
                 let context = statement.apply(context);
                 Ok(AstAndContextPair::new(
                     Self::CreateOperatorClass(Box::new(statement)),
+                    context,
+                ))
+            }
+            AstStatementNode::AlterOperator(ast) => {
+                let statement = AlterOperator::analyze(ast, &mut context)?;
+                let context = context.apply_alter_operator(&statement)?;
+                Ok(AstAndContextPair::new(
+                    Self::AlterOperator(Box::new(statement)),
                     context,
                 ))
             }

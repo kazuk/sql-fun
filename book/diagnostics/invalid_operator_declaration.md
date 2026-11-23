@@ -6,10 +6,12 @@ The error code is `invalid_operator_declaration`.
 
 ## When it is reported
 
-PostgreSQL analysis reports this error for invalid `CREATE OPERATOR`
+PostgreSQL analysis reports this error for invalid `CREATE OPERATOR` and
+`ALTER OPERATOR … SET`
 definitions. Examples include a missing right operand type, a missing
 implementation function with the exact operand signature, a duplicate
-operator signature, and a planner attribute incompatible with the operand
+operator signature, an attempt to disable a previously enabled flag, and a
+planner attribute incompatible with the operand
 count or return type.
 
 ## What analysis knows and does not know

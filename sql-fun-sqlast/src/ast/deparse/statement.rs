@@ -1,9 +1,10 @@
 use crate::{
     ast::{
-        CreateTableMode, PartitionBound, PartitionDatum, PartitionSpec, StatementNode,
+        CreateTableMode, Name, PartitionBound, PartitionDatum, PartitionSpec, StatementNode,
         SyntaxOption, Table, TableExtras,
         create_operator::{
-            CreateOperator, OperatorOption, OperatorOptionValue, valid_operator_token,
+            AlterOperator, CreateOperator, OperatorOption, OperatorOptionValue,
+            valid_operator_token,
         },
         deparse::{DeparseError, SqlEmit, SqlWriter},
     },
@@ -33,7 +34,7 @@ impl SqlEmit for StatementNode {
             Self::VariableSet(v) => v.emit(writer),
             Self::EnumType(v) => v.emit(writer),
             Self::CreateOperator(operator) => operator.emit(writer),
-            Self::AlterOperator(_) => writer.unsupported("ALTER OPERATOR SET"),
+            Self::AlterOperator(operator) => operator.emit(writer),
             Self::CreateAccessMethod(_) => writer.unsupported("CREATE ACCESS METHOD"),
             Self::CreateOperatorClass(_) => writer.unsupported("CREATE OPERATOR CLASS"),
             Self::CreateOperatorFamily(_) => writer.unsupported("CREATE OPERATOR FAMILY"),
@@ -64,23 +65,56 @@ impl SqlEmit for StatementNode {
 impl SqlEmit for CreateOperator {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("CREATE OPERATOR")?;
-        let Some((token, qualifiers)) = self.name().parts().split_last() else {
-            return writer.invalid("CREATE OPERATOR", "operator name is required");
-        };
-        if !valid_operator_token(token) {
-            return writer.invalid("CREATE OPERATOR", "operator contains invalid punctuation");
-        }
         writer.sql("CREATE OPERATOR ");
-        if !qualifiers.is_empty() {
-            writer.names(qualifiers, ".")?;
-            writer.sql(".");
-        }
-        writer.sql(token);
+        emit_operator_declaration_name(self.name(), "CREATE OPERATOR", writer)?;
         writer.sql(" (");
         writer.list(self.options(), ", ")?;
         writer.sql(")");
         Ok(())
     }
+}
+
+impl SqlEmit for AlterOperator {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("ALTER OPERATOR")?;
+        writer.sql("ALTER OPERATOR ");
+        emit_operator_declaration_name(self.name(), "ALTER OPERATOR", writer)?;
+        writer.sql(" (");
+        writer.list(self.operands(), ", ")?;
+        writer.sql(") SET (");
+        for (index, option) in self.options().iter().enumerate() {
+            if index != 0 {
+                writer.sql(", ");
+            }
+            if option.value().is_none() && matches!(option.key(), "restrict" | "join") {
+                writer.ident(option.key())?;
+                writer.sql(" = NONE");
+            } else {
+                option.emit(writer)?;
+            }
+        }
+        writer.sql(")");
+        Ok(())
+    }
+}
+
+fn emit_operator_declaration_name(
+    name: &Name,
+    statement: &str,
+    writer: &mut SqlWriter,
+) -> Result<(), DeparseError> {
+    let Some((token, qualifiers)) = name.parts().split_last() else {
+        return writer.invalid(statement, "operator name is required");
+    };
+    if !valid_operator_token(token) {
+        return writer.invalid(statement, "operator contains invalid punctuation");
+    }
+    if !qualifiers.is_empty() {
+        writer.names(qualifiers, ".")?;
+        writer.sql(".");
+    }
+    writer.sql(token);
+    Ok(())
 }
 
 impl SqlEmit for OperatorOption {

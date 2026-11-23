@@ -41,9 +41,9 @@ use crate::{
     },
     names::{FullName, OperatorName, SchemaName, TableName as NamesTableName},
     sem::{
-        AccessMethodDefinition, AlterIndex, AlterOwner, AnalysisError, AnalysisProblem,
-        AnalysisState, CastDefinition, CatalogNameLookup, CollationDefinition, Comment,
-        ConflictArbiterInference, CreateExtension, CreateForeignDataWrapper, CreateIndex,
+        AccessMethodDefinition, AlterIndex, AlterOperator, AlterOwner, AnalysisError,
+        AnalysisProblem, AnalysisState, CastDefinition, CatalogNameLookup, CollationDefinition,
+        Comment, ConflictArbiterInference, CreateExtension, CreateForeignDataWrapper, CreateIndex,
         CreateOperator, CreateRule, CreateSchema, CreateTrigger, CursorInfo, DatabaseCollation,
         ExtensionMembershipChange, FunctionTombstone, ImplicitChange, InsertConflict, Kind,
         ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition, OperatorFamily,
@@ -1040,6 +1040,13 @@ impl ParseContext for SchemaFileContext {
         if let Some(member) = identity.extension_member() {
             self.record_extension_member(&member);
         }
+        Ok(self)
+    }
+
+    fn apply_alter_operator(mut self, statement: &AlterOperator) -> Result<Self, AnalysisError> {
+        self.catalog
+            .operator_links
+            .extend(statement.updates().iter().cloned());
         Ok(self)
     }
 

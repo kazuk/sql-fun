@@ -73,9 +73,11 @@ impl TryFromWithTokens<&syn::CreateCastStmt> for CreateCast {
 mod tests {
     use rstest::rstest;
 
-    use super::*;
     use crate::{
-        ast::{Dialect, StatementKind, StatementNode},
+        ast::{
+            Dialect, StatementKind, StatementNode,
+            create_cast::{CastContext, CastMethod},
+        },
         parse_statements,
     };
 

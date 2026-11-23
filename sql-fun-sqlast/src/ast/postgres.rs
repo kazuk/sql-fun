@@ -14,6 +14,7 @@ use crate::{
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
         create_access_method::CreateAccessMethod,
+        create_cast::CreateCast,
         create_operator::AlterOperator,
         create_operator_class::CreateOperatorClass,
         create_text_search_template::CreateTextSearchTemplate,
@@ -833,7 +834,7 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         }
         if let Some(cast) = value.as_create_cast_stmt().as_inner() {
             return Ok(Self::CreateCast(Box::new(
-                super::create_cast::CreateCast::try_from_with_tokens(&cast, tokens)?,
+                CreateCast::try_from_with_tokens(&cast, tokens)?,
             )));
         }
         if let Some(method) = value.as_create_am_stmt().as_inner() {

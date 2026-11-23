@@ -63,7 +63,8 @@ also affects ALTER declarations in extension scripts.
 
 PostgreSQL 17 and 18 also allow adding a `COMMUTATOR` or `NEGATOR` and enabling
 `HASHES` or `MERGES`. Linking two operators updates the reciprocal
-relationship. Repeating an existing setting is allowed. Replacing an
+relationship. Related operators must return the same type. Repeating an
+existing setting is allowed. Replacing an
 existing link or disabling an enabled flag reports
 [`invalid_operator_declaration`](../../diagnostics/invalid_operator_declaration.md)
 and leaves the catalog unchanged. Builtin operators require a catalog bundle

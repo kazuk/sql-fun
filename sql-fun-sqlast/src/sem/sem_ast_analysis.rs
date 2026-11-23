@@ -9,11 +9,11 @@ use crate::{
         AnalysisError, Comment, CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum,
         CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex, CreateOperator,
         CreateOperatorClass, CreateOperatorFamily, CreateRule, CreateSchema, CreateSequence,
-        CreateTable, CreateTableAs, CreateTrigger, CreateView, DeleteStatement, DropFunction,
-        DropRule, DropTable, DropTrigger, DropView, EngineFeatureValidation,
-        ExtensionMembershipChange, InsertStatement, MergeStatement, ObjectPrivilegeChange,
-        ParameterConstraints, RelationAlteration, RoleMembershipDeclaration, SelectStatement,
-        SemAst, UpdateStatement, VariableSet,
+        CreateTable, CreateTableAs, CreateTextSearchTemplate, CreateTrigger, CreateView,
+        DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
+        EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
+        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
+        SelectStatement, SemAst, UpdateStatement, VariableSet,
     },
 };
 
@@ -46,10 +46,9 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
-            AstStatementNode::CreateTextSearchTemplate(_) => {
-                todo!(
-                    "CREATE TEXT SEARCH TEMPLATE semantic analysis and catalog application (#1236)"
-                )
+            AstStatementNode::CreateTextSearchTemplate(ast) => {
+                CreateTextSearchTemplate::analyze(ast, context)
+                    .map(|statement| Self::CreateTextSearchTemplate(Box::new(statement)))
             }
             AstStatementNode::AlterOperator(ast) => Ok(Self::AlterOperator(Box::new(
                 AlterOperator::analyze(ast, context)?,
@@ -276,6 +275,9 @@ impl SemAst {
                 RelationAlteration::from_ast_and_apply(statement, context)
             }
             AstStatementNode::Domain(domain) => CreateDomain::from_ast_and_apply(domain, context),
+            AstStatementNode::CreateTextSearchTemplate(ast) => {
+                CreateTextSearchTemplate::analyze_and_apply(ast, context)
+            }
             AstStatementNode::CreateAccessMethod(ast) => {
                 CreateAccessMethod::analyze_and_apply(ast, context)
             }

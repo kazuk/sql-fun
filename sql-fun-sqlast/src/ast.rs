@@ -13,7 +13,7 @@ pub(crate) mod create_access_method;
 mod create_cast;
 pub(crate) mod create_operator;
 pub(crate) mod create_operator_class;
-mod create_text_search_template;
+pub(crate) mod create_text_search_template;
 mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;

@@ -1,0 +1,99 @@
+[
+  {
+    "name": "qualified-callback-without-init",
+    "sql": "CREATE TEXT SEARCH TEMPLATE \"Search\".existing (LEXIZE = \"Search\".\"Lexize\")",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "optional-init",
+    "sql": "CREATE TEXT SEARCH TEMPLATE example (LEXIZE = \"Search\".\"Lexize\", INIT = init_callback)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-template",
+    "sql": "CREATE TEXT SEARCH TEMPLATE public.existing (LEXIZE = \"Search\".\"Lexize\")",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_template",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-lexize",
+    "sql": "CREATE TEXT SEARCH TEMPLATE example (INIT = init_callback)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_template",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "unknown-option",
+    "sql": "CREATE TEXT SEARCH TEMPLATE example (LEXIZE = \"Search\".\"Lexize\", OTHER = init_callback)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_template",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-callback",
+    "sql": "CREATE TEXT SEARCH TEMPLATE example (LEXIZE = absent)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_template",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-signature",
+    "sql": "CREATE TEXT SEARCH TEMPLATE example (LEXIZE = init_callback)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_template",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-return-type",
+    "sql": "CREATE TEXT SEARCH TEMPLATE example (LEXIZE = bad_result)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_template",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-earlier-option",
+    "sql": "CREATE TEXT SEARCH TEMPLATE example (LEXIZE = absent, LEXIZE = \"Search\".\"Lexize\")",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_template",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  }
+]

@@ -836,6 +836,36 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL text search template declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTextSearchTemplate": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidTextSearchTemplate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -6188,6 +6218,36 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL text search template declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTextSearchTemplate": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidTextSearchTemplate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -11428,6 +11488,36 @@
                   },
                   "required": [
                     "InvalidOperatorDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid PostgreSQL text search template declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTextSearchTemplate": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidTextSearchTemplate"
                   ],
                   "additionalProperties": false
                 },

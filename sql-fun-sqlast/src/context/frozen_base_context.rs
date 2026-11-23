@@ -538,6 +538,14 @@ macro_rules! forward_catalog_reads {
                 self.$catalog().access_method(name)
             }
         }
+        impl crate::context::TextSearchTemplateInfoRead for $context {
+            fn text_search_template(
+                &self,
+                name: &crate::names::FullName,
+            ) -> Option<&crate::sem::TextSearchTemplateDefinition> {
+                self.$catalog().text_search_template(name)
+            }
+        }
 
         impl crate::context::TriggerInfoRead for $context {
             fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {

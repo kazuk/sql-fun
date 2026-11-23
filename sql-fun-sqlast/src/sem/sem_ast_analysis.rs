@@ -71,6 +71,9 @@ impl SemAst {
                 CreateOperatorClass::analyze(ast, context)
                     .map(|statement| Self::CreateOperatorClass(Box::new(statement)))
             }
+            AstStatementNode::CreateCast(_) => {
+                todo!("CREATE CAST interpretation (#1237)")
+            }
             AstStatementNode::CreateType(ast) => ast.analyze(context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")

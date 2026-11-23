@@ -31,6 +31,7 @@
     - [CREATE RULE / DROP RULE](./sql-analysis/statements/rules.md)
     - [CREATE TRIGGER / DROP TRIGGER](./sql-analysis/statements/triggers.md)
     - [CREATE TYPE](./sql-analysis/statements/create-type.md)
+    - [CREATE CAST](./sql-analysis/statements/create-cast.md)
     - [CREATE DOMAIN](./sql-analysis/statements/create-domain.md)
     - [CREATE FUNCTION](./sql-analysis/statements/create-function.md)
     - [CREATE OPERATOR](./sql-analysis/statements/create-operator.md)

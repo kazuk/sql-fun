@@ -13,22 +13,46 @@ use ::sql_fun_core::IVec;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CreateTextSearchTemplate {
-    pub(crate) name: Name,
-    pub(crate) options: Vec<TemplateOption>,
+    name: Name,
+    options: Vec<TemplateOption>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TemplateOption {
-    pub(crate) key: String,
-    pub(crate) value: Option<TemplateOptionValue>,
+    key: String,
+    value: Option<TemplateOptionValue>,
     // Relative to the statement being converted.
-    pub(crate) location: Option<StringSpan>,
+    location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum TemplateOptionValue {
     Name(Name),
     Literal(Literal),
+}
+
+impl CreateTextSearchTemplate {
+    pub(crate) const fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn options(&self) -> &[TemplateOption] {
+        &self.options
+    }
+}
+
+impl TemplateOption {
+    pub(crate) fn key(&self) -> &str {
+        &self.key
+    }
+
+    pub(crate) const fn value(&self) -> Option<&TemplateOptionValue> {
+        self.value.as_ref()
+    }
+
+    pub(crate) const fn location(&self) -> Option<StringSpan> {
+        self.location
+    }
 }
 
 impl TryFromWithTokens<&syn::DefineStmt> for CreateTextSearchTemplate {

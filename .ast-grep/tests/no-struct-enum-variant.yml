@@ -1,0 +1,8 @@
+id: no-struct-enum-variant
+valid:
+  - 'struct Payload { name: String }'
+  - 'struct Payload { name: String } enum Example { Tuple(Payload) }'
+  - 'enum Example { Unit }'
+invalid:
+  - 'enum Example { Named { name: String, version: String } }'
+  - 'enum Example { Empty {} }'

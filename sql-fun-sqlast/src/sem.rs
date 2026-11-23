@@ -111,6 +111,7 @@ pub use self::{
     alter_column_type::{AlterColumnType, ColumnTypeConversion},
     alter_constraint::{
         AlterConstraint, ConstraintAction, ConstraintChangeOutcome, ConstraintTarget,
+        DropConstraintOptions,
     },
     alter_function_parallel::{AlterFunctionParallel, ParallelSafety},
     column_drop::{

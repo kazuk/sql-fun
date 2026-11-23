@@ -1,0 +1,9 @@
+id: no-struct-enum-variant
+language: Rust
+severity: error
+message: Use a tuple variant with a named payload struct.
+rule:
+  kind: enum_variant
+  has:
+    kind: field_declaration_list
+    field: body

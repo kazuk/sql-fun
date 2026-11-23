@@ -325,6 +325,13 @@ impl DiagnosticMessage for PrivilegeProblem {
     }
 }
 
+/// An unresolved SQL operation requiring an unsupported candidate search.
+#[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct InferenceCandidateSpaceProblem {
+    operation: String,
+}
+
 /// Semantic analysis problems
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -345,10 +352,7 @@ pub enum AnalysisProblem {
     ParameterTypeUnresolved(ParameterBindingAmbiguity),
     /// Inference would need an unsupported catalog-wide candidate search.
     /// This reports an analysis limitation, not invalid SQL.
-    InferenceCandidateSpaceUnsupported {
-        /// SQL operation whose unresolved input requires that search.
-        operation: String,
-    },
+    InferenceCandidateSpaceUnsupported(InferenceCandidateSpaceProblem),
     /// Malformed operator-name components.
     OperatorNameSyntax(Vec<String>),
     /// A `PostgreSQL` operator reference has database qualification.
@@ -779,9 +783,9 @@ impl AnalysisProblem {
     /// Report an unsupported, unbounded inference search without rejecting SQL.
     #[must_use]
     pub fn inference_candidate_space_unsupported(operation: &str) -> Self {
-        Self::InferenceCandidateSpaceUnsupported {
+        Self::InferenceCandidateSpaceUnsupported(InferenceCandidateSpaceProblem {
             operation: operation.to_owned(),
-        }
+        })
     }
 
     /// Stable diagnostic classification, independent of formatted debug output.
@@ -792,9 +796,7 @@ impl AnalysisProblem {
             Self::Lint(problem) => problem.code(),
             Self::IncompatibleEngineVersion(_) => "incompatible_engine_version",
             Self::ParameterTypeUnresolved(_) => "parameter_type_unresolved",
-            Self::InferenceCandidateSpaceUnsupported { .. } => {
-                "inference_candidate_space_unsupported"
-            }
+            Self::InferenceCandidateSpaceUnsupported(_) => "inference_candidate_space_unsupported",
             Self::OperatorNameSyntax(_) => "operator_name_syntax",
             Self::CrossDatabaseOperatorReference(_) => "cross_database_operator_reference",
             Self::QueryAnalysis(problem) => problem.code(),
@@ -896,7 +898,7 @@ impl AnalysisProblem {
             | Self::ForeignKeyPeriodMismatch
             | Self::ForeignKeyTemporalAction
             | Self::ParameterTypeUnresolved(_)
-            | Self::InferenceCandidateSpaceUnsupported { .. }
+            | Self::InferenceCandidateSpaceUnsupported(_)
             | Self::CoalesceExprTypeUnknown(..)
             | Self::OperatorNameSyntax(_)
             | Self::DropFunctionDependency(_)
@@ -1007,8 +1009,9 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::RowSecurityRequiresTable => "row-security actions require ALTER TABLE".to_owned(),
             Self::Lint(problem) => problem.diagnostic_message(),
             Self::IncompatibleEngineVersion(problem) => problem.diagnostic_message(),
-            Self::InferenceCandidateSpaceUnsupported { operation } => format!(
-                "type inference for {operation} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint"
+            Self::InferenceCandidateSpaceUnsupported(problem) => format!(
+                "type inference for {} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint",
+                problem.operation
             ),
             Self::ParameterTypeUnresolved(problem) => problem.message(),
             Self::OperatorNameSyntax(parts) => Self::operator_name_syntax_message(parts),

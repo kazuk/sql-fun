@@ -159,10 +159,10 @@ impl ExtensionPaths<'_> {
             if requiring_scripts.is_empty() {
                 source
             } else {
-                ExtensionConfigError::RequiredExtension {
-                    chain: requiring_scripts.join(" -> ") + " -> " + name,
-                    source: Box::new(source),
-                }
+                ExtensionConfigError::required_extension(
+                    requiring_scripts.join(" -> ") + " -> " + name,
+                    source,
+                )
             }
         })?;
         let requirements =

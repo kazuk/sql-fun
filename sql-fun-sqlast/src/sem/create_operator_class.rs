@@ -53,14 +53,20 @@ pub enum ClassFailure {
 enum MemberAnalysis {
     Blocked,
     BindingFailed,
-    Storage {
-        typ: TypeReference,
-        accepted: bool,
-    },
-    Bound {
-        binding: Box<(FamilySlot, FamilyMember)>,
-        accepted: bool,
-    },
+    Storage(StorageAnalysis),
+    Bound(BoundMemberAnalysis),
+}
+
+#[derive(Clone, Debug)]
+struct StorageAnalysis {
+    typ: TypeReference,
+    accepted: bool,
+}
+
+#[derive(Clone, Debug)]
+struct BoundMemberAnalysis {
+    binding: Box<(FamilySlot, FamilyMember)>,
+    accepted: bool,
 }
 
 impl CreateOperatorClass {
@@ -111,13 +117,7 @@ impl CreateOperatorClass {
 
     /// Applicability of a clause in declaration order, absent if binding was blocked.
     pub fn member_applicability(&self, index: usize) -> Option<bool> {
-        match self.members.get(index)? {
-            MemberAnalysis::Blocked => None,
-            MemberAnalysis::BindingFailed => Some(false),
-            MemberAnalysis::Storage { accepted, .. } | MemberAnalysis::Bound { accepted, .. } => {
-                Some(*accepted)
-            }
-        }
+        self.members.get(index)?.applicability()
     }
 
     pub(crate) fn analyze(
@@ -177,11 +177,13 @@ impl CreateOperatorClass {
             let mut storage = None;
             for member in &statement.members {
                 match member {
-                    MemberAnalysis::Bound { binding, .. } => {
-                        let (slot, member) = binding.as_ref();
+                    MemberAnalysis::Bound(bound) => {
+                        let (slot, member) = bound.binding.as_ref();
                         family.members.insert(slot.clone(), member.clone());
                     }
-                    MemberAnalysis::Storage { typ, .. } if typ != &input => storage = Some(typ),
+                    MemberAnalysis::Storage(value) if value.typ != input => {
+                        storage = Some(&value.typ)
+                    }
                     _ => {}
                 }
             }
@@ -271,10 +273,7 @@ impl CreateOperatorClass {
                     false
                 }
             };
-            outcomes.push(MemberAnalysis::Bound {
-                binding: Box::new((slot, member)),
-                accepted,
-            });
+            outcomes.push(MemberAnalysis::bound(slot, member, accepted));
         }
         Ok(outcomes)
     }
@@ -304,15 +303,32 @@ impl CreateOperatorClass {
         } else {
             true
         };
-        Ok(MemberAnalysis::Storage { typ, accepted })
+        Ok(MemberAnalysis::storage(typ, accepted))
     }
 }
 
 impl MemberAnalysis {
-    const fn accepted(&self) -> bool {
+    fn bound(slot: FamilySlot, member: FamilyMember, accepted: bool) -> Self {
+        Self::Bound(BoundMemberAnalysis {
+            binding: Box::new((slot, member)),
+            accepted,
+        })
+    }
+
+    const fn storage(typ: TypeReference, accepted: bool) -> Self {
+        Self::Storage(StorageAnalysis { typ, accepted })
+    }
+
+    fn accepted(&self) -> bool {
+        self.applicability().unwrap_or(false)
+    }
+
+    const fn applicability(&self) -> Option<bool> {
         match self {
-            Self::Blocked | Self::BindingFailed => false,
-            Self::Storage { accepted, .. } | Self::Bound { accepted, .. } => *accepted,
+            Self::Blocked => None,
+            Self::BindingFailed => Some(false),
+            Self::Storage(storage) => Some(storage.accepted),
+            Self::Bound(bound) => Some(bound.accepted),
         }
     }
 }

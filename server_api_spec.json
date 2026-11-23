@@ -544,16 +544,7 @@
                   "type": "object",
                   "properties": {
                     "InferenceCandidateSpaceUnsupported": {
-                      "type": "object",
-                      "properties": {
-                        "operation": {
-                          "description": "SQL operation whose unresolved input requires that search.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "operation"
-                      ]
+                      "$ref": "#/$defs/InferenceCandidateSpaceProblem"
                     }
                   },
                   "required": [
@@ -1697,6 +1688,18 @@
             "TypeReference": {
               "description": "Retained diagnostic text for `TypeReference`.",
               "type": "string"
+            },
+            "InferenceCandidateSpaceProblem": {
+              "description": "An unresolved SQL operation requiring an unsupported candidate search.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "operation"
+              ]
             },
             "QueryAnalysisProblem": {
               "description": "A query-input or analysis-capability failure, distinct from semantic inference.",
@@ -5893,16 +5896,7 @@
                   "type": "object",
                   "properties": {
                     "InferenceCandidateSpaceUnsupported": {
-                      "type": "object",
-                      "properties": {
-                        "operation": {
-                          "description": "SQL operation whose unresolved input requires that search.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "operation"
-                      ]
+                      "$ref": "#/$defs/InferenceCandidateSpaceProblem"
                     }
                   },
                   "required": [
@@ -7046,6 +7040,18 @@
             "TypeReference": {
               "description": "Retained diagnostic text for `TypeReference`.",
               "type": "string"
+            },
+            "InferenceCandidateSpaceProblem": {
+              "description": "An unresolved SQL operation requiring an unsupported candidate search.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "operation"
+              ]
             },
             "QueryAnalysisProblem": {
               "description": "A query-input or analysis-capability failure, distinct from semantic inference.",
@@ -11134,16 +11140,7 @@
                   "type": "object",
                   "properties": {
                     "InferenceCandidateSpaceUnsupported": {
-                      "type": "object",
-                      "properties": {
-                        "operation": {
-                          "description": "SQL operation whose unresolved input requires that search.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "operation"
-                      ]
+                      "$ref": "#/$defs/InferenceCandidateSpaceProblem"
                     }
                   },
                   "required": [
@@ -12287,6 +12284,18 @@
             "TypeReference": {
               "description": "Retained diagnostic text for `TypeReference`.",
               "type": "string"
+            },
+            "InferenceCandidateSpaceProblem": {
+              "description": "An unresolved SQL operation requiring an unsupported candidate search.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "operation"
+              ]
             },
             "QueryAnalysisProblem": {
               "description": "A query-input or analysis-capability failure, distinct from semantic inference.",

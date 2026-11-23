@@ -20,7 +20,7 @@ pub(crate) struct CreateCast {
 #[derive(Clone, Debug)]
 #[allow(dead_code, reason = "CREATE CAST interpretation is deferred to #1237")]
 enum CastMethod {
-    Function(ObjectTarget),
+    Function(Box<ObjectTarget>),
     Binary,
     InOut,
 }
@@ -46,9 +46,9 @@ impl TryFromWithTokens<&syn::CreateCastStmt> for CreateCast {
             target: TypeName::try_from_with_tokens(&target, tokens)?,
         };
         let method = match (value.get_func().as_inner(), value.get_inout()) {
-            (Some(function), false) => {
-                CastMethod::Function(ObjectTarget::try_from_object_with_args(&function, tokens)?)
-            }
+            (Some(function), false) => CastMethod::Function(Box::new(
+                ObjectTarget::try_from_object_with_args(&function, tokens)?,
+            )),
             (None, false) => CastMethod::Binary,
             (None, true) => CastMethod::InOut,
             (Some(_), true) => {

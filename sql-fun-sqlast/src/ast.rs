@@ -416,6 +416,10 @@ impl StatementNode {
         Self::AlterOperatorFamily(Box::new(value))
     }
 
+    fn create_cast(value: create_cast::CreateCast) -> Self {
+        Self::CreateCast(Box::new(value))
+    }
+
     fn create_access_method(value: create_access_method::CreateAccessMethod) -> Self {
         Self::CreateAccessMethod(Box::new(value))
     }

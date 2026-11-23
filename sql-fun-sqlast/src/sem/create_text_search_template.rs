@@ -4,7 +4,9 @@ use crate::{
     AstAndContextPair, StringSpan,
     ast::{
         Literal, Name,
-        create_text_search_template::{CreateTextSearchTemplate as Syntax, TemplateOptionValue},
+        create_text_search_template::{
+            CreateTextSearchTemplate as Syntax, TemplateOption, TemplateOptionValue,
+        },
     },
     context::ParseContext,
     names::FullName,
@@ -39,24 +41,142 @@ impl TextSearchTemplateDefinition {
     }
 }
 
+/// Reason a text search template declaration cannot be applied.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextSearchTemplateFailure {
+    /// The written target cannot be used in this database.
+    InvalidTarget,
+    /// The requested schema does not exist or the search path has no creation schema.
+    MissingSchema,
+    /// The option key is unsupported.
+    UnknownOption,
+    /// The callback value is not a usable routine name.
+    InvalidCallbackName,
+    /// No routine matched the required input signature.
+    MissingCallback,
+    /// The resolved routine does not return `internal`.
+    WrongReturnType,
+    /// The required LEXIZE option was omitted.
+    MissingLexize,
+    /// The target already names a registered template.
+    DuplicateTemplate,
+}
+
+/// Completed analysis of one written template option.
+#[derive(Clone, Debug)]
+pub struct TextSearchTemplateOption {
+    key: String,
+    requested: Option<Vec<String>>,
+    resolved: Option<FullName>,
+    failure: Option<TextSearchTemplateFailure>,
+}
+
+impl TextSearchTemplateOption {
+    /// Written option key.
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    /// Written routine name components, when the value names a routine.
+    pub fn requested(&self) -> Option<&[String]> {
+        self.requested.as_deref()
+    }
+
+    /// Exact routine identity, including when its return type is invalid.
+    pub const fn resolved(&self) -> Option<&FullName> {
+        self.resolved.as_ref()
+    }
+
+    /// Validation outcome for this option.
+    pub const fn failure(&self) -> Option<TextSearchTemplateFailure> {
+        self.failure
+    }
+}
+
 /// Analyzed PostgreSQL text search template declaration.
 #[derive(Clone, Debug)]
 pub struct CreateTextSearchTemplate {
-    definition: Option<TextSearchTemplateDefinition>,
+    requested: Vec<String>,
+    name: Option<FullName>,
+    options: Vec<TextSearchTemplateOption>,
+    applicability: Result<TextSearchTemplateDefinition, TextSearchTemplateFailure>,
 }
 
 impl CreateTextSearchTemplate {
+    /// Written template name components.
+    pub fn requested(&self) -> &[String] {
+        &self.requested
+    }
+
+    /// Qualified target when namespace resolution succeeded.
+    pub const fn name(&self) -> Option<&FullName> {
+        self.name.as_ref()
+    }
+
+    /// Completed option outcomes in source order.
+    pub fn options(&self) -> &[TextSearchTemplateOption] {
+        &self.options
+    }
+
+    /// Catalog applicability or the first failure in PostgreSQL validation order.
+    pub const fn applicability(
+        &self,
+    ) -> &Result<TextSearchTemplateDefinition, TextSearchTemplateFailure> {
+        &self.applicability
+    }
+
     /// The definition if the declaration is applicable.
     pub const fn definition(&self) -> Option<&TextSearchTemplateDefinition> {
-        self.definition.as_ref()
+        match &self.applicability {
+            Ok(definition) => Some(definition),
+            Err(_) => None,
+        }
     }
 
     pub(crate) fn analyze(
         syntax: &Syntax,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
+        let target = creation_name(syntax.name(), context);
+        let mut first_error = None;
+        let mut options = Vec::new();
+        let mut init = None;
+        let mut lexize = None;
+        for option in syntax.options() {
+            let (outcome, error) = analyze_option(option, context);
+            if first_error.is_none() {
+                first_error = error;
+            }
+            if outcome.failure().is_none() {
+                match outcome.key() {
+                    "init" => init = outcome.resolved().cloned(),
+                    "lexize" => lexize = outcome.resolved().cloned(),
+                    _ => {}
+                }
+            }
+            options.push(outcome);
+        }
+
+        let name = target.as_ref().ok().cloned();
+        let applicability = target.and_then(|name| match first_error {
+            Some(error) => Err(error),
+            None => finish_definition(name, init, lexize, context),
+        });
+        let applicability = match applicability {
+            Ok(definition) => Ok(definition),
+            Err(error) => {
+                context.report_analysis_problem(AnalysisProblem::InvalidTextSearchTemplate(
+                    error.message,
+                    error.location.as_ref().map(Into::into),
+                ))?;
+                Err(error.failure)
+            }
+        };
         Ok(Self {
-            definition: analyze_definition(syntax, context)?,
+            requested: syntax.name().parts().to_vec(),
+            name,
+            options,
+            applicability,
         })
     }
 
@@ -80,8 +200,11 @@ mod test_catalog_application {
     use crate::{
         context::{ParseContext, TextSearchTemplateInfoRead},
         names::FullName,
-        sem::TypeReference,
-        test_helpers::{TestParseContext, schema_creation, search_path::search_path},
+        sem::{SemAst, TextSearchTemplateFailure, TypeReference},
+        test_helpers::{
+            TestParseContext, ownership::apply_ownership_sql, schema_creation,
+            search_path::search_path,
+        },
     };
 
     #[test]
@@ -89,6 +212,7 @@ mod test_catalog_application {
         let mut inventory = TestParseContext::default();
         inventory.set_search_path(&search_path(&["public"]));
         inventory.setup_type(TypeReference::from_master_type_name("internal"));
+        inventory.setup_type(TypeReference::from_master_type_name("int4"));
         let context = schema_creation::apply(
             schema_creation::child(inventory.freeze()),
             r#"
@@ -96,6 +220,8 @@ mod test_catalog_application {
                 RETURNS internal AS 'fixture' LANGUAGE C;
             CREATE FUNCTION public."Second"(internal, internal, internal, internal)
                 RETURNS internal AS 'fixture' LANGUAGE C;
+            CREATE FUNCTION public.bad_callback(internal, internal, internal, internal)
+                RETURNS int4 AS 'fixture' LANGUAGE C;
             CREATE TEXT SEARCH TEMPLATE public.demo
                 (LEXIZE = first_callback, LEXIZE = 'Second');
             "#,
@@ -108,18 +234,63 @@ mod test_catalog_application {
         assert!(entry.init().is_none());
         assert_eq!(entry.lexize(), &FullName::with_schema("public", "Second"));
 
-        let child = schema_creation::apply(
+        let duplicate = apply_ownership_sql(
             schema_creation::child(parent.clone()),
-            "CREATE TEXT SEARCH TEMPLATE public.demo (LEXIZE = first_callback);
-             CREATE TEXT SEARCH TEMPLATE public.invalid
-                 (LEXIZE = missing, LEXIZE = first_callback);",
+            "CREATE TEXT SEARCH TEMPLATE public.demo (LEXIZE = first_callback)",
         )?;
-        assert_eq!(child.problems().len(), 2);
-        assert!(
-            child
-                .text_search_template(&FullName::with_schema("public", "invalid"))
-                .is_none()
+        let SemAst::CreateTextSearchTemplate(statement) = duplicate.ast() else {
+            panic!("expected a text search template");
+        };
+        assert_eq!(statement.name(), Some(&name));
+        assert_eq!(
+            statement.options()[0].resolved(),
+            Some(&FullName::with_schema("public", "first_callback"))
         );
+        assert_eq!(
+            statement.applicability().as_ref().unwrap_err(),
+            &TextSearchTemplateFailure::DuplicateTemplate
+        );
+
+        let invalid_name = FullName::with_schema("public", "invalid");
+        let invalid = apply_ownership_sql(
+            duplicate.into_context(),
+            "CREATE TEXT SEARCH TEMPLATE public.invalid (LEXIZE = missing, LEXIZE = first_callback)",
+        )?;
+        let SemAst::CreateTextSearchTemplate(statement) = invalid.ast() else {
+            panic!("expected a text search template");
+        };
+        assert_eq!(statement.name(), Some(&invalid_name));
+        assert_eq!(
+            statement.options()[0].failure(),
+            Some(TextSearchTemplateFailure::MissingCallback)
+        );
+        assert_eq!(
+            statement.options()[1].resolved(),
+            Some(&FullName::with_schema("public", "first_callback"))
+        );
+        assert_eq!(
+            statement.applicability().as_ref().unwrap_err(),
+            &TextSearchTemplateFailure::MissingCallback
+        );
+
+        let bad_return = apply_ownership_sql(
+            invalid.into_context(),
+            "CREATE TEXT SEARCH TEMPLATE public.invalid (LEXIZE = bad_callback)",
+        )?;
+        let SemAst::CreateTextSearchTemplate(statement) = bad_return.ast() else {
+            panic!("expected a text search template");
+        };
+        assert_eq!(
+            statement.options()[0].resolved(),
+            Some(&FullName::with_schema("public", "bad_callback"))
+        );
+        assert_eq!(
+            statement.applicability().as_ref().unwrap_err(),
+            &TextSearchTemplateFailure::WrongReturnType
+        );
+        let child = bad_return.into_context();
+        assert_eq!(child.problems().len(), 3);
+        assert!(child.text_search_template(&invalid_name).is_none());
         assert_eq!(
             child.text_search_template(&name).unwrap().lexize(),
             entry.lexize()
@@ -128,100 +299,127 @@ mod test_catalog_application {
     }
 }
 
-fn analyze_definition(
-    syntax: &Syntax,
-    context: &mut impl ParseContext,
-) -> Result<Option<TextSearchTemplateDefinition>, AnalysisError> {
-    let Some(name) = creation_name(syntax, context)? else {
-        return Ok(None);
-    };
-    let mut init = None;
-    let mut lexize = None;
-    for option in &syntax.options {
-        let (arity, binding) = match option.key.as_str() {
-            "init" => (1, &mut init),
-            "lexize" => (4, &mut lexize),
-            key => {
-                return reject(
-                    context,
-                    format!("unrecognized text search template option {key:?}"),
-                    option.location,
-                );
-            }
-        };
-        let Some(callback) = callback_name(option.value.as_ref(), context) else {
-            return reject(
-                context,
-                format!("{} requires a function name", option.key),
-                option.location,
-            );
-        };
-        let internal = TypeReference::from_master_type_name("internal");
-        let arguments = vec![Some(internal.clone()); arity];
-        let Some(function) = context.find_exact_function(&callback, &arguments) else {
-            return reject(
-                context,
-                format!(
-                    "{} function {callback} must exist with {arity} internal arguments",
-                    option.key
-                ),
-                option.location,
-            );
-        };
-        if function.overload().ret_type().as_ref() != Some(&internal) {
-            return reject(
-                context,
-                format!("{} function {callback} must return internal", option.key),
-                option.location,
-            );
-        }
-        *binding = Some(function.name().clone());
-    }
-    let Some(lexize) = lexize else {
-        return reject(context, "text search template requires LEXIZE", None);
-    };
-    if context.text_search_template(&name).is_some() {
-        return reject(
-            context,
-            format!("text search template {name} already exists"),
-            None,
-        );
-    }
-    Ok(Some(TextSearchTemplateDefinition { name, init, lexize }))
+use TextSearchTemplateFailure as Failure;
+
+struct ValidationError {
+    failure: Failure,
+    message: String,
+    location: Option<StringSpan>,
 }
 
-fn creation_name(
-    syntax: &Syntax,
-    context: &mut impl ParseContext,
-) -> Result<Option<FullName>, AnalysisError> {
-    let Some(name) = local_name(&syntax.name, context) else {
-        return reject(
-            context,
-            "invalid text search template name for this database",
-            None,
-        );
-    };
-    if let Some(schema) = postgres_creation_schema(context, name.schema()) {
-        return Ok(Some(name.replace_schema(&schema)));
-    }
-    let message = name.schema().map_or_else(
-        || "no schema selected for text search template creation".to_owned(),
-        |schema| format!("schema {schema} does not exist"),
-    );
-    reject(context, message, None)
-}
-
-fn callback_name(
-    value: Option<&TemplateOptionValue>,
+fn finish_definition(
+    name: FullName,
+    init: Option<FullName>,
+    lexize: Option<FullName>,
     context: &impl ParseContext,
-) -> Option<FullName> {
-    match value {
-        Some(TemplateOptionValue::Name(name)) => local_name(name, context),
-        Some(TemplateOptionValue::Literal(Literal::String(name))) => {
-            Some(FullName::from_local_name(name))
-        }
-        _ => None,
+) -> Result<TextSearchTemplateDefinition, ValidationError> {
+    let lexize = lexize.ok_or_else(|| ValidationError {
+        failure: Failure::MissingLexize,
+        message: "text search template requires LEXIZE".to_owned(),
+        location: None,
+    })?;
+    if context.text_search_template(&name).is_some() {
+        return Err(ValidationError {
+            failure: Failure::DuplicateTemplate,
+            message: format!("text search template {name} already exists"),
+            location: None,
+        });
     }
+    Ok(TextSearchTemplateDefinition { name, init, lexize })
+}
+
+fn analyze_option(
+    option: &TemplateOption,
+    context: &impl ParseContext,
+) -> (TextSearchTemplateOption, Option<ValidationError>) {
+    let (requested, callback) = match option.value() {
+        Some(TemplateOptionValue::Name(name)) => {
+            (Some(name.parts().to_vec()), local_name(name, context))
+        }
+        Some(TemplateOptionValue::Literal(Literal::String(name))) => (
+            Some(vec![name.clone()]),
+            Some(FullName::from_local_name(name)),
+        ),
+        _ => (None, None),
+    };
+    let mut option_outcome = TextSearchTemplateOption {
+        key: option.key().to_owned(),
+        requested,
+        resolved: None,
+        failure: None,
+    };
+    let error = bind_callback(&mut option_outcome, callback, context)
+        .err()
+        .map(|(failure, message)| ValidationError {
+            failure,
+            message,
+            location: option.location(),
+        });
+    option_outcome.failure = error.as_ref().map(|error| error.failure);
+    (option_outcome, error)
+}
+
+fn bind_callback(
+    option: &mut TextSearchTemplateOption,
+    callback: Option<FullName>,
+    context: &impl ParseContext,
+) -> Result<(), (Failure, String)> {
+    let key = option.key();
+    let arity = match key {
+        "init" => 1,
+        "lexize" => 4,
+        _ => {
+            return Err((
+                Failure::UnknownOption,
+                format!("unrecognized text search template option {key:?}"),
+            ));
+        }
+    };
+    let callback = callback.ok_or_else(|| {
+        (
+            Failure::InvalidCallbackName,
+            format!("{key} requires a function name"),
+        )
+    })?;
+    let internal = TypeReference::from_master_type_name("internal");
+    let arguments = vec![Some(internal.clone()); arity];
+    let function = context
+        .find_exact_function(&callback, &arguments)
+        .ok_or_else(|| {
+            (
+                Failure::MissingCallback,
+                format!("{key} function {callback} must exist with {arity} internal arguments"),
+            )
+        })?;
+    let failure = if function.overload().ret_type().as_ref() == Some(&internal) {
+        Ok(())
+    } else {
+        Err((
+            Failure::WrongReturnType,
+            format!("{key} function {callback} must return internal"),
+        ))
+    };
+    option.resolved = Some(function.name().clone());
+    failure
+}
+
+fn creation_name(written: &Name, context: &impl ParseContext) -> Result<FullName, ValidationError> {
+    let name = local_name(written, context).ok_or_else(|| ValidationError {
+        failure: Failure::InvalidTarget,
+        message: "invalid text search template name for this database".to_owned(),
+        location: None,
+    })?;
+    if let Some(schema) = postgres_creation_schema(context, name.schema()) {
+        return Ok(name.replace_schema(&schema));
+    }
+    Err(ValidationError {
+        failure: Failure::MissingSchema,
+        message: name.schema().map_or_else(
+            || "no schema selected for text search template creation".to_owned(),
+            |schema| format!("schema {schema} does not exist"),
+        ),
+        location: None,
+    })
 }
 
 fn local_name(name: &Name, context: &impl ParseContext) -> Option<FullName> {
@@ -233,16 +431,4 @@ fn local_name(name: &Name, context: &impl ParseContext) -> Option<FullName> {
         }
         _ => None,
     }
-}
-
-fn reject<T>(
-    context: &mut impl ParseContext,
-    message: impl Into<String>,
-    span: Option<StringSpan>,
-) -> Result<Option<T>, AnalysisError> {
-    context.report_analysis_problem(AnalysisProblem::InvalidTextSearchTemplate(
-        message.into(),
-        span.as_ref().map(Into::into),
-    ))?;
-    Ok(None)
 }

@@ -190,6 +190,8 @@
   - [function_overload_resolution_failed](diagnostics/function_overload_resolution_failed.md)
   - [invalid_function_signature](diagnostics/invalid_function_signature.md)
   - [invalid_operator_declaration](diagnostics/invalid_operator_declaration.md)
+  - [invalid_cast_declaration](diagnostics/invalid_cast_declaration.md)
+  - [ignored_domain_cast](diagnostics/ignored_domain_cast.md)
   - [invalid_text_search_template](diagnostics/invalid_text_search_template.md)
   - [implicit_cast_not_found](diagnostics/implicit_cast_not_found.md)
   - [incompatible_case_values](diagnostics/incompatible_case_values.md)

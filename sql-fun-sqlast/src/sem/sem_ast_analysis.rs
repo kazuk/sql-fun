@@ -13,7 +13,7 @@ use crate::{
         DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
         EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
         ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
-        SelectStatement, SemAst, UpdateStatement, VariableSet,
+        SelectStatement, SemAst, UpdateStatement, VariableSet, cast::CreateCast,
     },
 };
 
@@ -70,9 +70,10 @@ impl SemAst {
                 CreateOperatorClass::analyze(ast, context)
                     .map(|statement| Self::CreateOperatorClass(Box::new(statement)))
             }
-            AstStatementNode::CreateCast(_) => {
-                todo!("CREATE CAST interpretation (#1237)")
-            }
+            AstStatementNode::CreateCast(ast) => Ok(CreateCast::analyze(ast, context)?
+                .map_or_else(Self::unresolved_statement, |cast| {
+                    Self::CreateCast(Box::new(cast))
+                })),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
@@ -305,6 +306,19 @@ impl SemAst {
                 let context = context.apply_alter_operator(&statement)?;
                 Ok(AstAndContextPair::new(
                     Self::AlterOperator(Box::new(statement)),
+                    context,
+                ))
+            }
+            AstStatementNode::CreateCast(ast) => {
+                let Some(cast) = CreateCast::analyze(ast, &mut context)? else {
+                    return Ok(AstAndContextPair::new(
+                        Self::unresolved_statement(),
+                        context,
+                    ));
+                };
+                let context = context.apply_create_cast(&cast)?;
+                Ok(AstAndContextPair::new(
+                    Self::CreateCast(Box::new(cast)),
                     context,
                 ))
             }

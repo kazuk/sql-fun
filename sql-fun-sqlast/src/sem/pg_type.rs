@@ -41,6 +41,23 @@ pub enum TypeDefinition {
     ImplicitComposite(ColumnCollection),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub(crate) struct PhysicalTypeLayout {
+    length: i16,
+    alignment: char,
+    by_value: bool,
+}
+
+impl PhysicalTypeLayout {
+    pub(crate) const fn new(length: i16, alignment: char, by_value: bool) -> Self {
+        Self {
+            length,
+            alignment,
+            by_value,
+        }
+    }
+}
+
 /// Catalog-loaded nominal type and its optional PostgreSQL facts.
 /// The flattened reference retains the existing serialized reference shape.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -53,6 +70,8 @@ pub struct BuiltinTypeDefinition {
     collatable: Option<bool>,
     #[serde(skip)]
     privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    physical_layout: Option<PhysicalTypeLayout>,
 }
 
 impl PartialEq for BuiltinTypeDefinition {
@@ -60,6 +79,7 @@ impl PartialEq for BuiltinTypeDefinition {
         self.reference == other.reference
             && self.category == other.category
             && self.collatable == other.collatable
+            && self.physical_layout == other.physical_layout
     }
 }
 impl Eq for BuiltinTypeDefinition {}
@@ -68,6 +88,7 @@ impl std::hash::Hash for BuiltinTypeDefinition {
         self.reference.hash(state);
         self.category.hash(state);
         self.collatable.hash(state);
+        self.physical_layout.hash(state);
     }
 }
 
@@ -372,7 +393,22 @@ impl TypeDefinition {
             category,
             collatable,
             privilege_declarations: Vec::new(),
+            physical_layout: None,
         })
+    }
+
+    pub(crate) const fn physical_layout(&self) -> Option<PhysicalTypeLayout> {
+        match self {
+            Self::Builtin(definition) | Self::Base(definition) => definition.physical_layout,
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn with_physical_layout(mut self, layout: PhysicalTypeLayout) -> Self {
+        if let Self::Builtin(definition) | Self::Base(definition) = &mut self {
+            definition.physical_layout = Some(layout);
+        }
+        self
     }
 
     pub(crate) const fn is_shell(&self) -> bool {
@@ -411,6 +447,7 @@ impl TypeDefinition {
             category: Some(category),
             collatable: Some(collatable),
             privilege_declarations: Vec::new(),
+            physical_layout: None,
         })
     }
 

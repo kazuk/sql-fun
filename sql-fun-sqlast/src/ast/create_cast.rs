@@ -8,9 +8,7 @@ use crate::{
     syn::{self, CoercionContext, Opt, ScanToken},
 };
 
-// Retained for semantic interpretation (#1237).
 #[derive(Clone, Debug)]
-#[allow(dead_code, reason = "CREATE CAST interpretation is deferred to #1237")]
 pub(crate) struct CreateCast {
     types: CastTarget,
     method: CastMethod,
@@ -18,18 +16,35 @@ pub(crate) struct CreateCast {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code, reason = "CREATE CAST interpretation is deferred to #1237")]
-enum CastMethod {
+pub(crate) enum CastMethod {
     Function(Box<ObjectTarget>),
     Binary,
     InOut,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum CastContext {
+pub(crate) enum CastContext {
     Explicit,
     Assignment,
     Implicit,
+}
+
+impl CreateCast {
+    pub(crate) const fn source(&self) -> &TypeName {
+        &self.types.source
+    }
+
+    pub(crate) const fn target(&self) -> &TypeName {
+        &self.types.target
+    }
+
+    pub(crate) const fn method(&self) -> &CastMethod {
+        &self.method
+    }
+
+    pub(crate) const fn context(&self) -> CastContext {
+        self.context
+    }
 }
 
 impl TryFromWithTokens<&syn::CreateCastStmt> for CreateCast {

@@ -1,3 +1,4 @@
+use crate::sem::cast::CreateCast;
 mod cast_info;
 
 #[cfg(test)]
@@ -1019,6 +1020,12 @@ mod test_parameter_type_hint_write {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn apply_create_cast(mut self, statement: &CreateCast) -> Result<Self, AnalysisError> {
+        let (source, target, definition) = statement.entry();
+        self.insert_cast(source, target, definition.clone());
+        Ok(self)
+    }
+
     fn apply_create_operator(mut self, statement: &CreateOperator) -> Result<Self, AnalysisError> {
         let Some((identity, mut definition)) = statement.definition() else {
             return Ok(self);
@@ -1541,9 +1548,8 @@ impl crate::context::ViewMergeInfoRead for SchemaCatalog {
     }
 }
 
-#[cfg(test)]
 impl SchemaFileContext {
-    pub(crate) fn set_test_cast(
+    fn insert_cast(
         &mut self,
         source: &TypeReference,
         target: &TypeReference,
@@ -1556,6 +1562,17 @@ impl SchemaFileContext {
             targets.insert(&target.to_string(), cast);
             self.catalog.casts.insert(&source.to_string(), targets);
         }
+    }
+}
+#[cfg(test)]
+impl SchemaFileContext {
+    pub(crate) fn set_test_cast(
+        &mut self,
+        source: &TypeReference,
+        target: &TypeReference,
+        cast: CastDefinition,
+    ) {
+        self.insert_cast(source, target, cast);
     }
 
     pub(crate) fn set_test_operator(&mut self, name: &str, operator: OperatorDefinition) {

@@ -145,6 +145,8 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [call_argument_assigned_twice](call_argument_assigned_twice.md)
 - [function_overload_resolution_failed](function_overload_resolution_failed.md)
 - [invalid_function_signature](invalid_function_signature.md)
+- [ignored_domain_cast](ignored_domain_cast.md)
+- [invalid_cast_declaration](invalid_cast_declaration.md)
 - [invalid_operator_declaration](invalid_operator_declaration.md)
 - [invalid_text_search_template](invalid_text_search_template.md)
 - [implicit_cast_not_found](implicit_cast_not_found.md)

@@ -14,7 +14,7 @@ use crate::{
     TrieMap,
     context::{CastInfoRead, TypeInfoRead},
     names::FullName,
-    sem::{AnalysisError, CastContext, CastDefinition, TypeReference},
+    sem::{AnalysisError, CastContext, CastDefinition, TypeReference, cast::CastMethod},
 };
 
 /// Loads builtin cast definitions from the selected master file.
@@ -24,7 +24,7 @@ pub struct PgBuiltinCasts {}
 #[derive(Debug, serde::Deserialize)]
 pub struct CastInfo {
     pub func: String,
-    pub method: String,
+    method: CastMethod,
     pub context: String,
     #[serde(default, rename = "is_prefferd")]
     preferred: bool,
@@ -47,12 +47,6 @@ impl PgBuiltinCasts {
         for (source, m) in casts {
             let mut group = TrieMap::new();
             for (target, ci) in m {
-                if ci.method == "b"
-                    && ci.context == "i"
-                    && masters.type_ordered(&FullName::with_schema("pg_catalog", &target))
-                {
-                    binary_ordered.insert(FullName::with_schema("pg_catalog", &source));
-                }
                 let cc = match ci.context.as_str() {
                     "i" if ci.preferred => CastContext::ImplicitPrefeerd,
                     "i" => CastContext::Implicit,
@@ -60,7 +54,12 @@ impl PgBuiltinCasts {
                     "e" => CastContext::Explicit,
                     e => panic!("unexpected cast context {e}"),
                 };
-                let def = CastDefinition::new(cc);
+                let def = CastDefinition::declared(cc, ci.method);
+                if def.is_implicit_binary()
+                    && masters.type_ordered(&FullName::with_schema("pg_catalog", &target))
+                {
+                    binary_ordered.insert(FullName::with_schema("pg_catalog", &source));
+                }
                 group.insert(&target, def);
             }
             result.insert(&source, group);

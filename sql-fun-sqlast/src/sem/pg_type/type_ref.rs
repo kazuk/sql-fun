@@ -1128,6 +1128,74 @@ mod canonical_type_tests {
 }
 
 impl TypeReference {
+    /// Directional PostgreSQL binary coercion used by declaration binding.
+    pub(crate) fn is_binary_coercible_to(
+        &self,
+        target: &Self,
+        context: &impl BaseParseContext,
+    ) -> bool {
+        if self == target {
+            return true;
+        }
+        let Some(source) = self.domain_base_type(context) else {
+            return false;
+        };
+        if &source == target {
+            return true;
+        }
+        if let Some(name) = target.full_name()
+            && name
+                .schema()
+                .is_some_and(|schema| schema.as_str() == "pg_catalog")
+        {
+            let definition = source.definition_from_catalog(context);
+            let is_array = context.get_array_item_type(&source).is_some();
+            let composite =
+                definition.is_some_and(|ty| ty.is_composite_type() || ty.is_relation_type());
+            let accepts = match (name.name().as_str(), target.is_array() == Some(true)) {
+                ("any" | "anyelement" | "anycompatible", false) => true,
+                ("anyarray" | "anycompatiblearray", false) => is_array,
+                ("anynonarray" | "anycompatiblenonarray", false) => !is_array,
+                ("anyenum", false) => {
+                    !is_array && matches!(definition, Some(TypeDefinition::Enum(_)))
+                }
+                ("anyrange" | "anycompatiblerange", false) => {
+                    !is_array
+                        && definition.is_some_and(|ty| {
+                            ty.is_builtin()
+                                && ty
+                                    .intrinsic_category()
+                                    .is_some_and(|kind| kind.code() == 'R')
+                                && !ty.full_name().is_some_and(|name| {
+                                    name.name().as_str().ends_with("multirange")
+                                })
+                        })
+                }
+                ("anymultirange" | "anycompatiblemultirange", false) => {
+                    !is_array
+                        && definition.is_some_and(|ty| {
+                            ty.is_builtin()
+                                && ty
+                                    .intrinsic_category()
+                                    .is_some_and(|kind| kind.code() == 'R')
+                                && ty.full_name().is_some_and(|name| {
+                                    name.name().as_str().ends_with("multirange")
+                                })
+                        })
+                }
+                ("record", array) => composite && array == is_array,
+                _ => false,
+            };
+            if accepts {
+                return true;
+            }
+        }
+        context.has_declared_cast(&source, target)
+            && context
+                .get_implicit_cast(&source, target)
+                .is_some_and(|cast| cast.is_implicit_binary())
+    }
+
     /// Resolve domain layers without erasing array element or source identity.
     /// Missing domain bases and cycles cannot establish coercion eligibility.
     pub(crate) fn domain_base_type(&self, context: &impl BaseParseContext) -> Option<Self> {

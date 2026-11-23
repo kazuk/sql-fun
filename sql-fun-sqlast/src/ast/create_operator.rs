@@ -3,7 +3,7 @@
 use crate::{
     StringSpan,
     ast::{
-        Literal, Name, TryFromWithTokens, TypeName,
+        Literal, Name, ObjectArgument, TryFromWithTokens, TypeName,
         postgres::{anchored_token_span, required},
     },
     error::AnalysisError,
@@ -89,13 +89,7 @@ impl TryFromWithTokens<&syn::DefineStmt> for CreateOperator {
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let name = Name::try_from(value.get_defnames())?;
-        let options = value
-            .get_definition()
-            .as_inner()
-            .unwrap_or_default()
-            .iter()
-            .map(|node| OperatorOption::try_from_with_tokens(node, tokens))
-            .collect::<Result<Vec<_>, _>>()?;
+        let options = OperatorOption::convert_list(value.get_definition(), tokens)?;
         Ok(Self { name, options })
     }
 }
@@ -342,5 +336,169 @@ mod test_operator_option_value_conversion {
             ));
         }
         assert_eq!(options.len(), 7);
+    }
+}
+
+impl OperatorOption {
+    fn convert_list(
+        options: syn::NodeListOpt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Vec<Self>, AnalysisError> {
+        options
+            .as_inner()
+            .unwrap_or_default()
+            .iter()
+            .map(|node| Self::try_from_with_tokens(node, tokens))
+            .collect()
+    }
+}
+
+#[derive(Clone, Debug)]
+#[allow(
+    dead_code,
+    reason = "retained for subsequent ALTER OPERATOR semantic analysis"
+)]
+pub(crate) struct AlterOperator {
+    name: Name,
+    operands: [ObjectArgument; 2],
+    options: Vec<OperatorOption>,
+}
+
+impl TryFromWithTokens<&syn::AlterOperatorStmt> for AlterOperator {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::AlterOperatorStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let target = required(value.get_opername().as_inner(), "ALTER OPERATOR target")?;
+        let name = Name::try_from(target.get_objname())?;
+        let operands = required(target.get_objargs().as_inner(), "ALTER OPERATOR operands")?;
+        let [left, right] = &operands[..] else {
+            return AnalysisError::raise_unexpected_input("ALTER OPERATOR operand slots");
+        };
+        Ok(Self {
+            name,
+            operands: [
+                ObjectArgument::try_from_node(left, tokens)?,
+                ObjectArgument::try_from_node(right, tokens)?,
+            ],
+            options: OperatorOption::convert_list(value.get_options(), tokens)?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_alter_operator_conversion {
+    use crate::{
+        ast::{Dialect, StatementKind, StatementNode},
+        parse_statements,
+    };
+
+    #[test]
+    fn converts_audited_bundle_declarations() {
+        // These declarations are identical in the 17.6 and 18.1 bundles.
+        // Sources: cube--1.2--1.3, seg--1.1--1.2, and pg_trgm--1.4--1.5.
+        let fixtures: [(_, _, &[_]); 3] = [
+            (
+                "cube",
+                r#"ALTER OPERATOR <= (cube, cube) SET (
+	RESTRICT = scalarlesel, JOIN = scalarlejoinsel
+);
+ALTER OPERATOR >= (cube, cube) SET (
+	RESTRICT = scalargesel, JOIN = scalargejoinsel
+);"#,
+                &[
+                    ("<=", "scalarlesel", "scalarlejoinsel"),
+                    (">=", "scalargesel", "scalargejoinsel"),
+                ],
+            ),
+            (
+                "seg",
+                r#"ALTER OPERATOR <= (seg, seg) SET (
+	RESTRICT = scalarlesel,
+	JOIN = scalarlejoinsel
+);
+ALTER OPERATOR >= (seg, seg) SET (
+	RESTRICT = scalargesel,
+	JOIN = scalargejoinsel
+);"#,
+                &[
+                    ("<=", "scalarlesel", "scalarlejoinsel"),
+                    (">=", "scalargesel", "scalargejoinsel"),
+                ],
+            ),
+            (
+                "text",
+                r#"ALTER OPERATOR % (text, text)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel);
+ALTER OPERATOR <% (text, text)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel);
+ALTER OPERATOR %> (text, text)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel);
+ALTER OPERATOR <<% (text, text)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel);
+ALTER OPERATOR %>> (text, text)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel);"#,
+                &[
+                    ("%", "matchingsel", "matchingjoinsel"),
+                    ("<%", "matchingsel", "matchingjoinsel"),
+                    ("%>", "matchingsel", "matchingjoinsel"),
+                    ("<<%", "matchingsel", "matchingjoinsel"),
+                    ("%>>", "matchingsel", "matchingjoinsel"),
+                ],
+            ),
+        ];
+        for (operand, sql, expected) in fixtures {
+            let statements = parse_statements(sql, Dialect::postgres())
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert_eq!(statements.len(), expected.len());
+            for (statement, &(name, restrict, join)) in statements.iter().zip(expected) {
+                assert_eq!(statement.kind(), StatementKind::AlterOperator);
+                let StatementNode::AlterOperator(operator) = statement.node() else {
+                    panic!("expected ALTER OPERATOR");
+                };
+                assert_eq!(operator.name.0, [name]);
+                for argument in &operator.operands {
+                    assert_eq!(argument.type_name.as_ref().unwrap().name.0, [operand]);
+                }
+                let statement_sql = statement.span().get_from(sql).unwrap();
+                assert_eq!(operator.options.len(), 2);
+                for (option, (key, estimator, token)) in operator
+                    .options
+                    .iter()
+                    .zip([("restrict", restrict, "RESTRICT"), ("join", join, "JOIN")])
+                {
+                    assert_eq!(option.key(), key);
+                    assert_eq!(option.name().unwrap().0, [estimator]);
+                    assert_eq!(
+                        option.location().unwrap().get_from(statement_sql),
+                        Some(token)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn retains_qualified_prefix_operator_and_explicit_reset() {
+        let sql = r#"ALTER OPERATOR "App".- (NONE, pg_catalog.int4) SET (RESTRICT = NONE);"#;
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let StatementNode::AlterOperator(operator) = statement.node() else {
+            panic!("expected ALTER OPERATOR");
+        };
+        assert_eq!(operator.name.0, ["App", "-"]);
+        assert!(operator.operands[0].type_name.is_none());
+        assert_eq!(
+            operator.operands[1].type_name.as_ref().unwrap().name.0,
+            ["pg_catalog", "int4"],
+        );
+        assert_eq!(operator.options.len(), 1);
+        assert_eq!(operator.options[0].key(), "restrict");
+        assert!(operator.options[0].value().is_none());
     }
 }

@@ -896,6 +896,36 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL language declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidLanguageDeclaration": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidLanguageDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "A domain cast is recorded but ignored by PostgreSQL coercion.",
                   "type": "object",
                   "properties": {
@@ -6338,6 +6368,36 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL language declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidLanguageDeclaration": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidLanguageDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "A domain cast is recorded but ignored by PostgreSQL coercion.",
                   "type": "object",
                   "properties": {
@@ -11668,6 +11728,36 @@
                   },
                   "required": [
                     "InvalidCastDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid PostgreSQL language declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidLanguageDeclaration": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidLanguageDeclaration"
                   ],
                   "additionalProperties": false
                 },

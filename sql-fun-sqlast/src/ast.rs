@@ -11,7 +11,7 @@
 pub(crate) mod client_type;
 pub(crate) mod create_access_method;
 pub(crate) mod create_cast;
-mod create_language;
+pub(crate) mod create_language;
 pub(crate) mod create_operator;
 pub(crate) mod create_operator_class;
 pub(crate) mod create_text_search_template;

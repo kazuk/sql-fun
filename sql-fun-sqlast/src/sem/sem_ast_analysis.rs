@@ -7,10 +7,10 @@ use crate::{
     sem::{
         AlterFunctionParallel, AlterOperator, AlterOperatorFamily, AlterOwner, AlterSequence,
         AnalysisError, Comment, CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum,
-        CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex, CreateOperator,
-        CreateOperatorClass, CreateOperatorFamily, CreateRule, CreateSchema, CreateSequence,
-        CreateTable, CreateTableAs, CreateTextSearchTemplate, CreateTrigger, CreateView,
-        DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
+        CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex, CreateLanguage,
+        CreateOperator, CreateOperatorClass, CreateOperatorFamily, CreateRule, CreateSchema,
+        CreateSequence, CreateTable, CreateTableAs, CreateTextSearchTemplate, CreateTrigger,
+        CreateView, DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
         EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
         ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
         SelectStatement, SemAst, UpdateStatement, VariableSet, cast::CreateCast,
@@ -70,9 +70,8 @@ impl SemAst {
                 CreateOperatorClass::analyze(ast, context)
                     .map(|statement| Self::CreateOperatorClass(Box::new(statement)))
             }
-            AstStatementNode::CreateLanguage(_) => {
-                todo!("CREATE LANGUAGE interpretation (#1246)")
-            }
+            AstStatementNode::CreateLanguage(ast) => CreateLanguage::analyze(ast, context)
+                .map(|language| Self::CreateLanguage(Box::new(language))),
             AstStatementNode::CreateCast(ast) => Ok(CreateCast::analyze(ast, context)?
                 .map_or_else(Self::unresolved_statement, |cast| {
                     Self::CreateCast(Box::new(cast))
@@ -311,6 +310,9 @@ impl SemAst {
                     Self::AlterOperator(Box::new(statement)),
                     context,
                 ))
+            }
+            AstStatementNode::CreateLanguage(ast) => {
+                CreateLanguage::analyze_and_apply(ast, context)
             }
             AstStatementNode::CreateCast(ast) => {
                 let Some(cast) = CreateCast::analyze(ast, &mut context)? else {

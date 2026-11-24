@@ -40,8 +40,12 @@ The PostgreSQL 17 and 18 bundled scripts for `cube@1.2`,
 SQL analysis. Selecting only `earthdistance` also loads its declared
 prerequisite `cube`. The bundled `cube` script stops at its base-type definition,
 before loading any `earthdistance` script. The `earthdistance` operator
-definition and the `plpgsql` procedural-language declaration also fail when
-reached. For `hstore`, the bundled path starts with `hstore--1.4.sql` and reaches
+definition also fails when reached. The `plpgsql` script declares
+`pg_catalog.plpgsql_call_handler()` and `pg_catalog.plpgsql_validator(oid)`
+before its language declaration. Those signatures are already present in the
+bundled catalogs, so the script reports duplicate routine declarations.
+The [CREATE LANGUAGE](create-language.md) statement itself is supported.
+For `hstore`, the bundled path starts with `hstore--1.4.sql` and reaches
 `1.8` through four updates. Analysis currently stops at the installation script's
 shell-type declaration
 (`CREATE TYPE hstore;`), before reaching the updates. Follow

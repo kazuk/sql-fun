@@ -1,0 +1,60 @@
+[
+  {
+    "name": "subsequent_project_sql_sees_extension_definition",
+    "sql": "SELECT 1 AS value FROM public.do_project_visible",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "extension_body_does_not_create_table",
+    "sql": "SELECT 1 AS value FROM public.do_extension_hidden",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "project_body_does_not_create_table",
+    "sql": "SELECT 1 AS value FROM public.do_project_hidden",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

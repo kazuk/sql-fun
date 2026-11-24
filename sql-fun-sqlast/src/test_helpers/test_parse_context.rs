@@ -42,7 +42,7 @@ pub struct TestContext<Constraints> {
     extension_memberships: HashMap<OwnershipIdentity, Vec<ExtensionMembershipChange>>,
     access_methods: HashMap<String, AccessMethodDefinition>,
     text_search_templates: HashMap<FullName, TextSearchTemplateDefinition>,
-    text_search_dictionarys: HashMap<FullName, TextSearchDictionaryDefinition>,
+    text_search_dictionaries: HashMap<FullName, TextSearchDictionaryDefinition>,
     foreign_data_wrappers: HashMap<String, CreateForeignDataWrapper>,
     triggers: HashMap<TriggerIdentity, Option<CreateTrigger>>,
     masters: Option<ConflictMasters>,
@@ -513,7 +513,7 @@ impl<Constraints> crate::context::TextSearchTemplateInfoRead for TestContext<Con
 
 impl<Constraints> crate::context::TextSearchDictionaryInfoRead for TestContext<Constraints> {
     fn text_search_dictionary(&self, name: &FullName) -> Option<&TextSearchDictionaryDefinition> {
-        self.text_search_dictionarys.get(name)
+        self.text_search_dictionaries.get(name)
     }
 }
 
@@ -538,7 +538,7 @@ impl crate::context::TextSearchDictionaryInfoWrite for TestParseContext {
         mut self,
         definition: &TextSearchDictionaryDefinition,
     ) -> Self {
-        self.text_search_dictionarys
+        self.text_search_dictionaries
             .insert(definition.name().to_owned(), definition.clone());
         self
     }
@@ -849,7 +849,7 @@ impl ParseContext for TestParseContext {
             triggers: self.triggers,
             access_methods: self.access_methods,
             text_search_templates: self.text_search_templates,
-            text_search_dictionarys: self.text_search_dictionarys,
+            text_search_dictionaries: self.text_search_dictionaries,
             foreign_data_wrappers: self.foreign_data_wrappers,
             masters: self.masters,
             function_set_properties: self.function_set_properties,

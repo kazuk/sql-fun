@@ -1,0 +1,86 @@
+[
+  {
+    "name": "bundled-plpgsql",
+    "sql": "CREATE TRUSTED LANGUAGE plpgsql\n  HANDLER plpgsql_call_handler\n  INLINE plpgsql_inline_handler\n  VALIDATOR plpgsql_validator",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "qualified-nonvoid-optional-routines",
+    "sql": "CREATE LANGUAGE sample HANDLER pg_catalog.plpgsql_call_handler INLINE callbacks.inline_handler VALIDATOR callbacks.validator",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "different-signature-does-not-shadow",
+    "sql": "CREATE LANGUAGE sample HANDLER plpgsql_call_handler VALIDATOR validator_shadow",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-handler-return",
+    "sql": "CREATE LANGUAGE sample HANDLER pg_catalog.version",
+    "expected": {
+      "diagnostics": [
+        "invalid_language_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong-validator-signature",
+    "sql": "CREATE LANGUAGE sample HANDLER plpgsql_call_handler VALIDATOR public.validator",
+    "expected": {
+      "diagnostics": [
+        "invalid_language_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-inline-handler",
+    "sql": "CREATE LANGUAGE sample HANDLER plpgsql_call_handler INLINE public.missing",
+    "expected": {
+      "diagnostics": [
+        "invalid_language_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate",
+    "sql": "CREATE LANGUAGE existing_language HANDLER plpgsql_call_handler",
+    "expected": {
+      "diagnostics": [
+        "invalid_language_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "replace",
+    "sql": "CREATE OR REPLACE LANGUAGE existing_language HANDLER plpgsql_call_handler",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  }
+]

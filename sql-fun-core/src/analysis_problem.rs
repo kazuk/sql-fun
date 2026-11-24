@@ -397,6 +397,8 @@ pub enum AnalysisProblem {
     InvalidTextSearchTemplate(String, Option<StringSpan>),
     /// A CREATE CAST declaration cannot be applied.
     InvalidCastDeclaration(String, Option<StringSpan>),
+    /// Invalid PostgreSQL language declaration.
+    InvalidLanguageDeclaration(String, Option<StringSpan>),
     /// A domain cast is recorded but ignored by PostgreSQL coercion.
     IgnoredDomainCast(String, Option<StringSpan>),
     /// ALTER OWNER target or role lookup failed.
@@ -821,6 +823,7 @@ impl AnalysisProblem {
             Self::InvalidTextSearchTemplate(..) => "invalid_text_search_template",
             Self::InvalidOperatorDeclaration(..) => "invalid_operator_declaration",
             Self::InvalidCastDeclaration(..) => "invalid_cast_declaration",
+            Self::InvalidLanguageDeclaration(..) => "invalid_language_declaration",
             Self::IgnoredDomainCast(..) => "ignored_domain_cast",
             Self::InvalidBaseType(_) => "base_type_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
@@ -887,6 +890,7 @@ impl AnalysisProblem {
             Self::Lint(problem) => problem.span(),
             Self::InvalidTextSearchTemplate(_, span)
             | Self::InvalidOperatorDeclaration(_, span)
+            | Self::InvalidLanguageDeclaration(_, span)
             | Self::InvalidCastDeclaration(_, span)
             | Self::IgnoredDomainCast(_, span) => *span,
             Self::NameResolution(problem) => problem.statement_relative_span(),
@@ -920,6 +924,7 @@ impl AnalysisProblem {
             | Self::InvalidFunctionSignature(_)
             | Self::InvalidTextSearchTemplate(..)
             | Self::InvalidOperatorDeclaration(..)
+            | Self::InvalidLanguageDeclaration(..)
             | Self::InvalidCastDeclaration(..)
             | Self::IgnoredDomainCast(..)
             | Self::InvalidBaseType(_)
@@ -1058,6 +1063,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::InvalidFunctionSignature(problem) => problem.diagnostic_message(),
             Self::InvalidTextSearchTemplate(message, _)
             | Self::InvalidOperatorDeclaration(message, _)
+            | Self::InvalidLanguageDeclaration(message, _)
             | Self::InvalidCastDeclaration(message, _)
             | Self::IgnoredDomainCast(message, _)
             | Self::InvalidOperatorFamilyDeclaration(message) => message.clone(),

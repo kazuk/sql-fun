@@ -13,6 +13,8 @@ mod analysis_state;
 mod ast;
 pub(crate) mod cast;
 pub use cast::CreateCast;
+mod create_language;
+pub use create_language::CreateLanguage;
 mod client_type;
 mod column_addition;
 mod column_constraints;
@@ -356,6 +358,8 @@ pub enum SemAst {
     CreateOperator(Box<CreateOperator>),
     /// A PostgreSQL cast declaration.
     CreateCast(Box<CreateCast>),
+    /// PostgreSQL procedural language declaration.
+    CreateLanguage(Box<CreateLanguage>),
     /// PostgreSQL ALTER OPERATOR SET.
     AlterOperator(Box<AlterOperator>),
     /// A resolved CREATE TRIGGER statement.
@@ -523,6 +527,7 @@ impl SemAst {
             Self::CreateSchema(schema) => schema.visit_references(visitor),
             Self::CreateRule(rule) => rule.visit_references(visitor),
             Self::CreateTrigger(trigger) => trigger.visit_references(visitor),
+            Self::CreateLanguage(language) => language.visit_references(visitor),
             Self::CreateForeignDataWrapper(wrapper) => wrapper.visit_references(visitor),
             Self::CreateTable(table) => table.visit_references(visitor),
             Self::CreateCompType(composite) => composite.visit_references(visitor),

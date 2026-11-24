@@ -241,6 +241,10 @@ import binding (direct or grouped) as well as the conversion body. Its witness
 count increases from three to four solely because of the new import; no emitter
 or diagnostic classification is added.
 
+The #1246 language declaration reuses `OwnershipLookup` to retain exact
+handler, inline handler, and validator bindings. A failed lookup reports
+`invalid_language_declaration` without using the ownership diagnostic adapter.
+
 The #1000 message-fragment formatter adds one `ArgumentTypeMismatch` match in
 `analysis_problem.rs`. It only describes an existing payload and does not
 construct or emit the excluded diagnostic; its witness count increases by one.

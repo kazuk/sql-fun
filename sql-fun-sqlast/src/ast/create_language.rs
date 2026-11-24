@@ -6,11 +6,7 @@ use crate::{
     syn::{CreatePLangStmt, ListOpt, NodeListOpt},
 };
 
-#[derive(Clone, Debug)]
-#[allow(
-    dead_code,
-    reason = "CREATE LANGUAGE interpretation is deferred to #1246"
-)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct CreateLanguage {
     name: String,
     replace: bool,

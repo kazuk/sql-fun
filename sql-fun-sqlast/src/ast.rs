@@ -11,6 +11,7 @@
 pub(crate) mod client_type;
 pub(crate) mod create_access_method;
 pub(crate) mod create_cast;
+mod create_language;
 pub(crate) mod create_operator;
 pub(crate) mod create_operator_class;
 pub(crate) mod create_text_search_template;
@@ -307,6 +308,11 @@ pub(crate) enum StatementNode {
     AlterOperator(Box<AlterOperator>),
     #[allow(dead_code, reason = "CREATE CAST interpretation is deferred to #1237")]
     CreateCast(Box<create_cast::CreateCast>),
+    #[allow(
+        dead_code,
+        reason = "CREATE LANGUAGE interpretation is deferred to #1246"
+    )]
+    CreateLanguage(Box<create_language::CreateLanguage>),
     CreateAccessMethod(Box<create_access_method::CreateAccessMethod>),
     CreateOperatorClass(Box<create_operator_class::CreateOperatorClass>),
     CreateOperatorFamily(Box<operator_family::CreateOperatorFamily>),
@@ -414,6 +420,10 @@ impl StatementNode {
 
     fn alter_operator_family(value: operator_family::AlterOperatorFamily) -> Self {
         Self::AlterOperatorFamily(Box::new(value))
+    }
+
+    fn create_language(value: create_language::CreateLanguage) -> Self {
+        Self::CreateLanguage(Box::new(value))
     }
 
     fn create_cast(value: create_cast::CreateCast) -> Self {

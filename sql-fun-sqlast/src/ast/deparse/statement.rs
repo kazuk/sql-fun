@@ -37,6 +37,7 @@ impl SqlEmit for StatementNode {
             Self::CreateTextSearchTemplate(_) => writer.unsupported("CREATE TEXT SEARCH TEMPLATE"),
             Self::AlterOperator(operator) => operator.emit(writer),
             Self::CreateCast(_) => writer.unsupported("CREATE CAST"),
+            Self::CreateLanguage(_) => writer.unsupported("CREATE LANGUAGE"),
             Self::CreateAccessMethod(_) => writer.unsupported("CREATE ACCESS METHOD"),
             Self::CreateOperatorClass(_) => writer.unsupported("CREATE OPERATOR CLASS"),
             Self::CreateOperatorFamily(_) => writer.unsupported("CREATE OPERATOR FAMILY"),

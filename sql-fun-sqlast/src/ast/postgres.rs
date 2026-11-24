@@ -20,6 +20,7 @@ use crate::{
         create_operator_class::CreateOperatorClass,
         create_text_search_template::CreateTextSearchTemplate,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
+        do_statement::DoStatement,
         document::DocumentExpr,
         operator_family::{AlterOperatorFamily, CreateOperatorFamily},
     },
@@ -784,6 +785,11 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(value) = value.as_create_foreign_table_stmt().as_inner() {
             let value = ForeignTable::try_from_with_tokens(&value, tokens)?;
             return Ok(Self::foreign_table(value));
+        }
+        if let Some(statement) = value.as_do_stmt().as_inner() {
+            return DoStatement::try_from_with_tokens(&statement, tokens)
+                .map(Box::new)
+                .map(Self::Do);
         }
         if let Some(notify) = value.as_notify_stmt().as_inner() {
             let notify = Notify::try_from(&notify)?;

@@ -27,7 +27,7 @@ SQL parser can be analyzed or executed.
   [CREATE SCHEMA](statements/create-schema.md),
   [ALTER ... OWNER TO](statements/alter-owner.md),
   [CREATE EXTENSION](statements/create-extension.md), [SET](statements/set.md),
-  and [COMMENT](statements/comment.md).
+  [COMMENT](statements/comment.md), and [DO](statements/do.md).
 
 ## Conflicting schema definitions
 

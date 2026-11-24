@@ -19,6 +19,7 @@ mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;
 pub(crate) mod deparse;
+mod do_statement;
 pub(crate) mod document;
 mod drop_behavior;
 pub(crate) mod extension_membership;
@@ -291,6 +292,7 @@ pub(crate) enum StatementNode {
     Update(Update),
     Delete(Delete),
     Notify(Notify),
+    Do(Box<do_statement::DoStatement>),
     Merge(Merge),
     View(View),
     DropRule(DropRule),

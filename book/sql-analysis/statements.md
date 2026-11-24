@@ -241,4 +241,13 @@ stops at a subsequent `CREATE TEXT SEARCH DICTIONARY` declaration such as
 the one in `dict_int`, `dict_xsyn`, or `unaccent`.
 [Dictionary declaration support (#1240)](https://github.com/kazuk/sql-fun/issues/1240).
 
+## PostgreSQL procedural language declarations
+
+The SQL parser recognizes `CREATE LANGUAGE` with a `HANDLER` clause,
+including `CREATE TRUSTED LANGUAGE` and declarations with an inline handler
+or validator. Schema loading stops when it reaches the declaration because
+language registration is pending
+([#1246](https://github.com/kazuk/sql-fun/issues/1246)).
+Commands that render the declaration as SQL report `query_deparse`.
+
 [fdw-diagnostic]: ../diagnostics/foreign_data_wrapper_invalid_definition.md

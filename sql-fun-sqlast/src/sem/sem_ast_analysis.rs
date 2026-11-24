@@ -70,6 +70,9 @@ impl SemAst {
                 CreateOperatorClass::analyze(ast, context)
                     .map(|statement| Self::CreateOperatorClass(Box::new(statement)))
             }
+            AstStatementNode::CreateLanguage(_) => {
+                todo!("CREATE LANGUAGE interpretation (#1246)")
+            }
             AstStatementNode::CreateCast(ast) => Ok(CreateCast::analyze(ast, context)?
                 .map_or_else(Self::unresolved_statement, |cast| {
                     Self::CreateCast(Box::new(cast))

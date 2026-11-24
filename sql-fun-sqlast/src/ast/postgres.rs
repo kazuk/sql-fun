@@ -15,6 +15,7 @@ use crate::{
         View, ViewCheckOption, Window,
         create_access_method::CreateAccessMethod,
         create_cast::CreateCast,
+        create_language::CreateLanguage,
         create_operator::AlterOperator,
         create_operator_class::CreateOperatorClass,
         create_text_search_template::CreateTextSearchTemplate,
@@ -831,6 +832,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 &variable_set,
                 tokens,
             )?));
+        }
+        if let Some(language) = value.as_create_plang_stmt().as_inner() {
+            return Ok(Self::create_language(CreateLanguage::try_from(&language)?));
         }
         if let Some(cast) = value.as_create_cast_stmt().as_inner() {
             return Ok(Self::create_cast(CreateCast::try_from_with_tokens(

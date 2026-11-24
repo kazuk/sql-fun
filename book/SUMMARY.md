@@ -44,6 +44,7 @@
     - [DROP TABLE](./sql-analysis/statements/drop-table.md)
     - [CREATE EXTENSION](./sql-analysis/statements/create-extension.md)
     - [CREATE LANGUAGE](./sql-analysis/statements/create-language.md)
+    - [DO](./sql-analysis/statements/do.md)
     - [SET](./sql-analysis/statements/set.md)
     - [COMMENT](./sql-analysis/statements/comment.md)
   - [Common clauses](./sql-analysis/clauses.md)

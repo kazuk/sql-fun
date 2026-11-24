@@ -109,6 +109,8 @@ impl Statement {
 pub enum StatementKind {
     /// Unresolved PostgreSQL NOTIFY syntax; semantic analysis is separate.
     Notify,
+    /// PostgreSQL anonymous code block.
+    Do,
     /// A PostgreSQL grant of object privileges or role membership.
     Grant,
     /// A PostgreSQL revocation of object privileges or role membership.
@@ -209,6 +211,7 @@ impl std::fmt::Display for StatementKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Notify => "NOTIFY",
+            Self::Do => "DO",
             Self::Grant => "GRANT",
             Self::Revoke => "REVOKE",
             Self::DropRule => "DROP RULE",
@@ -432,6 +435,7 @@ impl StatementNode {
     pub(super) const fn kind(&self) -> StatementKind {
         match self {
             Self::Notify(_) => StatementKind::notify(),
+            Self::Do(_) => StatementKind::Do,
             Self::ObjectPrivileges(value) => StatementKind::privilege_action(value.is_grant()),
             Self::RoleMembership(value) => StatementKind::privilege_action(value.is_grant()),
             Self::Query(_) => StatementKind::query(),

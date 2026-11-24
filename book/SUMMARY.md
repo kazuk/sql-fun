@@ -196,6 +196,7 @@
   - [invalid_language_declaration](diagnostics/invalid_language_declaration.md)
   - [ignored_domain_cast](diagnostics/ignored_domain_cast.md)
   - [opaque_do_body](diagnostics/opaque_do_body.md)
+  - [invalid_text_search_dictionary](diagnostics/invalid_text_search_dictionary.md)
   - [invalid_text_search_template](diagnostics/invalid_text_search_template.md)
   - [implicit_cast_not_found](diagnostics/implicit_cast_not_found.md)
   - [incompatible_case_values](diagnostics/incompatible_case_values.md)

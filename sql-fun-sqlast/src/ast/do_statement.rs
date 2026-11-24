@@ -10,14 +10,16 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-#[cfg_attr(not(test), allow(dead_code, reason = "retained for DO interpretation"))]
 pub(crate) struct DoStatement {
+    pub(crate) keyword_span: Option<StringSpan>,
+    #[cfg_attr(not(test), allow(dead_code, reason = "retained opaque DO body"))]
     body: Operand,
+    #[cfg_attr(not(test), allow(dead_code, reason = "retained DO language clause"))]
     language: Option<Operand>,
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(not(test), allow(dead_code, reason = "retained for DO interpretation"))]
+#[cfg_attr(not(test), allow(dead_code, reason = "retained opaque DO operand"))]
 struct Operand {
     text: String,
     span: Option<StringSpan>,
@@ -55,7 +57,17 @@ impl TryFromWithTokens<&syn::DoStmt> for DoStatement {
                 span: operand_span(tokens, option.get_location(), end, skip),
             });
         }
+        let keyword_span = tokens
+            .iter()
+            .find(|token| matches!(token.get_token().as_inner(), Some(Token::Do)))
+            .map(|token| {
+                StringSpan::new(
+                    token.get_start() as usize,
+                    (token.get_end() - token.get_start()) as usize,
+                )
+            });
         Ok(Self {
+            keyword_span,
             body: required(body, "DO body")?,
             language,
         })
@@ -174,6 +186,10 @@ mod test_conversion {
         let StatementNode::Do(block) = statement.node() else {
             panic!("expected DO");
         };
+        assert_eq!(
+            block.keyword_span.unwrap().get_from(statement_sql),
+            Some("DO")
+        );
         assert_eq!(block.body.text, decoded);
         assert_eq!(
             block.body.span.unwrap().get_from(statement_sql),

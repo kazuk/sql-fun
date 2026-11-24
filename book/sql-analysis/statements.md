@@ -236,10 +236,26 @@ callbacks such as `pg_catalog.dsimple_lexize`. Analysis cannot resolve an
 omitted callback or detect a collision with an omitted builtin template
 ([#1241](https://github.com/kazuk/sql-fun/issues/1241)).
 
-Query SQL rendering for this declaration is unsupported. Schema loading
-stops at a subsequent `CREATE TEXT SEARCH DICTIONARY` declaration such as
-the one in `dict_int`, `dict_xsyn`, or `unaccent`.
-[Dictionary declaration support (#1240)](https://github.com/kazuk/sql-fun/issues/1240).
+Query SQL rendering for template declarations is unsupported.
+
+## PostgreSQL text search dictionaries
+
+Schema analysis registers valid `CREATE TEXT SEARCH DICTIONARY` declarations
+from project schemas and extension scripts. An unqualified dictionary is
+created in the first existing schema in the active search path. An
+unqualified `TEMPLATE` reference is resolved through the active search path,
+excluding the temporary schema. A qualified reference selects the named
+schema. Every `TEMPLATE` occurrence must resolve, and the last occurrence
+selects the template. Dictionary names must be unique within their schema.
+
+A template without `INIT` rejects dictionary options. For a template with
+`INIT`, PostgreSQL checks the remaining options when it runs that callback.
+Offline analysis records the dictionary and its template without running the
+callback or checking files it may load. References to builtin templates
+omitted from the shipped catalog still fail to resolve
+([#1241](https://github.com/kazuk/sql-fun/issues/1241)).
+
+Query SQL rendering for dictionary declarations is unsupported.
 
 ## PostgreSQL procedural language declarations
 

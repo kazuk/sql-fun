@@ -23,6 +23,7 @@ mod search_path;
 mod sequence_info;
 mod source;
 mod table_info;
+mod text_search_dictionary_info;
 mod text_search_template_info;
 mod transformation_info;
 mod trigger_info;
@@ -54,6 +55,7 @@ pub use self::{
         MutSourcePathWithSpan, SourceAccessService,
     },
     table_info::{TableInfoRead, TableInfoWrite},
+    text_search_dictionary_info::{TextSearchDictionaryInfoRead, TextSearchDictionaryInfoWrite},
     text_search_template_info::{TextSearchTemplateInfoRead, TextSearchTemplateInfoWrite},
     transformation_info::{TransformationInfoRead, TransformationInfoWrite},
     trigger_info::{TriggerInfoRead, TriggerInfoWrite},
@@ -102,6 +104,7 @@ pub trait ParseContext:
     + TransformationInfoWrite
     + AccessMethodInfoWrite
     + TextSearchTemplateInfoWrite
+    + TextSearchDictionaryInfoWrite
     + OperatorFamilyInfoWrite
     + TriggerInfoWrite
     + SequenceInfoWrite

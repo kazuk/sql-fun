@@ -150,6 +150,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [invalid_cast_declaration](invalid_cast_declaration.md)
 - [invalid_language_declaration](invalid_language_declaration.md)
 - [invalid_operator_declaration](invalid_operator_declaration.md)
+- [invalid_text_search_dictionary](invalid_text_search_dictionary.md)
 - [invalid_text_search_template](invalid_text_search_template.md)
 - [implicit_cast_not_found](implicit_cast_not_found.md)
 - [incompatible_case_values](incompatible_case_values.md)

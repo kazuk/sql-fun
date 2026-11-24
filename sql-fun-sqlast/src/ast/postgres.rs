@@ -18,11 +18,11 @@ use crate::{
         create_language::CreateLanguage,
         create_operator::AlterOperator,
         create_operator_class::CreateOperatorClass,
-        create_text_search_template::CreateTextSearchTemplate,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         do_statement::DoStatement,
         document::DocumentExpr,
         operator_family::{AlterOperatorFamily, CreateOperatorFamily},
+        text_search_declaration::TextSearchDeclaration,
     },
     error::AnalysisError,
     stack::with_stack,
@@ -876,8 +876,12 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                     return Ok(Self::CreateOperator(operator));
                 }
                 Some(syn::ObjectType::ObjectTstemplate) => {
-                    let template = CreateTextSearchTemplate::try_from_with_tokens(&define, tokens)?;
+                    let template = TextSearchDeclaration::try_from_with_tokens(&define, tokens)?;
                     return Ok(Self::CreateTextSearchTemplate(template));
+                }
+                Some(syn::ObjectType::ObjectTsdictionary) => {
+                    let dictionary = TextSearchDeclaration::try_from_with_tokens(&define, tokens)?;
+                    return Ok(Self::CreateTextSearchDictionary(dictionary));
                 }
                 Some(syn::ObjectType::ObjectType) => {
                     let create_type = CreateType::try_from_with_tokens(&define, tokens)?;

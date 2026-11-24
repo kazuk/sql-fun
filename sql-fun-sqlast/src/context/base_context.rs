@@ -531,6 +531,7 @@ impl crate::context::ForeignDataWrapperInfoRead for BaseContext {}
 
 impl crate::context::AccessMethodInfoRead for BaseContext {}
 impl crate::context::TextSearchTemplateInfoRead for BaseContext {}
+impl crate::context::TextSearchDictionaryInfoRead for BaseContext {}
 impl crate::context::OperatorFamilyInfoRead for BaseContext {
     fn operator_family(&self, key: &OperatorFamilyKey) -> Option<&OperatorFamily> {
         self.operator_families.get(key)

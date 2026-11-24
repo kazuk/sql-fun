@@ -866,6 +866,36 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL text search dictionary declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTextSearchDictionary": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidTextSearchDictionary"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "A CREATE CAST declaration cannot be applied.",
                   "type": "object",
                   "properties": {
@@ -6358,6 +6388,36 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid PostgreSQL text search dictionary declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTextSearchDictionary": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidTextSearchDictionary"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "A CREATE CAST declaration cannot be applied.",
                   "type": "object",
                   "properties": {
@@ -11738,6 +11798,36 @@
                   },
                   "required": [
                     "InvalidTextSearchTemplate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Invalid PostgreSQL text search dictionary declaration.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTextSearchDictionary": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/StringSpan"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "InvalidTextSearchDictionary"
                   ],
                   "additionalProperties": false
                 },

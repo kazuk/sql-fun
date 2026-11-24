@@ -26,6 +26,7 @@ pub(crate) mod conflict_masters;
 mod constraint;
 mod create_access_method;
 mod create_operator_class;
+mod create_text_search_dictionary;
 mod create_text_search_template;
 pub use create_operator_class::{ClassFailure, CreateOperatorClass};
 pub(crate) mod operator_family;
@@ -126,6 +127,7 @@ pub use self::{
     create_access_method::{AccessMethodDefinition, CreateAccessMethod},
     create_foreign_data_wrapper::{CreateForeignDataWrapper, FdwRoutineBinding, FdwRoutineOutcome},
     create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
+    create_text_search_dictionary::{CreateTextSearchDictionary, TextSearchDictionaryDefinition},
     create_text_search_template::{
         CreateTextSearchTemplate, TextSearchTemplateDefinition, TextSearchTemplateFailure,
         TextSearchTemplateOption,
@@ -370,6 +372,8 @@ pub enum SemAst {
     CreateAccessMethod(Box<CreateAccessMethod>),
     /// PostgreSQL text search template declaration.
     CreateTextSearchTemplate(Box<CreateTextSearchTemplate>),
+    /// PostgreSQL CREATE TEXT SEARCH DICTIONARY declaration.
+    CreateTextSearchDictionary(Box<CreateTextSearchDictionary>),
     /// PostgreSQL operator class declaration.
     CreateOperatorClass(Box<CreateOperatorClass>),
     /// PostgreSQL operator family declaration.

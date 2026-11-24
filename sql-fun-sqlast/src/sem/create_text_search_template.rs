@@ -4,15 +4,15 @@ use crate::{
     AstAndContextPair, StringSpan,
     ast::{
         Literal, Name,
-        create_text_search_template::{
-            CreateTextSearchTemplate as Syntax, TemplateOption, TemplateOptionValue,
+        text_search_declaration::{
+            TextSearchDeclaration as Syntax, TextSearchOption, TextSearchOptionValue,
         },
     },
     context::ParseContext,
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, SemAst, TypeReference,
-        search_path::postgres_creation_schema,
+        search_path::{postgres_creation_schema, postgres_local_name},
     },
 };
 
@@ -329,14 +329,15 @@ fn finish_definition(
 }
 
 fn analyze_option(
-    option: &TemplateOption,
+    option: &TextSearchOption,
     context: &impl ParseContext,
 ) -> (TextSearchTemplateOption, Option<ValidationError>) {
     let (requested, callback) = match option.value() {
-        Some(TemplateOptionValue::Name(name)) => {
-            (Some(name.parts().to_vec()), local_name(name, context))
-        }
-        Some(TemplateOptionValue::Literal(Literal::String(name))) => (
+        Some(TextSearchOptionValue::Name(name)) => (
+            Some(name.parts().to_vec()),
+            postgres_local_name(name, context),
+        ),
+        Some(TextSearchOptionValue::Literal(Literal::String(name))) => (
             Some(vec![name.clone()]),
             Some(FullName::from_local_name(name)),
         ),
@@ -404,7 +405,7 @@ fn bind_callback(
 }
 
 fn creation_name(written: &Name, context: &impl ParseContext) -> Result<FullName, ValidationError> {
-    let name = local_name(written, context).ok_or_else(|| ValidationError {
+    let name = postgres_local_name(written, context).ok_or_else(|| ValidationError {
         failure: Failure::InvalidTarget,
         message: "invalid text search template name for this database".to_owned(),
         location: None,
@@ -420,15 +421,4 @@ fn creation_name(written: &Name, context: &impl ParseContext) -> Result<FullName
         ),
         location: None,
     })
-}
-
-fn local_name(name: &Name, context: &impl ParseContext) -> Option<FullName> {
-    match name.parts() {
-        [local] => Some(FullName::from_local_name(local)),
-        [schema, local] => Some(FullName::with_schema(schema, local)),
-        [database, schema, local] if context.metadata().database_name() == Some(database) => {
-            Some(FullName::with_schema(schema, local))
-        }
-        _ => None,
-    }
 }

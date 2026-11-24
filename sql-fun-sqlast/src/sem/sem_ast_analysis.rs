@@ -10,11 +10,11 @@ use crate::{
         CreateDomain, CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction,
         CreateIndex, CreateLanguage, CreateOperator, CreateOperatorClass, CreateOperatorFamily,
         CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs,
-        CreateTextSearchTemplate, CreateTrigger, CreateView, DeleteStatement, DropFunction,
-        DropRule, DropTable, DropTrigger, DropView, EngineFeatureValidation,
-        ExtensionMembershipChange, InsertStatement, MergeStatement, ObjectPrivilegeChange,
-        ParameterConstraints, RelationAlteration, RoleMembershipDeclaration, SelectStatement,
-        SemAst, UpdateStatement, VariableSet, cast::CreateCast,
+        CreateTextSearchDictionary, CreateTextSearchTemplate, CreateTrigger, CreateView,
+        DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
+        EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
+        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
+        SelectStatement, SemAst, UpdateStatement, VariableSet, cast::CreateCast,
     },
 };
 
@@ -50,6 +50,10 @@ impl SemAst {
             AstStatementNode::CreateTextSearchTemplate(ast) => {
                 CreateTextSearchTemplate::analyze(ast, context)
                     .map(|statement| Self::CreateTextSearchTemplate(Box::new(statement)))
+            }
+            AstStatementNode::CreateTextSearchDictionary(ast) => {
+                CreateTextSearchDictionary::analyze(ast, context)
+                    .map(|statement| Self::CreateTextSearchDictionary(Box::new(statement)))
             }
             AstStatementNode::AlterOperator(ast) => Ok(Self::AlterOperator(Box::new(
                 AlterOperator::analyze(ast, context)?,
@@ -288,6 +292,9 @@ impl SemAst {
             AstStatementNode::Domain(domain) => CreateDomain::from_ast_and_apply(domain, context),
             AstStatementNode::CreateTextSearchTemplate(ast) => {
                 CreateTextSearchTemplate::analyze_and_apply(ast, context)
+            }
+            AstStatementNode::CreateTextSearchDictionary(ast) => {
+                CreateTextSearchDictionary::analyze_and_apply(ast, context)
             }
             AstStatementNode::CreateAccessMethod(ast) => {
                 CreateAccessMethod::analyze_and_apply(ast, context)

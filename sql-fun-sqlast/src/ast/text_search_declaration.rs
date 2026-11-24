@@ -1,4 +1,4 @@
-//! Converts PostgreSQL text search template declarations before catalog resolution.
+//! Converts PostgreSQL text search declarations before catalog resolution.
 
 use crate::{
     StringSpan,
@@ -12,41 +12,41 @@ use crate::{
 use ::sql_fun_core::IVec;
 
 #[derive(Clone, Debug)]
-pub(crate) struct CreateTextSearchTemplate {
+pub(crate) struct TextSearchDeclaration {
     name: Name,
-    options: Vec<TemplateOption>,
+    options: Vec<TextSearchOption>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct TemplateOption {
+pub(crate) struct TextSearchOption {
     key: String,
-    value: Option<TemplateOptionValue>,
+    value: Option<TextSearchOptionValue>,
     // Relative to the statement being converted.
     location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum TemplateOptionValue {
+pub(crate) enum TextSearchOptionValue {
     Name(Name),
     Literal(Literal),
 }
 
-impl CreateTextSearchTemplate {
+impl TextSearchDeclaration {
     pub(crate) const fn name(&self) -> &Name {
         &self.name
     }
 
-    pub(crate) fn options(&self) -> &[TemplateOption] {
+    pub(crate) fn options(&self) -> &[TextSearchOption] {
         &self.options
     }
 }
 
-impl TemplateOption {
+impl TextSearchOption {
     pub(crate) fn key(&self) -> &str {
         &self.key
     }
 
-    pub(crate) const fn value(&self) -> Option<&TemplateOptionValue> {
+    pub(crate) const fn value(&self) -> Option<&TextSearchOptionValue> {
         self.value.as_ref()
     }
 
@@ -55,7 +55,7 @@ impl TemplateOption {
     }
 }
 
-impl TryFromWithTokens<&syn::DefineStmt> for CreateTextSearchTemplate {
+impl TryFromWithTokens<&syn::DefineStmt> for TextSearchDeclaration {
     type Error = AnalysisError;
 
     fn try_from_with_tokens(
@@ -68,7 +68,7 @@ impl TryFromWithTokens<&syn::DefineStmt> for CreateTextSearchTemplate {
             .as_inner()
             .unwrap_or_default()
             .iter()
-            .map(|node| TemplateOption::try_from_with_tokens(node, tokens))
+            .map(|node| TextSearchOption::try_from_with_tokens(node, tokens))
             .collect::<Result<_, _>>()?;
         Ok(Self { name, options })
     }
@@ -79,7 +79,7 @@ mod test_template_conversion {
     use crate::{
         ast::{
             Dialect, Literal, StatementKind, StatementNode,
-            create_text_search_template::TemplateOptionValue,
+            text_search_declaration::TextSearchOptionValue,
         },
         parse_statements,
     };
@@ -144,8 +144,8 @@ mod test_template_conversion {
             assert_eq!(location, &crate::StringSpan::new(offset, token.len()));
             remaining_sql = suffix;
             match option.value.as_ref().unwrap() {
-                TemplateOptionValue::Name(name) => assert_eq!(name.0, expected_value),
-                TemplateOptionValue::Literal(Literal::String(name)) => {
+                TextSearchOptionValue::Name(name) => assert_eq!(name.0, expected_value),
+                TextSearchOptionValue::Literal(Literal::String(name)) => {
                     assert_eq!([name.as_str()], expected_value);
                 }
                 value => panic!("unexpected template option value: {value:?}"),
@@ -154,28 +154,25 @@ mod test_template_conversion {
     }
 }
 
-impl TryFromWithTokens<&syn::Node> for TemplateOption {
+impl TryFromWithTokens<&syn::Node> for TextSearchOption {
     type Error = AnalysisError;
 
     fn try_from_with_tokens(
         node: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let option = required(node.as_def_elem().as_inner(), "text search template option")?;
+        let option = required(node.as_def_elem().as_inner(), "text search option")?;
         let value = option
             .get_arg()
             .as_inner()
             .map(|node| {
                 if let Some(typ) = node.as_type_name().as_inner() {
-                    Name::try_from(typ.get_names()).map(TemplateOptionValue::Name)
+                    Name::try_from(typ.get_names()).map(TextSearchOptionValue::Name)
                 } else if let Some(list) = node.as_list().as_inner() {
-                    Name::try_from(list.get_items()).map(TemplateOptionValue::Name)
+                    Name::try_from(list.get_items()).map(TextSearchOptionValue::Name)
                 } else {
-                    required(
-                        Option::<Literal>::from(&node),
-                        "text search template option value",
-                    )
-                    .map(TemplateOptionValue::Literal)
+                    required(Option::<Literal>::from(&node), "text search option value")
+                        .map(TextSearchOptionValue::Literal)
                 }
             })
             .transpose()?;
@@ -184,5 +181,47 @@ impl TryFromWithTokens<&syn::Node> for TemplateOption {
             value,
             location: anchored_token_span(option.get_location(), tokens),
         })
+    }
+}
+
+#[cfg(test)]
+mod test_dictionary_conversion {
+    use crate::{
+        ast::{
+            Dialect, Literal, StatementKind, StatementNode,
+            text_search_declaration::TextSearchOptionValue,
+        },
+        parse_statements,
+    };
+
+    #[test]
+    fn retains_dictionary_option_order_values_and_locations() {
+        let sql = r#"CREATE TEXT SEARCH DICTIONARY "Search".demo (RULES = 'unaccent', TEMPLATE = "Search".t, TEMPLATE = 'other')"#;
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        assert_eq!(statement.kind(), StatementKind::CreateTextSearchDictionary);
+        let StatementNode::CreateTextSearchDictionary(dictionary) = statement.node() else {
+            panic!("expected CREATE TEXT SEARCH DICTIONARY");
+        };
+        assert_eq!(dictionary.name().parts(), &["Search", "demo"]);
+        let [rules, qualified, quoted] = dictionary.options() else {
+            panic!("expected three options");
+        };
+        assert_eq!(rules.key(), "rules");
+        assert_eq!(qualified.key(), "template");
+        assert_eq!(quoted.key(), "template");
+        assert!(
+            matches!(rules.value(), Some(TextSearchOptionValue::Literal(Literal::String(value))) if value == "unaccent")
+        );
+        assert!(
+            matches!(qualified.value(), Some(TextSearchOptionValue::Name(name)) if name.parts() == ["Search", "t"])
+        );
+        assert!(
+            matches!(quoted.value(), Some(TextSearchOptionValue::Literal(Literal::String(value))) if value == "other")
+        );
+        assert_eq!(rules.location().unwrap().get_from(sql), Some("RULES"));
+        assert!(qualified.location().unwrap().offset() < quoted.location().unwrap().offset());
     }
 }

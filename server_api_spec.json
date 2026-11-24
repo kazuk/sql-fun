@@ -956,6 +956,26 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "PostgreSQL DO has an opaque body with no modeled catalog effects.",
+                  "type": "object",
+                  "properties": {
+                    "OpaqueDoBody": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/StringSpan"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "OpaqueDoBody"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -6428,6 +6448,26 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "PostgreSQL DO has an opaque body with no modeled catalog effects.",
+                  "type": "object",
+                  "properties": {
+                    "OpaqueDoBody": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/StringSpan"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "OpaqueDoBody"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "ALTER OWNER target or role lookup failed.",
                   "type": "object",
                   "properties": {
@@ -11788,6 +11828,26 @@
                   },
                   "required": [
                     "IgnoredDomainCast"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "PostgreSQL DO has an opaque body with no modeled catalog effects.",
+                  "type": "object",
+                  "properties": {
+                    "OpaqueDoBody": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/StringSpan"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "OpaqueDoBody"
                   ],
                   "additionalProperties": false
                 },

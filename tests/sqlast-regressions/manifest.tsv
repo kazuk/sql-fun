@@ -104,4 +104,4 @@ alter-function-parallel	project	alter-function-parallel.sql	7	17,18
 schema-base-types	project	schema-base-types.sql	4	17,18
 operator-classes	project	operator-classes.sql	13	17,18
 text-search-templates	project	text-search-templates.sql	9	17,18
-do-statements	project	do-statements.sql	3	17,18
+do-statements	project	do-statements.sql	5	17,18

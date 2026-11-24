@@ -56,5 +56,27 @@
         }
       ]
     }
+  },
+  {
+    "name": "implicit_language_warns",
+    "sql": "DO $$ BEGIN NULL; END $$",
+    "expected": {
+      "diagnostics": [
+        "opaque_do_body",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "explicit_language_warns_without_body_analysis",
+    "sql": "/* leading comment */ DO LANGUAGE example_language 'opaque payload'",
+    "expected": {
+      "diagnostics": [
+        "opaque_do_body",
+        "query_deparse"
+      ],
+      "columns": []
+    }
   }
 ]

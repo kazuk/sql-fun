@@ -6,14 +6,15 @@ use crate::{
     context::ParseContext,
     sem::{
         AlterFunctionParallel, AlterOperator, AlterOperatorFamily, AlterOwner, AlterSequence,
-        AnalysisError, Comment, CreateAccessMethod, CreateCompositeType, CreateDomain, CreateEnum,
-        CreateExtension, CreateForeignDataWrapper, CreateFunction, CreateIndex, CreateLanguage,
-        CreateOperator, CreateOperatorClass, CreateOperatorFamily, CreateRule, CreateSchema,
-        CreateSequence, CreateTable, CreateTableAs, CreateTextSearchTemplate, CreateTrigger,
-        CreateView, DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
-        EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
-        ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
-        SelectStatement, SemAst, UpdateStatement, VariableSet, cast::CreateCast,
+        AnalysisError, AnalysisProblem, Comment, CreateAccessMethod, CreateCompositeType,
+        CreateDomain, CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction,
+        CreateIndex, CreateLanguage, CreateOperator, CreateOperatorClass, CreateOperatorFamily,
+        CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs,
+        CreateTextSearchTemplate, CreateTrigger, CreateView, DeleteStatement, DropFunction,
+        DropRule, DropTable, DropTrigger, DropView, EngineFeatureValidation,
+        ExtensionMembershipChange, InsertStatement, MergeStatement, ObjectPrivilegeChange,
+        ParameterConstraints, RelationAlteration, RoleMembershipDeclaration, SelectStatement,
+        SemAst, UpdateStatement, VariableSet, cast::CreateCast,
     },
 };
 
@@ -77,7 +78,13 @@ impl SemAst {
                     Self::CreateCast(Box::new(cast))
                 })),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
-            AstStatementNode::Do(_) => Ok(Self::Do),
+            AstStatementNode::Do(ast) => {
+                let span = ast.keyword_span.map(|span| {
+                    ::sql_fun_core::analysis_problem::StringSpan::new(span.offset(), span.len())
+                });
+                context.report_analysis_problem(AnalysisProblem::OpaqueDoBody(span))?;
+                Ok(Self::Do)
+            }
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
             }
@@ -368,7 +375,6 @@ impl SemAst {
     ///
     /// # Panics
     ///
-    /// DO interpretation is unimplemented (#1250).
     /// CREATE TRIGGER analysis is not implemented yet (#602 / #555).
     /// ALTER DEFAULT PRIVILEGES and CREATE FOREIGN TABLE interpretation remains
     /// unimplemented (#955 / #956), after syntax-version checks succeed.

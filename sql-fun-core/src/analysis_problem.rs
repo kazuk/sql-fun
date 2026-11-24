@@ -401,6 +401,8 @@ pub enum AnalysisProblem {
     InvalidLanguageDeclaration(String, Option<StringSpan>),
     /// A domain cast is recorded but ignored by PostgreSQL coercion.
     IgnoredDomainCast(String, Option<StringSpan>),
+    /// PostgreSQL DO has an opaque body with no modeled catalog effects.
+    OpaqueDoBody(Option<StringSpan>),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid or unresolved PostgreSQL privilege declaration.
@@ -579,9 +581,10 @@ impl AnalysisProblem {
         match self {
             Self::AlterColumn(problem) => problem.reason().severity(),
             Self::Index(problem) => problem.severity(),
-            Self::Lint(_) | Self::UnreachableCoalesceArgument(..) | Self::IgnoredDomainCast(..) => {
-                DiagnosticSeverity::Warning
-            }
+            Self::Lint(_)
+            | Self::UnreachableCoalesceArgument(..)
+            | Self::IgnoredDomainCast(..)
+            | Self::OpaqueDoBody(_) => DiagnosticSeverity::Warning,
             _ => DiagnosticSeverity::Error,
         }
     }
@@ -825,6 +828,7 @@ impl AnalysisProblem {
             Self::InvalidCastDeclaration(..) => "invalid_cast_declaration",
             Self::InvalidLanguageDeclaration(..) => "invalid_language_declaration",
             Self::IgnoredDomainCast(..) => "ignored_domain_cast",
+            Self::OpaqueDoBody(_) => "opaque_do_body",
             Self::InvalidBaseType(_) => "base_type_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
@@ -892,7 +896,8 @@ impl AnalysisProblem {
             | Self::InvalidOperatorDeclaration(_, span)
             | Self::InvalidLanguageDeclaration(_, span)
             | Self::InvalidCastDeclaration(_, span)
-            | Self::IgnoredDomainCast(_, span) => *span,
+            | Self::IgnoredDomainCast(_, span)
+            | Self::OpaqueDoBody(span) => *span,
             Self::NameResolution(problem) => problem.statement_relative_span(),
             Self::CallArgument(problem) => problem.statement_relative_span(),
             _ => None,
@@ -930,6 +935,13 @@ impl AnalysisProblem {
             | Self::InvalidBaseType(_)
             | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
+            }
+            Self::OpaqueDoBody(span) => {
+                let mut metadata = DiagnosticMetadata::from(self.diagnostic_message());
+                if let Some(span) = span {
+                    metadata = metadata.with_label("opaque DO statement", *span);
+                }
+                metadata
             }
             Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
             Self::Index(problem) => problem.render_metadata(),
@@ -1067,6 +1079,7 @@ impl DiagnosticMessage for AnalysisProblem {
             | Self::InvalidCastDeclaration(message, _)
             | Self::IgnoredDomainCast(message, _)
             | Self::InvalidOperatorFamilyDeclaration(message) => message.clone(),
+            Self::OpaqueDoBody(_) => "The DO body is opaque. sql-fun does not analyze or execute it. Subsequent analysis does not reflect its catalog effects.".to_owned(),
             Self::InvalidBaseType(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),
             Self::Privilege(problem) => problem.diagnostic_message(),

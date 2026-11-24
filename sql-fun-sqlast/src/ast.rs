@@ -342,6 +342,10 @@ pub(crate) enum StatementNode {
 }
 
 impl StatementNode {
+    fn do_statement(value: do_statement::DoStatement) -> Self {
+        Self::Do(Box::new(value))
+    }
+
     const fn notify(value: Notify) -> Self {
         Self::Notify(value)
     }

@@ -787,9 +787,8 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             return Ok(Self::foreign_table(value));
         }
         if let Some(statement) = value.as_do_stmt().as_inner() {
-            return DoStatement::try_from_with_tokens(&statement, tokens)
-                .map(Box::new)
-                .map(Self::Do);
+            let statement = DoStatement::try_from_with_tokens(&statement, tokens)?;
+            return Ok(Self::do_statement(statement));
         }
         if let Some(notify) = value.as_notify_stmt().as_inner() {
             let notify = Notify::try_from(&notify)?;

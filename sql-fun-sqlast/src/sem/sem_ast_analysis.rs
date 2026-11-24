@@ -77,7 +77,7 @@ impl SemAst {
                     Self::CreateCast(Box::new(cast))
                 })),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
-            AstStatementNode::Do(_) => todo!("DO semantic interpretation (#1250)"),
+            AstStatementNode::Do(_) => Ok(Self::Do),
             AstStatementNode::Notify(_) => {
                 todo!("standalone NOTIFY semantic analysis (#1098)")
             }

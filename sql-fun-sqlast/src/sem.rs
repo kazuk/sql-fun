@@ -354,6 +354,8 @@ impl From<CreateIndex> for ImplicitChange {
 /// Semantic AST for top-level statement
 #[derive(Debug, Clone)]
 pub enum SemAst {
+    /// A PostgreSQL DO statement with opaque contents and no modeled catalog effects.
+    Do,
     /// An analyzed PostgreSQL operator declaration.
     CreateOperator(Box<CreateOperator>),
     /// A PostgreSQL cast declaration.

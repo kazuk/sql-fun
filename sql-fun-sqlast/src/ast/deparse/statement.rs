@@ -36,6 +36,9 @@ impl SqlEmit for StatementNode {
             Self::EnumType(v) => v.emit(writer),
             Self::CreateOperator(operator) => operator.emit(writer),
             Self::CreateTextSearchTemplate(_) => writer.unsupported("CREATE TEXT SEARCH TEMPLATE"),
+            Self::CreateTextSearchDictionary(_) => {
+                writer.unsupported("CREATE TEXT SEARCH DICTIONARY")
+            }
             Self::AlterOperator(operator) => operator.emit(writer),
             Self::CreateCast(_) => writer.unsupported("CREATE CAST"),
             Self::CreateLanguage(_) => writer.unsupported("CREATE LANGUAGE"),

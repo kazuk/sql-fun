@@ -395,6 +395,8 @@ pub enum AnalysisProblem {
     InvalidOperatorDeclaration(String, Option<StringSpan>),
     /// Invalid PostgreSQL text search template declaration.
     InvalidTextSearchTemplate(String, Option<StringSpan>),
+    /// Invalid PostgreSQL text search dictionary declaration.
+    InvalidTextSearchDictionary(String, Option<StringSpan>),
     /// A CREATE CAST declaration cannot be applied.
     InvalidCastDeclaration(String, Option<StringSpan>),
     /// Invalid PostgreSQL language declaration.
@@ -824,6 +826,7 @@ impl AnalysisProblem {
             Self::ForeignDataWrapper(_) => "foreign_data_wrapper_invalid_definition",
             Self::InvalidFunctionSignature(_) => "invalid_function_signature",
             Self::InvalidTextSearchTemplate(..) => "invalid_text_search_template",
+            Self::InvalidTextSearchDictionary(..) => "invalid_text_search_dictionary",
             Self::InvalidOperatorDeclaration(..) => "invalid_operator_declaration",
             Self::InvalidCastDeclaration(..) => "invalid_cast_declaration",
             Self::InvalidLanguageDeclaration(..) => "invalid_language_declaration",
@@ -893,6 +896,7 @@ impl AnalysisProblem {
         match self {
             Self::Lint(problem) => problem.span(),
             Self::InvalidTextSearchTemplate(_, span)
+            | Self::InvalidTextSearchDictionary(_, span)
             | Self::InvalidOperatorDeclaration(_, span)
             | Self::InvalidLanguageDeclaration(_, span)
             | Self::InvalidCastDeclaration(_, span)
@@ -928,6 +932,7 @@ impl AnalysisProblem {
             | Self::ForeignDataWrapper(_)
             | Self::InvalidFunctionSignature(_)
             | Self::InvalidTextSearchTemplate(..)
+            | Self::InvalidTextSearchDictionary(..)
             | Self::InvalidOperatorDeclaration(..)
             | Self::InvalidLanguageDeclaration(..)
             | Self::InvalidCastDeclaration(..)
@@ -1074,6 +1079,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::ForeignDataWrapper(problem) => problem.diagnostic_message(),
             Self::InvalidFunctionSignature(problem) => problem.diagnostic_message(),
             Self::InvalidTextSearchTemplate(message, _)
+            | Self::InvalidTextSearchDictionary(message, _)
             | Self::InvalidOperatorDeclaration(message, _)
             | Self::InvalidLanguageDeclaration(message, _)
             | Self::InvalidCastDeclaration(message, _)

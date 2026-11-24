@@ -14,7 +14,6 @@ pub(crate) mod create_cast;
 pub(crate) mod create_language;
 pub(crate) mod create_operator;
 pub(crate) mod create_operator_class;
-pub(crate) mod create_text_search_template;
 mod create_type;
 pub(crate) mod ddl;
 mod default_privileges;
@@ -40,6 +39,7 @@ mod rows_from;
 mod rule;
 #[cfg(feature = "sqlite")]
 mod sqlite;
+pub(crate) mod text_search_declaration;
 mod traversal;
 mod trigger;
 pub(crate) mod validation;
@@ -306,7 +306,8 @@ pub(crate) enum StatementNode {
     VariableSet(VariableSet),
     EnumType(EnumType),
     CreateOperator(CreateOperator),
-    CreateTextSearchTemplate(create_text_search_template::CreateTextSearchTemplate),
+    CreateTextSearchTemplate(text_search_declaration::TextSearchDeclaration),
+    CreateTextSearchDictionary(text_search_declaration::TextSearchDeclaration),
     AlterOperator(Box<AlterOperator>),
     #[allow(dead_code, reason = "CREATE CAST interpretation is deferred to #1237")]
     CreateCast(Box<create_cast::CreateCast>),

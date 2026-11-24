@@ -547,6 +547,15 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::context::TextSearchDictionaryInfoRead for $context {
+            fn text_search_dictionary(
+                &self,
+                name: &crate::names::FullName,
+            ) -> Option<&crate::sem::TextSearchDictionaryDefinition> {
+                self.$catalog().text_search_dictionary(name)
+            }
+        }
+
         impl crate::context::TriggerInfoRead for $context {
             fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
                 self.$catalog().trigger_is_cancelled(identity)

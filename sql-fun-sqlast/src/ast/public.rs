@@ -159,6 +159,8 @@ pub enum StatementKind {
     CreateOperator,
     /// PostgreSQL CREATE TEXT SEARCH TEMPLATE.
     CreateTextSearchTemplate,
+    /// PostgreSQL CREATE TEXT SEARCH DICTIONARY declaration.
+    CreateTextSearchDictionary,
     /// ALTER OPERATOR SET.
     AlterOperator,
     /// A PostgreSQL cast declaration.
@@ -234,6 +236,7 @@ impl std::fmt::Display for StatementKind {
             Self::EnumType => "CREATE TYPE AS ENUM",
             Self::CreateOperator => "CREATE OPERATOR",
             Self::CreateTextSearchTemplate => "CREATE TEXT SEARCH TEMPLATE",
+            Self::CreateTextSearchDictionary => "CREATE TEXT SEARCH DICTIONARY",
             Self::AlterOperator => "ALTER OPERATOR",
             Self::CreateCast => "CREATE CAST",
             Self::CreateLanguage => "CREATE LANGUAGE",
@@ -457,6 +460,7 @@ impl StatementNode {
             Self::EnumType(_) => StatementKind::enum_type(),
             Self::CreateOperator(_) => StatementKind::CreateOperator,
             Self::CreateTextSearchTemplate(_) => StatementKind::CreateTextSearchTemplate,
+            Self::CreateTextSearchDictionary(_) => StatementKind::CreateTextSearchDictionary,
             Self::AlterOperator(_) => StatementKind::AlterOperator,
             Self::CreateCast(_) => StatementKind::CreateCast,
             Self::CreateLanguage(_) => StatementKind::CreateLanguage,

@@ -1,5 +1,5 @@
 use crate::{
-    ast::Dialect,
+    ast::{Dialect, Name},
     context::BaseParseContext,
     names::{FullName, OperatorName, SchemaName},
 };
@@ -136,4 +136,18 @@ where
     expand_search_path_inst(context, &name.full_name()?, |key| {
         getter(&OperatorName::from_full_name(key))
     })
+}
+
+pub(crate) fn postgres_local_name(
+    name: &Name,
+    context: &impl BaseParseContext,
+) -> Option<FullName> {
+    match name.parts() {
+        [local] => Some(FullName::from_local_name(local)),
+        [schema, local] => Some(FullName::with_schema(schema, local)),
+        [database, schema, local] if context.metadata().database_name() == Some(database) => {
+            Some(FullName::with_schema(schema, local))
+        }
+        _ => None,
+    }
 }

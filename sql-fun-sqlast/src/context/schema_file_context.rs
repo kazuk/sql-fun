@@ -51,9 +51,9 @@ use crate::{
         OperatorFamilyKey, OperatorIdentity, OperatorLinks, OverloadVariant as SemOverloadVariant,
         OwnedObjectDefinition, OwnershipIdentity, ParameterConstraints, Role,
         RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr, SourcePathWithSpan,
-        TextSearchTemplateDefinition, TriggerIdentity, TypeReference, VariableSet,
-        ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport, ViewTombstone,
-        ViewUpdateSupport,
+        TextSearchDictionaryDefinition, TextSearchTemplateDefinition, TriggerIdentity,
+        TypeReference, VariableSet, ViewDeleteSupport, ViewInsertSupport, ViewLike,
+        ViewMergeSupport, ViewTombstone, ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
             lookup_collation as conflict_masters_lookup_collation,
@@ -101,6 +101,7 @@ pub(super) struct SchemaCatalog {
     base: FrozenBaseContext,
     access_methods: std::collections::HashMap<String, AccessMethodDefinition>,
     text_search_templates: std::collections::HashMap<FullName, TextSearchTemplateDefinition>,
+    text_search_dictionarys: std::collections::HashMap<FullName, TextSearchDictionaryDefinition>,
     operator_classes: Vec<OperatorClassDefinition>,
     operator_families: std::collections::HashMap<OperatorFamilyKey, OperatorFamily>,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
@@ -180,6 +181,7 @@ impl SchemaFileContext {
                 base: base.clone(),
                 access_methods: Default::default(),
                 text_search_templates: Default::default(),
+                text_search_dictionarys: Default::default(),
                 operator_classes: Default::default(),
                 operator_families: Default::default(),
                 triggers: std::collections::HashMap::new(),
@@ -744,6 +746,16 @@ impl crate::context::TextSearchTemplateInfoRead for SchemaCatalog {
     }
 }
 
+impl crate::context::TextSearchDictionaryInfoRead for SchemaCatalog {
+    fn text_search_dictionary(&self, name: &FullName) -> Option<&TextSearchDictionaryDefinition> {
+        if let Some(definition) = self.text_search_dictionarys.get(name) {
+            Some(definition)
+        } else {
+            self.base.text_search_dictionary(name)
+        }
+    }
+}
+
 impl crate::context::AccessMethodInfoWrite for SchemaFileContext {
     fn register_access_method(mut self, definition: &AccessMethodDefinition) -> Self {
         self.catalog
@@ -757,6 +769,18 @@ impl crate::context::TextSearchTemplateInfoWrite for SchemaFileContext {
     fn register_text_search_template(mut self, definition: &TextSearchTemplateDefinition) -> Self {
         self.catalog
             .text_search_templates
+            .insert(definition.name().to_owned(), definition.clone());
+        self
+    }
+}
+
+impl crate::context::TextSearchDictionaryInfoWrite for SchemaFileContext {
+    fn register_text_search_dictionary(
+        mut self,
+        definition: &TextSearchDictionaryDefinition,
+    ) -> Self {
+        self.catalog
+            .text_search_dictionarys
             .insert(definition.name().to_owned(), definition.clone());
         self
     }

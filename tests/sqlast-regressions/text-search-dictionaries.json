@@ -1,0 +1,98 @@
+[
+  {
+    "name": "qualified-template-with-opaque-options",
+    "sql": "CREATE TEXT SEARCH DICTIONARY new (Rules = 'unaccent', TEMPLATE = \"Search\".\"Opts\", Custom = 4)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "quoted-template-without-options",
+    "sql": "CREATE TEXT SEARCH DICTIONARY new (TEMPLATE = 'no_options')",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "same-name-in-another-schema",
+    "sql": "CREATE TEXT SEARCH DICTIONARY \"Search\".existing (TEMPLATE = no_options)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-in-same-schema",
+    "sql": "CREATE TEXT SEARCH DICTIONARY existing (TEMPLATE = no_options)",
+    "expected": {
+      "diagnostics": [
+        "conflicting_creation",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-template",
+    "sql": "CREATE TEXT SEARCH DICTIONARY new (Rules = false)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_dictionary",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-template-value",
+    "sql": "CREATE TEXT SEARCH DICTIONARY new (TEMPLATE = 4)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_dictionary",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "unresolved-earlier-template",
+    "sql": "CREATE TEXT SEARCH DICTIONARY new (TEMPLATE = missing, TEMPLATE = no_options)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_dictionary",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "reject-options-without-init",
+    "sql": "CREATE TEXT SEARCH DICTIONARY new (TEMPLATE = no_options, Rules = false)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_dictionary",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-target-schema",
+    "sql": "CREATE TEXT SEARCH DICTIONARY absent.new (TEMPLATE = no_options)",
+    "expected": {
+      "diagnostics": [
+        "invalid_text_search_dictionary",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  }
+]

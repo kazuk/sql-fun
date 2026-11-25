@@ -127,7 +127,9 @@ pub use self::{
     create_access_method::{AccessMethodDefinition, CreateAccessMethod},
     create_foreign_data_wrapper::{CreateForeignDataWrapper, FdwRoutineBinding, FdwRoutineOutcome},
     create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
-    create_text_search_dictionary::{CreateTextSearchDictionary, TextSearchDictionaryDefinition},
+    create_text_search_dictionary::{
+        CreateTextSearchDictionary, TextSearchDictionaryDefinition, TextSearchDictionaryFailure,
+    },
     create_text_search_template::{
         CreateTextSearchTemplate, TextSearchTemplateDefinition, TextSearchTemplateFailure,
         TextSearchTemplateOption,

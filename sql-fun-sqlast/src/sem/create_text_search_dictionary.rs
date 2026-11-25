@@ -34,30 +34,78 @@ impl TextSearchDictionaryDefinition {
     }
 }
 
+/// Reason an analyzed text search dictionary cannot be applied.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextSearchDictionaryFailure {
+    /// The dictionary name is outside the current database.
+    InvalidName,
+    /// The creation schema could not be resolved.
+    MissingCreationSchema,
+    /// No TEMPLATE option was supplied.
+    MissingTemplate,
+    /// A TEMPLATE option did not contain a valid local name.
+    InvalidTemplateName,
+    /// A named template was absent from the catalog.
+    TemplateNotFound,
+    /// The selected template has no INIT callback and cannot accept options.
+    OptionsWithoutInit,
+    /// A dictionary already exists under the resolved name.
+    AlreadyExists,
+}
+
 /// Analyzed PostgreSQL text search dictionary declaration.
 #[derive(Clone, Debug)]
 pub struct CreateTextSearchDictionary {
-    definition: Option<TextSearchDictionaryDefinition>,
+    name: Option<FullName>,
+    template: Option<FullName>,
+    definition: Result<TextSearchDictionaryDefinition, TextSearchDictionaryFailure>,
 }
 
 impl CreateTextSearchDictionary {
+    /// Qualified creation target, when resolved.
+    pub const fn name(&self) -> Option<&FullName> {
+        self.name.as_ref()
+    }
+
+    /// Most recent successfully resolved TEMPLATE binding, if any.
+    pub const fn template(&self) -> Option<&FullName> {
+        self.template.as_ref()
+    }
+
+    /// The reason the declaration cannot be applied, if rejected.
+    pub const fn failure(&self) -> Option<TextSearchDictionaryFailure> {
+        match self.definition {
+            Ok(_) => None,
+            Err(failure) => Some(failure),
+        }
+    }
+
     /// The definition if the declaration is applicable.
     pub const fn definition(&self) -> Option<&TextSearchDictionaryDefinition> {
-        self.definition.as_ref()
+        match &self.definition {
+            Ok(definition) => Some(definition),
+            Err(_) => None,
+        }
     }
 
     pub(crate) fn analyze(
         syntax: &TextSearchDeclaration,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let definition = match resolve_definition(syntax, context) {
-            Ok(definition) => Some(definition),
-            Err(problem) => {
+        let mut name = None;
+        let mut template = None;
+        let definition = match resolve_definition(syntax, context, &mut name, &mut template) {
+            Ok(definition) => Ok(definition),
+            Err((failure, problem)) => {
                 context.report_analysis_problem(*problem)?;
-                None
+                Err(failure)
             }
         };
-        Ok(Self { definition })
+        Ok(Self {
+            name,
+            template,
+            definition,
+        })
     }
 
     pub(crate) fn analyze_and_apply<C: ParseContext>(
@@ -75,12 +123,131 @@ impl CreateTextSearchDictionary {
     }
 }
 
+#[cfg(test)]
+mod applicability_tests {
+    use crate::{
+        ast::Dialect,
+        context::{ParseContext, TextSearchDictionaryInfoRead},
+        names::FullName,
+        parse_statements,
+        sem::{AnalysisProblem, SemAst, TextSearchDictionaryFailure, TypeReference},
+        test_helpers::{
+            TestParseContext, create_cache_context, schema_creation, search_path::search_path,
+        },
+    };
+
+    #[test]
+    fn rejected_dictionaries_retain_bindings_and_do_not_update_the_catalog()
+    -> testresult::TestResult {
+        let mut inventory = TestParseContext::default();
+        inventory.set_search_path(&search_path(&["public"]));
+        inventory.setup_type(TypeReference::from_master_type_name("internal"));
+        let mut context = schema_creation::apply(
+            schema_creation::child(inventory.freeze()),
+            r#"
+            CREATE FUNCTION lexize(internal, internal, internal, internal)
+                RETURNS internal AS 'fixture' LANGUAGE C;
+            CREATE TEXT SEARCH TEMPLATE original (LEXIZE = lexize);
+            CREATE TEXT SEARCH TEMPLATE selected (LEXIZE = lexize);
+            CREATE TEXT SEARCH DICTIONARY existing (TEMPLATE = original);
+            "#,
+        )?;
+        assert!(context.problems().is_empty());
+        let mut parsed = parse_statements(
+            r#"
+            CREATE TEXT SEARCH DICTIONARY existing (TEMPLATE = selected);
+            CREATE TEXT SEARCH DICTIONARY with_options (TEMPLATE = selected, extra = true);
+            CREATE TEXT SEARCH DICTIONARY unresolved (TEMPLATE = missing);
+            CREATE TEXT SEARCH DICTIONARY partially_resolved
+                (TEMPLATE = original, TEMPLATE = missing);
+            CREATE TEXT SEARCH DICTIONARY with_options (TEMPLATE = selected);
+            "#,
+            Dialect::postgres(),
+        );
+        let expected = [
+            (
+                "existing",
+                Some("selected"),
+                Some(TextSearchDictionaryFailure::AlreadyExists),
+                Some("original"),
+            ),
+            (
+                "with_options",
+                Some("selected"),
+                Some(TextSearchDictionaryFailure::OptionsWithoutInit),
+                None,
+            ),
+            (
+                "unresolved",
+                None,
+                Some(TextSearchDictionaryFailure::TemplateNotFound),
+                None,
+            ),
+            (
+                "partially_resolved",
+                Some("original"),
+                Some(TextSearchDictionaryFailure::TemplateNotFound),
+                None,
+            ),
+            ("with_options", Some("selected"), None, Some("selected")),
+        ];
+        let mut problem_count = 0;
+        for (name, binding, failure, published) in expected {
+            let syntax = parsed.next().expect("dictionary statement")?;
+            let analyzed =
+                SemAst::apply_ast_node(syntax.node(), context, &mut create_cache_context())?;
+            let SemAst::CreateTextSearchDictionary(statement) = analyzed.ast() else {
+                panic!("expected dictionary analysis");
+            };
+            let target = FullName::with_schema("public", name);
+            assert_eq!(statement.name(), Some(&target));
+            assert_eq!(
+                statement.template(),
+                binding
+                    .map(|name| FullName::with_schema("public", name))
+                    .as_ref()
+            );
+            assert_eq!(statement.failure(), failure);
+            assert_eq!(statement.definition().is_none(), failure.is_some());
+
+            context = analyzed.into_context();
+            if failure.is_some() {
+                problem_count += 1;
+            }
+            assert_eq!(context.problems().len(), problem_count);
+            assert_eq!(
+                context
+                    .text_search_dictionary(&target)
+                    .map(|definition| definition.template()),
+                published
+                    .map(|name| FullName::with_schema("public", name))
+                    .as_ref(),
+            );
+        }
+        assert!(parsed.next().is_none());
+        assert!(context.problems()[0].creation_problem().is_some());
+        assert!(matches!(
+            context.problems()[1],
+            AnalysisProblem::InvalidTextSearchDictionary(..)
+        ));
+        assert!(matches!(
+            context.problems()[2],
+            AnalysisProblem::InvalidTextSearchDictionary(..)
+        ));
+        Ok(())
+    }
+}
+
+type Rejection = (TextSearchDictionaryFailure, Box<AnalysisProblem>);
+
 fn resolve_definition(
     syntax: &TextSearchDeclaration,
     context: &impl ParseContext,
-) -> Result<TextSearchDictionaryDefinition, Box<AnalysisProblem>> {
+    resolved_name: &mut Option<FullName>,
+    resolved_template: &mut Option<FullName>,
+) -> Result<TextSearchDictionaryDefinition, Rejection> {
     let target = postgres_local_name(syntax.name(), context).ok_or_else(|| {
-        invalid(
+        TextSearchDictionaryFailure::InvalidName.problem(
             "invalid text search dictionary name for this database",
             None,
         )
@@ -90,17 +257,21 @@ fn resolve_definition(
             || "no schema selected for text search dictionary creation".to_owned(),
             |schema| format!("schema {schema} does not exist"),
         );
-        invalid(message, None)
+        TextSearchDictionaryFailure::MissingCreationSchema.problem(message, None)
     })?;
     let name = target.replace_schema(&schema);
-    let template = select_template(syntax, context)?;
+    *resolved_name = Some(name.clone());
+    let template = select_template(syntax, context, resolved_template)?;
     if context.text_search_dictionary(&name).is_some() {
         let span = context.get_span().copied().unwrap_or_default();
-        return Err(Box::new(AnalysisProblem::creation(CreationProblem::named(
-            &name,
-            "text search dictionary",
-            &span,
-        ))));
+        return Err((
+            TextSearchDictionaryFailure::AlreadyExists,
+            Box::new(AnalysisProblem::creation(CreationProblem::named(
+                &name,
+                "text search dictionary",
+                &span,
+            ))),
+        ));
     }
     Ok(TextSearchDictionaryDefinition {
         name,
@@ -111,21 +282,27 @@ fn resolve_definition(
 fn select_template<'a>(
     syntax: &TextSearchDeclaration,
     context: &'a impl ParseContext,
-) -> Result<&'a TextSearchTemplateDefinition, Box<AnalysisProblem>> {
+    resolved_template: &mut Option<FullName>,
+) -> Result<&'a TextSearchTemplateDefinition, Rejection> {
     let mut template = None;
     let mut first_setting = None;
     for option in syntax.options() {
         if option.key() == "template" {
-            template = Some(resolve_template(option, context)?);
+            let binding = resolve_template(option, context)?;
+            *resolved_template = Some(binding.name().clone());
+            template = Some(binding);
         } else {
             first_setting.get_or_insert(option);
         }
     }
-    let template = template.ok_or_else(|| invalid("text search template is required", None))?;
+    let template = template.ok_or_else(|| {
+        TextSearchDictionaryFailure::MissingTemplate
+            .problem("text search template is required", None)
+    })?;
     if let Some(setting) = first_setting
         && template.init().is_none()
     {
-        return Err(invalid(
+        return Err(TextSearchDictionaryFailure::OptionsWithoutInit.problem(
             format!(
                 "text search template {} does not accept options",
                 template.name()
@@ -139,7 +316,7 @@ fn select_template<'a>(
 fn resolve_template<'a>(
     option: &TextSearchOption,
     context: &'a impl ParseContext,
-) -> Result<&'a TextSearchTemplateDefinition, Box<AnalysisProblem>> {
+) -> Result<&'a TextSearchTemplateDefinition, Rejection> {
     let name = match option.value() {
         Some(TextSearchOptionValue::Name(name)) => postgres_local_name(name, context),
         Some(TextSearchOptionValue::Literal(Literal::String(name))) => {
@@ -147,10 +324,13 @@ fn resolve_template<'a>(
         }
         _ => None,
     }
-    .ok_or_else(|| invalid("TEMPLATE requires a valid template name", option.location()))?;
+    .ok_or_else(|| {
+        TextSearchDictionaryFailure::InvalidTemplateName
+            .problem("TEMPLATE requires a valid template name", option.location())
+    })?;
     expand_search_path_inst(context, &name, |key| context.text_search_template(key)).ok_or_else(
         || {
-            invalid(
+            TextSearchDictionaryFailure::TemplateNotFound.problem(
                 format!("text search template {name} does not exist"),
                 option.location(),
             )
@@ -158,11 +338,16 @@ fn resolve_template<'a>(
     )
 }
 
-fn invalid(message: impl Into<String>, location: Option<StringSpan>) -> Box<AnalysisProblem> {
-    Box::new(AnalysisProblem::InvalidTextSearchDictionary(
-        message.into(),
-        location.as_ref().map(Into::into),
-    ))
+impl TextSearchDictionaryFailure {
+    fn problem(self, message: impl Into<String>, location: Option<StringSpan>) -> Rejection {
+        (
+            self,
+            Box::new(AnalysisProblem::InvalidTextSearchDictionary(
+                message.into(),
+                location.as_ref().map(Into::into),
+            )),
+        )
+    }
 }
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+mod aggregate;
 use crate::sem::{AnalysisError, traversal::SemanticVisitor};
 mod ddl;
 use crate::{
@@ -227,6 +228,7 @@ impl CreateFunction {
     }
     pub(crate) fn can_replace(&self, other: &Self) -> bool {
         self.object_kind == other.object_kind
+            && self.catalog_aggregate() == other.catalog_aggregate()
             && self.returning_columdef == other.returning_columdef
             && self.overloads.get_at(0).map(OverloadVariant::ret_type)
                 == other.overloads.get_at(0).map(OverloadVariant::ret_type)

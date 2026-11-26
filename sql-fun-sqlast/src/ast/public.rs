@@ -164,6 +164,7 @@ pub enum StatementKind {
     /// ALTER OPERATOR SET.
     AlterOperator,
     /// A PostgreSQL DROP OPERATOR declaration.
+    CreateAggregate,
     DropOperator,
     /// A PostgreSQL cast declaration.
     CreateCast,
@@ -240,6 +241,7 @@ impl std::fmt::Display for StatementKind {
             Self::CreateTextSearchTemplate => "CREATE TEXT SEARCH TEMPLATE",
             Self::CreateTextSearchDictionary => "CREATE TEXT SEARCH DICTIONARY",
             Self::AlterOperator => "ALTER OPERATOR",
+            Self::CreateAggregate => "CREATE AGGREGATE",
             Self::DropOperator => "DROP OPERATOR",
             Self::CreateCast => "CREATE CAST",
             Self::CreateLanguage => "CREATE LANGUAGE",
@@ -465,6 +467,7 @@ impl StatementNode {
             Self::CreateTextSearchTemplate(_) => StatementKind::CreateTextSearchTemplate,
             Self::CreateTextSearchDictionary(_) => StatementKind::CreateTextSearchDictionary,
             Self::AlterOperator(_) => StatementKind::AlterOperator,
+            Self::CreateAggregate(_) => StatementKind::CreateAggregate,
             Self::DropOperator(_) => StatementKind::DropOperator,
             Self::CreateCast(_) => StatementKind::CreateCast,
             Self::CreateLanguage(_) => StatementKind::CreateLanguage,

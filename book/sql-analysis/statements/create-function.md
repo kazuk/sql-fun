@@ -52,12 +52,18 @@ leave existing catalog entries intact.
 
 ### Custom aggregates
 
-`CREATE AGGREGATE` is legal PostgreSQL syntax but is not converted into an
-analyzable top-level declaration. A schema file containing it fails initialization
-with `unexpected input :top-level PostgreSQL statement`
-([#987](https://github.com/kazuk/sql-fun/issues/987)). This prevents loading custom
-aggregate definitions from that file; it does not prevent using aggregate
-metadata already present in the selected builtin catalog.
+Schema analysis can register ordinary PostgreSQL `CREATE AGGREGATE`
+declarations with fixed input arguments and the options used by
+`named_sum`, `citext` and `intagg`. The aggregate's result type comes
+from `STYPE` or from `FINALFUNC` when supplied.
+
+Schema analysis stops at aggregate declarations whose argument form or options
+are outside this supported subset. See
+[#987](https://github.com/kazuk/sql-fun/issues/987) for the ordinary aggregate
+implementation.
+Semantic support for custom ordered-set and hypothetical-set aggregates, including
+`WITHIN GROUP` call analysis, is tracked in
+[#1256](https://github.com/kazuk/sql-fun/issues/1256).
 
 ### Declaration validation gaps
 

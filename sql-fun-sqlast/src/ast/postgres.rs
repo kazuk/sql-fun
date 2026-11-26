@@ -871,6 +871,12 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         }
         if let Some(define) = value.as_define_stmt().as_inner() {
             match define.get_kind().as_inner() {
+                Some(syn::ObjectType::ObjectAggregate) => {
+                    let aggregate = super::create_aggregate::CreateAggregate::try_from_with_tokens(
+                        &define, tokens,
+                    )?;
+                    return Ok(Self::CreateAggregate(Box::new(aggregate)));
+                }
                 Some(syn::ObjectType::ObjectOperator) => {
                     let operator = CreateOperator::try_from_with_tokens(&define, tokens)?;
                     return Ok(Self::CreateOperator(operator));

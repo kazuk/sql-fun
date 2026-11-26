@@ -43,7 +43,7 @@ impl ShellPolicy {
 }
 
 impl FunctionDeclarationOutcome {
-    fn reject(
+    pub(super) fn reject(
         &mut self,
         name: &FullName,
         reason: String,
@@ -86,7 +86,10 @@ impl CreateFunction {
         Ok(function)
     }
 
-    fn declaration_conflict(&self, context: &impl ParseContext) -> Option<AnalysisProblem> {
+    pub(super) fn declaration_conflict(
+        &self,
+        context: &impl ParseContext,
+    ) -> Option<AnalysisProblem> {
         let mut name = self.name().clone();
         if name.schema().is_none() {
             name = name.set_schema(context.get_default_schema()?);

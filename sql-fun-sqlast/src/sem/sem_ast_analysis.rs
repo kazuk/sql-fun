@@ -47,6 +47,9 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
+            AstStatementNode::CreateAggregate(aggregate) => Ok(Self::create_function(
+                &CreateFunction::from_aggregate(aggregate, context)?,
+            )),
             AstStatementNode::DropOperator(_) => Err(AnalysisError::unexpected_input_error(
                 "DROP OPERATOR semantic analysis is unsupported",
             )),
@@ -350,6 +353,14 @@ impl SemAst {
                 let context = context.apply_create_operator(&statement)?;
                 Ok(AstAndContextPair::new(
                     Self::CreateOperator(Box::new(statement)),
+                    context,
+                ))
+            }
+            AstStatementNode::CreateAggregate(aggregate) => {
+                let statement = CreateFunction::from_aggregate(aggregate, &mut context)?;
+                let context = context.apply_create_function(&statement, false)?;
+                Ok(AstAndContextPair::new(
+                    Self::create_function(&statement),
                     context,
                 ))
             }

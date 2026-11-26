@@ -10,6 +10,7 @@
 
 pub(crate) mod client_type;
 pub(crate) mod create_access_method;
+pub(crate) mod create_aggregate;
 pub(crate) mod create_cast;
 pub(crate) mod create_language;
 pub(crate) mod create_operator;
@@ -305,6 +306,7 @@ pub(crate) enum StatementNode {
     ExtensionMembership(ExtensionMembership),
     VariableSet(VariableSet),
     EnumType(EnumType),
+    CreateAggregate(Box<create_aggregate::CreateAggregate>),
     CreateOperator(CreateOperator),
     CreateTextSearchTemplate(text_search_declaration::TextSearchDeclaration),
     CreateTextSearchDictionary(text_search_declaration::TextSearchDeclaration),

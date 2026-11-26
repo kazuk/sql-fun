@@ -297,6 +297,7 @@ impl RetainSqliteTypes for StatementNode {
             | Self::CreateTextSearchTemplate(_)
             | Self::CreateTextSearchDictionary(_)
             | Self::AlterOperator(_)
+            | Self::CreateAggregate(_)
             | Self::DropOperator(_)
             | Self::CreateCast(_)
             | Self::CreateLanguage(_)

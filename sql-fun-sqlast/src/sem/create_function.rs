@@ -27,7 +27,7 @@ pub struct CreateFunction {
     overloads: FunctionOverloadCollection,
     returning_columdef: Option<ColumnCollection>,
     builtin_properties: Option<(bool, bool)>,
-    aggregate_support: Option<aggregate::AggregateSupport>,
+    aggregate_support: Option<Box<aggregate::AggregateSupport>>,
     privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 

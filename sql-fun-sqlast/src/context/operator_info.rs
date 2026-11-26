@@ -1,18 +1,10 @@
 use crate::{
-    names::{FullName, OperatorName},
-    sem::{CascadeRemoval, OperatorDefinition, OperatorIdentity, OperatorLinks},
+    names::OperatorName,
+    sem::{OperatorDefinition, OperatorIdentity, OperatorLinks},
 };
 
 /// get operator definition
 pub trait OperatorInfoRead {
-    /// Registered removals for dependents of this exact operator overload.
-    fn operator_removals(
-        &self,
-        _identity: &OperatorIdentity,
-    ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
-        Vec::new()
-    }
-
     /// Whether the builtin catalog requires this exact operator.
     fn operator_is_system_required(&self, _identity: &OperatorIdentity) -> bool {
         false

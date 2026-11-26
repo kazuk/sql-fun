@@ -16,7 +16,8 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ExactFunction,
         OperatorDefinition, OwnershipIdentity, TypeReference, UnaryOperatorDefinition,
-        search_path::expand_operator_search_path, traversal::SemanticVisitor,
+        operators::OperatorDependents, search_path::expand_operator_search_path,
+        traversal::SemanticVisitor,
     },
 };
 
@@ -141,6 +142,55 @@ impl OperatorIdentity {
         right: &TypeReference,
     ) -> bool {
         &self.name == name && self.left.as_ref() == left && &self.right == right
+    }
+
+    pub(crate) fn dependents<'a>(
+        &self,
+        definition: &'a OperatorDefinition,
+    ) -> Option<&'a OperatorDependents> {
+        match definition {
+            OperatorDefinition::Binary(entries) => {
+                let entry = entries.iter().find(|entry| {
+                    self.left.as_ref() == Some(entry.left_arg_type())
+                        && &self.right == entry.right_arg_type()
+                })?;
+                Some(entry.dependents())
+            }
+            OperatorDefinition::RightUnary(entries) => {
+                let entry = entries
+                    .iter()
+                    .find(|entry| self.left.is_none() && &self.right == entry.arg_type())?;
+                Some(entry.dependents())
+            }
+            OperatorDefinition::LeftUnary(_) => None,
+        }
+    }
+
+    pub(crate) fn update_dependent(
+        &self,
+        definition: &mut OperatorDefinition,
+        view: &FullName,
+        removal: Option<&dyn CascadeRemoval>,
+    ) {
+        match definition {
+            OperatorDefinition::Binary(entries) => {
+                if let Some(entry) = entries.iter_mut().find(|entry| {
+                    self.left.as_ref() == Some(entry.left_arg_type())
+                        && &self.right == entry.right_arg_type()
+                }) {
+                    entry.dependents_mut().replace(view, removal);
+                }
+            }
+            OperatorDefinition::RightUnary(entries) => {
+                if let Some(entry) = entries
+                    .iter_mut()
+                    .find(|entry| self.left.is_none() && &self.right == entry.arg_type())
+                {
+                    entry.dependents_mut().replace(view, removal);
+                }
+            }
+            OperatorDefinition::LeftUnary(_) => {}
+        }
     }
 
     pub(crate) fn remove_from(&self, definition: &mut OperatorDefinition) {

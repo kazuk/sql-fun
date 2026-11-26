@@ -276,7 +276,7 @@ impl FunctionInfoWrite for SchemaFileContext {
             ));
         }
         for (name, tombstone) in views {
-            self.catalog.mask_view(name, tombstone);
+            self.catalog.mask_view(name, tombstone)?;
         }
         self.catalog.function_tombstones.extend(removals);
         Ok(self)

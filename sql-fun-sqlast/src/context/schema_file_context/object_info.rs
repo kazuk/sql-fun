@@ -106,7 +106,7 @@ impl SchemaCatalog {
         self.renamed_relations.remove(&name);
         self.renamed_types.remove(&name);
         self.view_tombstones.remove(&name);
-        self.register_view(&name, definition, dependencies);
+        self.register_view(&name, definition, dependencies)?;
         if let Some(row_type) = row_type {
             self.types.insert_create_composite_type(&name, &row_type);
         }

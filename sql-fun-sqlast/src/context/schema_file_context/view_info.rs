@@ -127,17 +127,6 @@ impl SemanticVisitor for RelationReferences {
 }
 
 impl ViewInformationCollection {
-    pub(super) fn has_registered_definition(&self, name: &FullName) -> bool {
-        self.dependencies.contains_key(name)
-    }
-
-    pub(super) fn operator_signatures(&self, name: &FullName) -> &[OperatorIdentity] {
-        match self.dependencies.get(name) {
-            Some(dependencies) => &dependencies.operators,
-            None => &[],
-        }
-    }
-
     pub(super) fn append_names(&self, names: &mut Vec<FullName>) {
         for name in &self.names {
             if !names.contains(name) {
@@ -196,7 +185,7 @@ impl SchemaFileContext {
             );
         };
         self.catalog
-            .mask_view(name.clone(), ViewTombstone::for_operator_drop(definition));
+            .mask_view(name.clone(), ViewTombstone::for_operator_drop(definition))?;
         Ok(())
     }
 }
@@ -207,20 +196,35 @@ impl SchemaCatalog {
         name: &FullName,
         view: &ViewLike,
         dependencies: ViewDependencies,
-    ) {
-        self.operator_removals.replace(
-            name,
-            self.views.operator_signatures(name),
-            &dependencies.operators,
-            &DependentView(name.clone()),
-        );
+    ) -> Result<(), AnalysisError> {
+        if let Some(previous) = self.get_view_impl(name) {
+            let old = ViewDependencies::collect(previous)?;
+            for identity in old.operators {
+                if !dependencies.operators.contains(&identity) {
+                    self.update_operator_dependent(&identity, name, None);
+                }
+            }
+        }
+        let removal = DependentView(name.clone());
+        for identity in &dependencies.operators {
+            self.update_operator_dependent(identity, name, Some(&removal));
+        }
         self.views.register(name, view, dependencies);
+        Ok(())
     }
 
-    pub(super) fn mask_view(&mut self, name: FullName, tombstone: ViewTombstone) {
+    pub(super) fn mask_view(
+        &mut self,
+        name: FullName,
+        tombstone: ViewTombstone,
+    ) -> Result<(), AnalysisError> {
+        for identity in ViewDependencies::collect(tombstone.definition())?.operators {
+            self.update_operator_dependent(&identity, &name, None);
+        }
         // The relation and its composite row type disappear together.
         self.renamed_types.insert(name.clone());
         self.view_tombstones.insert(name, tombstone);
+        Ok(())
     }
 }
 
@@ -314,7 +318,7 @@ impl ViewInfoWrite for SchemaFileContext {
                 );
                 self.catalog.apply_extension_membership(&change);
             }
-            self.catalog.mask_view(name, tombstone);
+            self.catalog.mask_view(name, tombstone)?;
         }
         Ok(self)
     }

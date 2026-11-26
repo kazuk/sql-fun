@@ -926,6 +926,26 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A binary cast declaration whose runtime compatibility was not verified.",
+                  "type": "object",
+                  "properties": {
+                    "UnverifiedBinaryCastCompatibility": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/StringSpan"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "UnverifiedBinaryCastCompatibility"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid PostgreSQL language declaration.",
                   "type": "object",
                   "properties": {
@@ -6464,6 +6484,26 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A binary cast declaration whose runtime compatibility was not verified.",
+                  "type": "object",
+                  "properties": {
+                    "UnverifiedBinaryCastCompatibility": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/StringSpan"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "UnverifiedBinaryCastCompatibility"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid PostgreSQL language declaration.",
                   "type": "object",
                   "properties": {
@@ -11890,6 +11930,26 @@
                   },
                   "required": [
                     "InvalidCastDeclaration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A binary cast declaration whose runtime compatibility was not verified.",
+                  "type": "object",
+                  "properties": {
+                    "UnverifiedBinaryCastCompatibility": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/StringSpan"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "UnverifiedBinaryCastCompatibility"
                   ],
                   "additionalProperties": false
                 },

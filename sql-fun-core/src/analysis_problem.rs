@@ -399,6 +399,8 @@ pub enum AnalysisProblem {
     InvalidTextSearchDictionary(String, Option<StringSpan>),
     /// A CREATE CAST declaration cannot be applied.
     InvalidCastDeclaration(String, Option<StringSpan>),
+    /// A binary cast declaration whose runtime compatibility was not verified.
+    UnverifiedBinaryCastCompatibility(Option<StringSpan>),
     /// Invalid PostgreSQL language declaration.
     InvalidLanguageDeclaration(String, Option<StringSpan>),
     /// A domain cast is recorded but ignored by PostgreSQL coercion.
@@ -586,6 +588,7 @@ impl AnalysisProblem {
             Self::Lint(_)
             | Self::UnreachableCoalesceArgument(..)
             | Self::IgnoredDomainCast(..)
+            | Self::UnverifiedBinaryCastCompatibility(_)
             | Self::OpaqueDoBody(_) => DiagnosticSeverity::Warning,
             _ => DiagnosticSeverity::Error,
         }
@@ -829,6 +832,7 @@ impl AnalysisProblem {
             Self::InvalidTextSearchDictionary(..) => "invalid_text_search_dictionary",
             Self::InvalidOperatorDeclaration(..) => "invalid_operator_declaration",
             Self::InvalidCastDeclaration(..) => "invalid_cast_declaration",
+            Self::UnverifiedBinaryCastCompatibility(_) => "unverified_binary_cast_compatibility",
             Self::InvalidLanguageDeclaration(..) => "invalid_language_declaration",
             Self::IgnoredDomainCast(..) => "ignored_domain_cast",
             Self::OpaqueDoBody(_) => "opaque_do_body",
@@ -900,6 +904,7 @@ impl AnalysisProblem {
             | Self::InvalidOperatorDeclaration(_, span)
             | Self::InvalidLanguageDeclaration(_, span)
             | Self::InvalidCastDeclaration(_, span)
+            | Self::UnverifiedBinaryCastCompatibility(span)
             | Self::IgnoredDomainCast(_, span)
             | Self::OpaqueDoBody(span) => *span,
             Self::NameResolution(problem) => problem.statement_relative_span(),
@@ -938,6 +943,7 @@ impl AnalysisProblem {
             | Self::InvalidLanguageDeclaration(..)
             | Self::InvalidCastDeclaration(..)
             | Self::IgnoredDomainCast(..)
+            | Self::UnverifiedBinaryCastCompatibility(_)
             | Self::InvalidBaseType(_)
             | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
@@ -1112,6 +1118,7 @@ impl DiagnosticMessage for AnalysisProblem {
             | Self::InvalidCastDeclaration(message, _)
             | Self::IgnoredDomainCast(message, _)
             | Self::InvalidOperatorFamilyDeclaration(message) => message.clone(),
+            Self::UnverifiedBinaryCastCompatibility(_) => "sql-fun has not verified ABI or binary representation compatibility for this cast. Successful analysis does not guarantee runtime compatibility.".to_owned(),
             Self::OpaqueDoBody(_) => "The DO body is opaque. sql-fun does not analyze or execute it. Subsequent analysis does not reflect its catalog effects.".to_owned(),
             Self::InvalidBaseType(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),

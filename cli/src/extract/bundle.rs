@@ -205,6 +205,7 @@ mod tests {
     #[rstest::rstest]
     #[case::seventeen("1\n17.9\n", 170_009)]
     #[case::eighteen("1\n18.3\n", 180_003)]
+    #[case::nineteen("1\n19.0\n", 190_000)]
     fn validates_protocol_and_full_postgresql_version(#[case] text: &str, #[case] expected: u64) {
         assert_eq!(parse_version(text).unwrap(), expected);
     }
@@ -225,7 +226,7 @@ mod tests {
     #[case::extra_record("1\n18.1\nextra")]
     #[case::minor_overflow("1\n17.10000\n")]
     #[case::unsupported_older("1\n16.1\n")]
-    #[case::unsupported_newer("1\n19.1\n")]
+    #[case::unsupported_newer("1\n123.1\n")]
     fn rejects_invalid_or_unsupported_versions(#[case] text: &str) {
         assert!(parse_version(text).is_err());
     }

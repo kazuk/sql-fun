@@ -732,6 +732,12 @@ def validate(binary, major, image, destination, host, bind):
     assert '"pg_stats" WITH (security_barrier' in schema
     validate_masters(output)
     first = payload(output)
+    if major == "19":
+        docker_home = destination / f"{major}-initialized-docker"
+        run(binary, "init", "--yes", "--install-default-theme", "--sql-fun-home", str(docker_home),
+            "--engines", "postgres", "--docker", "--engine-versions", major,
+            "--docker-host-address", host, "--docker-bind-address", bind)
+        assert payload(docker_home / "postgres" / major) == first
     assert "extension/uuid-ossp.control" in first
     assert json.loads((output / "metadata.json").read_text())["server_version_num"] // 10000 == int(major)
     password = secrets.token_hex(24)
@@ -754,9 +760,9 @@ def validate(binary, major, image, destination, host, bind):
         port = ports["5432/tcp"][0]["HostPort"]
         connection_env = dict(os.environ, SQL_FUN_DATABASE_URL=f"postgresql://postgres:{password}@{host}:{port}/postgres?sslmode=disable",
                               DOCKER_HOST="unix:///nonexistent-sql-fun-test.sock")
-        version = run("psql", "-X", "-qAtw", "--dbname", connection_env["SQL_FUN_DATABASE_URL"],
-                      data=b"SHOW server_version_num;\n").stdout.decode().strip()
-        print(f"PostgreSQL {major}: server_version_num={version}", flush=True)
+        version, identity = run("psql", "-X", "-qAtw", "--dbname", connection_env["SQL_FUN_DATABASE_URL"],
+                                data=b"SHOW server_version_num;\nSHOW server_version;\n").stdout.decode().splitlines()
+        print(f"PostgreSQL {major}: server_version={identity}, server_version_num={version}", flush=True)
         assert int(version) // 10000 == int(major)
         assert json.loads((output / "metadata.json").read_text())["server_version_num"] == int(version)
         validate_server_init_navigation(binary, destination, connection_env["SQL_FUN_DATABASE_URL"], major)

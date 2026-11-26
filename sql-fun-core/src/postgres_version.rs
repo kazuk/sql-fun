@@ -192,6 +192,7 @@ const VERSIONS: &[Support] = &[
         18,
         Some("postgres@sha256:5773fe724c49c42a7a9ca70202e11e1dff21fb7235b335a73f39297d200b73a2"),
     ),
+    Support::stable(19, Some("postgres:19")),
 ];
 
 /// Authoritative `PostgreSQL` extraction capability inventory (catalog format 1).
@@ -286,6 +287,7 @@ mod test_inventory {
     #[rstest::rstest]
     #[case::seventeen(&["17"], &["17"])]
     #[case::eighteen(&["18"], &["18"])]
+    #[case::nineteen(&["19"], &["19"])]
     #[case::both(&["18", "17", "18"], &["17", "18"])]
     fn normalizes_supported_subsets(#[case] inputs: &[&str], #[case] expected: &[&str]) {
         let inputs = inputs.iter().map(ToString::to_string).collect::<Vec<_>>();
@@ -301,7 +303,7 @@ mod test_inventory {
     #[rstest::rstest]
     #[case::empty(&[])]
     #[case::older(&["16"])]
-    #[case::newer(&["19"])]
+    #[case::newer(&["123"])]
     #[case::prerelease(&["19beta1"])]
     fn rejects_unavailable_targets(#[case] inputs: &[&str]) {
         assert!(
@@ -313,7 +315,6 @@ mod test_inventory {
     #[test]
     fn inventory_extension_drives_selection_detection_and_storage() {
         let mut support = VERSIONS.to_vec();
-        support.push(Support::stable(19, Some("postgres:19")));
         let beta: PostgresVersion = "20beta1".parse().unwrap();
         support.push(Support::extractable(&beta, "postgres:20beta1"));
         let inventory = PostgresVersionInventory(&support);
@@ -334,8 +335,8 @@ mod test_inventory {
         assert_eq!(inventory.image(&beta).unwrap(), "postgres:20beta1");
         assert_eq!(inventory.detect(200_000, "20beta1").unwrap(), beta);
         assert_eq!(
-            inventory
-                .detect(190_002, "19.2 (test)")
+            PostgresVersionInventory::builtin()
+                .detect(190_000, "19.0 (Debian)")
                 .unwrap()
                 .to_string(),
             "19"

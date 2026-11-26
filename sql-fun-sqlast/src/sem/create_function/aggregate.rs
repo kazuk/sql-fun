@@ -8,7 +8,8 @@ use crate::{
     },
     names::{FullName, OperatorName},
     sem::{
-        AnalysisError, FunctionOverloadCollection, OverloadVariant, ParseContext, TypeReference,
+        AnalysisError, FunctionOverloadCollection, OverloadVariant, ParallelSafety, ParseContext,
+        TypeReference,
         type_system::{ExactFunction, FunctionParam},
     },
 };
@@ -73,6 +74,7 @@ impl CreateFunction {
         }
         let name = FullName::from_ast_name(&ast.name)?;
         let mut outcome = FunctionDeclarationOutcome::default();
+        let name = Self::shell_creation_name(&name, &name, &mut outcome, context)?.unwrap_or(name);
         let params = parameters
             .iter()
             .map(|param| FunctionParam::from_ast(param, context))
@@ -114,6 +116,7 @@ impl CreateFunction {
                 context,
             )?;
         }
+        let mut parallel_safety = None;
         let mut seen = std::collections::HashSet::new();
         for option in &ast.options {
             if !seen.insert(option.key.as_str()) {
@@ -189,6 +192,24 @@ impl CreateFunction {
                         )?;
                     }
                 }
+                "parallel" => {
+                    parallel_safety =
+                        option_name(option)
+                            .as_ref()
+                            .and_then(|name| match name.parts() {
+                                [mode] if mode == "safe" => Some(ParallelSafety::Safe),
+                                [mode] if mode == "restricted" => Some(ParallelSafety::Restricted),
+                                [mode] if mode == "unsafe" => Some(ParallelSafety::Unsafe),
+                                _ => None,
+                            });
+                    if parallel_safety.is_none() {
+                        outcome.reject(
+                            &name,
+                            "invalid aggregate PARALLEL mode".to_owned(),
+                            context,
+                        )?;
+                    }
+                }
                 _ => {}
             }
         }
@@ -196,6 +217,7 @@ impl CreateFunction {
         let mut definition = Self::new(&name, &FunctionOverloadCollection::new(&[overload]), &None)
             .with_replace(ast.replace);
         definition.set_builtin_properties(true, false);
+        definition.parallel_safety = parallel_safety;
         definition.source = context.get_source_path_with_span().cloned();
         if matches!(outcome, FunctionDeclarationOutcome::Applicable(_))
             && let Some(conflict) = definition.declaration_conflict(context)
@@ -230,5 +252,18 @@ fn support_function(
         .as_ref()
         .map(FullName::from_ast_name)
         .transpose()?;
-    Ok(name.and_then(|name| context.find_exact_function(&name, arguments)))
+    Ok(name
+        .and_then(|name| context.find_exact_function(&name, arguments))
+        .filter(|function| {
+            !context.function_returns_set(function.name(), function.overload())
+                && !context
+                    .routine_definitions(function.name())
+                    .iter()
+                    .any(|definition| {
+                        definition.catalog_aggregate()
+                            && definition
+                                .overloads()
+                                .contains_instantiation(function.overload(), context)
+                    })
+        }))
 }

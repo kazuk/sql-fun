@@ -1318,5 +1318,20 @@
         }
       ]
     }
+  },
+  {
+    "name": "schema_aggregate_named_call_rejected",
+    "sql": "SELECT named_sum(x => 1) AS result",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
   }
 ]

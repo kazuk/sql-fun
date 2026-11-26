@@ -27,16 +27,12 @@ An invalid definition reports an
 [`invalid_operator_declaration` diagnostic](../../diagnostics/invalid_operator_declaration.md)
 and leaves the catalog unchanged.
 
-`RESTRICT` and `JOIN` require a selectivity estimator with the appropriate
-signature in the analysis catalog. The PostgreSQL 17.6 and 18.1 bundles omit
-builtin estimators such as `contsel` and `contjoinsel`. A declaration that
-calls for one of these missing estimators is rejected, including the first
-operator declaration in the bundled `pg_trgm` installation script. Follow
-[issue #1217](https://github.com/kazuk/sql-fun/issues/1217) for estimator
-metadata. The full script also contains a
-[CREATE OPERATOR CLASS](create-operator-class.md) declaration for
-`gist_trgm_ops`. Follow [issue #1150](https://github.com/kazuk/sql-fun/issues/1150)
-for full extension initialization.
+sql-fun retains the `RESTRICT` and `JOIN` planner function names, including
+schema qualification and quoted identifiers. Analysis accepts these options
+when the functions are absent from the analysis catalog and skips checking
+their PostgreSQL planner signatures. Follow
+[issue #1150](https://github.com/kazuk/sql-fun/issues/1150) for bundled
+extension initialization.
 
 For a token defined in multiple schemas, qualify the operator with
 `OPERATOR(schema.token)` to select its schema explicitly. Unqualified lookup
@@ -54,12 +50,10 @@ Follow [issue #1218](https://github.com/kazuk/sql-fun/issues/1218).
 operand types. For a prefix operator, specify `NONE` for the left operand.
 An unqualified target uses the first matching signature on the search path.
 
-`RESTRICT` and `JOIN` set selectivity estimators by name. Use `NONE` to clear
-an estimator. Omitted settings retain their previous values. Estimator
-functions must be available in the analysis catalog, with the same signature
-requirements as for `CREATE OPERATOR`. The missing builtin estimator
-metadata tracked in [issue #1217](https://github.com/kazuk/sql-fun/issues/1217)
-also affects ALTER declarations in extension scripts.
+`RESTRICT` and `JOIN` replace the corresponding planner function names.
+Use `NONE` to clear a setting. Omitted settings retain their previous values.
+As with `CREATE OPERATOR`, sql-fun retains the names without looking them up
+in the analysis catalog.
 
 PostgreSQL 17 and 18 also allow adding a `COMMUTATOR` or `NEGATOR` and enabling
 `HASHES` or `MERGES`. Linking two operators updates the reciprocal

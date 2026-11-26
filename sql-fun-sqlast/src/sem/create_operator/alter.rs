@@ -6,11 +6,11 @@ use crate::{
         create_operator::{AlterOperator as Syntax, OperatorOption, OperatorOptionValue},
     },
     context::ParseContext,
-    names::{FullName, OperatorName},
+    names::OperatorName,
     sem::{
         AnalysisError, TypeReference,
         create_operator::{
-            Declaration, OperatorIdentity, OperatorLinks, builtin, estimator_identity,
+            Declaration, EstimatorSetting, OperatorIdentity, OperatorLinks, builtin,
         },
         search_path::expand_operator_search_path,
         traversal::SemanticVisitor,
@@ -22,7 +22,6 @@ use ::sql_fun_core::PostgresVersion;
 #[derive(Clone, Debug)]
 pub struct AlterOperator {
     identity: Option<OperatorIdentity>,
-    estimators: Vec<FullName>,
     updates: Vec<(OperatorIdentity, OperatorLinks)>,
     applicable: bool,
 }
@@ -46,9 +45,6 @@ impl AlterOperator {
                 visitor.schema_type(operand)?;
             }
         }
-        for estimator in &self.estimators {
-            visitor.schema_function(estimator)?;
-        }
         Ok(())
     }
 
@@ -62,13 +58,11 @@ impl AlterOperator {
         };
         let identity = analysis.alter_target(syntax)?;
         let mut updates = Vec::new();
-        let mut estimators = Vec::new();
         if let Some(identity) = &identity {
-            analysis.alter_settings(syntax, identity, &mut estimators, &mut updates)?;
+            analysis.alter_settings(syntax, identity, &mut updates)?;
         }
         Ok(Self {
             identity,
-            estimators,
             updates,
             applicable: analysis.applicable,
         })
@@ -115,7 +109,6 @@ impl<C: ParseContext> Declaration<'_, C> {
         &mut self,
         syntax: &Syntax,
         identity: &OperatorIdentity,
-        estimators: &mut Vec<FullName>,
         updates: &mut Vec<(OperatorIdentity, OperatorLinks)>,
     ) -> Result<(), AnalysisError> {
         let modern = if let Ok(version) = self
@@ -137,13 +130,19 @@ impl<C: ParseContext> Declaration<'_, C> {
         let options = syntax.options();
         for (index, option) in options.iter().enumerate() {
             let key = option.key();
-            self.validate_alter_option_value(option, modern)?;
+            let planner = matches!(key, "restrict" | "join");
+            let planner_name = if planner {
+                self.planner_name(option.value().map(|_| option))?
+            } else {
+                self.validate_alter_option_value(option, modern)?;
+                None
+            };
             if options[index + 1..].iter().any(|later| later.key() == key) {
                 continue;
             }
             match key {
                 "restrict" | "join" => {
-                    self.alter_estimator(identity, boolean, option, &mut settings, estimators)?;
+                    self.alter_estimator(identity, boolean, option, planner_name, &mut settings)?;
                 }
                 "hashes" | "merges" if modern => {
                     if !settings.flags_and_links_known {
@@ -187,30 +186,22 @@ impl<C: ParseContext> Declaration<'_, C> {
         identity: &OperatorIdentity,
         boolean: bool,
         option: &OperatorOption,
+        value: Option<EstimatorSetting>,
         settings: &mut OperatorLinks,
-        estimators: &mut Vec<FullName>,
     ) -> Result<(), AnalysisError> {
         let join = option.key() == "join";
-        let value = if option.value().is_none() {
-            None
-        } else {
-            self.estimator(Some(option), join)?
-        };
-        if let Some(value) = &value {
-            if !boolean || join && !identity.binary() {
-                self.reject(
-                    "estimator is incompatible with the operator signature",
-                    option.location(),
-                )?;
-            }
-            estimators.push(value.name().clone());
+        if value.is_some() && (!boolean || join && !identity.binary()) {
+            self.reject(
+                "estimator is incompatible with the operator signature",
+                option.location(),
+            )?;
         }
         let destination = if join {
             &mut settings.join
         } else {
             &mut settings.restriction
         };
-        *destination = Some(value.as_ref().map(estimator_identity));
+        *destination = Some(value);
         Ok(())
     }
 
@@ -249,7 +240,7 @@ impl<C: ParseContext> Declaration<'_, C> {
         option: &OperatorOption,
         modern: bool,
     ) -> Result<(), AnalysisError> {
-        if matches!(option.key(), "restrict" | "join" | "commutator" | "negator")
+        if matches!(option.key(), "commutator" | "negator")
             && option.value().is_some()
             && option.name().is_none()
         {
@@ -367,8 +358,12 @@ fn flag_value(option: &OperatorOption) -> Option<bool> {
 mod tests {
     use crate::{
         context::{BaseParseContext, OperatorInfoRead, ParseContext, SchemaFileContext},
-        names::SchemaName,
-        sem::{AnalysisProblem, SemAst, create_operator::builtin},
+        names::{FullName, SchemaName},
+        sem::{
+            AnalysisError, AnalysisProblem, SemAst,
+            create_operator::{EstimatorSetting, builtin},
+            traversal::SemanticVisitor,
+        },
         test_helpers::{TestParseContext, ownership::apply_ownership_sql, schema_layer},
     };
     use std::path::Path;
@@ -377,31 +372,60 @@ mod tests {
     fn rejected_update_preserves_estimators_and_later_updates_apply() -> testresult::TestResult {
         let mut inventory = TestParseContext::default();
         inventory.set_get_search_path_result(&[SchemaName::from("public")]);
-        for name in ["int4", "bool", "internal", "oid", "int2", "float8"] {
+        for name in ["int4", "bool"] {
             inventory.setup_type(builtin(name));
         }
-        let base = inventory.freeze();
-        let mut context = schema_layer(Path::new("operator-settings.sql"), &base);
-        for sql in [
-            "CREATE FUNCTION op(integer, integer) RETURNS boolean LANGUAGE sql AS 'SELECT true'",
-            "CREATE FUNCTION rs(internal, oid, internal, integer) RETURNS double precision LANGUAGE internal AS 'eqsel'",
-            "CREATE FUNCTION js(internal, oid, internal, smallint, internal) RETURNS double precision LANGUAGE internal AS 'eqjoinsel'",
-            "CREATE OPERATOR %% (LEFTARG=integer, RIGHTARG=integer, FUNCTION=op, RESTRICT=rs, JOIN=js)",
-        ] {
-            context = apply_ownership_sql(context, sql)?.into_context();
+        struct FunctionReferences(Vec<FullName>);
+
+        impl SemanticVisitor for FunctionReferences {
+            fn schema_function(&mut self, name: &FullName) -> Result<(), AnalysisError> {
+                self.0.push(name.clone());
+                Ok(())
+            }
         }
+
+        let base = inventory.freeze();
+        let context = schema_layer(Path::new("operator-settings.sql"), &base);
+        let context = apply_ownership_sql(
+            context,
+            "CREATE FUNCTION op(integer, integer) RETURNS boolean LANGUAGE sql AS 'SELECT true'",
+        )?
+        .into_context();
+        let created = apply_ownership_sql(
+            context,
+            r#"CREATE OPERATOR %% (
+                LEFTARG=integer, RIGHTARG=integer, FUNCTION=op,
+                RESTRICT=rs, JOIN="Planner"."JoinFn"
+            )"#,
+        )?;
+        let SemAst::CreateOperator(statement) = created.ast() else {
+            panic!("expected CREATE OPERATOR");
+        };
+        assert!(statement.applicable());
+        let mut references = FunctionReferences(Vec::new());
+        statement.visit_references(&mut references)?;
+        assert_eq!(references.0, [FullName::with_schema("public", "op")]);
+        let (identity, _) = statement.definition().expect("published operator");
+        let identity = identity.clone();
+        let restriction = Some(Some(EstimatorSetting::written(&["rs".into()])));
+        let join = Some(Some(EstimatorSetting::written(&[
+            "Planner".into(),
+            "JoinFn".into(),
+        ])));
+        assert_eq!(statement.links().restriction, restriction);
+        assert_eq!(statement.links().join, join);
+
+        let context = created.into_context();
         assert!(context.problems().is_empty(), "{:?}", context.problems());
         let base = context.freeze();
         let context = schema_layer(Path::new("alter-settings.sql"), &base);
         let rejected = apply_ownership_sql(
             context,
-            "ALTER OPERATOR %% (integer,integer) SET (RESTRICT=NONE, JOIN=missing)",
+            "ALTER OPERATOR %% (integer,integer) SET (RESTRICT=NONE, FUNCTION=op)",
         )?;
-        let SemAst::AlterOperator(statement) = rejected.ast() else {
-            panic!("expected ALTER OPERATOR");
-        };
-        assert!(!statement.applicable());
-        let identity = statement.identity.clone().expect("resolved target");
+        assert!(
+            matches!(rejected.ast(), SemAst::AlterOperator(statement) if !statement.applicable())
+        );
         let context = rejected.into_context();
         assert!(matches!(
             context.problems(),
@@ -410,19 +434,46 @@ mod tests {
         let settings = context
             .operator_links(&identity)
             .expect("original settings");
-        assert!(matches!(settings.restriction, Some(Some(_))));
-        let join = settings.join.clone().expect("original join estimator");
+        assert_eq!(settings.restriction, restriction);
+        assert_eq!(settings.join, join);
+
         let applied = apply_ownership_sql(
             context,
-            "ALTER OPERATOR %% (integer,integer) SET (RESTRICT=NONE)",
+            r#"ALTER OPERATOR %% (integer,integer) SET (RESTRICT=NONE, JOIN="NewJoin")"#,
         )?;
-        assert!(
-            matches!(applied.ast(), SemAst::AlterOperator(statement) if statement.applicable())
+        let SemAst::AlterOperator(statement) = applied.ast() else {
+            panic!("expected ALTER OPERATOR");
+        };
+        assert!(statement.applicable());
+        references.0.clear();
+        statement.visit_references(&mut references)?;
+        assert!(references.0.is_empty());
+        let join = Some(Some(EstimatorSetting::written(&["NewJoin".into()])));
+        assert_eq!(statement.updates()[0].1.join, join);
+
+        let context = applied.into_context();
+        assert_eq!(
+            context
+                .operator_links(&identity)
+                .expect("updated settings")
+                .restriction,
+            Some(None)
         );
+        let applied = apply_ownership_sql(
+            context,
+            r#"ALTER OPERATOR %% (integer,integer) SET (RESTRICT="Database"."Planner"."NewRestrict")"#,
+        )?;
         let context = applied.into_context();
         let settings = context.operator_links(&identity).expect("updated settings");
-        assert_eq!(settings.restriction, Some(None));
-        assert_eq!(settings.join.as_ref(), Some(&join));
+        assert_eq!(
+            settings.restriction,
+            Some(Some(EstimatorSetting::written(&[
+                "Database".into(),
+                "Planner".into(),
+                "NewRestrict".into(),
+            ])))
+        );
+        assert_eq!(settings.join, join);
         assert!(identity.result_type(&context).is_some());
         Ok(())
     }

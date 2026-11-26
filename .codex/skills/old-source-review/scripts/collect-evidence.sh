@@ -103,24 +103,32 @@ commit_sha="$(sed -n '1p' <<<"$commit_metadata")"
 commit_date="$(sed -n '2p' <<<"$commit_metadata")"
 commit_subject="$(sed -n '3p' <<<"$commit_metadata")"
 
-usages='[]'
-for definition in "${definitions[@]}"; do
-  matches="$({ git -C "$REPOSITORY_ROOT" grep -n --fixed-strings -e "$definition" "$evidence_commit" -- '*.rs' || true; })"
-  matches_json="$(printf '%s\n' "$matches" | jq -Rsc 'split("\n") | map(select(length > 0))')"
-  usages="$(jq -cn \
-    --arg definition "$definition" \
-    --argjson matches "$matches_json" \
-    --argjson previous "$usages" \
-    '$previous + [{definition: $definition, literal_occurrences: $matches}]')"
-done
+collect_usages() {
+  local definition matches status
+  for definition in "${definitions[@]}"; do
+    if matches="$(git -C "$REPOSITORY_ROOT" grep -n --fixed-strings -e "$definition" "$evidence_commit" -- '*.rs')"; then
+      :
+    else
+      status=$?
+      [[ "$status" -eq 1 ]] || fail "git grep failed for definition '$definition' at $evidence_commit (exit $status)"
+      matches=""
+    fi
 
-jq -n \
+    printf '%s' "$matches" | jq -Rsc --arg definition "$definition" '{
+      definition: $definition,
+      literal_occurrences: (split("\n") | map(select(length > 0)))
+    }' || return
+  done
+}
+
+# Finish collection before writing the evidence document to stdout.
+usages="$(collect_usages)"
+printf '%s' "$usages" | jq -s \
   --arg target "$target" \
   --arg evidence_commit "$evidence_commit" \
   --arg commit_sha "$commit_sha" \
   --arg commit_date "$commit_date" \
   --arg commit_subject "$commit_subject" \
-  --argjson usages "$usages" \
   '{
     target: $target,
     evidence_commit: $evidence_commit,
@@ -130,5 +138,5 @@ jq -n \
       date: $commit_date,
       subject: $commit_subject
     },
-    literal_definition_occurrences: $usages
+    literal_definition_occurrences: .
   }'

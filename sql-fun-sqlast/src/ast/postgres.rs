@@ -1,9 +1,9 @@
 use crate::{
     StringSpan,
     ast::{
-        Access, AlterFunctionParallel, AlterOwner, AlterRelation, AlterSequence, BooleanExpr,
-        BooleanOperator, Call, CallKind, Case, CaseArm, Cast, CastTarget, Collate, Comment,
-        CompositeType, CreateOperator, CreateRule, CreateTrigger, CreateType, CurrentOf,
+        Access, AlterFunctionParallel, AlterOwner, AlterRelation, AlterSequence, AlterTypeSettings,
+        BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, CastTarget, Collate,
+        Comment, CompositeType, CreateOperator, CreateRule, CreateTrigger, CreateType, CurrentOf,
         DefaultPrivileges, Delete, DomainConstraintTarget, DropBehavior, DropFunction, DropRule,
         DropTable, DropTrigger, DropView, EnumType, Expr, Extension, ExtensionMembership,
         ForeignDataWrapper, ForeignTable, Indirection, Insert, Literal, Merge, Name, NamedArgument,
@@ -869,6 +869,11 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(class) = value.as_create_op_class_stmt().as_inner() {
             let class = CreateOperatorClass::try_from_with_tokens(&class, tokens)?;
             return Ok(Self::CreateOperatorClass(Box::new(class)));
+        }
+        if let Some(alter) = value.as_alter_type_stmt().as_inner() {
+            return Ok(Self::alter_type_settings(
+                AlterTypeSettings::try_from_with_tokens(&alter, tokens)?,
+            ));
         }
         if let Some(define) = value.as_define_stmt().as_inner() {
             match define.get_kind().as_inner() {

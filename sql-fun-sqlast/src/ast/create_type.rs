@@ -1,4 +1,4 @@
-//! Unresolved PostgreSQL shell and base type declarations.
+//! Unresolved PostgreSQL shell and base type declarations and settings changes.
 
 use crate::{
     StringSpan,
@@ -151,5 +151,81 @@ CREATE TYPE "App"."Amount" (
             Some("PASSEDBYVALUE")
         );
         assert!(statements.next().is_none());
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AlterTypeSettings {
+    name: Name,
+    options: Vec<BaseTypeOption>,
+}
+
+impl TryFromWithTokens<&syn::AlterTypeStmt> for AlterTypeSettings {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        statement: &syn::AlterTypeStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let name = Name::try_from(statement.get_type_name())?;
+        let options = required(statement.get_options().as_inner(), "base type settings")?
+            .iter()
+            .map(|node| BaseTypeOption::try_from_with_tokens(node, tokens))
+            .collect::<Result<_, _>>()?;
+        Ok(Self { name, options })
+    }
+}
+
+#[cfg(test)]
+mod test_alter_type_settings_conversion {
+    use crate::{
+        ast::{Dialect, StatementKind, StatementNode, SyntaxValue},
+        parse_statements,
+    };
+
+    #[test]
+    fn retains_unresolved_base_type_settings() {
+        for (sql, target, receive, send) in [
+            (
+                "ALTER TYPE ltree SET ( RECEIVE = ltree_recv, SEND = ltree_send );",
+                &["ltree"][..],
+                &["ltree_recv"][..],
+                &["ltree_send"][..],
+            ),
+            (
+                r#"ALTER TYPE "App"."Tree" SET (RECEIVE = "App"."Read", SEND = "App"."Write");"#,
+                &["App", "Tree"][..],
+                &["App", "Read"][..],
+                &["App", "Write"][..],
+            ),
+        ] {
+            let script = format!("SELECT 1;\n{sql}");
+            let statement = parse_statements(&script, Dialect::postgres())
+                .nth(1)
+                .unwrap()
+                .unwrap();
+            assert_eq!(statement.kind(), StatementKind::AlterTypeSettings);
+            let StatementNode::AlterTypeSettings(settings) = statement.node() else {
+                panic!("expected base type settings");
+            };
+            assert_eq!(settings.name.0, target);
+            let statement_sql = statement.span().get_from(&script).unwrap();
+            assert_eq!(settings.options.len(), 2);
+            for (option, (name, function)) in settings
+                .options
+                .iter()
+                .zip([("RECEIVE", receive), ("SEND", send)])
+            {
+                assert_eq!(option.syntax.name, name.to_ascii_lowercase());
+                let Some(SyntaxValue::Type(value)) = &option.syntax.value else {
+                    panic!("expected an unresolved function name");
+                };
+                assert_eq!(value.name.0, function);
+                assert_eq!(
+                    option.location.as_ref().unwrap().get_from(statement_sql),
+                    Some(name)
+                );
+            }
+        }
     }
 }

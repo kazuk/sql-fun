@@ -88,6 +88,9 @@ impl SemAst {
                     Self::CreateCast(Box::new(cast))
                 })),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
+            AstStatementNode::AlterTypeSettings(_) => Err(AnalysisError::unexpected_input_error(
+                "ALTER TYPE settings semantic analysis is unsupported",
+            )),
             AstStatementNode::Do(ast) => {
                 let span = ast.keyword_span.map(|span| {
                     ::sql_fun_core::analysis_problem::StringSpan::new(span.offset(), span.len())

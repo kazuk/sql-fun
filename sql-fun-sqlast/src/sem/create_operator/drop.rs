@@ -4,7 +4,8 @@ use crate::{
     context::{ParseContext, SchemaFileContext},
     names::{FullName, OperatorName},
     sem::{
-        AnalysisError, AnalysisProblem, OperatorFamily, OperatorIdentity, SemAst, TypeReference,
+        AnalysisError, AnalysisProblem, OperatorFamily, OperatorIdentity, OwnershipIdentity,
+        SemAst, TypeReference,
         operator_family::{MemberObject, MemberOwner},
         traversal::SemanticVisitor,
     },
@@ -223,12 +224,14 @@ impl DropOperator {
             .operands
             .each_ref()
             .map(|arg| arg.type_name().as_ref());
-        let canonicalize = |ty| {
-            let reference = TypeReference::from_ast(ty)?;
-            Ok::<_, AnalysisError>(context.canonicalize_type_ref(&reference))
-        };
-        let left_type = left.map(canonicalize).transpose()?.flatten();
-        let right_type = right.map(canonicalize).transpose()?.flatten();
+        let left_type = left
+            .map(|ty| OwnershipIdentity::argument_type_from_ast(ty, context))
+            .transpose()?
+            .flatten();
+        let right_type = right
+            .map(|ty| OwnershipIdentity::argument_type_from_ast(ty, context))
+            .transpose()?
+            .flatten();
         if let Some(right_type) = right_type
             && (left.is_none() || left_type.is_some())
             && let Some((identity, _)) =

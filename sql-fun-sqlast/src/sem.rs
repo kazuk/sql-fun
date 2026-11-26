@@ -34,7 +34,11 @@ pub use operator_family::{
     AlterOperatorFamily, CreateOperatorFamily, OperatorFamily, OperatorFamilyKey,
 };
 mod create_base_type;
-pub use self::create_base_type::RejectedBaseType;
+pub use self::create_base_type::{
+    BaseTypeSetting, BaseTypeSettingValue, BaseTypeSettingsChange, RejectedBaseType,
+    SupportFunctionError,
+};
+pub use self::pg_type::TypeStorage;
 mod create_comp_type;
 mod create_domain;
 mod create_enum_type;
@@ -432,8 +436,8 @@ pub enum SemAst {
     /// A PostgreSQL shell or base declaration that cannot be applied.
     RejectedBaseType(RejectedBaseType),
 
-    /// A validated PostgreSQL base-type settings change.
-    AlterTypeSettings,
+    /// An analyzed PostgreSQL base-type settings change.
+    AlterTypeSettings(Box<BaseTypeSettingsChange>),
 
     /// `create function` / `create procedure` statement
     CreateFunction(CreateFunction),

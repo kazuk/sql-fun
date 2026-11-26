@@ -255,6 +255,7 @@ fn an_outer_cast_receives_the_case_result_domain() -> testresult::TestResult {
 #[case::omitted_else("CASE WHEN true THEN $1 END")]
 #[case::string("CASE WHEN true THEN $1 ELSE '1' END")]
 #[case::two_parameters("CASE WHEN true THEN $1 ELSE $2 END")]
+// The nested CASE case timed out and was removed in 03a79201b1e93ca2cdd3151e51e47c0f5263e5b9.
 fn unanchored_result_parameters_preserve_assignments(
     #[case] expression: &str,
 ) -> testresult::TestResult {

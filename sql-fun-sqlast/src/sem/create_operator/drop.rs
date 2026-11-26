@@ -367,7 +367,7 @@ mod tests {
     use crate::{
         context::{OperatorInfoRead, ParseContext, ViewInfoRead},
         names::{FullName, OperatorName, SchemaName},
-        sem::SemAst,
+        sem::{SemAst, create_operator::builtin},
         test_helpers::{TestParseContext, ownership::apply_ownership_sql, schema_layer},
     };
 
@@ -419,7 +419,7 @@ mod tests {
         let mut inventory = TestParseContext::default();
         inventory.set_get_search_path_result(&[SchemaName::from("public")]);
         for name in ["int4", "bool"] {
-            inventory.setup_type(super::super::builtin(name));
+            inventory.setup_type(builtin(name));
         }
         let base = inventory.freeze();
         let mut context = schema_layer(Path::new("operators.sql"), &base);

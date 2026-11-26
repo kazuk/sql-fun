@@ -1,9 +1,10 @@
 use crate::{
+    AstAndContextPair,
     ast::{DropBehavior, create_operator as ast},
     context::{ParseContext, SchemaFileContext},
     names::{FullName, OperatorName},
     sem::{
-        AnalysisError, AnalysisProblem, OperatorFamily, OperatorIdentity, TypeReference,
+        AnalysisError, AnalysisProblem, OperatorFamily, OperatorIdentity, SemAst, TypeReference,
         operator_family::{MemberObject, MemberOwner},
         traversal::SemanticVisitor,
     },
@@ -134,6 +135,18 @@ impl DropOperator {
                 .targets
                 .iter()
                 .any(|target| matches!(target, DropOperatorTarget::Resolved(_)))
+    }
+
+    pub(crate) fn analyze_and_apply<C: ParseContext>(
+        ast: &ast::DropOperator,
+        mut context: C,
+    ) -> Result<AstAndContextPair<C>, AnalysisError> {
+        let statement = Self::analyze(ast, &mut context)?;
+        let context = context.apply_drop_operator(&statement)?;
+        Ok(AstAndContextPair::new(
+            SemAst::DropOperator(Box::new(statement)),
+            context,
+        ))
     }
 
     pub(crate) fn analyze(

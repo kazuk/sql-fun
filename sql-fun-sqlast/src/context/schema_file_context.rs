@@ -46,8 +46,8 @@ use crate::{
         AnalysisProblem, AnalysisState, CastDefinition, CatalogNameLookup, CollationDefinition,
         Comment, ConflictArbiterInference, CreateExtension, CreateForeignDataWrapper, CreateIndex,
         CreateOperator, CreateRule, CreateSchema, CreateTrigger, CursorInfo, DatabaseCollation,
-        ExtensionMembershipChange, FunctionTombstone, ImplicitChange, InsertConflict, Kind,
-        ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition, OperatorFamily,
+        DropOperator, ExtensionMembershipChange, FunctionTombstone, ImplicitChange, InsertConflict,
+        Kind, ObjectPrivilegeChange, OperatorClassDefinition, OperatorDefinition, OperatorFamily,
         OperatorFamilyKey, OperatorIdentity, OperatorLinks, OverloadVariant as SemOverloadVariant,
         OwnedObjectDefinition, OwnershipIdentity, ParameterConstraints, Role,
         RoleMembershipDeclaration, RuleIdentity, SemAst, SemScalarExpr, SourcePathWithSpan,
@@ -1184,10 +1184,7 @@ impl ParseContext for SchemaFileContext {
         Ok(self)
     }
 
-    fn apply_drop_operator(
-        mut self,
-        statement: &crate::sem::DropOperator,
-    ) -> Result<Self, AnalysisError> {
+    fn apply_drop_operator(mut self, statement: &DropOperator) -> Result<Self, AnalysisError> {
         statement.apply(&mut self)?;
         Ok(self)
     }

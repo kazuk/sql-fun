@@ -11,7 +11,7 @@ use crate::{
         Literal, ObjectKind,
         create_operator::{self as ast, OperatorOption, OperatorOptionValue},
     },
-    context::{BaseParseContext, ParseContext},
+    context::{BaseParseContext, OperatorInfoRead, ParseContext},
     names::{FullName, OperatorName, SchemaName},
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ExactFunction,
@@ -114,7 +114,7 @@ impl OperatorIdentity {
         ))
     }
 
-    pub(crate) fn exists_in(&self, context: &impl crate::context::OperatorInfoRead) -> bool {
+    pub(crate) fn exists_in(&self, context: &impl OperatorInfoRead) -> bool {
         context
             .get_operator_op(&self.name, self.binary(), true)
             .is_some_and(|definition| {

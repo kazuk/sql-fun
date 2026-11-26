@@ -79,7 +79,7 @@ use crate::{
     sem::{
         AlterIndex, AlterOperator, AlterOwner, AnalysisError, AnalysisState, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
-        CreateIndex, CreateOperator, CreateSchema, CreateTable, CursorInfo,
+        CreateIndex, CreateOperator, CreateSchema, CreateTable, CursorInfo, DropOperator,
         ExtensionMembershipChange, InputTypeConstraint, Kind, ObjectPrivilegeChange,
         OwnedObjectDefinition, ParameterConstraints, Role, RoleMembershipDeclaration,
         SamplingMethodLookup, SelectStatement, SemScalarExpr, VariableSet,
@@ -144,10 +144,7 @@ where
     ///
     /// # Errors
     /// Returns an error when the context cannot apply an applicable statement.
-    fn apply_drop_operator(
-        self,
-        statement: &crate::sem::DropOperator,
-    ) -> Result<Self, AnalysisError> {
+    fn apply_drop_operator(self, statement: &DropOperator) -> Result<Self, AnalysisError> {
         if statement.applicable() {
             return AnalysisError::raise_unexpected_input("catalog does not support DROP OPERATOR");
         }

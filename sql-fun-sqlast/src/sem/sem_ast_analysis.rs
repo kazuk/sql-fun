@@ -267,14 +267,7 @@ impl SemAst {
                     context,
                 ))
             }
-            AstStatementNode::DropOperator(ast) => {
-                let statement = DropOperator::analyze(ast, &mut context)?;
-                let context = context.apply_drop_operator(&statement)?;
-                Ok(AstAndContextPair::new(
-                    Self::DropOperator(Box::new(statement)),
-                    context,
-                ))
-            }
+            AstStatementNode::DropOperator(ast) => DropOperator::analyze_and_apply(ast, context),
             AstStatementNode::DropFunction(ast) => {
                 let statement = DropFunction::analyze(ast, &mut context)?;
                 let context = context.apply_drop_function(&statement)?;

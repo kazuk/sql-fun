@@ -2,6 +2,7 @@
 
 mod alter;
 pub(crate) mod member;
+mod removal;
 pub(crate) mod seed;
 
 pub use alter::AlterOperatorFamily;

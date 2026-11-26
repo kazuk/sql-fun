@@ -218,7 +218,7 @@ impl RenameUpdates {
             catalog.store_table(&name, &table);
         }
         for (name, view, dependencies) in self.views {
-            catalog.register_view(&name, &view, dependencies);
+            catalog.views.register(&name, &view, dependencies);
         }
         for index in self.indexes {
             catalog.store_index(&index);

@@ -4,9 +4,8 @@ use crate::{
     context::{BaseParseContext, ParseContext, SchemaFileContext},
     names::{FullName, OperatorName},
     sem::{
-        AnalysisError, AnalysisProblem, OperatorFamily, OperatorIdentity, OwnershipIdentity,
-        SemAst, TypeReference,
-        operator_family::{MemberObject, MemberOwner},
+        AnalysisError, AnalysisProblem, OperatorFamilyKey, OperatorIdentity, OwnershipIdentity,
+        SemAst,
     },
 };
 
@@ -30,16 +29,28 @@ pub struct DropOperator {
     dependent_removals: Vec<Box<dyn CascadeRemoval>>,
 }
 
+/// Identity of a catalog removal registration.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum CascadeTarget {
+    /// A view in the relation namespace.
+    View(FullName),
+    /// The members contributed by one overload to an operator family.
+    OperatorFamily(OperatorFamilyKey, Box<OperatorIdentity>),
+}
+
 /// Catalog action registered for an object subject to cascading deletion.
 pub trait CascadeRemoval: std::fmt::Debug + Send + Sync {
+    /// Identity used to replace and deduplicate this registration.
+    fn target(&self) -> CascadeTarget;
+
+    /// Dependency diagnostic for RESTRICT, or absence for automatic removal.
+    fn restrict_problem(&self) -> Option<String>;
+
     /// Clone the registered action.
     fn clone_box(&self) -> Box<dyn CascadeRemoval>;
 
     /// Removals registered through this object's dependents.
-    fn dependents(
-        &self,
-        _catalog: &dyn BaseParseContext,
-    ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
+    fn dependents(&self, _catalog: &dyn BaseParseContext) -> Vec<Box<dyn CascadeRemoval>> {
         Vec::new()
     }
 
@@ -54,63 +65,6 @@ impl Clone for Box<dyn CascadeRemoval> {
     fn clone(&self) -> Self {
         self.clone_box()
     }
-}
-
-#[derive(Clone, Debug)]
-struct FamilyRemoval {
-    family: OperatorFamily,
-    classes: Vec<FullName>,
-}
-
-impl CascadeRemoval for FamilyRemoval {
-    fn clone_box(&self) -> Box<dyn CascadeRemoval> {
-        Box::new(self.clone())
-    }
-
-    fn remove(&self, context: &mut SchemaFileContext) -> Result<(), AnalysisError> {
-        context.apply_operator_family_removal(&self.family, &self.classes);
-        Ok(())
-    }
-}
-
-impl FamilyRemoval {
-    fn plan(family: &OperatorFamily, targets: &[DropOperatorTarget]) -> Option<Self> {
-        let mut classes = Vec::new();
-        let mut removed = Vec::new();
-        for (slot, member) in &family.members {
-            let MemberObject::Operator(name) = &member.object else {
-                continue;
-            };
-            if matches_target(targets, name, Some(&slot.left), &slot.right) {
-                removed.push(slot);
-                if let MemberOwner::Class(class) = &member.owner {
-                    classes.push(class.as_ref().clone());
-                }
-            }
-        }
-        if removed.is_empty() {
-            return None;
-        }
-        classes.sort_by_cached_key(FullName::to_string);
-        classes.dedup();
-        let mut family = family.clone();
-        family.members.retain(|slot, member| {
-            !removed.contains(&slot)
-                && !matches!(&member.owner, MemberOwner::Class(class) if classes.contains(class))
-        });
-        Some(Self { family, classes })
-    }
-}
-
-fn matches_target(
-    targets: &[DropOperatorTarget],
-    name: &OperatorName,
-    left: Option<&TypeReference>,
-    right: &TypeReference,
-) -> bool {
-    targets.iter().any(|target| {
-        matches!(target, DropOperatorTarget::Resolved(identity) if identity.matches(name, left, right))
-    })
 }
 
 impl DropOperator {
@@ -161,39 +115,16 @@ impl DropOperator {
             valid &= !matches!(target, DropOperatorTarget::Rejected);
             targets.push(target);
         }
-        let mut dependent_removals: Vec<Box<dyn CascadeRemoval>> = Vec::new();
+        let mut dependent_removals = Vec::new();
         if valid {
-            let removals = registered_operator_removals(context, &targets);
-            if ast.behavior() == DropBehavior::Cascade {
-                dependent_removals.extend(removals.into_iter().map(|(_, removal)| removal));
-            } else if let Some((name, _)) = removals.first() {
-                Self::reject(context, format!("view {name} depends on the operator"))?;
+            dependent_removals = registered_operator_removals(context, &targets);
+            if ast.behavior() != DropBehavior::Cascade
+                && let Some(problem) = dependent_removals
+                    .iter()
+                    .find_map(|action| action.restrict_problem())
+            {
+                Self::reject(context, problem)?;
                 valid = false;
-            }
-        }
-        if valid
-            && targets
-                .iter()
-                .any(|target| matches!(target, DropOperatorTarget::Resolved(_)))
-        {
-            for key in context.operator_family_keys() {
-                let Some(family) = context.operator_family(&key) else {
-                    continue;
-                };
-                let Some(removal) = FamilyRemoval::plan(family, &targets) else {
-                    continue;
-                };
-                if ast.behavior() != DropBehavior::Cascade
-                    && let Some(class) = removal.classes.first()
-                {
-                    Self::reject(
-                        context,
-                        format!("operator class {class} depends on the operator"),
-                    )?;
-                    valid = false;
-                    break;
-                }
-                dependent_removals.push(Box::new(removal));
             }
         }
         Ok(Self {
@@ -292,24 +223,23 @@ impl DropOperator {
 fn registered_operator_removals(
     context: &impl ParseContext,
     targets: &[DropOperatorTarget],
-) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
+) -> Vec<Box<dyn CascadeRemoval>> {
     let mut pending = std::collections::VecDeque::new();
     for target in targets {
-        if let DropOperatorTarget::Resolved(identity) = target {
-            if let Some(definition) =
+        if let DropOperatorTarget::Resolved(identity) = target
+            && let Some(definition) =
                 context.get_operator_op(identity.name(), identity.binary(), true)
-                && let Some(dependents) = identity.dependents(definition)
-            {
-                pending.extend(dependents.entries().iter().cloned());
-            }
+            && let Some(dependents) = identity.dependents(definition)
+        {
+            pending.extend(dependents.entries().iter().cloned());
         }
     }
     let mut visited = std::collections::HashSet::new();
     let mut removals = Vec::new();
-    while let Some((name, removal)) = pending.pop_front() {
-        if visited.insert(name.clone()) {
+    while let Some(removal) = pending.pop_front() {
+        if visited.insert(removal.target()) {
             pending.extend(removal.dependents(context));
-            removals.push((name, removal));
+            removals.push(removal);
         }
     }
     removals
@@ -345,6 +275,9 @@ mod tests {
             "CREATE ACCESS METHOD btree TYPE INDEX HANDLER handler;
              CREATE FUNCTION cmp(integer, integer) RETURNS boolean LANGUAGE sql AS 'SELECT true';
              CREATE OPERATOR %% (LEFTARG = integer, RIGHTARG = integer, FUNCTION = cmp);
+             CREATE OPERATOR ## (LEFTARG = integer, RIGHTARG = integer, FUNCTION = cmp);
+             CREATE OPERATOR FAMILY loose_drop_ops USING btree;
+             ALTER OPERATOR FAMILY loose_drop_ops USING btree ADD OPERATOR 3 ## (integer, integer);
              CREATE OPERATOR CLASS drop_ops FOR TYPE integer USING btree AS OPERATOR 3 %% (integer, integer);",
         )?;
         assert!(parent.problems().is_empty(), "{:?}", parent.problems());
@@ -366,6 +299,23 @@ mod tests {
         assert!(child.operator_family(&family).unwrap().members.is_empty());
         assert!(parent.operator_class_definition(&class, "btree").is_some());
         assert_eq!(parent.operator_family(&family).unwrap().members.len(), 1);
+
+        let loose =
+            OperatorFamilyKey::new(FullName::with_schema("public", "loose_drop_ops"), "btree");
+        let automatic = apply_ownership_sql(
+            schema_layer(Path::new("automatic.sql"), &parent),
+            "DROP OPERATOR ## (integer, integer) RESTRICT",
+        )?;
+        assert!(matches!(automatic.ast(), SemAst::DropOperator(drop) if drop.applicable()));
+        assert!(
+            automatic
+                .context()
+                .operator_family(&loose)
+                .unwrap()
+                .members
+                .is_empty()
+        );
+        assert_eq!(parent.operator_family(&loose).unwrap().members.len(), 1);
         Ok(())
     }
 

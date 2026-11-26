@@ -10,8 +10,8 @@ use crate::{
     },
     names::{FullName, OperatorName},
     sem::{
-        AlterView, AnalysisError, AnalysisProblem, CascadeRemoval, CreateTableAs, CreateView,
-        DropView, ExtensionMembershipChange, Kind, OperatorIdentity, OwnershipIdentity,
+        AlterView, AnalysisError, AnalysisProblem, CascadeRemoval, CascadeTarget, CreateTableAs,
+        CreateView, DropView, ExtensionMembershipChange, Kind, OperatorIdentity, OwnershipIdentity,
         TriggerIdentity, TypeReference, ViewLike, ViewTombstone, problem::CreationProblem,
         search_path::expand_relation_search_path, traversal::SemanticVisitor,
     },
@@ -30,22 +30,24 @@ pub struct ViewInformationCollection {
 struct DependentView(FullName);
 
 impl CascadeRemoval for DependentView {
+    fn target(&self) -> CascadeTarget {
+        CascadeTarget::View(self.0.clone())
+    }
+
+    fn restrict_problem(&self) -> Option<String> {
+        Some(format!("view {} depends on the operator", self.0))
+    }
+
     fn clone_box(&self) -> Box<dyn CascadeRemoval> {
         Box::new(self.clone())
     }
 
-    fn dependents(
-        &self,
-        catalog: &dyn BaseParseContext,
-    ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
+    fn dependents(&self, catalog: &dyn BaseParseContext) -> Vec<Box<dyn CascadeRemoval>> {
         catalog
             .view_dependents(&self.0)
             .queries
             .into_iter()
-            .map(|name| {
-                let action = Box::new(Self(name.clone())) as Box<dyn CascadeRemoval>;
-                (name, action)
-            })
+            .map(|name| Box::new(Self(name)) as Box<dyn CascadeRemoval>)
             .collect()
     }
 
@@ -197,17 +199,18 @@ impl SchemaCatalog {
         view: &ViewLike,
         dependencies: ViewDependencies,
     ) -> Result<(), AnalysisError> {
+        let target = CascadeTarget::View(name.clone());
         if let Some(previous) = self.get_view_impl(name) {
             let old = ViewDependencies::collect(previous)?;
             for identity in old.operators {
                 if !dependencies.operators.contains(&identity) {
-                    self.update_operator_dependent(&identity, name, None);
+                    self.update_operator_dependent(&identity, &target, None);
                 }
             }
         }
         let removal = DependentView(name.clone());
         for identity in &dependencies.operators {
-            self.update_operator_dependent(identity, name, Some(&removal));
+            self.update_operator_dependent(identity, &target, Some(&removal));
         }
         self.views.register(name, view, dependencies);
         Ok(())
@@ -218,8 +221,9 @@ impl SchemaCatalog {
         name: FullName,
         tombstone: ViewTombstone,
     ) -> Result<(), AnalysisError> {
+        let target = CascadeTarget::View(name.clone());
         for identity in ViewDependencies::collect(tombstone.definition())?.operators {
-            self.update_operator_dependent(&identity, &name, None);
+            self.update_operator_dependent(&identity, &target, None);
         }
         // The relation and its composite row type disappear together.
         self.renamed_types.insert(name.clone());

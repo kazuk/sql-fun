@@ -35,16 +35,16 @@ use crate::{
     ast::ObjectKind,
     context::{
         BaseParseContext, CursorBindings, DiagnosticContext, ExtensionInfoRead, FrozenBaseContext,
-        GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead,
-        OwnershipInfoRead, ParameterTypeHints, ParseContext, RuleInfoRead, SearchPathRead,
-        SourceAccessService, TableInfoRead, ViewInfoRead,
+        GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan, OperatorFamilyInfoRead,
+        OperatorInfoRead, OwnershipInfoRead, ParameterTypeHints, ParseContext, RuleInfoRead,
+        SearchPathRead, SourceAccessService, TableInfoRead, ViewInfoRead,
         ownership::{ConfiguredRoles, OwnershipCatalog},
     },
     names::{FullName, OperatorName, SchemaName, TableName as NamesTableName},
     sem::{
         AccessMethodDefinition, AlterIndex, AlterOperator, AlterOwner, AnalysisError,
-        AnalysisProblem, AnalysisState, CascadeRemoval, CastDefinition, CatalogNameLookup,
-        CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
+        AnalysisProblem, AnalysisState, CascadeRemoval, CascadeTarget, CastDefinition,
+        CatalogNameLookup, CollationDefinition, Comment, ConflictArbiterInference, CreateExtension,
         CreateForeignDataWrapper, CreateIndex, CreateOperator, CreateRule, CreateSchema,
         CreateTrigger, CursorInfo, DatabaseCollation, DropOperator, ExtensionMembershipChange,
         FunctionTombstone, ImplicitChange, InsertConflict, Kind, ObjectPrivilegeChange,
@@ -502,9 +502,7 @@ impl SchemaFileContext {
                 .removed_operator_classes
                 .insert((name.clone(), method.clone()));
         }
-        self.catalog
-            .operator_families
-            .insert(family.key.clone(), family.clone());
+        self.catalog.store_operator_family(family);
     }
 
     pub(crate) fn remove_operator(
@@ -555,7 +553,7 @@ impl SchemaCatalog {
     fn update_operator_dependent(
         &mut self,
         identity: &OperatorIdentity,
-        name: &FullName,
+        target: &CascadeTarget,
         removal: Option<&dyn CascadeRemoval>,
     ) {
         // Protected builtin overloads cannot participate in a drop.
@@ -579,7 +577,7 @@ impl SchemaCatalog {
             definitions.insert(&key, inherited.clone());
         }
         if let Some(definition) = definitions.get_mut(&key) {
-            identity.update_dependent(definition, name, removal);
+            identity.update_dependent(definition, target, removal);
         }
     }
 }
@@ -784,14 +782,6 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
 }
 
 impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
-    fn operator_family_keys(&self) -> Vec<OperatorFamilyKey> {
-        let mut keys = self.base.operator_family_keys();
-        keys.retain(|key| !self.operator_families.contains_key(key));
-        keys.extend(self.operator_families.keys().cloned());
-        keys.sort_by_cached_key(|key| (key.name.to_string(), key.method.clone()));
-        keys
-    }
-
     fn operator_classes(&self) -> Vec<&OperatorClassDefinition> {
         self.operator_classes
             .iter()
@@ -829,6 +819,29 @@ impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
     }
 }
 
+impl SchemaCatalog {
+    fn store_operator_family(&mut self, family: &OperatorFamily) {
+        if let Some(previous) = self.operator_family(family.key()) {
+            for registration in previous.removal_registrations() {
+                self.update_operator_dependent(
+                    registration.operator(),
+                    &registration.target(),
+                    None,
+                );
+            }
+        }
+        for registration in family.removal_registrations() {
+            self.update_operator_dependent(
+                registration.operator(),
+                &registration.target(),
+                Some(&registration),
+            );
+        }
+        self.operator_families
+            .insert(family.key.clone(), family.clone());
+    }
+}
+
 impl crate::context::OperatorFamilyInfoWrite for SchemaFileContext {
     fn publish_operator_class(
         mut self,
@@ -840,9 +853,7 @@ impl crate::context::OperatorFamilyInfoWrite for SchemaFileContext {
     }
 
     fn publish_operator_family(mut self, family: &OperatorFamily) -> Self {
-        self.catalog
-            .operator_families
-            .insert(family.key.clone(), family.clone());
+        self.catalog.store_operator_family(family);
         self
     }
 }

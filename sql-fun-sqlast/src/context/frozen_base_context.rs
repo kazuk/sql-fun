@@ -513,10 +513,6 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::OperatorFamilyInfoRead for $context {
-            fn operator_family_keys(&self) -> Vec<crate::sem::OperatorFamilyKey> {
-                self.$catalog().operator_family_keys()
-            }
-
             fn operator_classes(&self) -> Vec<&crate::sem::OperatorClassDefinition> {
                 self.$catalog().operator_classes()
             }

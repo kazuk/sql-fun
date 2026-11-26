@@ -76,6 +76,7 @@ pub struct SchemaFileContext {
     lint_configuration: ::sql_fun_core::LintConfigurations,
     catalog: SchemaCatalog,
     active_extension: Option<String>,
+    postgres_builtin_schema: bool,
     statement_span: StringSpan,
     source_access_service: Option<Box<dyn SourceAccessService>>,
     diagnostic_source: Option<String>,
@@ -137,6 +138,10 @@ pub(super) struct SchemaCatalog {
 }
 
 impl SchemaFileContext {
+    pub(crate) const fn mark_postgres_builtin_schema(&mut self) {
+        self.postgres_builtin_schema = true;
+    }
+
     /// Supply immutable declarations for explicit project lint traversal.
     pub fn set_lint_configuration(&mut self, configuration: &::sql_fun_core::LintConfigurations) {
         self.lint_configuration = configuration.clone();
@@ -216,6 +221,7 @@ impl SchemaFileContext {
             lint_configuration: Default::default(),
             statement_span: StringSpan::default(),
             active_extension: None,
+            postgres_builtin_schema: false,
             source_access_service: None,
             diagnostic_source: None,
             presentations: Vec::new(),
@@ -1179,6 +1185,10 @@ mod test_parameter_type_hint_write {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn is_postgres_builtin_schema(&self) -> bool {
+        self.postgres_builtin_schema
+    }
+
     fn apply_create_cast(mut self, statement: &CreateCast) -> Result<Self, AnalysisError> {
         let (source, target, definition) = statement.entry();
         self.insert_cast(source, target, definition.clone());

@@ -382,7 +382,7 @@ impl SchemaCacheService {
             .definition_base_path(&self.home)
             .join("schema.sql");
         layer = self
-            .load_layer(&layer, &builtin_sql, None, &args, &metadata)
+            .load_layer(&layer, &builtin_sql, None, &args, &metadata, true)
             .await?;
         Self::successful(&layer.outcome)?;
         if !selection.level.includes_extensions() {
@@ -400,7 +400,7 @@ impl SchemaCacheService {
             .as_deref()
             .expect("validated project hash");
         layer = self
-            .load_layer(&layer, dump, Some(expected_hash), &args, &metadata)
+            .load_layer(&layer, dump, Some(expected_hash), &args, &metadata, false)
             .await?;
         // Mismatch takes precedence even over deterministic SQL failure, after publication.
         let actual_hash = layer
@@ -531,7 +531,7 @@ impl SchemaCacheService {
     ) -> Result<LoadedLayer, SchemaLoadError> {
         for extension in &selection.extensions {
             layer = self
-                .load_layer(&layer, extension, None, args, metadata)
+                .load_layer(&layer, extension, None, args, metadata, false)
                 .await?;
             Self::successful(&layer.outcome)?;
         }
@@ -659,6 +659,7 @@ impl SchemaCacheService {
         expected_hash: Option<&str>,
         args: &SqlFunArgs,
         metadata: &SqlFunMetadata,
+        builtin_schema: bool,
     ) -> Result<LoadedLayer, SchemaLoadError> {
         Self::successful(&parent.outcome)?;
         let requested = std::path::absolute(path).map_err(|e| SchemaLoadError::source(&e))?;
@@ -722,7 +723,7 @@ impl SchemaCacheService {
         })
         .await
         .expect("SQL reader panicked")?;
-        self.resolve_layer(parent, snapshot, token, args, metadata)
+        self.resolve_layer(parent, snapshot, token, args, metadata, builtin_schema)
             .await
     }
 
@@ -733,6 +734,7 @@ impl SchemaCacheService {
         token: ReadToken,
         args: &SqlFunArgs,
         metadata: &SqlFunMetadata,
+        builtin_schema: bool,
     ) -> Result<LoadedLayer, SchemaLoadError> {
         let path = snapshot.path().to_path_buf();
         let hash = snapshot.content_hash();
@@ -760,9 +762,12 @@ impl SchemaCacheService {
             .load(&pending, move || async move {
                 ::tokio::task::spawn_blocking(move || {
                     let base = Self::successful(&parent.outcome)?;
-                    let parsed = PostgresDialect::parse_schema_snapshot(
-                        &snapshot, &base.base, &args, &metadata,
-                    );
+                    let parse = if builtin_schema {
+                        PostgresDialect::parse_builtin_schema_snapshot
+                    } else {
+                        PostgresDialect::parse_schema_snapshot
+                    };
+                    let parsed = parse(&snapshot, &base.base, &args, &metadata);
                     let outcome = Self::outcome(parsed, &path, &base.diagnostics)?;
                     let actual = snapshot.content_hash().to_owned();
                     let key = parent.key.layer(&actual, &path)?;

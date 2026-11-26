@@ -1,5 +1,8 @@
 # CREATE VIEW
 
+A PostgreSQL view introduces a composite row type. sql-fun rejects an
+underscore-prefixed view name under the [type naming rule](create-type.md).
+
 ## Overview
 
 View analysis checks the defining SELECT and reports its ordered result columns.

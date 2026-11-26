@@ -165,6 +165,12 @@ with three or more components can be parsed and rendered, but analysis reports
 [cross_database_operator_reference](../../diagnostics/cross_database_operator_reference.md);
 it does not resolve operators in another database.
 
+For an unqualified PostgreSQL operator, an earlier schema containing the same
+operator name can hide a matching signature in a later schema. For example,
+the builtin `@@` can hide the `intarray` signature installed in `public`.
+Use `OPERATOR(public.@@)` to select that schema explicitly
+([#797](https://github.com/kazuk/sql-fun/issues/797)).
+
 ## Diagnostics
 
 - [undefined_operator]: the selected catalog does not establish the requested

@@ -48,6 +48,52 @@ fn enum_references_retain_catalog_identity(
 }
 
 #[test]
+fn generated_array_alias_follows_search_path_and_inherited_table_rename() -> testresult::TestResult
+{
+    use crate::{context::BaseParseContext, names::SchemaName, sem::TypeReference};
+
+    let base = test_helpers::postgres(
+        "CREATE SCHEMA other; CREATE TABLE public.item (id integer); \
+         CREATE TABLE other.item (id integer)",
+    )?;
+    let mut context = test_helpers::child(base.freeze());
+    context.set_search_path(&[SchemaName::from("other"), SchemaName::from("public")]);
+    let alias = FullName::from_local_name("_item");
+    let other_item = FullName::with_schema("other", "item");
+    assert_eq!(
+        context.resolve_signature_type(&alias, false, false),
+        Some(TypeReference::concrete_type_ref(&other_item, true))
+    );
+    assert!(
+        context
+            .get_type_impl(&FullName::with_schema("other", "_item"))
+            .is_none()
+    );
+
+    let context = test_helpers::apply(context, "ALTER TABLE other.item RENAME TO renamed")?;
+    assert!(
+        context
+            .array_type_by_catalog_name(&FullName::with_schema("other", "_item"))
+            .is_none()
+    );
+    assert_eq!(
+        context.resolve_signature_type(&alias, false, false),
+        Some(TypeReference::concrete_type_ref(
+            &FullName::with_schema("public", "item"),
+            true
+        ))
+    );
+    assert_eq!(
+        context.resolve_signature_type(&FullName::with_schema("other", "_renamed"), false, false),
+        Some(TypeReference::concrete_type_ref(
+            &FullName::with_schema("other", "renamed"),
+            true
+        ))
+    );
+    Ok(())
+}
+
+#[test]
 fn distinct_enums_keep_distinct_references_and_missing_name_reports_a_problem()
 -> testresult::TestResult {
     use crate::sem::{AnalysisProblem, TypeReference, problem::NameResolution};

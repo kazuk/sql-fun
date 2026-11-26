@@ -199,25 +199,15 @@ impl ColumnDefinition {
     ) -> Result<Option<TypeReference>, AnalysisError> {
         let type_ref = if let Some(ty) = &ast.type_name() {
             let type_name = FullName::from_ast_name(ty.name())?;
-            if let Some(ty) = context.get_type(&type_name) {
-                if context.dialect() == AstDialect::sqlite() {
-                    Some(TypeReference::from_full_name(type_name))
-                } else if let Some(type_ref) = ty.type_reference() {
-                    let array = ast
-                        .type_name()
-                        .as_ref()
-                        .is_some_and(|syntax| !syntax.array_bounds().is_empty());
-                    Some(TypeReference::concrete_type_ref(
-                        type_ref
-                            .full_name()
-                            .expect("catalog declaration has a nominal type identity"),
-                        array,
-                    ))
-                } else {
-                    let problem = AnalysisProblem::unexpected_dynamic_type(ty);
-                    context.report_analysis_problem(problem)?;
-                    None
-                }
+            let resolved = if context.dialect() == AstDialect::sqlite() {
+                context
+                    .get_type(&type_name)
+                    .map(|_| TypeReference::from_full_name(type_name.clone()))
+            } else {
+                context.canonicalize_type_ref(&TypeReference::from_ast(ty)?)
+            };
+            if resolved.is_some() {
+                resolved
             } else {
                 context.report_analysis_problem(AnalysisProblem::column_type_not_found(
                     table, name, &type_name,

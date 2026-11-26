@@ -8,7 +8,7 @@ WITH bootstrap AS (
     AND t.typname !~ '^pg_toast_'
     AND t.typname !~ '^pg_temp_'
     AND t.typname !~ '^pg_toast_temp_'
-    AND (t.typname !~ '^_' OR t.typname = '_record')
+    AND t.typname !~ '^_'
 ), selected AS (
   SELECT t.*, n.nspname, b.oid IS NOT NULL AS is_bootstrap
   FROM pg_catalog.pg_type t

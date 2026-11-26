@@ -716,10 +716,14 @@ def validate(binary, major, image, destination, host, bind):
     run(binary, "extract", "catalog", "--docker-image", image,
         "--docker-host-address", host, "--docker-bind-address", bind, "--output", str(output))
     validate_type_facts(output)
-    types = {row["name"]: row["category"] for row in json.loads((output / "pg_type.json").read_text())}
+    type_rows = json.loads((output / "pg_type.json").read_text())
+    types = {row["name"]: row["category"] for row in type_rows}
     assert all(isinstance(code, str) and len(code) == 1 for code in types.values())
-    assert {name: types[name] for name in ("char", "unknown", "_record", "int4range")} == {
-        "char": "Z", "unknown": "X", "_record": "P", "int4range": "R"}
+    assert {name: types[name] for name in ("char", "unknown", "record", "int4range")} == {
+        "char": "Z", "unknown": "X", "record": "P", "int4range": "R"}
+    assert "_record" not in types
+    record = next(row for row in type_rows if row["schema"] == "pg_catalog" and row["name"] == "record")
+    assert record["array_name"] == {"schema": "pg_catalog", "name": "_record"}
     functions = json.loads((output / "functions.json").read_text())
     clock = next(f for f in functions if f["name"] == "clock_timestamp")
     assert clock["overloads"][0]["args"] == [], "zero-argument functions must not have a null argument"

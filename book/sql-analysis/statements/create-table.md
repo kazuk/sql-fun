@@ -1,5 +1,8 @@
 # CREATE TABLE / CREATE TABLE AS
 
+A PostgreSQL table introduces a composite row type. sql-fun rejects an
+underscore-prefixed table name under the [type naming rule](create-type.md).
+
 ## Overview
 
 CREATE TABLE analysis checks column declarations in written order and analyzes

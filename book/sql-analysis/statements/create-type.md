@@ -33,8 +33,14 @@ written physical-layout options in order.
 A `LIKE` clause resolves its source type using PostgreSQL type names and
 the active search path. PostgreSQL validates the physical layout at execution.
 
-Generated array catalog names such as `_name` are not registered for
-user-defined base types ([#1209](https://github.com/kazuk/sql-fun/issues/1209)).
+Array catalog names such as `_name` resolve to the same type as `name[]`
+when the name is available in the builtin catalog or can be determined from
+the declared schema. Schema qualification and the active search path apply.
+Use `name[]` when PostgreSQL assigned a collision-dependent catalog name.
+sql-fun rejects PostgreSQL declarations and renames that introduce an
+underscore-prefixed type name in project or extension SQL
+([#1209](https://github.com/kazuk/sql-fun/issues/1209)). PostgreSQL-owned names
+already recorded in the builtin catalog remain available.
 An input routine can also introduce the shell through
 [CREATE FUNCTION](create-function.md). The completed type keeps the identity
 used by the support functions. Range type declarations remain unsupported.

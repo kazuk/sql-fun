@@ -110,8 +110,8 @@
     }
   },
   {
-    "name": "scalar_shadow_is_distinct_from_builtin_array",
-    "sql": "ALTER FUNCTION public.array_shadow_probe(pg_catalog._text) PARALLEL UNSAFE",
+    "name": "named_scalar_is_distinct_from_builtin_array",
+    "sql": "ALTER FUNCTION public.scalar_signature_probe(pg_catalog._text) PARALLEL UNSAFE",
     "expected": {
       "diagnostics": [
         "ownership_target_not_found"
@@ -127,6 +127,42 @@
         "ownership_argument_type_not_found"
       ],
       "columns": []
+    }
+  },
+  {
+    "name": "generated_array_matches_bracket_identity",
+    "sql": "SELECT public.schema_array_probe(_value) AS value FROM public.array_fixture",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "array_fixture_element",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "operator_catalog_operand_matches_brackets",
+    "sql": "SELECT NULL::pg_catalog._int4 OPERATOR(public.?#?) NULL::integer[] AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
     }
   }
 ]

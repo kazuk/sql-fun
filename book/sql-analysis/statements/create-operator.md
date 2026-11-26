@@ -65,6 +65,21 @@ and leaves the catalog unchanged. Builtin operators require a catalog bundle
 that includes the initial planner settings to validate changes to these four
 attributes.
 
-Extension scripts containing `DROP OPERATOR` can be parsed, but schema
-initialization stops when analysis reaches the drop. Operator removal from the
-analysis catalog is tracked in [issue #1150](https://github.com/kazuk/sql-fun/issues/1150).
+## DROP OPERATOR
+
+`DROP OPERATOR` removes the overload with the specified operand types. Use
+`NONE` as the left operand of a prefix operator. For unqualified names, sql-fun
+uses the first schema on the search path with the specified signature.
+`IF EXISTS` skips missing targets. When any target fails validation, all
+targets remain in the analysis catalog.
+
+For ordinary prefix and binary operator expressions in views, `RESTRICT`
+rejects the drop and `CASCADE` removes dependent views. A dependent operator
+class also blocks `RESTRICT` and is removed by `CASCADE`. A family entry
+that can be removed independently is removed with its operator.
+
+An index using a removed operator class remains in the analysis catalog.
+Index operator-class binding is tracked in
+[issue #547](https://github.com/kazuk/sql-fun/issues/547). A dependent
+`CHECK` constraint remains in the analysis catalog, as tracked in
+[issue #1146](https://github.com/kazuk/sql-fun/issues/1146).

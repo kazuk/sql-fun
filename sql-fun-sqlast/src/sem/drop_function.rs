@@ -152,6 +152,8 @@ pub enum ViewDropCause {
     Function(Arc<DropFunction>),
     /// A DROP VIEW statement.
     View(Arc<DropView>),
+    /// A DROP OPERATOR cascade.
+    Operator,
 }
 
 /// A deleted view definition and its deletion provenance.
@@ -166,6 +168,13 @@ impl ViewTombstone {
         Self {
             definition,
             cause: ViewDropCause::Function(Arc::clone(cause)),
+        }
+    }
+
+    pub(crate) const fn for_operator_drop(definition: ViewLike) -> Self {
+        Self {
+            definition,
+            cause: ViewDropCause::Operator,
         }
     }
 

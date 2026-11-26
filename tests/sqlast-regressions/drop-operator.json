@@ -1,0 +1,55 @@
+[
+  {
+    "name": "removed-signature",
+    "sql": "SELECT 1 OPERATOR(public.%%) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "retained-prefix",
+    "sql": "SELECT OPERATOR(public.%%) 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "removed-view",
+    "sql": "SELECT 1 AS result FROM public.drop_operator_view",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  }
+]

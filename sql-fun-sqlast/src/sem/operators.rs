@@ -144,6 +144,13 @@ pub enum OperatorDefinition {
 }
 
 impl OperatorDefinition {
+    pub(crate) const fn is_empty(&self) -> bool {
+        match self {
+            Self::Binary(entries) => entries.is_empty(),
+            Self::LeftUnary(entries) | Self::RightUnary(entries) => entries.is_empty(),
+        }
+    }
+
     pub(crate) fn has_operands(
         &self,
         left: Option<&TypeReference>,

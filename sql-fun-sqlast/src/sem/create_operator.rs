@@ -1,7 +1,9 @@
 //! PostgreSQL operator declaration analysis.
 
 mod alter;
+mod drop;
 pub use alter::AlterOperator;
+pub use drop::{DropOperator, DropOperatorTarget};
 
 use crate::{
     StringSpan,
@@ -37,7 +39,7 @@ impl OperatorIdentity {
         Some((identity, result.clone()))
     }
 
-    fn resolve<'a>(
+    pub(crate) fn resolve<'a>(
         name: &OperatorName,
         left: Option<&TypeReference>,
         right: &TypeReference,
@@ -110,6 +112,28 @@ impl OperatorIdentity {
             &name,
             &[self.left.clone(), Some(self.right.clone())],
         ))
+    }
+
+    pub(crate) fn matches(
+        &self,
+        name: &OperatorName,
+        left: Option<&TypeReference>,
+        right: &TypeReference,
+    ) -> bool {
+        &self.name == name && self.left.as_ref() == left && &self.right == right
+    }
+
+    pub(crate) fn remove_from(&self, definition: &mut OperatorDefinition) {
+        match definition {
+            OperatorDefinition::Binary(entries) => entries.retain(|entry| {
+                self.left.as_ref() != Some(entry.left_arg_type())
+                    || &self.right != entry.right_arg_type()
+            }),
+            OperatorDefinition::RightUnary(entries) => {
+                entries.retain(|entry| &self.right != entry.arg_type());
+            }
+            OperatorDefinition::LeftUnary(_) => {}
+        }
     }
 
     fn result_type<'a>(&self, context: &'a impl ParseContext) -> Option<&'a TypeReference> {
@@ -206,6 +230,15 @@ impl OperatorLinks {
         } else {
             self.negator.as_ref()
         }
+    }
+
+    pub(crate) fn without_target(mut self, identity: &OperatorIdentity) -> Self {
+        for link in [&mut self.commutator, &mut self.negator] {
+            if link.as_ref() == Some(identity) {
+                *link = None;
+            }
+        }
+        self
     }
 
     pub(crate) fn with_reciprocal(mut self, commutator: bool, identity: &OperatorIdentity) -> Self {

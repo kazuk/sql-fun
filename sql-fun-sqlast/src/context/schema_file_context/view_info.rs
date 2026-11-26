@@ -135,6 +135,22 @@ impl ViewInformationCollection {
     }
 }
 
+impl SchemaFileContext {
+    pub(crate) fn remove_operator_dependent_view(
+        &mut self,
+        name: &FullName,
+    ) -> Result<(), AnalysisError> {
+        let Some(definition) = self.get_view_impl(name).cloned() else {
+            return AnalysisError::raise_unexpected_input(
+                "resolved dependent view missing from catalog",
+            );
+        };
+        self.catalog
+            .mask_view(name.clone(), ViewTombstone::for_operator_drop(definition));
+        Ok(())
+    }
+}
+
 impl SchemaCatalog {
     pub(super) fn mask_view(&mut self, name: FullName, tombstone: ViewTombstone) {
         // The relation and its composite row type disappear together.

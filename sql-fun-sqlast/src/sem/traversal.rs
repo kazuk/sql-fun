@@ -1,7 +1,7 @@
 //! Shared-reference and mutable semantic-tree traversal without name resolution.
 
 use crate::{
-    names::{ColumnName, FullName, TableName},
+    names::{ColumnName, FullName, OperatorName, TableName},
     sem::{
         AccessKind, AliasSpec, AnalysisError, ArraySubqueryExpr, ColumnCollection,
         ColumnDefinition, ColumnRename, InsertTarget, MembershipExpr, OverloadVariant, QueryName,
@@ -46,6 +46,13 @@ pub(crate) trait SemanticVisitor {
     fn access_join(&mut self, _join: &JoinExprDataSource) {}
     fn leave_access_join(&mut self) {}
     fn access_action(&mut self, _name: &FullName, _kind: AccessKind) {}
+    fn operator_overload(
+        &mut self,
+        _name: &OperatorName,
+        _left: Option<&TypeReference>,
+        _right: &TypeReference,
+    ) {
+    }
     fn function_overload(&mut self, _name: &FullName, _overload: &OverloadVariant) {}
 
     fn function_binding(&mut self, _name: &FullName, _alias: &AliasSpec, _columns: &[ColumnName]) {}

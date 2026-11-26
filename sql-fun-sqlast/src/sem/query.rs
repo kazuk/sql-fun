@@ -1048,6 +1048,10 @@ pub struct ResolvedOperator {
     application_overloads: Option<Vec<BinaryOperatorDefinition>>,
 }
 impl ResolvedOperator {
+    pub(crate) const fn name(&self) -> &OperatorName {
+        &self.name
+    }
+
     pub(crate) fn canonicalize_grouping_key(&mut self) {
         self.signatures.clear();
         self.application_overloads = None;

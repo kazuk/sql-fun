@@ -98,6 +98,7 @@ privilege-statements	project	privilege-statements.sql	10	17,18
 foreign-data-wrapper	project	foreign-data-wrapper.sql	15	17,18
 access-methods	project	access-methods.sql	3	17,18
 drop-function	project	drop-function.sql	9	17,18
+drop-operator	project	drop-operator.sql	3	17,18
 drop-view	project	drop-view.sql	10	17,18
 extension-membership	project	extension-membership.sql	3	17,18
 alter-function-parallel	project	alter-function-parallel.sql	11	17,18

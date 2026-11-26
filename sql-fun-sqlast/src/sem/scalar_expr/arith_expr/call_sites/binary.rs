@@ -109,8 +109,8 @@ impl BinaryOpCallSite {
         let call_site = Self {
             operator_name: name.clone(),
             binding: None,
-            left_arg_type: lexpr.get_type().clone(),
-            right_arg_type: rexpr.get_type().clone(),
+            left_arg_type: Some(operator_def.left_arg_type().clone()),
+            right_arg_type: Some(operator_def.right_arg_type().clone()),
             left_arg: lexpr,
             right_arg: rexpr,
             return_type: operator_def.get_return_type().clone(),
@@ -234,6 +234,15 @@ impl BinaryOpCallSite {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        if let (Some(left), Some(right)) = (&self.left_arg_type, &self.right_arg_type) {
+            visitor.operator_overload(
+                self.binding
+                    .as_deref()
+                    .map_or(&self.operator_name, ResolvedOperator::name),
+                Some(left),
+                right,
+            );
+        }
         self.left_arg.visit(visitor)?;
         self.right_arg.visit(visitor)?;
         Ok(())

@@ -47,7 +47,7 @@ pub(crate) mod validation;
 
 pub(crate) use self::{
     create_operator::{AlterOperator, CreateOperator, DropOperator},
-    create_type::{BaseTypeOption, CreateType},
+    create_type::{AlterTypeSettings, BaseTypeOption, CreateType},
     ddl::{CompositeType, Domain, Function, Index, Schema, TableAs},
     deparse::render_full_name,
     document::{
@@ -324,6 +324,7 @@ pub(crate) enum StatementNode {
     CreateOperatorFamily(Box<operator_family::CreateOperatorFamily>),
     AlterOperatorFamily(Box<operator_family::AlterOperatorFamily>),
     CreateType(CreateType),
+    AlterTypeSettings(AlterTypeSettings),
     Sequence(Sequence),
     DropTable(DropTable),
     DropView(DropView),
@@ -450,6 +451,10 @@ impl StatementNode {
 
     const fn variable_set(value: VariableSet) -> Self {
         Self::VariableSet(value)
+    }
+
+    const fn alter_type_settings(value: AlterTypeSettings) -> Self {
+        Self::AlterTypeSettings(value)
     }
 
     const fn create_type(value: CreateType) -> Self {

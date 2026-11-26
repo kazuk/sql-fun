@@ -153,6 +153,8 @@ pub enum StatementKind {
     EnumType,
     /// A PostgreSQL shell type declaration.
     ShellType,
+    /// Change settings on a PostgreSQL base type.
+    AlterTypeSettings,
     /// A PostgreSQL base type definition.
     BaseType,
     /// A PostgreSQL operator declaration.
@@ -250,6 +252,7 @@ impl std::fmt::Display for StatementKind {
             Self::CreateOperatorClass => "CREATE OPERATOR CLASS",
             Self::CreateOperatorFamily => "CREATE OPERATOR FAMILY",
             Self::AlterOperatorFamily => "ALTER OPERATOR FAMILY",
+            Self::AlterTypeSettings => "ALTER TYPE",
             Self::ShellType | Self::BaseType => "CREATE TYPE",
             Self::Sequence => "CREATE SEQUENCE",
             Self::DropTable => "DROP TABLE",
@@ -476,6 +479,7 @@ impl StatementNode {
             Self::CreateOperatorClass(_) => StatementKind::CreateOperatorClass,
             Self::CreateOperatorFamily(_) => StatementKind::CreateOperatorFamily,
             Self::AlterOperatorFamily(_) => StatementKind::AlterOperatorFamily,
+            Self::AlterTypeSettings(_) => StatementKind::AlterTypeSettings,
             Self::CreateType(value) => value.kind(),
             Self::Sequence(_) => StatementKind::sequence(),
             Self::DropTable(_) => StatementKind::drop_table(),

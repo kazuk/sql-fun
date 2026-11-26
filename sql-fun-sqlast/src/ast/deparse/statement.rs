@@ -48,6 +48,7 @@ impl SqlEmit for StatementNode {
             Self::CreateOperatorClass(_) => writer.unsupported("CREATE OPERATOR CLASS"),
             Self::CreateOperatorFamily(_) => writer.unsupported("CREATE OPERATOR FAMILY"),
             Self::AlterOperatorFamily(_) => writer.unsupported("ALTER OPERATOR FAMILY"),
+            Self::AlterTypeSettings(_) => writer.unsupported("ALTER TYPE"),
             Self::CreateType(_) => writer.unsupported("CREATE TYPE"),
             Self::Sequence(v) => v.emit(writer),
             Self::DropTable(v) => v.emit(writer),

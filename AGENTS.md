@@ -274,6 +274,9 @@ for operational details.
 - Apply its rules for job boundaries, expected-failure validation, prerequisite
   gates, producer/provenance contracts, and helper placement.
 
+Apply the [tool version restriction policy](docs/internal-rules/workflow-design-guideline.md#tool-version-restrictions-in-check-test-flow)
+before enforcing an exact tool version in `check-test-flow` or its helpers.
+
 ## CI Image Maintenance
 
 - Before modifying `ci/github-actions/Dockerfile`, CI image dependencies, or

@@ -3,11 +3,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 if ! command -v ast-grep >/dev/null; then
-  echo 'ast-grep 0.51.1 required; see CONTRIBUTING.md.' >&2
-  exit 1
-fi
-if [[ $(ast-grep --version) != 'ast-grep 0.51.1' ]]; then
-  echo 'ast-grep 0.51.1 required; see CONTRIBUTING.md.' >&2
+  echo 'ast-grep is required on PATH; see CONTRIBUTING.md.' >&2
   exit 1
 fi
 # Git does not recurse into submodules. Include new maintained files, but never

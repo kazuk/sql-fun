@@ -8,6 +8,20 @@ define the inputs, provenance requirements, and operations for each workflow.
 For CI image changes, follow the separate
 [image maintenance workflow](../../ci/README.md).
 
+## Tool version restrictions in `check-test-flow`
+
+Enforce an exact tool version in `check-test-flow` or its helpers only when a
+specific, confirmed defect makes other versions unsuitable or prevents
+reliable operation. Link the restriction to a tracking issue that documents
+the defect and explicitly tracks checking whether a future version fixes it
+and removing the restriction once it does.
+
+Precaution and unverified compatibility with newer versions do not justify
+enforcement. Unsupported restrictions create barriers for contributors whose
+tools already work and encourage them to keep stale tooling. A reference
+version or a pin in the controlled development/CI image can support
+reproducibility independently of local enforcement.
+
 ## Validation and PR health
 
 Expected-failure validation should not leave intentionally failing checks on

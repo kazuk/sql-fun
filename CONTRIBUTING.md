@@ -55,9 +55,11 @@ cargo install --locked --force \
   sccache cargo-sort cargo-edit cargo-expand cargo-binstall typos-cli
 ```
 
-The standard lint step also requires **ast-grep 0.51.1**. The development/CI
-image includes it. Outside that image, install only its unambiguous executable
-(the `sg` alias conflicts with the system group utility):
+The standard lint step requires `ast-grep` on PATH. The development/CI image
+pins version 0.51.1, which is a reference version for local installation.
+Local lint uses the installed version to run the rules and fixtures.
+Install only the `ast-grep` executable because the `sg` alias conflicts with
+the system group utility:
 
 ```sh
 cargo install --locked --version 0.51.1 --bin ast-grep ast-grep

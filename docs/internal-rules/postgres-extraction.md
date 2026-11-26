@@ -16,8 +16,8 @@ Connection credentials and endpoint parameters are never recorded.
 
 Queries run in a repeatable-read, read-only transaction with a fixed search path,
 standard-conforming strings, UTC timezone, and a statement timeout. Format 1
-covers released PostgreSQL 17 and 18. Bootstrap object OIDs are below PostgreSQL's
-`FirstNormalObjectId` (16384); this boundary separates bootstrap catalogs from
+covers released PostgreSQL 17, 18, and 19. Bootstrap object OIDs are below
+PostgreSQL's `FirstNormalObjectId` (16384); this boundary separates bootstrap catalogs from
 objects installed later, even inside `pg_catalog`. System schema rendering covers
 `pg_catalog` and `information_schema`; function metadata retains the loader's
 SQL-callable scope, excluding internal/trigger signatures. Application schema
@@ -109,9 +109,10 @@ New metadata is serialized without changing the existing nominal-reference shape
 category is an additive optional field. Domain classification is retained through
 serialization, independently of the existing domain identity/equality contract.
 
-Committed generations and the full extraction CLI support PostgreSQL 17/18.
+Committed generations cover PostgreSQL 17 and 18. The extraction CLI also
+supports PostgreSQL 19.
 Automated category load/read round-trips use these existing committed catalogs;
-no separate oracle snapshots are maintained. PostgreSQL 15–18 behavior can be
+no separate oracle snapshots are maintained. PostgreSQL 15–19 behavior can be
 checked with small development-oracle queries without extending the CLI's
 supported version matrix or making ordinary Rust tests depend on live servers.
 

@@ -1,6 +1,9 @@
 # Extract PostgreSQL metadata
 
-Use `sql-fun extract` to obtain builtin catalogs for PostgreSQL 17 or 18.
+Use `sql-fun extract` to obtain builtin catalogs for PostgreSQL 17, 18, or 19.
+For PostgreSQL 19, connect to a running server or choose
+`--docker-image postgres:19` to generate the catalog on demand. This sql-fun
+source tree includes catalog snapshots for PostgreSQL 17 and 18.
 It writes `schema.sql`, catalog JSON files, and `metadata.json` to the directory
 you specify. Outputs include `collations.json`, `operator_classes.json`, and
 `operator_families.json`. Refresh older generations to analyze operator family

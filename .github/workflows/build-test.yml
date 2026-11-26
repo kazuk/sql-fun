@@ -867,7 +867,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        postgres: ['17', '18']
+        postgres: ['17', '18', '19']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5

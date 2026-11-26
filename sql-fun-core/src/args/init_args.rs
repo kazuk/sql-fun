@@ -81,7 +81,7 @@ pub struct InitializeArgs {
     ///
     /// Accepts space-separated values, comma-separated lists, or repeated options.
     ///
-    /// Supported `PostgreSQL` targets: 17, 18. If omitted, ask interactively.
+    /// Supported `PostgreSQL` targets: 17, 18, 19. If omitted, ask interactively.
     /// Required with --yes when `PostgreSQL` setup is selected.
     ///
     #[arg(long, value_delimiter = ',', num_args = 1..)]

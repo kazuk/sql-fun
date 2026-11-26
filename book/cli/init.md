@@ -63,7 +63,7 @@ common options of the same name.
 | `--docker-host-address <ADDRESS>` | Address used to reach the Docker host; default `127.0.0.1`. |
 | `--docker-bind-address <ADDRESS>` | Host interface for the published port; default `127.0.0.1`. |
 | `--timeout-seconds <SECONDS>` | Positive extraction timeout for each version; default `120`. |
-| `--engine-versions <VERSIONS>...` | Choose PostgreSQL versions `17` and/or `18`; supports comma-separated, space-separated, or repeated values. Required for PostgreSQL with `--yes`. |
+| `--engine-versions <VERSIONS>...` | Choose one or more PostgreSQL versions from `17`, `18`, and `19`; supports comma-separated, space-separated, or repeated values. Required for PostgreSQL with `--yes`. |
 | `-h`, `--help` | Print help. |
 
 The command exits with status 0 after successful setup, 1 on cancellation or
@@ -170,7 +170,7 @@ version. PostgreSQL setup installs builtin types, functions, operators, casts,
 and catalog objects separately from your application schema dump.
 
 Choose a source and a nonempty set of supported versions. Currently extraction
-supports PostgreSQL 17 and 18. Multiple selected datasources share installations
+supports PostgreSQL 17, 18, and 19. Multiple selected datasources share installations
 for the same version; their configured versions must be included in your
 explicit target set. Unselected datasources do not add initialization tasks.
 
@@ -181,6 +181,8 @@ Docker daemon. Choose Docker interactively or supply `--docker` explicitly.
 No source or version is selected automatically.
 
 Each version uses its registered PostgreSQL image and a temporary container.
+Choose `--engine-versions 19` with `--docker` to generate and install the
+PostgreSQL 19 catalog from the official `postgres:19` image.
 The extractor removes its own containers and volumes after completion or a
 handled interruption. Image retrieval requires network access unless the image
 is already present.

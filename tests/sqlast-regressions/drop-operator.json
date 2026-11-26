@@ -22,7 +22,7 @@
       "columns": [
         {
           "name": "result",
-          "nullability": "nullable",
+          "nullability": "unknown",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -48,6 +48,126 @@
             "local_name": "int4",
             "is_array": false
           }
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-cube-at",
+    "sql": "SELECT NULL::public.cube OPERATOR(public.@) NULL::public.cube AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-cube-tilde",
+    "sql": "SELECT NULL::public.cube OPERATOR(public.~) NULL::public.cube AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-hstore-at",
+    "sql": "SELECT NULL::public.hstore OPERATOR(public.@) NULL::public.hstore AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-hstore-tilde",
+    "sql": "SELECT NULL::public.hstore OPERATOR(public.~) NULL::public.hstore AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-seg-at",
+    "sql": "SELECT NULL::public.seg OPERATOR(public.@) NULL::public.seg AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-seg-tilde",
+    "sql": "SELECT NULL::public.seg OPERATOR(public.~) NULL::public.seg AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-_int4-at",
+    "sql": "SELECT NULL::integer[] OPERATOR(public.@) NULL::integer[] AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "upgrade-_int4-tilde",
+    "sql": "SELECT NULL::integer[] OPERATOR(public.~) NULL::integer[] AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
         }
       ]
     }

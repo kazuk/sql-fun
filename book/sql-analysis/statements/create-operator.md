@@ -33,6 +33,8 @@ when the functions are absent from the analysis catalog and skips checking
 their PostgreSQL planner signatures. Follow
 [issue #1150](https://github.com/kazuk/sql-fun/issues/1150) for bundled
 extension initialization.
+In the bundled `intarray` installation, `CREATE OPERATOR` cannot resolve
+`_int4` as an operand type.
 
 For a token defined in multiple schemas, qualify the operator with
 `OPERATOR(schema.token)` to select its schema explicitly. Unqualified lookup

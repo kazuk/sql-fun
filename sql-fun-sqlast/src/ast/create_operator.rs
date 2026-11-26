@@ -509,6 +509,19 @@ struct OperatorSignature {
     operands: [ObjectArgument; 2],
 }
 
+impl OperatorSignature {
+    fn try_from_drop_target(
+        node: &syn::Node,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let target = required(
+            node.as_object_with_args().as_inner(),
+            "DROP OPERATOR target",
+        )?;
+        Self::try_from_with_tokens(&target, tokens)
+    }
+}
+
 impl TryFromWithTokens<&syn::ObjectWithArgs> for OperatorSignature {
     type Error = AnalysisError;
 
@@ -552,13 +565,7 @@ impl TryFromWithTokens<&syn::DropStmt> for DropOperator {
         let objects = required(value.get_objects().as_inner(), "DROP OPERATOR targets")?;
         let targets = objects
             .iter()
-            .map(|node| {
-                let target = required(
-                    node.as_object_with_args().as_inner(),
-                    "DROP OPERATOR target",
-                )?;
-                OperatorSignature::try_from_with_tokens(&target, tokens)
-            })
+            .map(|node| OperatorSignature::try_from_drop_target(node, tokens))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
             targets,

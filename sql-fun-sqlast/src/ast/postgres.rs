@@ -16,7 +16,7 @@ use crate::{
         create_access_method::CreateAccessMethod,
         create_cast::CreateCast,
         create_language::CreateLanguage,
-        create_operator::AlterOperator,
+        create_operator::{AlterOperator, DropOperator},
         create_operator_class::CreateOperatorClass,
         ddl::{Domain, Function, FunctionOption, Index as DdlIndex, Schema, TableAs},
         do_statement::DoStatement,
@@ -908,6 +908,10 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 Some(syn::ObjectType::ObjectFunction) => Ok(Self::drop_function(
                     DropFunction::try_from_with_tokens(&drop, tokens)?,
                 )),
+                Some(syn::ObjectType::ObjectOperator) => {
+                    let operator = DropOperator::try_from_with_tokens(&drop, tokens)?;
+                    Ok(Self::DropOperator(operator))
+                }
                 Some(syn::ObjectType::ObjectTrigger) => {
                     Ok(Self::drop_trigger(DropTrigger::try_from(&drop)?))
                 }

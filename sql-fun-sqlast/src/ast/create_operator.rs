@@ -3,7 +3,7 @@
 use crate::{
     StringSpan,
     ast::{
-        Literal, Name, ObjectArgument, TryFromWithTokens, TypeName,
+        DropBehavior, Literal, Name, ObjectArgument, TryFromWithTokens, TypeName,
         postgres::{anchored_token_span, required},
     },
     error::AnalysisError,
@@ -355,18 +355,17 @@ impl OperatorOption {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlterOperator {
-    name: Name,
-    operands: [ObjectArgument; 2],
+    signature: OperatorSignature,
     options: Vec<OperatorOption>,
 }
 
 impl AlterOperator {
     pub(crate) const fn name(&self) -> &Name {
-        &self.name
+        &self.signature.name
     }
 
     pub(crate) const fn operands(&self) -> &[ObjectArgument; 2] {
-        &self.operands
+        &self.signature.operands
     }
 
     pub(crate) fn options(&self) -> &[OperatorOption] {
@@ -382,17 +381,8 @@ impl TryFromWithTokens<&syn::AlterOperatorStmt> for AlterOperator {
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let target = required(value.get_opername().as_inner(), "ALTER OPERATOR target")?;
-        let name = Name::try_from(target.get_objname())?;
-        let operands = required(target.get_objargs().as_inner(), "ALTER OPERATOR operands")?;
-        let [left, right] = &operands[..] else {
-            return AnalysisError::raise_unexpected_input("ALTER OPERATOR operand slots");
-        };
         Ok(Self {
-            name,
-            operands: [
-                ObjectArgument::try_from_node(left, tokens)?,
-                ObjectArgument::try_from_node(right, tokens)?,
-            ],
+            signature: OperatorSignature::try_from_with_tokens(&target, tokens)?,
             options: OperatorOption::convert_list(value.get_options(), tokens)?,
         })
     }
@@ -469,8 +459,8 @@ ALTER OPERATOR %>> (text, text)
                 let StatementNode::AlterOperator(operator) = statement.node() else {
                     panic!("expected ALTER OPERATOR");
                 };
-                assert_eq!(operator.name.0, [name]);
-                for argument in &operator.operands {
+                assert_eq!(operator.name().0, [name]);
+                for argument in operator.operands() {
                     assert_eq!(argument.type_name.as_ref().unwrap().name.0, [operand]);
                 }
                 let statement_sql = statement.span().get_from(sql).unwrap();
@@ -501,14 +491,160 @@ ALTER OPERATOR %>> (text, text)
         let StatementNode::AlterOperator(operator) = statement.node() else {
             panic!("expected ALTER OPERATOR");
         };
-        assert_eq!(operator.name.0, ["App", "-"]);
-        assert!(operator.operands[0].type_name.is_none());
+        assert_eq!(operator.name().0, ["App", "-"]);
+        assert!(operator.operands()[0].type_name.is_none());
         assert_eq!(
-            operator.operands[1].type_name.as_ref().unwrap().name.0,
+            operator.operands()[1].type_name.as_ref().unwrap().name.0,
             ["pg_catalog", "int4"],
         );
         assert_eq!(operator.options.len(), 1);
         assert_eq!(operator.options[0].key(), "restrict");
         assert!(operator.options[0].value().is_none());
+    }
+}
+
+#[derive(Clone, Debug)]
+struct OperatorSignature {
+    name: Name,
+    operands: [ObjectArgument; 2],
+}
+
+impl TryFromWithTokens<&syn::ObjectWithArgs> for OperatorSignature {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::ObjectWithArgs,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let name = Name::try_from(value.get_objname())?;
+        let operands = required(value.get_objargs().as_inner(), "operator operands")?;
+        let [left, right] = &operands[..] else {
+            return AnalysisError::raise_unexpected_input("operator operand slots");
+        };
+        Ok(Self {
+            name,
+            operands: [
+                ObjectArgument::try_from_node(left, tokens)?,
+                ObjectArgument::try_from_node(right, tokens)?,
+            ],
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+#[allow(
+    dead_code,
+    reason = "retained for future DROP OPERATOR semantic analysis"
+)]
+pub(crate) struct DropOperator {
+    targets: Vec<OperatorSignature>,
+    if_exists: bool,
+    behavior: DropBehavior,
+}
+
+impl TryFromWithTokens<&syn::DropStmt> for DropOperator {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::DropStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let objects = required(value.get_objects().as_inner(), "DROP OPERATOR targets")?;
+        let targets = objects
+            .iter()
+            .map(|node| {
+                let target = required(
+                    node.as_object_with_args().as_inner(),
+                    "DROP OPERATOR target",
+                )?;
+                OperatorSignature::try_from_with_tokens(&target, tokens)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            targets,
+            if_exists: value.get_missing_ok(),
+            behavior: DropBehavior::try_from(value.get_behavior().as_inner())?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_drop_operator_conversion {
+    use crate::{
+        ast::{Dialect, DropBehavior, StatementKind, StatementNode},
+        parse_statements,
+    };
+
+    #[test]
+    fn retains_binary_signatures_and_source_locations() {
+        // Both bundled intarray--1.4--1.5.sql scripts use these declarations.
+        let sql = r#"DROP OPERATOR @ (_int4, _int4);
+DROP OPERATOR ~ (_int4, _int4);"#;
+        let statements = parse_statements(sql, Dialect::postgres())
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(statements.len(), 2);
+        for (statement, name) in statements.iter().zip(["@", "~"]) {
+            assert_eq!(statement.kind(), StatementKind::DropOperator);
+            let StatementNode::DropOperator(drop) = statement.node() else {
+                panic!("expected DROP OPERATOR");
+            };
+            assert!(!drop.if_exists);
+            assert_eq!(drop.behavior, DropBehavior::Restrict);
+            let [target] = drop.targets.as_slice() else {
+                panic!("expected a single operator signature");
+            };
+            assert_eq!(target.name.0, [name]);
+            let statement_sql = statement.span().get_from(sql).unwrap();
+            assert!(
+                statement_sql
+                    .trim_start()
+                    .starts_with(&format!("DROP OPERATOR {name}"))
+            );
+            for argument in &target.operands {
+                let ty = argument.type_name.as_ref().unwrap();
+                assert_eq!(ty.name.0, ["_int4"]);
+                assert_eq!(ty.location.unwrap().get_from(statement_sql), Some("_int4"));
+            }
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::cascade("CASCADE", DropBehavior::Cascade)]
+    #[case::restrict("RESTRICT", DropBehavior::Restrict)]
+    fn retains_ordered_signatures_and_options(
+        #[case] option: &str,
+        #[case] behavior: DropBehavior,
+    ) {
+        let sql = format!(
+            r#"DROP OPERATOR IF EXISTS "App".- (NONE, pg_catalog.int4), "App".- (text, int4) {option};"#
+        );
+        let statement = parse_statements(&sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let StatementNode::DropOperator(drop) = statement.node() else {
+            panic!("expected DROP OPERATOR");
+        };
+        assert!(drop.if_exists);
+        assert_eq!(drop.behavior, behavior);
+        let [unary, binary] = drop.targets.as_slice() else {
+            panic!("expected two operator signatures");
+        };
+        assert_eq!(unary.name.0, ["App", "-"]);
+        assert_eq!(binary.name.0, ["App", "-"]);
+        assert!(unary.operands[0].type_name.is_none());
+        assert_eq!(
+            unary.operands[1].type_name.as_ref().unwrap().name.0,
+            ["pg_catalog", "int4"],
+        );
+        assert_eq!(
+            binary.operands[0].type_name.as_ref().unwrap().name.0,
+            ["text"]
+        );
+        assert_eq!(
+            binary.operands[1].type_name.as_ref().unwrap().name.0,
+            ["int4"]
+        );
     }
 }

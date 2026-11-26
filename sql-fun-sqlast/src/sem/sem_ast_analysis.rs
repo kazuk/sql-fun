@@ -47,6 +47,9 @@ impl SemAst {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
             }
             AstStatementNode::DropView(ast) => DropView::analyze(ast, context).map(Self::DropView),
+            AstStatementNode::DropOperator(_) => Err(AnalysisError::unexpected_input_error(
+                "DROP OPERATOR semantic analysis is unsupported",
+            )),
             AstStatementNode::CreateTextSearchTemplate(ast) => {
                 CreateTextSearchTemplate::analyze(ast, context)
                     .map(|statement| Self::CreateTextSearchTemplate(Box::new(statement)))

@@ -40,6 +40,7 @@ impl SqlEmit for StatementNode {
                 writer.unsupported("CREATE TEXT SEARCH DICTIONARY")
             }
             Self::AlterOperator(operator) => operator.emit(writer),
+            Self::DropOperator(_) => writer.unsupported("DROP OPERATOR"),
             Self::CreateCast(_) => writer.unsupported("CREATE CAST"),
             Self::CreateLanguage(_) => writer.unsupported("CREATE LANGUAGE"),
             Self::CreateAccessMethod(_) => writer.unsupported("CREATE ACCESS METHOD"),

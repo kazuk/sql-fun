@@ -18,6 +18,25 @@ use crate::{
 
 use ::sql_fun_core::IVec;
 
+fn aggregate_overload(
+    context: &impl ContextParseContext,
+    name: &FullName,
+    overload: &OverloadVariant,
+) -> bool {
+    let definitions = context.routine_definitions(name);
+    definitions
+        .iter()
+        .find(|definition| {
+            definition
+                .overloads()
+                .contains_instantiation(overload, context)
+        })
+        .map_or_else(
+            || context.is_aggregate_impl(name) && definitions.is_empty(),
+            |definition| definition.catalog_aggregate(),
+        )
+}
+
 impl FuncCallExpr {
     pub(crate) fn resolve_supplied(
         context: &mut impl ParseContext,
@@ -34,21 +53,10 @@ impl FuncCallExpr {
             .map(|argument| FuncCallArgs::new(argument, &None))
             .collect();
         let candidates = context.get_function_by_name(name);
-        if !invalid
+        let ordinary_named_call = !window
             && arguments
                 .iter()
-                .any(|argument| argument.as_named_argument().is_some())
-            && !window
-            && context.is_aggregate_impl(&context.resolve_function_name_with_search_path(name))
-        {
-            context.report_analysis_problem(
-                AnalysisProblem::function_overload_resolution_failed(
-                    name,
-                    &ArgumentBindingCollection::from_expr_list(arguments),
-                ),
-            )?;
-            invalid = true;
-        }
+                .any(|argument| argument.as_named_argument().is_some());
         let found = candidates.is_some();
         if !found {
             context.report_analysis_problem(AnalysisProblem::function_not_found(
@@ -75,6 +83,14 @@ impl FuncCallExpr {
                 if let Some((overload, common_inputs)) =
                     candidates.resolve_in_context_with_common_inputs(context, &types)
                 {
+                    let qualified = context.resolve_function_name_with_search_path(name);
+                    if ordinary_named_call && aggregate_overload(context, &qualified, &overload) {
+                        context.report_analysis_problem(
+                            AnalysisProblem::function_overload_resolution_failed(name, &types),
+                        )?;
+                        call.set_candidates(Some(Vec::new()));
+                        return Ok(call);
+                    }
                     let bound = Self::cast_common_call_operands(
                         context,
                         name,
@@ -88,6 +104,17 @@ impl FuncCallExpr {
                     context.report_analysis_problem(
                         AnalysisProblem::function_overload_resolution_failed(name, &types),
                     )?;
+                }
+            } else if ordinary_named_call {
+                let qualified = context.resolve_function_name_with_search_path(name);
+                if candidates
+                    .iter()
+                    .all(|overload| aggregate_overload(context, &qualified, overload))
+                {
+                    context.report_analysis_problem(
+                        AnalysisProblem::function_overload_resolution_failed(name, &types),
+                    )?;
+                    invalid = true;
                 }
             }
         }
@@ -1110,11 +1137,13 @@ impl FuncCallExpr {
                 .name_resolution()
                 .function_identity()
                 .is_some_and(|name| {
-                    context.is_aggregate_impl(name)
-                        || self.overload().as_ref().is_some_and(|overload| {
-                            !context.function_returns_set(name, overload)
-                                && !context.function_preserves_view_rows(name, overload)
-                        })
+                    self.overload().as_ref().map_or_else(
+                        || context.is_aggregate_impl(name),
+                        |overload| aggregate_overload(context, name, overload),
+                    ) || self.overload().as_ref().is_some_and(|overload| {
+                        !context.function_returns_set(name, overload)
+                            && !context.function_preserves_view_rows(name, overload)
+                    })
                 })
     }
 }

@@ -27,6 +27,7 @@ pub struct CreateFunction {
     overloads: FunctionOverloadCollection,
     returning_columdef: Option<ColumnCollection>,
     builtin_properties: Option<(bool, bool)>,
+    aggregate_support: Option<aggregate::AggregateSupport>,
     privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
 }
 
@@ -86,6 +87,9 @@ impl CreateFunction {
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        if let Some(support) = &self.aggregate_support {
+            support.visit_references(visitor)?;
+        }
         for overload in &self.overloads {
             overload.visit_references(visitor)?;
         }
@@ -156,6 +160,7 @@ impl CreateFunction {
             parallel_changes: Vec::new(),
             source: None,
             builtin_properties: None,
+            aggregate_support: None,
             owner: None,
             privilege_declarations: Vec::new(),
             object_kind: ObjectKind::from(20),

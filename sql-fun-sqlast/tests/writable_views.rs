@@ -272,6 +272,8 @@ fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+// The frozen-parent replacement test timed out and was removed in c5b1f0aafca37cfebb4212d1f40995d193c3e165.
+
 #[rstest::rstest]
 #[case::conditional(
     "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING;",
@@ -865,6 +867,7 @@ fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
     Ok(())
 }
 
+// The missing trigger case timed out and was removed in c5b1f0aafca37cfebb4212d1f40995d193c3e165.
 #[rstest::rstest]
 #[case::rule("CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING", "r")]
 fn missing_linked_definition_is_incomplete_not_a_dropped_capability(

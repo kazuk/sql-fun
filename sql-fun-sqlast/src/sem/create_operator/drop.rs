@@ -7,7 +7,6 @@ use crate::{
         AnalysisError, AnalysisProblem, OperatorFamily, OperatorIdentity, OwnershipIdentity,
         SemAst, TypeReference,
         operator_family::{MemberObject, MemberOwner},
-        traversal::SemanticVisitor,
     },
 };
 
@@ -31,28 +30,21 @@ pub struct DropOperator {
     dependent_removals: Vec<Box<dyn CascadeRemoval>>,
 }
 
-trait CascadeRemoval: std::fmt::Debug + Send + Sync {
+/// Catalog action registered for an object subject to cascading deletion.
+pub trait CascadeRemoval: std::fmt::Debug + Send + Sync {
+    /// Clone the registered action.
     fn clone_box(&self) -> Box<dyn CascadeRemoval>;
 
+    /// Apply the removal to the effective catalog.
+    ///
+    /// # Errors
+    /// Returns an error if the catalog cannot apply the registered removal.
     fn remove(&self, context: &mut SchemaFileContext) -> Result<(), AnalysisError>;
 }
 
 impl Clone for Box<dyn CascadeRemoval> {
     fn clone(&self) -> Self {
         self.clone_box()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct DependentView(FullName);
-
-impl CascadeRemoval for DependentView {
-    fn clone_box(&self) -> Box<dyn CascadeRemoval> {
-        Box::new(self.clone())
-    }
-
-    fn remove(&self, context: &mut SchemaFileContext) -> Result<(), AnalysisError> {
-        context.remove_operator_dependent_view(&self.0)
     }
 }
 
@@ -163,14 +155,10 @@ impl DropOperator {
         }
         let mut dependent_removals: Vec<Box<dyn CascadeRemoval>> = Vec::new();
         if valid {
-            let views = dependent_views(context, &targets)?;
+            let views = registered_view_removals(context, &targets);
             if ast.behavior == DropBehavior::Cascade {
-                dependent_removals.extend(
-                    views
-                        .into_iter()
-                        .map(|name| Box::new(DependentView(name)) as Box<dyn CascadeRemoval>),
-                );
-            } else if let Some(name) = views.first() {
+                dependent_removals.extend(views.into_iter().map(|(_, removal)| removal));
+            } else if let Some((name, _)) = views.first() {
                 Self::reject(context, format!("view {name} depends on the operator"))?;
                 valid = false;
             }
@@ -293,71 +281,29 @@ impl DropOperator {
     }
 }
 
-fn dependent_views(
+fn registered_view_removals(
     context: &impl ParseContext,
     targets: &[DropOperatorTarget],
-) -> Result<Vec<FullName>, AnalysisError> {
-    let mut removed = std::collections::HashSet::new();
-    let mut views = Vec::new();
-    if !targets
-        .iter()
-        .any(|target| matches!(target, DropOperatorTarget::Resolved(_)))
-    {
-        return Ok(views);
-    }
-    let names = context.relation_names();
-    loop {
-        let previous_count = views.len();
-        for name in &names {
-            if removed.contains(name) {
-                continue;
-            }
-            let Some(view) = context.get_view_impl(name) else {
-                continue;
-            };
-            let mut probe = ViewDependencyProbe {
-                targets,
-                removed: &removed,
-                found: false,
-            };
-            view.query().visit(&mut probe)?;
-            if probe.found {
-                removed.insert(name.clone());
-                views.push(name.clone());
-            }
-        }
-        if previous_count == views.len() {
-            return Ok(views);
+) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
+    let mut names = Vec::new();
+    for target in targets {
+        if let DropOperatorTarget::Resolved(identity) = target {
+            names.extend(context.operator_view_dependents(identity));
         }
     }
-}
-
-struct ViewDependencyProbe<'a> {
-    targets: &'a [DropOperatorTarget],
-    removed: &'a std::collections::HashSet<FullName>,
-    found: bool,
-}
-
-impl SemanticVisitor for ViewDependencyProbe<'_> {
-    fn relation_identity(&mut self, name: &FullName) {
-        self.found |= self.removed.contains(name);
-    }
-
-    fn schema_type(&mut self, reference: &TypeReference) -> Result<(), AnalysisError> {
-        if let Some(name) = reference.full_name() {
-            self.relation_identity(name);
+    let mut visited = std::collections::HashSet::new();
+    let mut removals = Vec::new();
+    let mut index = 0;
+    while let Some(name) = names.get(index).cloned() {
+        index += 1;
+        if visited.insert(name.clone())
+            && let Some(removal) = context.view_cascade_removal(&name)
+        {
+            names.extend(context.view_dependents(&name).queries);
+            removals.push((name, removal));
         }
-        Ok(())
     }
-
-    fn operator_overload(
-        &mut self,
-        name: &OperatorName,
-        left: Option<&TypeReference>,
-        right: &TypeReference,
-    ) {
-        self.found |= matches_target(self.targets, name, left, right);
-    }
+    removals
 }
 
 #[cfg(test)]
@@ -429,6 +375,8 @@ mod tests {
             "CREATE OPERATOR %% (LEFTARG=integer, RIGHTARG=integer, FUNCTION=op)",
             "CREATE OPERATOR %% (RIGHTARG=integer, FUNCTION=op)",
             "CREATE VIEW v AS SELECT 1 %% 1 AS n",
+            "CREATE VIEW child_v AS SELECT n FROM v",
+            "CREATE VIEW replaced_v AS SELECT 1 %% 1 AS n",
         ] {
             context = apply_ownership_sql(context, sql)?.into_context();
         }
@@ -436,6 +384,8 @@ mod tests {
         let parent = context.freeze();
         let operator = OperatorName::from_parts(Some("public"), "%%");
         let view = FullName::with_schema("public", "v");
+        let dependent = FullName::with_schema("public", "child_v");
+        let replaced = FullName::with_schema("public", "replaced_v");
         let restricted = apply_ownership_sql(
             schema_layer(Path::new("restrict.sql"), &parent),
             "DROP OPERATOR public.%% (NONE, integer), public.%% (integer, integer)",
@@ -453,8 +403,13 @@ mod tests {
                 .get_operator_op(&operator, true, true)
                 .is_some()
         );
-        let cascaded = apply_ownership_sql(
+        let cascade_layer = apply_ownership_sql(
             schema_layer(Path::new("cascade.sql"), &parent),
+            "CREATE OR REPLACE VIEW replaced_v AS SELECT true AS n",
+        )?
+        .into_context();
+        let cascaded = apply_ownership_sql(
+            cascade_layer,
             "DROP OPERATOR public.%% (integer, integer) CASCADE",
         )?;
         assert!(matches!(cascaded.ast(), SemAst::DropOperator(drop) if drop.applicable()));
@@ -462,7 +417,10 @@ mod tests {
         assert!(child.get_operator_op(&operator, true, true).is_none());
         assert!(child.get_operator_op(&operator, false, true).is_some());
         assert!(child.get_view_impl(&view).is_none());
+        assert!(child.get_view_impl(&dependent).is_none());
+        assert!(child.get_view_impl(&replaced).is_some());
         assert!(parent.get_view_impl(&view).is_some());
+        assert!(parent.get_view_impl(&dependent).is_some());
         assert!(parent.get_operator_op(&operator, true, true).is_some());
         Ok(())
     }

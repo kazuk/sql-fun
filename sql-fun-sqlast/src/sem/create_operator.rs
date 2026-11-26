@@ -3,7 +3,7 @@
 mod alter;
 mod drop;
 pub use alter::AlterOperator;
-pub use drop::{DropOperator, DropOperatorTarget};
+pub use drop::{CascadeRemoval, DropOperator, DropOperatorTarget};
 
 use crate::{
     StringSpan,
@@ -120,6 +120,18 @@ impl OperatorIdentity {
             .is_some_and(|definition| {
                 definition.has_operands(self.left.as_ref(), Some(&self.right))
             })
+    }
+
+    pub(crate) fn bound(
+        name: &OperatorName,
+        left: Option<&TypeReference>,
+        right: &TypeReference,
+    ) -> Self {
+        Self {
+            name: name.clone(),
+            left: left.cloned(),
+            right: right.clone(),
+        }
     }
 
     pub(crate) fn matches(

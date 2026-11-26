@@ -46,8 +46,8 @@ mod create_foreign_data_wrapper;
 mod create_function;
 mod create_operator;
 pub use create_operator::{
-    AlterOperator, CreateOperator, DropOperator, DropOperatorTarget, OperatorIdentity,
-    OperatorLinks,
+    AlterOperator, CascadeRemoval, CreateOperator, DropOperator, DropOperatorTarget,
+    OperatorIdentity, OperatorLinks,
 };
 mod create_index;
 mod create_rule;

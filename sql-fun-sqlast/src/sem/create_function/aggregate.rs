@@ -74,7 +74,17 @@ impl CreateFunction {
         }
         let name = FullName::from_ast_name(&ast.name)?;
         let mut outcome = FunctionDeclarationOutcome::default();
-        let name = Self::shell_creation_name(&name, &name, &mut outcome, context)?.unwrap_or(name);
+        let name = match crate::sem::search_path::postgres_creation_schema(context, name.schema()) {
+            Some(schema) => name.replace_schema(&schema),
+            None => {
+                outcome.reject(
+                    &name,
+                    "no existing target schema for aggregate".to_owned(),
+                    context,
+                )?;
+                name
+            }
+        };
         let params = parameters
             .iter()
             .map(|param| FunctionParam::from_ast(param, context))

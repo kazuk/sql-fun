@@ -910,7 +910,7 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 )),
                 Some(syn::ObjectType::ObjectOperator) => {
                     let operator = DropOperator::try_from_with_tokens(&drop, tokens)?;
-                    Ok(Self::DropOperator(operator))
+                    Ok(Self::drop_operator(operator))
                 }
                 Some(syn::ObjectType::ObjectTrigger) => {
                     Ok(Self::drop_trigger(DropTrigger::try_from(&drop)?))

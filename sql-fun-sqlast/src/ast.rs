@@ -466,6 +466,10 @@ impl StatementNode {
         Self::DropTable(value)
     }
 
+    const fn drop_operator(value: DropOperator) -> Self {
+        Self::DropOperator(value)
+    }
+
     const fn drop_view(value: DropView) -> Self {
         Self::DropView(value)
     }

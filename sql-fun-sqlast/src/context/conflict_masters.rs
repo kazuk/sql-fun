@@ -246,6 +246,10 @@ mod test_qualified_collation {
 }
 
 impl ConflictMasters {
+    pub(super) fn operator_classes(&self) -> &[OperatorClassDefinition] {
+        &self.operator_classes
+    }
+
     pub(super) fn operator_class_for_family_type(
         &self,
         key: &OperatorFamilyKey,

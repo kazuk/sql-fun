@@ -504,9 +504,9 @@ ALTER OPERATOR %>> (text, text)
 }
 
 #[derive(Clone, Debug)]
-struct OperatorSignature {
-    name: Name,
-    operands: [ObjectArgument; 2],
+pub(crate) struct OperatorSignature {
+    pub(crate) name: Name,
+    pub(crate) operands: [ObjectArgument; 2],
 }
 
 impl OperatorSignature {
@@ -545,14 +545,10 @@ impl TryFromWithTokens<&syn::ObjectWithArgs> for OperatorSignature {
 }
 
 #[derive(Clone, Debug)]
-#[allow(
-    dead_code,
-    reason = "retained for future DROP OPERATOR semantic analysis"
-)]
 pub(crate) struct DropOperator {
-    targets: Vec<OperatorSignature>,
-    if_exists: bool,
-    behavior: DropBehavior,
+    pub(crate) targets: Vec<OperatorSignature>,
+    pub(crate) if_exists: bool,
+    pub(crate) behavior: DropBehavior,
 }
 
 impl TryFromWithTokens<&syn::DropStmt> for DropOperator {

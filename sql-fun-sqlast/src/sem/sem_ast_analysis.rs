@@ -11,7 +11,7 @@ use crate::{
         CreateIndex, CreateLanguage, CreateOperator, CreateOperatorClass, CreateOperatorFamily,
         CreateRule, CreateSchema, CreateSequence, CreateTable, CreateTableAs,
         CreateTextSearchDictionary, CreateTextSearchTemplate, CreateTrigger, CreateView,
-        DeleteStatement, DropFunction, DropRule, DropTable, DropTrigger, DropView,
+        DeleteStatement, DropFunction, DropOperator, DropRule, DropTable, DropTrigger, DropView,
         EngineFeatureValidation, ExtensionMembershipChange, InsertStatement, MergeStatement,
         ObjectPrivilegeChange, ParameterConstraints, RelationAlteration, RoleMembershipDeclaration,
         SelectStatement, SemAst, UpdateStatement, VariableSet, cast::CreateCast,
@@ -50,9 +50,8 @@ impl SemAst {
             AstStatementNode::CreateAggregate(aggregate) => Ok(Self::create_function(
                 &CreateFunction::from_aggregate(aggregate, context)?,
             )),
-            AstStatementNode::DropOperator(_) => Err(AnalysisError::unexpected_input_error(
-                "DROP OPERATOR semantic analysis is unsupported",
-            )),
+            AstStatementNode::DropOperator(ast) => DropOperator::analyze(ast, context)
+                .map(|statement| Self::DropOperator(Box::new(statement))),
             AstStatementNode::CreateTextSearchTemplate(ast) => {
                 CreateTextSearchTemplate::analyze(ast, context)
                     .map(|statement| Self::CreateTextSearchTemplate(Box::new(statement)))
@@ -265,6 +264,14 @@ impl SemAst {
                 let context = context.apply_alter_function_parallel(&statement)?;
                 Ok(AstAndContextPair::new(
                     Self::AlterFunctionParallel(statement),
+                    context,
+                ))
+            }
+            AstStatementNode::DropOperator(ast) => {
+                let statement = DropOperator::analyze(ast, &mut context)?;
+                let context = context.apply_drop_operator(&statement)?;
+                Ok(AstAndContextPair::new(
+                    Self::DropOperator(Box::new(statement)),
                     context,
                 ))
             }

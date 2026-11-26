@@ -140,6 +140,20 @@ where
         Ok(self)
     }
 
+    /// Apply a validated DROP OPERATOR statement.
+    ///
+    /// # Errors
+    /// Returns an error when the context cannot apply an applicable statement.
+    fn apply_drop_operator(
+        self,
+        statement: &crate::sem::DropOperator,
+    ) -> Result<Self, AnalysisError> {
+        if statement.applicable() {
+            return AnalysisError::raise_unexpected_input("catalog does not support DROP OPERATOR");
+        }
+        Ok(self)
+    }
+
     /// Apply a validated ALTER OPERATOR SET statement.
     ///
     /// # Errors

@@ -103,6 +103,7 @@ pub(super) struct SchemaCatalog {
     text_search_templates: std::collections::HashMap<FullName, TextSearchTemplateDefinition>,
     text_search_dictionaries: std::collections::HashMap<FullName, TextSearchDictionaryDefinition>,
     operator_classes: Vec<OperatorClassDefinition>,
+    removed_operator_classes: std::collections::HashSet<(FullName, String)>,
     operator_families: std::collections::HashMap<OperatorFamilyKey, OperatorFamily>,
     triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
     args: SqlFunArgs,
@@ -125,7 +126,7 @@ pub(super) struct SchemaCatalog {
     // Concrete TypeReference spelling preserves canonical FullName + array identity.
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
-    operator_links: std::collections::HashMap<OperatorIdentity, OperatorLinks>,
+    operator_links: std::collections::HashMap<OperatorIdentity, Option<OperatorLinks>>,
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
     indexes: TrieMap<CreateIndex>,
@@ -183,6 +184,7 @@ impl SchemaFileContext {
                 text_search_templates: Default::default(),
                 text_search_dictionaries: Default::default(),
                 operator_classes: Default::default(),
+                removed_operator_classes: Default::default(),
                 operator_families: Default::default(),
                 triggers: std::collections::HashMap::new(),
                 args: args.clone(),
@@ -484,10 +486,74 @@ mod test_index_lookup {
     }
 }
 
+impl SchemaFileContext {
+    pub(crate) fn apply_operator_family_removal(
+        &mut self,
+        family: &OperatorFamily,
+        classes: &[FullName],
+    ) {
+        let method = &family.key.method;
+        for name in classes {
+            self.catalog
+                .operator_classes
+                .retain(|class| class.access_method() != method || !class.matches_name(name));
+            self.catalog
+                .removed_operator_classes
+                .insert((name.clone(), method.clone()));
+        }
+        self.catalog
+            .operator_families
+            .insert(family.key.clone(), family.clone());
+    }
+
+    pub(crate) fn remove_operator(
+        &mut self,
+        identity: &OperatorIdentity,
+    ) -> Result<(), AnalysisError> {
+        let Some(mut definition) = self
+            .get_operator_op(identity.name(), identity.binary(), true)
+            .cloned()
+        else {
+            return AnalysisError::raise_unexpected_input("resolved operator missing from catalog");
+        };
+        identity.remove_from(&mut definition);
+        let definitions = if identity.binary() {
+            &mut self.catalog.binary_operators
+        } else {
+            &mut self.catalog.right_unary_operators
+        };
+        definitions.insert(&identity.name().to_name_string(), definition);
+        if let Some(links) = self.catalog.operator_links(identity).cloned() {
+            for related in [links.target(true), links.target(false)]
+                .into_iter()
+                .flatten()
+            {
+                if let Some(reciprocal) = self.catalog.operator_links(related).cloned() {
+                    self.catalog
+                        .operator_links
+                        .insert(related.clone(), Some(reciprocal.without_target(identity)));
+                }
+            }
+        }
+        self.catalog.operator_links.insert(identity.clone(), None);
+        if let Some(member) = identity.extension_member()
+            && let Some(extension) = self.extension_membership(&member)
+        {
+            let change = ExtensionMembershipChange::removed(
+                extension,
+                &member,
+                self.catalog.source.as_ref(),
+            );
+            self.catalog.apply_extension_membership(&change);
+        }
+        Ok(())
+    }
+}
+
 impl OperatorInfoRead for SchemaCatalog {
     fn operator_links(&self, identity: &OperatorIdentity) -> Option<&OperatorLinks> {
         if let Some(links) = self.operator_links.get(identity) {
-            Some(links)
+            links.as_ref()
         } else {
             self.base.operator_links(identity)
         }
@@ -520,7 +586,7 @@ impl OperatorInfoRead for SchemaCatalog {
         }) else {
             return self.base.get_operator_op(name, has_left, has_right);
         };
-        Some(ope)
+        if ope.is_empty() { None } else { Some(ope) }
     }
 }
 
@@ -680,23 +746,40 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
 }
 
 impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
+    fn operator_family_keys(&self) -> Vec<OperatorFamilyKey> {
+        let mut keys = self.base.operator_family_keys();
+        keys.retain(|key| !self.operator_families.contains_key(key));
+        keys.extend(self.operator_families.keys().cloned());
+        keys.sort_by_cached_key(|key| (key.name.to_string(), key.method.clone()));
+        keys
+    }
+
+    fn operator_classes(&self) -> Vec<&OperatorClassDefinition> {
+        self.operator_classes
+            .iter()
+            .chain(self.base.operator_classes().into_iter().filter(|class| {
+                !self
+                    .removed_operator_classes
+                    .contains(&(class.qualified_name(), class.access_method().to_owned()))
+            }))
+            .collect()
+    }
+
     fn operator_class_for_family_type(
         &self,
         key: &OperatorFamilyKey,
         typ: &TypeReference,
     ) -> Option<&OperatorClassDefinition> {
-        self.operator_classes
-            .iter()
+        self.operator_classes()
+            .into_iter()
             .filter(|class| class.belongs_to(key) && class.has_input(typ))
-            .chain(self.base.operator_class_for_family_type(key, typ))
             .min_by(|left, right| (left.name(), left.schema()).cmp(&(right.name(), right.schema())))
     }
 
     fn has_default_operator_class(&self, method: &str, typ: &TypeReference) -> bool {
-        self.operator_classes
-            .iter()
+        self.operator_classes()
+            .into_iter()
             .any(|class| class.default() && class.access_method() == method && class.has_input(typ))
-            || self.base.has_default_operator_class(method, typ)
     }
 
     fn operator_family(&self, key: &OperatorFamilyKey) -> Option<&OperatorFamily> {
@@ -1075,7 +1158,7 @@ impl ParseContext for SchemaFileContext {
         let links = statement.links();
         self.catalog
             .operator_links
-            .insert(identity.clone(), links.clone());
+            .insert(identity.clone(), Some(links.clone()));
         for commutator in [true, false] {
             if let Some(related) = links.target(commutator)
                 && related != identity
@@ -1085,9 +1168,10 @@ impl ParseContext for SchemaFileContext {
                     .operator_links(related)
                     .cloned()
                     .unwrap_or_default();
-                self.catalog
-                    .operator_links
-                    .insert(related.clone(), links.with_reciprocal(commutator, identity));
+                self.catalog.operator_links.insert(
+                    related.clone(),
+                    Some(links.with_reciprocal(commutator, identity)),
+                );
             }
         }
         if let Some(member) = identity.extension_member() {
@@ -1096,10 +1180,21 @@ impl ParseContext for SchemaFileContext {
         Ok(self)
     }
 
+    fn apply_drop_operator(
+        mut self,
+        statement: &crate::sem::DropOperator,
+    ) -> Result<Self, AnalysisError> {
+        statement.apply(&mut self)?;
+        Ok(self)
+    }
+
     fn apply_alter_operator(mut self, statement: &AlterOperator) -> Result<Self, AnalysisError> {
-        self.catalog
-            .operator_links
-            .extend(statement.updates().iter().cloned());
+        self.catalog.operator_links.extend(
+            statement
+                .updates()
+                .iter()
+                .map(|(identity, links)| (identity.clone(), Some(links.clone()))),
+        );
         Ok(self)
     }
 
@@ -1527,7 +1622,14 @@ impl crate::context::ConflictInfoRead for SchemaCatalog {
         {
             Some(class)
         } else {
-            self.base.operator_class_definition(name, method)
+            if self
+                .removed_operator_classes
+                .contains(&(name.clone(), method.to_owned()))
+            {
+                None
+            } else {
+                self.base.operator_class_definition(name, method)
+            }
         }
     }
     fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {

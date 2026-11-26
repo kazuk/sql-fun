@@ -45,7 +45,10 @@ mod create_enum_type;
 mod create_foreign_data_wrapper;
 mod create_function;
 mod create_operator;
-pub use create_operator::{AlterOperator, CreateOperator, OperatorIdentity, OperatorLinks};
+pub use create_operator::{
+    AlterOperator, CreateOperator, DropOperator, DropOperatorTarget, OperatorIdentity,
+    OperatorLinks,
+};
 mod create_index;
 mod create_rule;
 mod create_schema;
@@ -461,6 +464,8 @@ pub enum SemAst {
     DropTable(DropTable),
     /// Analyzed PostgreSQL ALTER FUNCTION PARALLEL.
     AlterFunctionParallel(AlterFunctionParallel),
+    /// Analyzed PostgreSQL DROP OPERATOR.
+    DropOperator(Box<DropOperator>),
     /// Analyzed PostgreSQL DROP FUNCTION.
     DropFunction(DropFunction),
     /// PostgreSQL DROP VIEW.

@@ -75,6 +75,13 @@ impl RightUnaryCallSite {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.operator_overload(
+            self.binding
+                .as_deref()
+                .map_or(&self.operator_name, ResolvedOperator::name),
+            None,
+            self.operator_def.arg_type(),
+        );
         self.arg.visit(visitor)?;
         Ok(())
     }

@@ -238,6 +238,31 @@ impl PostgresDialect {
             args,
             metadata,
             None,
+            false,
+        )
+    }
+
+    /// Replay an extracted PostgreSQL builtin schema snapshot.
+    ///
+    /// Builtin catalog declarations can contain PostgreSQL-owned row type names
+    /// such as those of internal information schema views.
+    ///
+    /// # Errors
+    /// Returns syntax or fatal semantic analysis failures.
+    pub fn parse_builtin_schema_snapshot(
+        snapshot: &SqlFileSnapshot,
+        input_context: &FrozenBaseContext,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        Self::parse_schema_text(
+            snapshot.postgres_text(),
+            snapshot.path(),
+            input_context,
+            args,
+            metadata,
+            None,
+            true,
         )
     }
 
@@ -261,6 +286,7 @@ impl PostgresDialect {
             args,
             metadata,
             Some((search_path, extension, schema)),
+            false,
         )
     }
 
@@ -271,10 +297,14 @@ impl PostgresDialect {
         args: &::sql_fun_core::SqlFunArgs,
         metadata: &::sql_fun_core::SqlFunMetadata,
         extension_script: Option<(&[names::SchemaName], &str, Option<&str>)>,
+        builtin_schema: bool,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         let statements = split_postgres_statements(&sql_statements)?;
         let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
+        if builtin_schema {
+            context.mark_postgres_builtin_schema();
+        }
         let previous_search_path = extension_script.map(|(path, extension, schema)| {
             context.enter_extension_script(extension, schema);
             let previous = context.get_search_path().to_vec();

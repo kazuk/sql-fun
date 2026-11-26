@@ -982,6 +982,19 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         if let Some(rename) = value.as_rename_stmt().as_inner()
+            && matches!(
+                rename.get_rename_type().as_inner(),
+                Some(
+                    syn::ObjectType::ObjectTable
+                        | syn::ObjectType::ObjectView
+                        | syn::ObjectType::ObjectType
+                        | syn::ObjectType::ObjectDomain
+                )
+            )
+        {
+            AnalysisError::check_postgres_type_declaration_name(&rename.get_newname())?;
+        }
+        if let Some(rename) = value.as_rename_stmt().as_inner()
             && (matches!(
                 rename.get_rename_type().as_inner(),
                 Some(syn::ObjectType::ObjectTable)

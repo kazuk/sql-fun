@@ -1,6 +1,6 @@
 use crate::{
     TrieMap,
-    ast::ObjectKind,
+    ast::{Dialect, ObjectKind},
     context::{
         BaseParseContext, TypeInfoRead, TypeInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
@@ -36,7 +36,19 @@ impl TypeInfoRead for SchemaCatalog {
     }
 
     fn array_type_by_catalog_name(&self, key: &FullName) -> Option<TypeReference> {
-        self.base.array_type_by_catalog_name(key)
+        if let Some(reference) = self.base.array_type_by_catalog_name(key)
+            && reference
+                .full_name()
+                .is_none_or(|name| !self.renamed_types.contains(name))
+        {
+            return Some(reference);
+        }
+        if Dialect::from(self.metadata()) != Dialect::postgres()
+            || self.get_type_impl(key).is_some()
+        {
+            return None;
+        }
+        self.types.generated_array_type(key, &self.renamed_types)
     }
 
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {
@@ -104,8 +116,6 @@ impl TypeInfoWrite for SchemaFileContext {
         if definition.is_shell() {
             self.record_named_extension_member(ObjectKind::TYPE, name);
         }
-        // TODO(#1209): register PostgreSQL's generated name for the completed array
-        // once catalog lookup can resolve that key to the existing T[] identity.
     }
 
     fn replace_type_settings(&mut self, name: &FullName, definition: &TypeDefinition) {
@@ -157,6 +167,41 @@ mod shell_membership_tests {
 pub(super) struct TypeDefinitionCollection(TrieMap<TypeDefinition>);
 
 impl TypeDefinitionCollection {
+    fn generated_array_type(
+        &self,
+        key: &FullName,
+        renamed_types: &std::collections::HashSet<FullName>,
+    ) -> Option<TypeReference> {
+        let alias = key.name().as_str().strip_prefix('_')?;
+        let mut matches = self.0.iter().filter_map(|(_, definition)| {
+            let name = definition.full_name()?;
+            if name.schema() != key.schema()
+                || name.catalog() != key.catalog()
+                || !definition.has_postgres_array_type()
+                || renamed_types.contains(name)
+            {
+                return None;
+            }
+            let element = name.name().as_str();
+            // PostgreSQL reserves one byte of its 63-byte identifier for the prefix.
+            let mut end = element.len().min(62);
+            while !element.is_char_boundary(end) {
+                end -= 1;
+            }
+            if alias == &element[..end] {
+                Some(TypeReference::concrete_type_ref(name, true))
+            } else {
+                None
+            }
+        });
+        let result = matches.next()?;
+        if matches.next().is_none() {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
     pub(super) fn replace_definition(&mut self, key: &FullName, definition: &TypeDefinition) {
         self.0.insert(&key.to_string(), definition.clone());
     }

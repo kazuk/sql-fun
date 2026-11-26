@@ -1,5 +1,9 @@
 # ALTER TABLE
 
+For PostgreSQL, the table rename destination follows the
+[type naming rule](create-type.md) because the row type is renamed too.
+That rule permits underscore-prefixed column names.
+
 ## Overview
 
 Supported schema changes update the analysis catalog for later statements in

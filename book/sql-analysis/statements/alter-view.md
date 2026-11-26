@@ -1,5 +1,8 @@
 # ALTER VIEW
 
+sql-fun rejects an underscore-prefixed PostgreSQL view rename destination
+under the [type naming rule](create-type.md) because the row type is renamed too.
+
 ## Overview
 
 PostgreSQL view column defaults can be set or removed for subsequent write

@@ -909,18 +909,6 @@
     "storage": "p"
   },
   {
-    "alignment": "d",
-    "alterable_base": false,
-    "array_name": null,
-    "by_value": false,
-    "category": "P",
-    "collatable": false,
-    "length": -1,
-    "name": "_record",
-    "schema": "pg_catalog",
-    "storage": "x"
-  },
-  {
     "alignment": "i",
     "alterable_base": false,
     "array_name": null,

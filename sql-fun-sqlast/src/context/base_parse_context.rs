@@ -142,24 +142,7 @@ pub trait BaseParseContext:
         array: bool,
         allow_shell: bool,
     ) -> Option<TypeReference> {
-        expand_type_search_path(self, name, |key| {
-            if let Some(reference) = self.array_type_by_catalog_name(key) {
-                return Some(if array { None } else { Some(reference) });
-            }
-            let definition = self.get_type_impl(key)?;
-            let valid = if array {
-                definition.has_postgres_array_type()
-            } else {
-                allow_shell || !definition.is_shell()
-            };
-            // An unusable type still shadows later schemas.
-            Some(if valid {
-                Some(TypeReference::concrete_type_ref(key, array))
-            } else {
-                None
-            })
-        })
-        .flatten()
+        resolve_type_reference(self, name, array, allow_shell, true)
     }
 
     /// get `CREATE TABLE` statement by table name
@@ -236,12 +219,37 @@ pub trait BaseParseContext:
         if type_ref.is_dynamic() {
             return Some(type_ref.clone());
         }
-        let full_name = self.resolve_type_name(type_ref.full_name()?)?;
-        Some(TypeReference::concrete_type_ref(
-            &full_name,
-            type_ref.is_array().unwrap_or(false),
-        ))
+        let name = type_ref.full_name()?;
+        let array = type_ref.is_array().unwrap_or(false);
+        resolve_type_reference(self, name, array, false, false)
     }
+}
+
+fn resolve_type_reference(
+    context: &(impl BaseParseContext + ?Sized),
+    name: &FullName,
+    array: bool,
+    allow_shell: bool,
+    require_array_type: bool,
+) -> Option<TypeReference> {
+    expand_type_search_path(context, name, |key| {
+        if let Some(reference) = context.array_type_by_catalog_name(key) {
+            return Some(if array { None } else { Some(reference) });
+        }
+        let definition = context.get_type_impl(key)?;
+        let valid = if array && require_array_type {
+            definition.has_postgres_array_type()
+        } else {
+            allow_shell || !definition.is_shell()
+        };
+        // An unusable type still shadows later schemas.
+        Some(if valid {
+            Some(TypeReference::concrete_type_ref(key, array))
+        } else {
+            None
+        })
+    })
+    .flatten()
 }
 
 #[cfg(test)]

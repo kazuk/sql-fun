@@ -252,8 +252,16 @@ where
         Ok(true)
     }
 
+    /// Whether this layer is replaying the extracted PostgreSQL builtin catalog.
+    fn is_postgres_builtin_schema(&self) -> bool {
+        false
+    }
+
     /// Validate a separate PostgreSQL type-name namespace without publishing a definition.
     fn permits_type_creation(&mut self, name: &FullName) -> Result<bool, AnalysisError> {
+        if self.dialect() == Dialect::postgres() && !self.is_postgres_builtin_schema() {
+            AnalysisError::check_postgres_type_declaration_name(name.name().as_str())?;
+        }
         if self.get_type_impl(name).is_some() {
             let span = self
                 .get_source_path_with_span()
@@ -617,6 +625,33 @@ where
 
     /// apply `create index` statement to current schema
     fn apply_create_index(self, create_index: &CreateIndex) -> Result<Self, AnalysisError>;
+}
+
+#[cfg(test)]
+mod type_declaration_name_tests {
+    use crate::{
+        sem::AnalysisError,
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[rstest::rstest]
+    #[case::base("CREATE TYPE public._demo")]
+    #[case::enum_type("CREATE TYPE public._demo AS ENUM ('example')")]
+    #[case::composite("CREATE TYPE public._demo AS (id integer)")]
+    #[case::table("CREATE TABLE public._demo (id integer)")]
+    #[case::view("CREATE VIEW public._demo AS SELECT 1 AS id")]
+    #[case::domain("CREATE DOMAIN public._demo AS integer")]
+    #[case::rename_table("ALTER TABLE public.demo RENAME TO _demo")]
+    #[case::rename_view("ALTER VIEW public.demo RENAME TO _demo")]
+    #[case::rename_type("ALTER TYPE public.demo RENAME TO _demo")]
+    #[case::rename_domain("ALTER DOMAIN public.demo RENAME TO _demo")]
+    fn rejects_underscore_prefixed_type_identity(#[case] statement: &str) {
+        let result = apply_ownership_sql(ownership_context(), statement);
+        assert!(matches!(
+            result,
+            Err(AnalysisError::UnsupportedPostgresTypeName(name)) if name == "_demo"
+        ));
+    }
 }
 
 #[cfg(test)]

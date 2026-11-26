@@ -150,7 +150,7 @@ async fn snapshot_hash_and_analysis_stay_paired_after_file_changes() {
     let actual = SchemaProject::hash(&path);
     let (args, metadata) = project.schema_environment();
     let loaded = service
-        .resolve_layer(&root, snapshot, token, &args, &metadata)
+        .resolve_layer(&root, snapshot, token, &args, &metadata, false)
         .await
         .unwrap();
     assert_eq!(loaded.hash.as_deref(), Some(old.as_str()));
@@ -356,7 +356,7 @@ async fn removed_file_does_not_change_an_already_read_snapshot() {
     std::fs::remove_file(&path).unwrap();
     let (args, metadata) = project.schema_environment();
     let loaded = service
-        .resolve_layer(&root, snapshot, token, &args, &metadata)
+        .resolve_layer(&root, snapshot, token, &args, &metadata, false)
         .await
         .unwrap();
     let table = TableName::from(FullName::with_schema("public", "retained"));
@@ -369,7 +369,7 @@ async fn removed_file_does_not_change_an_already_read_snapshot() {
     );
     assert!(
         service
-            .load_layer(&root, &path, None, &args, &metadata)
+            .load_layer(&root, &path, None, &args, &metadata, false)
             .await
             .is_err()
     );

@@ -1,5 +1,9 @@
 # CREATE DOMAIN
 
+sql-fun rejects underscore-prefixed PostgreSQL domain names in CREATE DOMAIN
+and as ALTER DOMAIN RENAME TO destinations under the
+[type naming rule](create-type.md).
+
 ## Overview
 
 PostgreSQL domain analysis resolves the base type and explicit collation. The

@@ -13,6 +13,33 @@ use crate::{
     },
 };
 
+#[derive(Clone, Debug)]
+pub(super) struct AggregateSupport {
+    state: Option<TypeReference>,
+    transition: Option<ExactFunction>,
+    final_function: Option<ExactFunction>,
+    combine: Option<ExactFunction>,
+    sort_operator: Option<OperatorName>,
+}
+
+impl AggregateSupport {
+    pub(super) fn visit_references(
+        &self,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+    ) -> Result<(), AnalysisError> {
+        if let Some(state) = &self.state {
+            visitor.schema_type(state)?;
+        }
+        for function in [&self.transition, &self.final_function, &self.combine]
+            .into_iter()
+            .flatten()
+        {
+            visitor.schema_function(function.name())?;
+        }
+        Ok(())
+    }
+}
+
 impl CreateFunction {
     pub(crate) fn from_aggregate(
         ast: &CreateAggregate,
@@ -65,6 +92,13 @@ impl CreateFunction {
             .map(TypeReference::from_ast)
             .transpose()?
             .and_then(|ty| context.canonicalize_type_ref(&ty));
+        let mut bindings = AggregateSupport {
+            state: state.clone(),
+            transition: None,
+            final_function: None,
+            combine: None,
+            sort_operator: None,
+        };
         let mut result = state.clone();
         if state.is_none() || inputs.iter().any(Option::is_none) {
             outcome.reject(
@@ -111,8 +145,13 @@ impl CreateFunction {
                                 context,
                             )?;
                         }
-                        if option.key == "finalfunc" {
-                            result = return_type;
+                        match option.key.as_str() {
+                            "finalfunc" => {
+                                result = return_type;
+                                bindings.final_function = resolved;
+                            }
+                            "sfunc" => bindings.transition = resolved,
+                            _ => bindings.combine = resolved,
                         }
                     }
                 }
@@ -121,13 +160,21 @@ impl CreateFunction {
                         .as_ref()
                         .and_then(|name| OperatorName::from_ast_name(name).ok());
                     if let [Some(input)] = inputs.as_slice() {
-                        if !operator.as_ref().is_some_and(|operator| {
-                            context
-                                .get_operator(operator, true, true)
-                                .is_some_and(|definition| {
-                                    definition.has_operands(Some(input), Some(input))
-                                })
-                        }) {
+                        bindings.sort_operator = operator.as_ref().and_then(|operator| {
+                            crate::sem::search_path::expand_operator_search_path(
+                                context,
+                                operator,
+                                |candidate| {
+                                    context
+                                        .get_operator_op(candidate, true, true)
+                                        .filter(|definition| {
+                                            definition.has_operands(Some(input), Some(input))
+                                        })
+                                        .map(|_| candidate.clone())
+                                },
+                            )
+                        });
+                        if bindings.sort_operator.is_none() {
                             outcome.reject(
                                 &name,
                                 "unresolved aggregate sort operator".to_owned(),
@@ -158,6 +205,7 @@ impl CreateFunction {
             );
             context.report_analysis_problem(conflict)?;
         }
+        definition.aggregate_support = Some(bindings);
         definition.outcome = outcome;
         Ok(definition)
     }

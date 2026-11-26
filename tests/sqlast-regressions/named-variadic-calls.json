@@ -1264,5 +1264,59 @@
         }
       ]
     }
+  },
+  {
+    "name": "schema_aggregate_positional",
+    "sql": "SELECT named_sum(1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_aggregate_named_window",
+    "sql": "SELECT named_sum(x => 1) OVER () AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_aggregate_named_scalar_overload",
+    "sql": "SELECT named_sum(x => 'abc'::text) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

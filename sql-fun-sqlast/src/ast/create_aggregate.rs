@@ -144,6 +144,52 @@ mod tests {
     };
 
     #[test]
+    fn retains_aggregate_argument_forms() {
+        use super::AggregateArguments;
+
+        for (arguments, options, expected) in [
+            (
+                "(*)",
+                "SFUNC = transition, STYPE = integer",
+                Some((0, None)),
+            ),
+            (
+                "(x integer ORDER BY y text)",
+                "SFUNC = transition, STYPE = integer",
+                Some((2, Some(1))),
+            ),
+            (
+                "(ORDER BY x integer)",
+                "SFUNC = transition, STYPE = integer, HYPOTHETICAL",
+                Some((1, Some(0))),
+            ),
+            (
+                "",
+                "BASETYPE = integer, SFUNC = transition, STYPE = integer",
+                None,
+            ),
+        ] {
+            let sql = format!("CREATE AGGREGATE app.agg{arguments} ({options});");
+            let statement = parse_statements(&sql, Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap();
+            let StatementNode::CreateAggregate(aggregate) = statement.node() else {
+                panic!("expected CREATE AGGREGATE");
+            };
+            assert_eq!(aggregate.name.parts(), &["app", "agg"]);
+            let actual = match &aggregate.arguments {
+                AggregateArguments::Legacy => None,
+                AggregateArguments::Declared {
+                    parameters,
+                    direct_count,
+                } => Some((parameters.len(), *direct_count)),
+            };
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
     fn converts_bundled_aggregate_declarations() {
         for script in [
             include_str!("../../../sql-fun-home/postgres/17/extension/citext--1.4.sql"),

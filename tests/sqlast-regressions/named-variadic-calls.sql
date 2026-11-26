@@ -25,3 +25,11 @@ CREATE FUNCTION compatible_variadic(VARIADIC xs anycompatiblearray)
 RETURNS anycompatiblearray LANGUAGE SQL AS 'SELECT xs';
 CREATE FUNCTION compatible_nonarray(a anycompatiblenonarray, b anycompatible)
 RETURNS anycompatible LANGUAGE SQL AS 'SELECT a';
+
+CREATE AGGREGATE named_sum(x integer) (
+    SFUNC = pg_catalog.int4pl,
+    STYPE = integer,
+    INITCOND = '0'
+);
+
+CREATE FUNCTION named_sum(x text) RETURNS text LANGUAGE SQL AS 'SELECT x';

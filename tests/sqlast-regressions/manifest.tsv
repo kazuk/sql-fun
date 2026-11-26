@@ -85,7 +85,7 @@ create-language	project	create-language.sql	8	17,18
 create-operator	project	create-operator.sql	34	17,18
 serial-original	project	serial-original.sql	2	17,18
 serial-family	project	serial-family.sql	20	17,18
-named-variadic-calls	project	named-variadic-calls.sql	72	17,18
+named-variadic-calls	project	named-variadic-calls.sql	75	17,18
 table-checks	project	table-checks.sql	66	17,18
 table-additions	project	table-additions.sql	22	17,18
 row-security	project	row-security.sql	12	17,18

@@ -993,13 +993,17 @@ pub struct BaseTypeProblem {
     reason: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     altering: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     span: Option<StringSpan>,
 }
 
 impl DiagnosticMessage for BaseTypeProblem {
     fn diagnostic_message(&self) -> String {
-        let action = if self.altering == Some(true) { "alter" } else { "define" };
+        let action = if self.altering == Some(true) {
+            "alter"
+        } else {
+            "define"
+        };
         format!("cannot {action} base type {}: {}", self.name, self.reason)
     }
 }

@@ -3128,7 +3128,10 @@
                   "type": "string"
                 },
                 "altering": {
-                  "type": "boolean"
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
                 },
                 "span": {
                   "anyOf": [
@@ -8663,7 +8666,10 @@
                   "type": "string"
                 },
                 "altering": {
-                  "type": "boolean"
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
                 },
                 "span": {
                   "anyOf": [
@@ -14090,7 +14096,10 @@
                   "type": "string"
                 },
                 "altering": {
-                  "type": "boolean"
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
                 },
                 "span": {
                   "anyOf": [

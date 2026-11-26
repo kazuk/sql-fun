@@ -62,7 +62,9 @@ types, or `NONE` to remove the function in PostgreSQL. Analysis validates
 these settings without invoking the functions. `STORAGE` accepts `plain`,
 `external`, `extended`, or `main`. Subsequent statements use the updated
 storage setting. Fixed-size types require `plain`, and a type with a
-non-plain setting cannot return to `plain`. A rejected statement preserves
+non-plain setting cannot return to `plain`. If a statement repeats
+`STORAGE`, each assignment is checked against the setting before the
+statement and the last value takes effect. A rejected statement preserves
 the type and its previous settings.
 
 A standalone `analyze` or `test` input can report the semantic result

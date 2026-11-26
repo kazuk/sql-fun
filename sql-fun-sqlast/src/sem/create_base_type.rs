@@ -1,5 +1,9 @@
 mod alter;
 
+pub use self::alter::{
+    BaseTypeSetting, BaseTypeSettingValue, BaseTypeSettingsChange, SupportFunctionError,
+};
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
@@ -7,7 +11,8 @@ use crate::{
     context::ParseContext,
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, AstAndContextPair, SemAst, TypeDefinition, TypeReference,
+        AnalysisError, AnalysisProblem, AstAndContextPair, ExactFunction, SemAst, TypeDefinition,
+        TypeReference,
         pg_type::{PhysicalTypeLayout, TypeCategory, TypeStorage},
     },
 };
@@ -493,18 +498,19 @@ impl<'a> SupportFunctions<'a> {
             }
         }
         for (role, routine) in self.0 {
-            Self::check_signature(context, reference, role, &routine, false)?;
+            Self::resolve_support_function(context, reference, role, &routine, false)
+                .map_err(|error| invalid(&error.message(role, &routine)))?;
         }
         Ok(())
     }
 
-    fn check_signature(
+    fn resolve_support_function(
         context: &impl ParseContext,
         base: &TypeReference,
         role: &str,
         routine: &FullName,
         altering: bool,
-    ) -> Result<(), InvalidDefinition> {
+    ) -> Result<ExactFunction, SupportFunctionError> {
         let builtin = |name| {
             TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", name), false)
         };
@@ -532,21 +538,20 @@ impl<'a> SupportFunctions<'a> {
             args.extend([Some(builtin("oid")), Some(builtin("int4"))]);
             let alternate = context.find_exact_function(routine, &args);
             if exact.is_some() && alternate.is_some() {
-                return Err(invalid(&format!("ambiguous {role} function {routine}")));
+                return Err(SupportFunctionError::Ambiguous);
             }
             exact = exact.or(alternate);
         }
-        let function = exact
-            .filter(|function| function.overload().ret_type().as_ref() == Some(&result))
-            .ok_or_else(|| invalid(&format!("invalid {role} function {routine}")))?;
+        let function = exact.ok_or(SupportFunctionError::NotFound)?;
+        if function.overload().ret_type().as_ref() != Some(&result) {
+            return Err(SupportFunctionError::InvalidReturn(Box::new(function)));
+        }
         if altering
             && role == "subscript"
             && function.name() == &FullName::with_schema("pg_catalog", "array_subscript_handler")
         {
-            return Err(invalid(
-                "the built-in array subscript handler is reserved for generated array types",
-            ));
+            return Err(SupportFunctionError::ReservedHandler(Box::new(function)));
         }
-        Ok(())
+        Ok(function)
     }
 }

@@ -48,14 +48,19 @@ pub(crate) struct PhysicalTypeLayout {
     by_value: bool,
 }
 
+/// PostgreSQL storage strategy for values of a type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub(crate) enum TypeStorage {
+pub enum TypeStorage {
+    /// Store the value inline without compression.
     #[serde(rename = "p")]
     Plain,
+    /// Allow out-of-line storage without compression.
     #[serde(rename = "e")]
     External,
+    /// Allow compression and out-of-line storage.
     #[serde(rename = "x")]
     Extended,
+    /// Prefer inline storage and allow compression.
     #[serde(rename = "m")]
     Main,
 }

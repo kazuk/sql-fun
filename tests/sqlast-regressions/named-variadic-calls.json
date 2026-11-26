@@ -1333,5 +1333,23 @@
         }
       ]
     }
+  },
+  {
+    "name": "schema_aggregate_final_function_result",
+    "sql": "SELECT sum_text(1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

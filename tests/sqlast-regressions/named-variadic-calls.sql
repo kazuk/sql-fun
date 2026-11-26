@@ -33,3 +33,13 @@ CREATE AGGREGATE named_sum(x integer) (
 );
 
 CREATE FUNCTION named_sum(x text) RETURNS text LANGUAGE SQL AS 'SELECT x';
+
+CREATE FUNCTION sum_text_state(state integer) RETURNS text
+LANGUAGE SQL AS 'SELECT state::text';
+
+CREATE AGGREGATE sum_text(integer) (
+    SFUNC = pg_catalog.int4pl,
+    STYPE = integer,
+    FINALFUNC = sum_text_state,
+    INITCOND = '0'
+);

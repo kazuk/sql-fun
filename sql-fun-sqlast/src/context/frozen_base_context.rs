@@ -355,6 +355,16 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::OperatorInfoRead for $context {
+            fn operator_removals(
+                &self,
+                identity: &$crate::sem::OperatorIdentity,
+            ) -> Vec<(
+                $crate::names::FullName,
+                Box<dyn $crate::sem::CascadeRemoval>,
+            )> {
+                self.$catalog().operator_removals(identity)
+            }
+
             fn operator_is_system_required(&self, identity: &crate::sem::OperatorIdentity) -> bool {
                 self.$catalog().operator_is_system_required(identity)
             }
@@ -453,20 +463,6 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::ViewInfoRead for $context {
-            fn operator_view_dependents(
-                &self,
-                operator: &$crate::sem::OperatorIdentity,
-            ) -> Vec<$crate::names::FullName> {
-                self.$catalog().operator_view_dependents(operator)
-            }
-
-            fn view_cascade_removal(
-                &self,
-                name: &$crate::names::FullName,
-            ) -> Option<Box<dyn $crate::sem::CascadeRemoval>> {
-                self.$catalog().view_cascade_removal(name)
-            }
-
             fn view_dependents(
                 &self,
                 name: &$crate::names::FullName,

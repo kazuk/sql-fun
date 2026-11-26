@@ -10,7 +10,7 @@ use crate::{
     sem::{
         AnalysisError, FunctionOverloadCollection, OverloadVariant, ParallelSafety, ParseContext,
         TypeReference,
-        type_system::{ExactFunction, FunctionParam},
+        type_system::{ArgumentBindingCollection, ExactFunction, FunctionParam},
     },
 };
 
@@ -263,7 +263,11 @@ fn support_function(
         .map(FullName::from_ast_name)
         .transpose()?;
     Ok(name
-        .and_then(|name| context.find_exact_function(&name, arguments))
+        .and_then(|name| {
+            context
+                .find_exact_function(&name, arguments)
+                .or_else(|| binary_coercible_support_function(&name, arguments, context))
+        })
         .filter(|function| {
             !context.function_returns_set(function.name(), function.overload())
                 && !context
@@ -276,4 +280,37 @@ fn support_function(
                                 .contains_instantiation(function.overload(), context)
                     })
         }))
+}
+
+fn binary_coercible_support_function(
+    name: &FullName,
+    arguments: &[Option<TypeReference>],
+    context: &impl ParseContext,
+) -> Option<ExactFunction> {
+    let mut supplied = ArgumentBindingCollection::default();
+    for ty in arguments {
+        supplied.push(ty.clone());
+    }
+    crate::sem::search_path::expand_search_path_inst(context, name, |qualified| {
+        let candidates: Vec<_> = context
+            .get_function_impl(qualified)?
+            .iter()
+            .filter(|candidate| {
+                !candidate.is_variadic() && candidate.identity_arguments().len() == arguments.len()
+            })
+            .cloned()
+            .collect();
+        let resolved =
+            FunctionOverloadCollection::new(&candidates).resolve_in_context(context, &supplied)?;
+        let compatible = arguments
+            .iter()
+            .zip(resolved.declaration_arguments().iter())
+            .all(|(source, target)| {
+                source
+                    .as_ref()
+                    .zip(target.as_ref())
+                    .is_some_and(|(source, target)| source.is_binary_coercible_to(target, context))
+            });
+        compatible.then(|| ExactFunction::new(qualified, &resolved))
+    })
 }

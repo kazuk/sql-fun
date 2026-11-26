@@ -1,7 +1,7 @@
 use crate::{
     AstAndContextPair,
     ast::{DropBehavior, create_operator as ast},
-    context::{ParseContext, SchemaFileContext},
+    context::{BaseParseContext, ParseContext, SchemaFileContext},
     names::{FullName, OperatorName},
     sem::{
         AnalysisError, AnalysisProblem, OperatorFamily, OperatorIdentity, OwnershipIdentity,
@@ -34,6 +34,14 @@ pub struct DropOperator {
 pub trait CascadeRemoval: std::fmt::Debug + Send + Sync {
     /// Clone the registered action.
     fn clone_box(&self) -> Box<dyn CascadeRemoval>;
+
+    /// Removals registered through this object's dependents.
+    fn dependents(
+        &self,
+        _catalog: &dyn BaseParseContext,
+    ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
+        Vec::new()
+    }
 
     /// Apply the removal to the effective catalog.
     ///
@@ -155,10 +163,10 @@ impl DropOperator {
         }
         let mut dependent_removals: Vec<Box<dyn CascadeRemoval>> = Vec::new();
         if valid {
-            let views = registered_view_removals(context, &targets);
+            let removals = registered_operator_removals(context, &targets);
             if ast.behavior() == DropBehavior::Cascade {
-                dependent_removals.extend(views.into_iter().map(|(_, removal)| removal));
-            } else if let Some((name, _)) = views.first() {
+                dependent_removals.extend(removals.into_iter().map(|(_, removal)| removal));
+            } else if let Some((name, _)) = removals.first() {
                 Self::reject(context, format!("view {name} depends on the operator"))?;
                 valid = false;
             }
@@ -281,25 +289,21 @@ impl DropOperator {
     }
 }
 
-fn registered_view_removals(
+fn registered_operator_removals(
     context: &impl ParseContext,
     targets: &[DropOperatorTarget],
 ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
-    let mut names = Vec::new();
+    let mut pending = std::collections::VecDeque::new();
     for target in targets {
         if let DropOperatorTarget::Resolved(identity) = target {
-            names.extend(context.operator_view_dependents(identity));
+            pending.extend(context.operator_removals(identity));
         }
     }
     let mut visited = std::collections::HashSet::new();
     let mut removals = Vec::new();
-    let mut index = 0;
-    while let Some(name) = names.get(index).cloned() {
-        index += 1;
-        if visited.insert(name.clone())
-            && let Some(removal) = context.view_cascade_removal(&name)
-        {
-            names.extend(context.view_dependents(&name).queries);
+    while let Some((name, removal)) = pending.pop_front() {
+        if visited.insert(name.clone()) {
+            pending.extend(removal.dependents(context));
             removals.push((name, removal));
         }
     }

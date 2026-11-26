@@ -1,10 +1,7 @@
 use crate::sem::{ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport, ViewUpdateSupport};
 use crate::{
     names::FullName,
-    sem::{
-        AlterView, AnalysisError, CascadeRemoval, CreateTableAs, CreateView, DropView,
-        OperatorIdentity, ViewLike, ViewTombstone,
-    },
+    sem::{AlterView, AnalysisError, CreateTableAs, CreateView, DropView, ViewLike, ViewTombstone},
 };
 
 /// Recorded view dependents of a relation.
@@ -18,16 +15,6 @@ pub struct ViewDependents {
 
 /// get view definition
 pub trait ViewInfoRead {
-    /// Views with a registered dependency on this exact operator.
-    fn operator_view_dependents(&self, _operator: &OperatorIdentity) -> Vec<FullName> {
-        Vec::new()
-    }
-
-    /// Registered removal action for an effective view.
-    fn view_cascade_removal(&self, _name: &FullName) -> Option<Box<dyn CascadeRemoval>> {
-        None
-    }
-
     /// Inspect a view removed by a catalog cascade.
     fn view_tombstone(&self, _name: &FullName) -> Option<&ViewTombstone> {
         None

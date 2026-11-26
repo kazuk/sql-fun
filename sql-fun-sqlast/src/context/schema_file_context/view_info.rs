@@ -4,8 +4,8 @@ use crate::{
     TrieMap,
     ast::ObjectKind,
     context::{
-        ExtensionInfoRead, ObjectInfoRead, ParseContext, RuleInfoWrite, TriggerInfoWrite,
-        ViewDependents, ViewInfoRead, ViewInfoWrite,
+        BaseParseContext, ExtensionInfoRead, ObjectInfoRead, ParseContext, RuleInfoWrite,
+        TriggerInfoWrite, ViewDependents, ViewInfoRead, ViewInfoWrite,
         schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::{FullName, OperatorName},
@@ -24,7 +24,6 @@ pub struct ViewInformationCollection {
     dependencies: HashMap<FullName, ViewDependencies>,
     query_dependents: HashMap<FullName, Vec<FullName>>,
     default_dependents: HashMap<FullName, Vec<FullName>>,
-    operator_dependents: HashMap<OperatorIdentity, Vec<FullName>>,
 }
 
 #[derive(Clone, Debug)]
@@ -33,6 +32,21 @@ struct DependentView(FullName);
 impl CascadeRemoval for DependentView {
     fn clone_box(&self) -> Box<dyn CascadeRemoval> {
         Box::new(self.clone())
+    }
+
+    fn dependents(
+        &self,
+        catalog: &dyn BaseParseContext,
+    ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
+        catalog
+            .view_dependents(&self.0)
+            .queries
+            .into_iter()
+            .map(|name| {
+                let action = Box::new(Self(name.clone())) as Box<dyn CascadeRemoval>;
+                (name, action)
+            })
+            .collect()
     }
 
     fn remove(&self, context: &mut SchemaFileContext) -> Result<(), AnalysisError> {
@@ -45,7 +59,6 @@ pub(super) struct ViewDependencies {
     query: Vec<FullName>,
     defaults: Vec<FullName>,
     operators: Vec<OperatorIdentity>,
-    removal: Option<Box<dyn CascadeRemoval>>,
 }
 
 impl ViewDependencies {
@@ -60,7 +73,6 @@ impl ViewDependencies {
             query: query.0,
             defaults: defaults.0,
             operators: query.1,
-            removal: None,
         })
     }
 
@@ -115,6 +127,17 @@ impl SemanticVisitor for RelationReferences {
 }
 
 impl ViewInformationCollection {
+    pub(super) fn has_registered_definition(&self, name: &FullName) -> bool {
+        self.dependencies.contains_key(name)
+    }
+
+    pub(super) fn operator_signatures(&self, name: &FullName) -> &[OperatorIdentity] {
+        match self.dependencies.get(name) {
+            Some(dependencies) => &dependencies.operators,
+            None => &[],
+        }
+    }
+
     pub(super) fn append_names(&self, names: &mut Vec<FullName>) {
         for name in &self.names {
             if !names.contains(name) {
@@ -138,7 +161,7 @@ impl ViewInformationCollection {
         &mut self,
         key: &FullName,
         value: &ViewLike,
-        mut dependencies: ViewDependencies,
+        dependencies: ViewDependencies,
     ) {
         let previous = self.dependencies.remove(key).unwrap_or_default();
         ViewDependencies::update_index(
@@ -153,13 +176,6 @@ impl ViewInformationCollection {
             &previous.defaults,
             &dependencies.defaults,
         );
-        ViewDependencies::update_index(
-            &mut self.operator_dependents,
-            key,
-            &previous.operators,
-            &dependencies.operators,
-        );
-        dependencies.removal = Some(Box::new(DependentView(key.clone())));
         self.dependencies.insert(key.clone(), dependencies);
         self.insert(key, value);
     }
@@ -186,6 +202,21 @@ impl SchemaFileContext {
 }
 
 impl SchemaCatalog {
+    pub(super) fn register_view(
+        &mut self,
+        name: &FullName,
+        view: &ViewLike,
+        dependencies: ViewDependencies,
+    ) {
+        self.operator_removals.replace(
+            name,
+            self.views.operator_signatures(name),
+            &dependencies.operators,
+            &DependentView(name.clone()),
+        );
+        self.views.register(name, view, dependencies);
+    }
+
     pub(super) fn mask_view(&mut self, name: FullName, tombstone: ViewTombstone) {
         // The relation and its composite row type disappear together.
         self.renamed_types.insert(name.clone());
@@ -194,25 +225,6 @@ impl SchemaCatalog {
 }
 
 impl ViewInfoRead for SchemaCatalog {
-    fn operator_view_dependents(&self, operator: &OperatorIdentity) -> Vec<FullName> {
-        let mut owners = self.base.operator_view_dependents(operator);
-        owners.retain(|owner| !self.views.dependencies.contains_key(owner));
-        if let Some(local) = self.views.operator_dependents.get(operator) {
-            owners.extend(local.iter().cloned());
-        }
-        owners.retain(|owner| self.get_view_impl(owner).is_some());
-        owners
-    }
-
-    fn view_cascade_removal(&self, name: &FullName) -> Option<Box<dyn CascadeRemoval>> {
-        self.get_view_impl(name)?;
-        if let Some(dependencies) = self.views.dependencies.get(name) {
-            dependencies.removal.clone()
-        } else {
-            self.base.view_cascade_removal(name)
-        }
-    }
-
     fn view_tombstone(&self, key: &FullName) -> Option<&ViewTombstone> {
         let key = self.relation_identity(key);
         if let Some(tombstone) = self.view_tombstones.get(&key) {

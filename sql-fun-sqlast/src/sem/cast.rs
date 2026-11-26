@@ -8,7 +8,7 @@ use crate::{
     context::ParseContext,
     sem::{
         AnalysisError, AnalysisProblem, OwnershipIdentity, PgBuiltInType, TypeDefinition,
-        TypeReference, ownership::RequestedIdentity, pg_type::PhysicalTypeLayout,
+        TypeReference, ownership::RequestedIdentity,
     },
 };
 
@@ -226,6 +226,11 @@ impl CreateCast {
                         None,
                     ))?;
                 }
+                if matches!(declaration.definition.method, Some(CastMethod::Binary)) {
+                    context.report_analysis_problem(
+                        AnalysisProblem::UnverifiedBinaryCastCompatibility(None),
+                    )?;
+                }
                 Ok(Some(declaration))
             }
             Err(AnalysisError::UnexpectedInput(reason)) => {
@@ -259,16 +264,7 @@ impl CreateCast {
                 Self::validate_function(function, &source, &target, context)?;
                 CastMethod::Function
             }
-            AstCastMethod::Binary => {
-                let source_layout = Self::physical_layout(&source, context);
-                let target_layout = Self::physical_layout(&target, context);
-                if source_layout.is_none() || source_layout != target_layout {
-                    return Err(Self::invalid(
-                        "source and target data types are not physically compatible",
-                    ));
-                }
-                CastMethod::Binary
-            }
+            AstCastMethod::Binary => CastMethod::Binary,
             AstCastMethod::InOut => CastMethod::InOut,
         };
         if source == target && !matches!(method, CastMethod::Function) {
@@ -307,24 +303,6 @@ impl CreateCast {
             ));
         }
         Ok(reference)
-    }
-
-    fn physical_layout(
-        reference: &TypeReference,
-        context: &impl ParseContext,
-    ) -> Option<PhysicalTypeLayout> {
-        if reference.is_array() == Some(true) {
-            return None;
-        }
-        let definition = reference.definition_from_catalog(context)?;
-        if definition.is_builtin()
-            && definition
-                .intrinsic_category()
-                .is_some_and(|category| matches!(category.code(), 'A' | 'R'))
-        {
-            return None;
-        }
-        definition.physical_layout()
     }
 
     fn validate_function(
@@ -414,6 +392,7 @@ mod application_tests {
         #[case] clause: &str,
         #[case] assignment: bool,
         #[case] implicit: bool,
+        #[values("WITH INOUT", "WITHOUT FUNCTION")] method: &str,
     ) -> testresult::TestResult {
         let context = apply_ownership_sql(
             ownership_context(),
@@ -427,22 +406,32 @@ mod application_tests {
         let target =
             TypeReference::concrete_type_ref(&FullName::with_schema("public", "cast_b"), false);
 
-        let context = apply_ownership_sql(
-            context,
-            "CREATE CAST (public.cast_a AS public.cast_b) WITHOUT FUNCTION",
-        )?
-        .into_context();
-        assert_eq!(context.problems()[0].code(), "invalid_cast_declaration");
-        assert!(!context.has_declared_cast(&source, &target));
-
-        let declaration =
-            format!("CREATE CAST (public.cast_a AS public.cast_b) WITH INOUT {clause}");
+        let declaration = format!("CREATE CAST (public.cast_a AS public.cast_b) {method} {clause}");
         let context = apply_ownership_sql(context, &declaration)?.into_context();
+        let binary = method == "WITHOUT FUNCTION";
+        if binary {
+            let [problem] = context.problems() else {
+                panic!("expected one binary cast warning");
+            };
+            assert_eq!(problem.code(), "unverified_binary_cast_compatibility");
+            assert_eq!(
+                problem.severity(),
+                sql_fun_core::analysis_problem::DiagnosticSeverity::Warning
+            );
+        } else {
+            assert!(context.problems().is_empty());
+        }
         let frozen = context.freeze();
         let layer = schema_layer(std::path::Path::new("later.sql"), &frozen);
         assert!(layer.has_declared_cast(&source, &target));
         assert!(!layer.has_declared_cast(&target, &source));
-        assert!(layer.get_explicit_cast(&source, &target).is_some());
+        let cast = layer
+            .get_explicit_cast(&source, &target)
+            .expect("published cast");
+        assert_eq!(
+            matches!(cast.method, Some(super::CastMethod::Binary)),
+            binary
+        );
         assert_eq!(
             layer.get_assignment_cast(&source, &target).is_some(),
             assignment

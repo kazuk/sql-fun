@@ -126,11 +126,11 @@
     }
   },
   {
-    "name": "invalid-physical-layout",
-    "sql": "CREATE CAST (uuid AS macaddr8) WITHOUT FUNCTION",
+    "name": "binary-unequal-layout-warning",
+    "sql": "CREATE CAST (macaddr8 AS uuid) WITHOUT FUNCTION",
     "expected": {
       "diagnostics": [
-        "invalid_cast_declaration",
+        "unverified_binary_cast_compatibility",
         "query_deparse"
       ],
       "columns": []
@@ -227,6 +227,119 @@
         "query_deparse"
       ],
       "columns": []
+    }
+  },
+  {
+    "name": "binary-equal-layout-warning",
+    "sql": "CREATE CAST (float4 AS oid) WITHOUT FUNCTION",
+    "expected": {
+      "diagnostics": [
+        "unverified_binary_cast_compatibility",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "binary-missing-layout-warning",
+    "sql": "CREATE CAST (public.binary_implicit AS public.cast_source) WITHOUT FUNCTION",
+    "expected": {
+      "diagnostics": [
+        "unverified_binary_cast_compatibility",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "binary-unresolved-type",
+    "sql": "CREATE CAST (public.missing_cast_endpoint AS public.cast_source) WITHOUT FUNCTION",
+    "expected": {
+      "diagnostics": [
+        "invalid_cast_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "binary-duplicate",
+    "sql": "CREATE CAST (uuid AS macaddr8) WITHOUT FUNCTION AS IMPLICIT",
+    "expected": {
+      "diagnostics": [
+        "invalid_cast_declaration",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "binary-unequal-layout-explicit",
+    "sql": "SELECT NULL::uuid::macaddr8 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "macaddr8",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "binary-assignment",
+    "sql": "INSERT INTO public.binary_outputs SELECT value FROM public.cast_inputs RETURNING value AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "public",
+            "local_name": "binary_assignment",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "binary-implicit-overload",
+    "sql": "SELECT public.consume_binary(value) AS result FROM public.cast_inputs",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "binary-assignment-is-not-implicit",
+    "sql": "SELECT public.consume_binary_assignment(value) AS result FROM public.cast_inputs",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
     }
   }
 ]

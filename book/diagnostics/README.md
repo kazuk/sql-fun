@@ -146,6 +146,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [function_overload_resolution_failed](function_overload_resolution_failed.md)
 - [invalid_function_signature](invalid_function_signature.md)
 - [ignored_domain_cast](ignored_domain_cast.md)
+- [unverified_binary_cast_compatibility](unverified_binary_cast_compatibility.md)
 - [opaque_do_body](opaque_do_body.md)
 - [invalid_cast_declaration](invalid_cast_declaration.md)
 - [invalid_language_declaration](invalid_language_declaration.md)

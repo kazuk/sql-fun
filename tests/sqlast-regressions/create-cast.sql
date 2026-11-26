@@ -54,3 +54,21 @@ CREATE FUNCTION public.consume_source(boolean) RETURNS integer
 LANGUAGE sql AS 'SELECT 1';
 
 CREATE DOMAIN public.cast_domain AS public.cast_source;
+
+-- These declarations exercise analysis only. PostgreSQL checks runtime layout.
+CREATE CAST (uuid AS macaddr8) WITHOUT FUNCTION;
+
+CREATE TYPE public.binary_assignment AS ENUM ('one');
+CREATE TYPE public.binary_implicit AS ENUM ('one');
+CREATE CAST (public.cast_source AS public.binary_assignment)
+WITHOUT FUNCTION AS ASSIGNMENT;
+CREATE CAST (public.cast_source AS public.binary_implicit)
+WITHOUT FUNCTION AS IMPLICIT;
+
+CREATE TABLE public.binary_outputs (value public.binary_assignment);
+CREATE FUNCTION public.consume_binary(public.binary_assignment) RETURNS text
+LANGUAGE sql AS 'SELECT ''assignment''';
+CREATE FUNCTION public.consume_binary(public.binary_implicit) RETURNS integer
+LANGUAGE sql AS 'SELECT 1';
+CREATE FUNCTION public.consume_binary_assignment(public.binary_assignment) RETURNS integer
+LANGUAGE sql AS 'SELECT 2';

@@ -35,7 +35,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 200 groups are split 10/95/95.
+in the committed file. The current 210 groups are split 10/100/100.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -102,8 +102,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1817 inputs for PostgreSQL 17 and 1813 for
-PostgreSQL 18 (3630 total). These count positive contract inputs separately from
+manifest totals are 1838 inputs for PostgreSQL 17 and 1834 for
+PostgreSQL 18 (3672 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 

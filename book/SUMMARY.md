@@ -195,6 +195,7 @@
   - [invalid_cast_declaration](diagnostics/invalid_cast_declaration.md)
   - [invalid_language_declaration](diagnostics/invalid_language_declaration.md)
   - [ignored_domain_cast](diagnostics/ignored_domain_cast.md)
+  - [unverified_binary_cast_compatibility](diagnostics/unverified_binary_cast_compatibility.md)
   - [opaque_do_body](diagnostics/opaque_do_body.md)
   - [invalid_text_search_dictionary](diagnostics/invalid_text_search_dictionary.md)
   - [invalid_text_search_template](diagnostics/invalid_text_search_template.md)

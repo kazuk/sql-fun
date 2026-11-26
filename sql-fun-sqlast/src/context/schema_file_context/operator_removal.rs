@@ -5,9 +5,11 @@ use crate::{
     sem::{CascadeRemoval, OperatorIdentity},
 };
 
+type RegisteredRemovals = Vec<(FullName, Box<dyn CascadeRemoval>)>;
+
 #[derive(Clone, Debug, Default)]
 pub(super) struct OperatorRemovalRegistry {
-    by_signature: HashMap<OperatorIdentity, Vec<(FullName, Box<dyn CascadeRemoval>)>>,
+    by_signature: HashMap<OperatorIdentity, RegisteredRemovals>,
 }
 
 impl OperatorRemovalRegistry {
@@ -34,10 +36,7 @@ impl OperatorRemovalRegistry {
         }
     }
 
-    pub(super) fn for_operator(
-        &self,
-        identity: &OperatorIdentity,
-    ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
+    pub(super) fn for_operator(&self, identity: &OperatorIdentity) -> RegisteredRemovals {
         self.by_signature.get(identity).cloned().unwrap_or_default()
     }
 }

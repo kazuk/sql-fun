@@ -163,8 +163,9 @@ pub enum StatementKind {
     CreateTextSearchDictionary,
     /// ALTER OPERATOR SET.
     AlterOperator,
-    /// A PostgreSQL DROP OPERATOR declaration.
+    /// A PostgreSQL CREATE AGGREGATE declaration.
     CreateAggregate,
+    /// A PostgreSQL DROP OPERATOR declaration.
     DropOperator,
     /// A PostgreSQL cast declaration.
     CreateCast,

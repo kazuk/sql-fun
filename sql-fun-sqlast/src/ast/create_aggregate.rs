@@ -21,11 +21,14 @@ pub(crate) struct CreateAggregate {
 #[derive(Clone, Debug)]
 pub(crate) enum AggregateArguments {
     Legacy,
-    Declared {
-        parameters: Vec<FunctionParameter>,
-        // Equality with the parameter count denotes a shared variadic parameter.
-        direct_count: Option<usize>,
-    },
+    Declared(DeclaredAggregateArguments),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DeclaredAggregateArguments {
+    pub(crate) parameters: Vec<FunctionParameter>,
+    // Equality with the parameter count denotes a shared variadic parameter.
+    pub(crate) direct_count: Option<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -94,10 +97,10 @@ impl AggregateArguments {
                 FunctionParameter::try_from_with_tokens(&parameter, tokens)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self::Declared {
+        Ok(Self::Declared(DeclaredAggregateArguments {
             parameters,
             direct_count: usize::try_from(count).ok(),
-        })
+        }))
     }
 }
 
@@ -139,14 +142,12 @@ impl TryFromWithTokens<&syn::Node> for AggregateOption {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{Dialect, StatementNode},
+        ast::{Dialect, StatementNode, create_aggregate::AggregateArguments},
         parse_statements,
     };
 
     #[test]
     fn retains_aggregate_argument_forms() {
-        use super::AggregateArguments;
-
         for (arguments, options, expected) in [
             (
                 "(*)",
@@ -180,10 +181,9 @@ mod tests {
             assert_eq!(aggregate.name.parts(), &["app", "agg"]);
             let actual = match &aggregate.arguments {
                 AggregateArguments::Legacy => None,
-                AggregateArguments::Declared {
-                    parameters,
-                    direct_count,
-                } => Some((parameters.len(), *direct_count)),
+                AggregateArguments::Declared(arguments) => {
+                    Some((arguments.parameters.len(), arguments.direct_count))
+                }
             };
             assert_eq!(actual, expected);
         }

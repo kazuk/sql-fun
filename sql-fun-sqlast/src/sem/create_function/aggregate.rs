@@ -1,8 +1,9 @@
-use super::{CreateFunction, FunctionDeclarationOutcome};
 use crate::{
     ast::{
+        Literal, Name,
         create_aggregate::{
             AggregateArguments, AggregateOption, AggregateOptionValue, CreateAggregate,
+            DeclaredAggregateArguments,
         },
         ddl::ParameterMode,
     },
@@ -10,6 +11,11 @@ use crate::{
     sem::{
         AnalysisError, FunctionOverloadCollection, OverloadVariant, ParallelSafety, ParseContext,
         TypeReference,
+        create_function::{CreateFunction, FunctionDeclarationOutcome},
+        search_path::{
+            expand_operator_search_path, expand_search_path_inst, postgres_creation_schema,
+        },
+        traversal::SemanticVisitor,
         type_system::{ArgumentBindingCollection, ExactFunction, FunctionParam},
     },
 };
@@ -26,7 +32,7 @@ pub(super) struct AggregateSupport {
 impl AggregateSupport {
     pub(super) fn visit_references(
         &self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl SemanticVisitor,
     ) -> Result<(), AnalysisError> {
         if let Some(state) = &self.state {
             visitor.schema_type(state)?;
@@ -46,10 +52,10 @@ impl CreateFunction {
         ast: &CreateAggregate,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let AggregateArguments::Declared {
+        let AggregateArguments::Declared(DeclaredAggregateArguments {
             parameters,
             direct_count: None,
-        } = &ast.arguments
+        }) = &ast.arguments
         else {
             todo!("unsupported CREATE AGGREGATE argument form");
         };
@@ -74,7 +80,7 @@ impl CreateFunction {
         }
         let name = FullName::from_ast_name(&ast.name)?;
         let mut outcome = FunctionDeclarationOutcome::default();
-        let name = match crate::sem::search_path::postgres_creation_schema(context, name.schema()) {
+        let name = match postgres_creation_schema(context, name.schema()) {
             Some(schema) => name.replace_schema(&schema),
             None => {
                 outcome.reject(
@@ -221,12 +227,10 @@ impl CreateFunction {
     }
 }
 
-fn option_name(option: &AggregateOption) -> Option<crate::ast::Name> {
+fn option_name(option: &AggregateOption) -> Option<Name> {
     match &option.value {
         Some(AggregateOptionValue::Name(name)) => Some(name.clone()),
-        Some(AggregateOptionValue::Literal(crate::ast::Literal::String(name))) => {
-            Some(crate::ast::Name::local(name))
-        }
+        Some(AggregateOptionValue::Literal(Literal::String(name))) => Some(Name::local(name)),
         _ => None,
     }
 }
@@ -267,7 +271,7 @@ fn resolve_sort_operator(
     context: &impl ParseContext,
 ) -> Option<OperatorName> {
     let operator = OperatorName::from_ast_name(&option_name(option)?).ok()?;
-    crate::sem::search_path::expand_operator_search_path(context, &operator, |candidate| {
+    expand_operator_search_path(context, &operator, |candidate| {
         context
             .get_operator_op(candidate, true, true)
             .filter(|definition| definition.has_operands(Some(input), Some(input)))
@@ -284,7 +288,7 @@ fn binary_coercible_support_function(
     for ty in arguments {
         supplied.push(ty.clone());
     }
-    crate::sem::search_path::expand_search_path_inst(context, name, |qualified| {
+    expand_search_path_inst(context, name, |qualified| {
         let candidates: Vec<_> = context
             .get_function_impl(qualified)?
             .iter()

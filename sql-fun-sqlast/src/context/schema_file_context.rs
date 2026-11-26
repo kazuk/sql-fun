@@ -574,6 +574,9 @@ impl SchemaCatalog {
             else {
                 return;
             };
+            if identity.dependents(inherited).is_none() {
+                return;
+            }
             definitions.insert(&key, inherited.clone());
         }
         if let Some(definition) = definitions.get_mut(&key) {

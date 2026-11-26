@@ -35,8 +35,8 @@ pub use operator_family::{
 };
 mod create_base_type;
 pub use self::create_base_type::{
-    BaseTypeSetting, BaseTypeSettingValue, BaseTypeSettingsChange, RejectedBaseType,
-    SupportFunctionError,
+    BaseTypeDeclaration, BaseTypeSetting, BaseTypeSettingValue, BaseTypeSettingsChange,
+    RejectedBaseType, SupportFunctionError,
 };
 pub use self::pg_type::TypeStorage;
 mod create_comp_type;
@@ -434,7 +434,7 @@ pub enum SemAst {
     CreateEnum(CreateEnum),
 
     /// PostgreSQL shell or completed base type declaration.
-    CreateBaseType(TypeDefinition),
+    CreateBaseType(Box<BaseTypeDeclaration>),
 
     /// A PostgreSQL shell or base declaration that cannot be applied.
     RejectedBaseType(RejectedBaseType),

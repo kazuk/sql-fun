@@ -276,5 +276,34 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "search_path_like_source_publishes_completed_type",
+    "sql": "SELECT item FROM public.like_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "item",
+          "type": {
+            "schema_name": "public",
+            "local_name": "like_value",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unresolved_like_source",
+    "sql": "CREATE TYPE public.missing_like (LIKE = public.missing_source)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
   }
 ]

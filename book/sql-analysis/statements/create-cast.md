@@ -9,6 +9,12 @@ the cast in the same direction.
 - `AS ASSIGNMENT` also permits conversion when assigning a value to a column.
 - `AS IMPLICIT` also permits conversion during expression and routine resolution.
 
+A binary cast declared with `WITHOUT FUNCTION` requires analysis to establish
+physical compatibility. Base types declared with `CREATE TYPE ... LIKE`
+can be resolved by name, but using them as binary cast endpoints reports
+`invalid_cast_declaration`. This affects initialization of the bundled
+`isn` extension ([#1150](https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7190271178)).
+
 A cast declared on a domain is recorded for duplicate detection. Subsequent
 coercion follows the domain's base type, and analysis reports a warning.
 

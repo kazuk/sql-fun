@@ -5,10 +5,11 @@ diagnostic names the type and explains the missing prerequisite, invalid
 option, or invalid support function.
 
 Declare the shell and its support functions before the full definition. Match
-each support function's required argument and return types. For fixed-length
-types, use `STORAGE = plain`. For an existing type, check whether the
-setting can be changed with `ALTER TYPE` and whether its active storage
-strategy permits the requested change.
+each support function's required argument and return types. If the declaration
+uses `LIKE`, make sure its source type is already defined and visible in the
+search path, or qualify its name with the schema. For `ALTER TYPE` storage
+changes, check whether the type's layout and current storage strategy permit
+the requested change.
 [Base type settings changes](../sql-analysis/statements/create-type.md#postgresql-base-type-settings-changes)
 
 Analysis continues with the catalog as it was before the rejected statement.

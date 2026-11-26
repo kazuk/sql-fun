@@ -17,8 +17,9 @@ Connection credentials and endpoint parameters are never recorded.
 Queries run in a repeatable-read, read-only transaction with a fixed search path,
 standard-conforming strings, UTC timezone, and a statement timeout. Format 1
 covers released PostgreSQL 17, 18, and 19. Bootstrap object OIDs are below
-PostgreSQL's `FirstNormalObjectId` (16384); this boundary separates bootstrap catalogs from
-objects installed later, even inside `pg_catalog`. System schema rendering covers
+PostgreSQL's `FirstNormalObjectId` (16384). This boundary separates bootstrap
+catalogs from objects installed later, even inside `pg_catalog`. System schema
+rendering covers
 `pg_catalog` and `information_schema`; function metadata retains the loader's
 SQL-callable scope, excluding internal/trigger signatures. Application schema
 SQL and extension scripts remain separate inputs. The type master additionally

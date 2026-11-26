@@ -71,6 +71,6 @@ and leaves the catalog unchanged. Builtin operators require a catalog bundle
 that includes the initial planner settings to validate changes to these four
 attributes.
 
-`DROP OPERATOR`, which occurs in the bundled `intarray` update script, still
-fails during statement conversion. Follow
-[issue #1229](https://github.com/kazuk/sql-fun/issues/1229).
+Extension scripts containing `DROP OPERATOR` can be parsed, but schema
+initialization stops when analysis reaches the drop. Operator removal from the
+analysis catalog is tracked in [issue #1150](https://github.com/kazuk/sql-fun/issues/1150).

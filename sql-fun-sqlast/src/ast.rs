@@ -45,7 +45,7 @@ mod trigger;
 pub(crate) mod validation;
 
 pub(crate) use self::{
-    create_operator::{AlterOperator, CreateOperator},
+    create_operator::{AlterOperator, CreateOperator, DropOperator},
     create_type::{BaseTypeOption, CreateType},
     ddl::{CompositeType, Domain, Function, Index, Schema, TableAs},
     deparse::render_full_name,
@@ -309,6 +309,7 @@ pub(crate) enum StatementNode {
     CreateTextSearchTemplate(text_search_declaration::TextSearchDeclaration),
     CreateTextSearchDictionary(text_search_declaration::TextSearchDeclaration),
     AlterOperator(Box<AlterOperator>),
+    DropOperator(DropOperator),
     #[allow(dead_code, reason = "CREATE CAST interpretation is deferred to #1237")]
     CreateCast(Box<create_cast::CreateCast>),
     #[allow(

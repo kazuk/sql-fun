@@ -42,7 +42,7 @@ Check `docker compose version` and `docker compose up --help` before launching.
 The builder uses its existing PostgreSQL client; it has no Docker socket or
 Docker Engine management access. `--build-only` does not require Compose.
 
-The normal launcher starts four independent, disposable PostgreSQL servers and
+The normal launcher starts five independent, disposable PostgreSQL servers and
 waits up to 120 seconds for authenticated SQL healthchecks before opening the
 builder shell. The first launch downloads the official PostgreSQL images;
 subsequent launches reuse locally available images. No database ports are
@@ -54,6 +54,7 @@ published to the host.
 | `postgres16` | 5432 | 16 |
 | `postgres17` | 5432 | 17 |
 | `postgres18` | 5432 | 18 |
+| `postgres19` | 5432 | 19 |
 
 Each instance has role `oracle`, database `oracle`, and password
 `sql-fun-development-only`. These are disposable development credentials, not
@@ -65,6 +66,7 @@ psql -h postgres15
 psql -X -w -h postgres16 -Atc "SELECT current_setting('server_version_num')"
 psql -X -w -h postgres17 -Atc "SELECT current_setting('server_version_num')"
 psql -X -w -h postgres18 -Atc "SELECT current_setting('server_version_num')"
+psql -X -w -h postgres19 -Atc "SELECT current_setting('server_version_num')"
 ```
 
 Both local and network server connections require password authentication.

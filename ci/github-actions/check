@@ -166,5 +166,5 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 printf 'Oracle Compose project: %s\n' "$compose_project"
-"${compose[@]}" up --wait --wait-timeout 120 postgres15 postgres16 postgres17 postgres18
+"${compose[@]}" up --wait --wait-timeout 120 postgres15 postgres16 postgres17 postgres18 postgres19
 "${compose[@]}" run --rm --no-deps "${compose_args[@]}" builder bash

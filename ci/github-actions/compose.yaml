@@ -64,6 +64,12 @@ services:
     tmpfs:
       - /var/lib/postgresql
 
+  postgres19:
+    <<: *postgres
+    image: postgres:19
+    tmpfs:
+      - /var/lib/postgresql
+
 volumes:
   user_home:
     external: true

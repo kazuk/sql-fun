@@ -93,17 +93,13 @@ impl CreateFunction {
             .iter()
             .map(|param| param.get_type().cloned())
             .collect::<Vec<_>>();
-        let state = ast
-            .options
-            .iter()
-            .find(|option| option.key == "stype")
-            .and_then(|option| match &option.value {
-                Some(AggregateOptionValue::Type(ty)) => Some(ty),
-                _ => None,
-            })
-            .map(TypeReference::from_ast)
-            .transpose()?
-            .and_then(|ty| context.canonicalize_type_ref(&ty));
+        let state = match ast.options.iter().find(|option| option.key == "stype") {
+            Some(AggregateOption {
+                value: Some(AggregateOptionValue::Type(ty)),
+                ..
+            }) => context.canonicalize_type_ref(&TypeReference::from_ast(ty)?),
+            _ => None,
+        };
         let mut bindings = AggregateSupport {
             state: state.clone(),
             transition: None,
@@ -146,9 +142,10 @@ impl CreateFunction {
                     }
                     if arguments.iter().all(Option::is_some) {
                         let resolved = support_function(option, &arguments, context)?;
-                        let return_type = resolved
-                            .as_ref()
-                            .and_then(|function| function.overload().ret_type().clone());
+                        let return_type = match &resolved {
+                            Some(function) => function.overload().ret_type().clone(),
+                            None => None,
+                        };
                         if return_type.is_none()
                             || (option.key != "finalfunc" && return_type != state)
                         {
@@ -169,24 +166,8 @@ impl CreateFunction {
                     }
                 }
                 "sortop" => {
-                    let operator = option_name(option)
-                        .as_ref()
-                        .and_then(|name| OperatorName::from_ast_name(name).ok());
                     if let [Some(input)] = inputs.as_slice() {
-                        bindings.sort_operator = operator.as_ref().and_then(|operator| {
-                            crate::sem::search_path::expand_operator_search_path(
-                                context,
-                                operator,
-                                |candidate| {
-                                    context
-                                        .get_operator_op(candidate, true, true)
-                                        .filter(|definition| {
-                                            definition.has_operands(Some(input), Some(input))
-                                        })
-                                        .map(|_| candidate.clone())
-                                },
-                            )
-                        });
+                        bindings.sort_operator = resolve_sort_operator(option, input, context);
                         if bindings.sort_operator.is_none() {
                             outcome.reject(
                                 &name,
@@ -203,15 +184,12 @@ impl CreateFunction {
                     }
                 }
                 "parallel" => {
-                    parallel_safety =
-                        option_name(option)
-                            .as_ref()
-                            .and_then(|name| match name.parts() {
-                                [mode] if mode == "safe" => Some(ParallelSafety::Safe),
-                                [mode] if mode == "restricted" => Some(ParallelSafety::Restricted),
-                                [mode] if mode == "unsafe" => Some(ParallelSafety::Unsafe),
-                                _ => None,
-                            });
+                    parallel_safety = match option_name(option).as_ref().map(|name| name.parts()) {
+                        Some([mode]) if mode == "safe" => Some(ParallelSafety::Safe),
+                        Some([mode]) if mode == "restricted" => Some(ParallelSafety::Restricted),
+                        Some([mode]) if mode == "unsafe" => Some(ParallelSafety::Unsafe),
+                        _ => None,
+                    };
                     if parallel_safety.is_none() {
                         outcome.reject(
                             &name,
@@ -237,7 +215,7 @@ impl CreateFunction {
             );
             context.report_analysis_problem(conflict)?;
         }
-        definition.aggregate_support = Some(bindings);
+        definition.aggregate_support = Some(Box::new(bindings));
         definition.outcome = outcome;
         Ok(definition)
     }
@@ -262,24 +240,39 @@ fn support_function(
         .as_ref()
         .map(FullName::from_ast_name)
         .transpose()?;
-    Ok(name
-        .and_then(|name| {
-            context
-                .find_exact_function(&name, arguments)
-                .or_else(|| binary_coercible_support_function(&name, arguments, context))
-        })
-        .filter(|function| {
-            !context.function_returns_set(function.name(), function.overload())
-                && !context
-                    .routine_definitions(function.name())
-                    .iter()
-                    .any(|definition| {
-                        definition.catalog_aggregate()
-                            && definition
-                                .overloads()
-                                .contains_instantiation(function.overload(), context)
-                    })
-        }))
+    let Some(name) = name else {
+        return Ok(None);
+    };
+    let resolved = match context.find_exact_function(&name, arguments) {
+        Some(function) => Some(function),
+        None => binary_coercible_support_function(&name, arguments, context),
+    };
+    Ok(resolved.filter(|function| {
+        !context.function_returns_set(function.name(), function.overload())
+            && !context
+                .routine_definitions(function.name())
+                .iter()
+                .any(|definition| {
+                    definition.catalog_aggregate()
+                        && definition
+                            .overloads()
+                            .contains_instantiation(function.overload(), context)
+                })
+    }))
+}
+
+fn resolve_sort_operator(
+    option: &AggregateOption,
+    input: &TypeReference,
+    context: &impl ParseContext,
+) -> Option<OperatorName> {
+    let operator = OperatorName::from_ast_name(&option_name(option)?).ok()?;
+    crate::sem::search_path::expand_operator_search_path(context, &operator, |candidate| {
+        context
+            .get_operator_op(candidate, true, true)
+            .filter(|definition| definition.has_operands(Some(input), Some(input)))
+            .map(|_| candidate.clone())
+    })
 }
 
 fn binary_coercible_support_function(
@@ -311,6 +304,10 @@ fn binary_coercible_support_function(
                     .zip(target.as_ref())
                     .is_some_and(|(source, target)| source.is_binary_coercible_to(target, context))
             });
-        compatible.then(|| ExactFunction::new(qualified, &resolved))
+        if compatible {
+            Some(ExactFunction::new(qualified, &resolved))
+        } else {
+            None
+        }
     })
 }

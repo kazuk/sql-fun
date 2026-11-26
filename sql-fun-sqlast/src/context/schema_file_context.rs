@@ -551,6 +551,10 @@ impl SchemaFileContext {
 }
 
 impl OperatorInfoRead for SchemaCatalog {
+    fn operator_is_system_required(&self, identity: &OperatorIdentity) -> bool {
+        self.base.operator_is_system_required(identity)
+    }
+
     fn operator_links(&self, identity: &OperatorIdentity) -> Option<&OperatorLinks> {
         if let Some(links) = self.operator_links.get(identity) {
             links.as_ref()

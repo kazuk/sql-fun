@@ -355,6 +355,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::OperatorInfoRead for $context {
+            fn operator_is_system_required(&self, identity: &crate::sem::OperatorIdentity) -> bool {
+                self.$catalog().operator_is_system_required(identity)
+            }
+
             fn operator_links(
                 &self,
                 identity: &$crate::sem::OperatorIdentity,

@@ -5,6 +5,11 @@ use crate::{
 
 /// get operator definition
 pub trait OperatorInfoRead {
+    /// Whether the builtin catalog requires this exact operator.
+    fn operator_is_system_required(&self, _identity: &OperatorIdentity) -> bool {
+        false
+    }
+
     /// Read declaration links for an exact signature, including an operator shell.
     fn operator_links(&self, _identity: &OperatorIdentity) -> Option<&OperatorLinks> {
         None

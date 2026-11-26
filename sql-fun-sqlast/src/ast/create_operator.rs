@@ -505,11 +505,19 @@ ALTER OPERATOR %>> (text, text)
 
 #[derive(Clone, Debug)]
 pub(crate) struct OperatorSignature {
-    pub(crate) name: Name,
-    pub(crate) operands: [ObjectArgument; 2],
+    name: Name,
+    operands: [ObjectArgument; 2],
 }
 
 impl OperatorSignature {
+    pub(crate) const fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) const fn operands(&self) -> &[ObjectArgument; 2] {
+        &self.operands
+    }
+
     fn try_from_drop_target(
         node: &syn::Node,
         tokens: &IVec<ScanToken>,
@@ -546,9 +554,23 @@ impl TryFromWithTokens<&syn::ObjectWithArgs> for OperatorSignature {
 
 #[derive(Clone, Debug)]
 pub(crate) struct DropOperator {
-    pub(crate) targets: Vec<OperatorSignature>,
-    pub(crate) if_exists: bool,
-    pub(crate) behavior: DropBehavior,
+    targets: Vec<OperatorSignature>,
+    if_exists: bool,
+    behavior: DropBehavior,
+}
+
+impl DropOperator {
+    pub(crate) fn targets(&self) -> &[OperatorSignature] {
+        &self.targets
+    }
+
+    pub(crate) const fn if_exists(&self) -> bool {
+        self.if_exists
+    }
+
+    pub(crate) const fn behavior(&self) -> DropBehavior {
+        self.behavior
+    }
 }
 
 impl TryFromWithTokens<&syn::DropStmt> for DropOperator {

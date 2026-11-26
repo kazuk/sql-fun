@@ -144,6 +144,13 @@ impl AllBinaryCallSite {
         Ok(())
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.operator_overload(
+            self.binding
+                .as_deref()
+                .map_or(&self.operator_name, ResolvedOperator::name),
+            Some(self.operator_def.left_arg_type()),
+            self.operator_def.right_arg_type(),
+        );
         self.left_arg.visit(visitor)?;
         self.right_arg.visit(visitor)?;
         Ok(())

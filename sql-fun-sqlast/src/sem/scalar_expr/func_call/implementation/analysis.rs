@@ -24,17 +24,18 @@ fn aggregate_overload(
     overload: &OverloadVariant,
 ) -> bool {
     let definitions = context.routine_definitions(name);
-    definitions
+    if !definitions
         .iter()
-        .find(|definition| {
-            definition
+        .any(crate::sem::CreateFunction::catalog_aggregate)
+    {
+        return context.is_aggregate_impl(name);
+    }
+    definitions.iter().any(|definition| {
+        definition.catalog_aggregate()
+            && definition
                 .overloads()
                 .contains_instantiation(overload, context)
-        })
-        .map_or_else(
-            || context.is_aggregate_impl(name) && definitions.is_empty(),
-            |definition| definition.catalog_aggregate(),
-        )
+    })
 }
 
 impl FuncCallExpr {

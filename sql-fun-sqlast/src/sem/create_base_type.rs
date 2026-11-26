@@ -1,3 +1,5 @@
+mod alter;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
@@ -6,7 +8,7 @@ use crate::{
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, AstAndContextPair, SemAst, TypeDefinition, TypeReference,
-        pg_type::{PhysicalTypeLayout, TypeCategory},
+        pg_type::{PhysicalTypeLayout, TypeCategory, TypeStorage},
     },
 };
 
@@ -85,10 +87,9 @@ impl CreateType {
         }
         layout.validate()?;
         support.validate(context, reference)?;
-        Ok(
-            TypeDefinition::base(name, category, collatable)
-                .with_physical_layout(layout.physical()),
-        )
+        Ok(TypeDefinition::base(name, category, collatable)
+            .with_physical_layout(layout.physical())
+            .with_storage(Some(layout.storage)))
     }
 }
 
@@ -256,7 +257,7 @@ struct TypeLayout {
     length: TypeLength,
     alignment: i16,
     by_value: bool,
-    plain_storage: bool,
+    storage: TypeStorage,
 }
 
 impl Default for TypeLayout {
@@ -265,7 +266,7 @@ impl Default for TypeLayout {
             length: TypeLength::Variable,
             alignment: 4,
             by_value: false,
-            plain_storage: true,
+            storage: TypeStorage::Plain,
         }
     }
 }
@@ -308,16 +309,8 @@ impl TypeLayout {
     }
 
     fn set_storage(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
-        self.plain_storage = Self::parse_storage(option)?;
+        self.storage = option.storage()?;
         Ok(())
-    }
-
-    fn parse_storage(option: &BaseTypeOption) -> Result<bool, InvalidDefinition> {
-        match option.text()?.to_ascii_lowercase().as_str() {
-            "plain" => Ok(true),
-            "external" | "extended" | "main" => Ok(false),
-            _ => Err(invalid("unrecognized storage")),
-        }
     }
 
     fn set_passed_by_value(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
@@ -350,7 +343,7 @@ impl TypeLayout {
         {
             return Err(invalid("invalid alignment for a variable-length type"));
         }
-        if self.length != TypeLength::Variable && !self.plain_storage {
+        if self.length != TypeLength::Variable && self.storage != TypeStorage::Plain {
             return Err(invalid("fixed-size types must have storage PLAIN"));
         }
         Ok(())
@@ -359,7 +352,10 @@ impl TypeLayout {
 
 #[cfg(test)]
 mod layout_tests {
-    use crate::sem::create_base_type::{TypeLayout, TypeLength};
+    use crate::sem::{
+        create_base_type::{TypeLayout, TypeLength},
+        pg_type::TypeStorage,
+    };
 
     #[rstest::rstest]
     #[case(TypeLength::Fixed(4), 4, true, true, true)]
@@ -381,7 +377,11 @@ mod layout_tests {
             length,
             alignment,
             by_value,
-            plain_storage,
+            storage: if plain_storage {
+                TypeStorage::Plain
+            } else {
+                TypeStorage::Extended
+            },
         };
         assert_eq!(layout.validate().is_ok(), valid);
     }
@@ -403,6 +403,10 @@ impl BaseTypeOption {
 
     fn value(&self) -> Option<&SyntaxValue> {
         self.syntax().value().as_ref()
+    }
+
+    fn storage(&self) -> Result<TypeStorage, InvalidDefinition> {
+        TypeStorage::parse(&self.text()?).ok_or_else(|| invalid("unrecognized storage"))
     }
 
     fn category(&self) -> Result<TypeCategory, InvalidDefinition> {
@@ -489,7 +493,7 @@ impl<'a> SupportFunctions<'a> {
             }
         }
         for (role, routine) in self.0 {
-            Self::check_signature(context, reference, role, &routine)?;
+            Self::check_signature(context, reference, role, &routine, false)?;
         }
         Ok(())
     }
@@ -499,6 +503,7 @@ impl<'a> SupportFunctions<'a> {
         base: &TypeReference,
         role: &str,
         routine: &FullName,
+        altering: bool,
     ) -> Result<(), InvalidDefinition> {
         let builtin = |name| {
             TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", name), false)
@@ -522,17 +527,26 @@ impl<'a> SupportFunctions<'a> {
             _ => unreachable!("only recognized support roles reach signature lookup"),
         };
         let mut args = args.into_iter().map(Some).collect::<Vec<_>>();
-        let exact = match context.find_exact_function(routine, &args) {
-            None if alternate => {
-                args.extend([Some(builtin("oid")), Some(builtin("int4"))]);
-                context.find_exact_function(routine, &args)
+        let mut exact = context.find_exact_function(routine, &args);
+        if alternate && (exact.is_none() || altering) {
+            args.extend([Some(builtin("oid")), Some(builtin("int4"))]);
+            let alternate = context.find_exact_function(routine, &args);
+            if exact.is_some() && alternate.is_some() {
+                return Err(invalid(&format!("ambiguous {role} function {routine}")));
             }
-            found => found,
-        };
-        if exact.is_some_and(|function| function.overload().ret_type().as_ref() == Some(&result)) {
-            Ok(())
-        } else {
-            Err(invalid(&format!("invalid {role} function {routine}")))
+            exact = exact.or(alternate);
         }
+        let function = exact
+            .filter(|function| function.overload().ret_type().as_ref() == Some(&result))
+            .ok_or_else(|| invalid(&format!("invalid {role} function {routine}")))?;
+        if altering
+            && role == "subscript"
+            && function.name() == &FullName::with_schema("pg_catalog", "array_subscript_handler")
+        {
+            return Err(invalid(
+                "the built-in array subscript handler is reserved for generated array types",
+            ));
+        }
+        Ok(())
     }
 }

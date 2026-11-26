@@ -904,6 +904,7 @@ impl AnalysisProblem {
             | Self::OpaqueDoBody(span) => *span,
             Self::NameResolution(problem) => problem.statement_relative_span(),
             Self::CallArgument(problem) => problem.statement_relative_span(),
+            Self::InvalidBaseType(problem) => problem.span,
             _ => None,
         }
     }
@@ -982,7 +983,7 @@ impl AnalysisProblem {
     }
 }
 
-/// Diagnostic facts for a rejected PostgreSQL base type declaration.
+/// Diagnostic facts for a rejected PostgreSQL base type declaration or settings change.
 #[derive(Clone, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct BaseTypeProblem {
@@ -990,11 +991,16 @@ pub struct BaseTypeProblem {
     name: FullName,
     /// Reason the declaration cannot be applied.
     reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    altering: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    span: Option<StringSpan>,
 }
 
 impl DiagnosticMessage for BaseTypeProblem {
     fn diagnostic_message(&self) -> String {
-        format!("cannot define base type {}: {}", self.name, self.reason)
+        let action = if self.altering == Some(true) { "alter" } else { "define" };
+        format!("cannot {action} base type {}: {}", self.name, self.reason)
     }
 }
 
@@ -1005,6 +1011,23 @@ impl AnalysisProblem {
         Self::InvalidBaseType(BaseTypeProblem {
             name: name.clone(),
             reason: reason.to_owned(),
+            altering: None,
+            span: None,
+        })
+    }
+
+    /// Report a base type settings change that cannot be applied.
+    #[must_use]
+    pub fn invalid_base_type_settings(
+        name: &FullName,
+        reason: &str,
+        span: Option<StringSpan>,
+    ) -> Self {
+        Self::InvalidBaseType(BaseTypeProblem {
+            name: name.clone(),
+            reason: reason.to_owned(),
+            altering: Some(true),
+            span,
         })
     }
 }

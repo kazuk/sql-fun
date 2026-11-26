@@ -570,11 +570,13 @@ def validate_shell_selection(identifier):
     # Substitute only the source relation to exercise the real producer query
     # without changing PostgreSQL system catalogs or depending on bootstrap shells.
     source = '''source_types(oid, typnamespace, typtype, typname, typisdefined,
-        typcategory, typcollation, typarray, typlen, typalign, typbyval) AS (
-      VALUES (42::oid, 'pg_catalog'::regnamespace::oid, 'p', 'shell', false, NULL::text, 0::oid, 0::oid, 4::smallint, 'i', true),
-             (43::oid, 'pg_catalog'::regnamespace::oid, 'p', '__excluded', false, NULL::text, 0::oid, 0::oid, 4::smallint, 'i', true),
-             (44::oid, 'pg_catalog'::regnamespace::oid, 'b', 'defined', true, 'S', 100::oid, 45::oid, -1::smallint, 'i', false),
-             (45::oid, 'pg_catalog'::regnamespace::oid, 'b', '_defined', true, 'A', 100::oid, 0::oid, 4::smallint, 'i', true)
+        typcategory, typcollation, typarray, typlen, typalign, typbyval,
+        typelem, typsubscript, typstorage) AS (
+      VALUES (42::oid, 'pg_catalog'::regnamespace::oid, 'p', 'shell', false, NULL::text, 0::oid, 0::oid, 4::smallint, 'i', true, 0::oid, 0::oid, 'p'),
+             (43::oid, 'pg_catalog'::regnamespace::oid, 'p', '__excluded', false, NULL::text, 0::oid, 0::oid, 4::smallint, 'i', true, 0::oid, 0::oid, 'p'),
+             (44::oid, 'pg_catalog'::regnamespace::oid, 'b', 'defined', true, 'S', 100::oid, 45::oid, -1::smallint, 'i', false, 0::oid, 0::oid, 'x'),
+             (45::oid, 'pg_catalog'::regnamespace::oid, 'b', '_defined', true, 'A', 100::oid, 0::oid, 4::smallint, 'i', true, 44::oid,
+              'pg_catalog.array_subscript_handler(internal)'::regprocedure::oid, 'x')
     ), bootstrap'''
     query = TYPE_QUERY.replace("pg_catalog.pg_type", "source_types").replace("WITH bootstrap", "WITH " + source)
     result = run("docker", "exec", "-i", identifier, "psql", "-X", "-qAt", "-U", "postgres",
@@ -582,10 +584,12 @@ def validate_shell_selection(identifier):
     rows = json.loads(result.stdout)
     assert rows == [
         {"schema": "pg_catalog", "name": "shell", "category": None, "collatable": None,
-         "length": None, "alignment": None, "by_value": None, "array_name": None},
+         "length": None, "alignment": None, "by_value": None, "array_name": None,
+         "alterable_base": False, "storage": None},
         {"schema": "pg_catalog", "name": "defined", "category": "S", "collatable": True,
          "length": -1, "alignment": "i", "by_value": False,
-         "array_name": {"schema": "pg_catalog", "name": "_defined"}},
+         "array_name": {"schema": "pg_catalog", "name": "_defined"},
+         "alterable_base": True, "storage": "x"},
     ], "shell-null facts or existing eligibility changed"
 
 

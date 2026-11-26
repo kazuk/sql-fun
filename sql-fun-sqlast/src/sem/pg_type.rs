@@ -48,7 +48,35 @@ pub(crate) struct PhysicalTypeLayout {
     by_value: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub(crate) enum TypeStorage {
+    #[serde(rename = "p")]
+    Plain,
+    #[serde(rename = "e")]
+    External,
+    #[serde(rename = "x")]
+    Extended,
+    #[serde(rename = "m")]
+    Main,
+}
+
+impl TypeStorage {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value.to_ascii_lowercase().as_str() {
+            "plain" => Some(Self::Plain),
+            "external" => Some(Self::External),
+            "extended" => Some(Self::Extended),
+            "main" => Some(Self::Main),
+            _ => None,
+        }
+    }
+}
+
 impl PhysicalTypeLayout {
+    pub(crate) const fn is_varlena(self) -> bool {
+        self.length == -1
+    }
+
     pub(crate) const fn new(length: i16, alignment: char, by_value: bool) -> Self {
         Self {
             length,
@@ -72,6 +100,10 @@ pub struct BuiltinTypeDefinition {
     privilege_declarations: Vec<ObjectPrivilegeDeclaration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     physical_layout: Option<PhysicalTypeLayout>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    alterable_base: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    storage: Option<TypeStorage>,
 }
 
 impl PartialEq for BuiltinTypeDefinition {
@@ -80,6 +112,8 @@ impl PartialEq for BuiltinTypeDefinition {
             && self.category == other.category
             && self.collatable == other.collatable
             && self.physical_layout == other.physical_layout
+            && self.alterable_base == other.alterable_base
+            && self.storage == other.storage
     }
 }
 impl Eq for BuiltinTypeDefinition {}
@@ -89,6 +123,8 @@ impl std::hash::Hash for BuiltinTypeDefinition {
         self.category.hash(state);
         self.collatable.hash(state);
         self.physical_layout.hash(state);
+        self.alterable_base.hash(state);
+        self.storage.hash(state);
     }
 }
 
@@ -394,6 +430,8 @@ impl TypeDefinition {
             collatable,
             privilege_declarations: Vec::new(),
             physical_layout: None,
+            alterable_base: None,
+            storage: None,
         })
     }
 
@@ -407,6 +445,35 @@ impl TypeDefinition {
     pub(crate) const fn with_physical_layout(mut self, layout: PhysicalTypeLayout) -> Self {
         if let Self::Builtin(definition) | Self::Base(definition) = &mut self {
             definition.physical_layout = Some(layout);
+        }
+        self
+    }
+
+    pub(crate) const fn with_builtin_alterability(mut self, alterable_base: Option<bool>) -> Self {
+        if let Self::Builtin(definition) = &mut self {
+            definition.alterable_base = alterable_base;
+        }
+        self
+    }
+
+    pub(crate) const fn alterable_base(&self) -> Option<bool> {
+        match self {
+            Self::Base(_) => Some(true),
+            Self::Builtin(definition) => definition.alterable_base,
+            _ => Some(false),
+        }
+    }
+
+    pub(crate) const fn storage(&self) -> Option<TypeStorage> {
+        match self {
+            Self::Builtin(definition) | Self::Base(definition) => definition.storage,
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn with_storage(mut self, storage: Option<TypeStorage>) -> Self {
+        if let Self::Builtin(definition) | Self::Base(definition) = &mut self {
+            definition.storage = storage;
         }
         self
     }
@@ -448,6 +515,8 @@ impl TypeDefinition {
             collatable: Some(collatable),
             privilege_declarations: Vec::new(),
             physical_layout: None,
+            alterable_base: None,
+            storage: None,
         })
     }
 

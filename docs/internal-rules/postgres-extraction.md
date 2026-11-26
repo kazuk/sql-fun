@@ -85,6 +85,12 @@ The union emits each identity once: existing bootstrap OID order first, then
 additional types ordered by exact namespace/name using `C` ordering. This does
 not select application schema SQL, extension files or further catalog payloads.
 
+For PostgreSQL base type settings changes, `alterable_base` records whether
+a catalog row is a defined base type eligible for `ALTER TYPE ... SET`.
+The flag excludes true arrays using PostgreSQL's element and subscript
+handler test. `storage` carries `pg_type.typstorage` for defined types.
+The loader treats missing fields in older catalogs as unknown.
+
 The semantic type definition retains category independently of type names,
 preferred status, and casts. `TypeDefinition::category` uses the supplied
 catalog context to restrict PostgreSQL-specific semantics to that dialect.

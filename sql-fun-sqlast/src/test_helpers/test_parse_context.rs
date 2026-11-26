@@ -660,6 +660,10 @@ impl TypeInfoWrite for TestParseContext {
         todo!()
     }
 
+    fn replace_type_settings(&mut self, name: &FullName, definition: &TypeDefinition) {
+        let _ = (name, definition);
+    }
+
     fn insert_create_enum(&mut self, _name: &FullName, _create_enum_type: &CreateEnum) {
         todo!()
     }

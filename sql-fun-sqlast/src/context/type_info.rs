@@ -49,6 +49,9 @@ where
     /// Publish a PostgreSQL shell or its completed base definition.
     fn insert_shell_or_base_type(&mut self, name: &FullName, definition: &TypeDefinition);
 
+    /// Replace the existing type definition after a validated settings change.
+    fn replace_type_settings(&mut self, name: &FullName, definition: &TypeDefinition);
+
     /// register enum type
     fn insert_create_enum(&mut self, name: &FullName, create_enum_type: &CreateEnum);
 }

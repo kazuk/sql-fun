@@ -11,6 +11,20 @@ CREATE TYPE public.base_value (
   CATEGORY = 'SS',
   COLLATABLE = true
 );
+CREATE FUNCTION public.base_value_send(public.base_value) RETURNS bytea
+  LANGUAGE internal IMMUTABLE STRICT AS 'textsend';
+CREATE FUNCTION public.base_value_recv(internal) RETURNS public.base_value
+  LANGUAGE internal IMMUTABLE STRICT AS 'textrecv';
+CREATE FUNCTION public.base_value_recv(internal, oid, int4) RETURNS public.base_value
+  LANGUAGE internal IMMUTABLE STRICT AS 'textrecv';
+CREATE FUNCTION public.base_value_recv3(internal, oid, int4) RETURNS public.base_value
+  LANGUAGE internal IMMUTABLE STRICT AS 'textrecv';
+CREATE FUNCTION public.base_value_analyze(internal) RETURNS bool
+  LANGUAGE internal AS 'range_typanalyze';
+CREATE FUNCTION public.base_value_subscript(internal) RETURNS internal
+  LANGUAGE internal AS 'jsonb_subscript_handler';
+ALTER TYPE public.base_value SET (SEND = public.base_value_send, STORAGE = main);
+ALTER TYPE base_value SET (STORAGE = external, SEND = NONE);
 CREATE TABLE public.base_values (
   item public.base_value COLLATE "C",
   items public.base_value[]

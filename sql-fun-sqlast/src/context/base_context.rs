@@ -6,7 +6,7 @@ mod builtin_ope;
 pub use self::{
     builtin_casts::PgBuiltinCasts, builtin_fun::PgBuiltInFunctions, builtin_ope::PgBuiltinOperators,
 };
-use crate::sem::pg_type::PhysicalTypeLayout;
+use crate::sem::pg_type::{PhysicalTypeLayout, TypeStorage};
 use crate::{
     TrieMap,
     ast::{Dialect, ObjectKind},
@@ -70,6 +70,8 @@ struct BuiltinTypeInfo {
     alignment: Option<char>,
     by_value: Option<bool>,
     array_name: Option<BuiltinTypeName>,
+    alterable_base: Option<bool>,
+    storage: Option<TypeStorage>,
 }
 
 #[derive(serde::Deserialize)]
@@ -101,7 +103,9 @@ mod builtin_type_info_tests {
 impl From<&BuiltinTypeInfo> for TypeDefinition {
     fn from(info: &BuiltinTypeInfo) -> Self {
         let name = FullName::with_schema(&info.schema, &info.name);
-        let definition = Self::builtin_with_category(&name, info.category, info.collatable);
+        let definition = Self::builtin_with_category(&name, info.category, info.collatable)
+            .with_builtin_alterability(info.alterable_base)
+            .with_storage(info.storage);
         if let (Some(length), Some(alignment), Some(by_value)) =
             (info.length, info.alignment, info.by_value)
         {

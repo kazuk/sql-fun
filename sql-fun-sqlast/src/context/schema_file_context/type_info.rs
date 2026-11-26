@@ -108,6 +108,10 @@ impl TypeInfoWrite for SchemaFileContext {
         // once catalog lookup can resolve that key to the existing T[] identity.
     }
 
+    fn replace_type_settings(&mut self, name: &FullName, definition: &TypeDefinition) {
+        self.catalog.types.replace_definition(name, definition);
+    }
+
     fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
         self.catalog.renamed_types.remove(name);
         self.catalog.types.insert_create_enum(name, create_enum);

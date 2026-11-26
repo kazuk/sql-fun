@@ -146,17 +146,17 @@ impl DropOperator {
         ast: &ast::DropOperator,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let mut targets = Vec::with_capacity(ast.targets.len());
+        let mut targets = Vec::with_capacity(ast.targets().len());
         let mut valid = true;
-        for signature in &ast.targets {
-            let target = Self::resolve_target(signature, ast.if_exists, context)?;
+        for signature in ast.targets() {
+            let target = Self::resolve_target(signature, ast.if_exists(), context)?;
             valid &= !matches!(target, DropOperatorTarget::Rejected);
             targets.push(target);
         }
         let mut dependent_removals: Vec<Box<dyn CascadeRemoval>> = Vec::new();
         if valid {
             let views = registered_view_removals(context, &targets);
-            if ast.behavior == DropBehavior::Cascade {
+            if ast.behavior() == DropBehavior::Cascade {
                 dependent_removals.extend(views.into_iter().map(|(_, removal)| removal));
             } else if let Some((name, _)) = views.first() {
                 Self::reject(context, format!("view {name} depends on the operator"))?;
@@ -175,7 +175,7 @@ impl DropOperator {
                 let Some(removal) = FamilyRemoval::plan(family, &targets) else {
                     continue;
                 };
-                if ast.behavior != DropBehavior::Cascade
+                if ast.behavior() != DropBehavior::Cascade
                     && let Some(class) = removal.classes.first()
                 {
                     Self::reject(
@@ -190,7 +190,7 @@ impl DropOperator {
         }
         Ok(Self {
             targets,
-            behavior: ast.behavior,
+            behavior: ast.behavior(),
             valid,
             dependent_removals,
         })
@@ -201,7 +201,7 @@ impl DropOperator {
         if_exists: bool,
         context: &mut impl ParseContext,
     ) -> Result<DropOperatorTarget, AnalysisError> {
-        let name = match OperatorName::from_ast_name(&signature.name) {
+        let name = match OperatorName::from_ast_name(signature.name()) {
             Ok(name) => name,
             Err(problem) => {
                 problem.report_problem_to(context)?;
@@ -209,7 +209,7 @@ impl DropOperator {
             }
         };
         let [left, right] = signature
-            .operands
+            .operands()
             .each_ref()
             .map(|arg| arg.type_name().as_ref());
         let left_type = left
@@ -376,6 +376,8 @@ mod tests {
             "CREATE OPERATOR %% (RIGHTARG=integer, FUNCTION=op)",
             "CREATE VIEW v AS SELECT 1 %% 1 AS n",
             "CREATE VIEW child_v AS SELECT n FROM v",
+            "CREATE VIEW any_v AS SELECT 1 OPERATOR(public.%%) ANY (ARRAY[2]) AS n",
+            "CREATE VIEW all_v AS SELECT 1 OPERATOR(public.%%) ALL (ARRAY[2]) AS n",
             "CREATE VIEW replaced_v AS SELECT 1 %% 1 AS n",
         ] {
             context = apply_ownership_sql(context, sql)?.into_context();
@@ -418,6 +420,11 @@ mod tests {
         assert!(child.get_operator_op(&operator, false, true).is_some());
         assert!(child.get_view_impl(&view).is_none());
         assert!(child.get_view_impl(&dependent).is_none());
+        for name in ["any_v", "all_v"] {
+            let view = FullName::with_schema("public", name);
+            assert!(parent.get_view_impl(&view).is_some());
+            assert!(child.get_view_impl(&view).is_none());
+        }
         assert!(child.get_view_impl(&replaced).is_some());
         assert!(parent.get_view_impl(&view).is_some());
         assert!(parent.get_view_impl(&dependent).is_some());

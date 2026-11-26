@@ -862,7 +862,7 @@ jobs:
         if: ${{ always() }}
         run: cargo clean
 
-  postgres-extraction:
+  postgres-extraction-version:
     needs: [pr-freshness, packaging]
     strategy:
       fail-fast: false
@@ -934,8 +934,8 @@ jobs:
           path: ${{ runner.temp }}/sql-fun-postgres/${{ matrix.postgres }}-initialized-connection/postgres/${{ matrix.postgres }}/
           if-no-files-found: error
 
-  postgres-extraction-shared:
-    needs: [packaging, postgres-extraction]
+  postgres-extraction:
+    needs: [packaging, postgres-extraction-version]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -1079,7 +1079,7 @@ jobs:
       - packaging
       - install-validation
       - postgres-extraction
-      - postgres-extraction-shared
+      - postgres-extraction-version
     steps:
       - name: Require every dependency to succeed
         env:

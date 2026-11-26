@@ -88,9 +88,7 @@ impl SemAst {
                     Self::CreateCast(Box::new(cast))
                 })),
             AstStatementNode::CreateType(ast) => ast.analyze(context),
-            AstStatementNode::AlterTypeSettings(_) => {
-                todo!("ALTER TYPE settings semantic analysis (#1258)")
-            }
+            AstStatementNode::AlterTypeSettings(ast) => ast.analyze(context),
             AstStatementNode::Do(ast) => {
                 let span = ast.keyword_span.map(|span| {
                     ::sql_fun_core::analysis_problem::StringSpan::new(span.offset(), span.len())
@@ -208,6 +206,7 @@ impl SemAst {
         }
         match ast {
             AstStatementNode::CreateType(ast) => ast.analyze_and_apply(context),
+            AstStatementNode::AlterTypeSettings(ast) => ast.analyze_and_apply(context),
             AstStatementNode::ExtensionMembership(_) => {
                 let statement = Self::from_ast_node(ast, &mut context, cache)?;
                 if let Self::ExtensionMembership(change) = &statement

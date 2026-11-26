@@ -40,12 +40,6 @@ An input routine can also introduce the shell through
 [CREATE FUNCTION](create-function.md). The completed type keeps the identity
 used by the support functions. Range type declarations remain unsupported.
 
-PostgreSQL ALTER TYPE operations that alter composite types remain unimplemented
-and can terminate analysis
-([#543](https://github.com/kazuk/sql-fun/issues/543)).
-The base-type `ALTER TYPE … SET (...)` form passes SQL conversion.
-Analysis stops when it reaches the settings change, so the catalog is
-unaffected ([#1258](https://github.com/kazuk/sql-fun/issues/1258)).
 SQLite/Turso CREATE/DROP TYPE
 operations are separately listed in the [statement support
 inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
@@ -56,10 +50,43 @@ for an absent label. Individual enum-label references are not yet available
 for deprecated-label linting
 ([#1084](https://github.com/kazuk/sql-fun/issues/1084)).
 
+## PostgreSQL base type settings changes
+
+Schema and extension analysis supports `ALTER TYPE name SET (...)` on
+completed PostgreSQL base types. A schema-qualified name selects the type
+directly, and an unqualified name resolves through the active search path.
+
+`RECEIVE`, `SEND`, `TYPMOD_IN`, `TYPMOD_OUT`, `ANALYZE`, and
+`SUBSCRIPT` accept a support function with the required argument and return
+types, or `NONE` to remove the function in PostgreSQL. Analysis validates
+these settings without invoking the functions. `STORAGE` accepts `plain`,
+`external`, `extended`, or `main`. Subsequent statements use the updated
+storage setting. Fixed-size types require `plain`, and a type with a
+non-plain setting cannot return to `plain`. A rejected statement preserves
+the type and its previous settings.
+
+A standalone `analyze` or `test` input can report the semantic result
+alongside `query_deparse` while executable SQL rendering is pending
+([#1262](https://github.com/kazuk/sql-fun/issues/1262)).
+
+Some builtin type support functions, such as `pg_catalog.varcharrecv` and
+`pg_catalog.jsonb_subscript_handler`, are missing from the routine catalog.
+Naming one in an alteration produces a support-function diagnostic
+([#1260](https://github.com/kazuk/sql-fun/issues/1260)).
+
+A catalog extracted before base type eligibility and storage metadata were
+available may need a fresh extraction to analyze these alterations. PostgreSQL
+enforces ownership and superuser requirements when executing the statement.
+
+PostgreSQL ALTER TYPE operations that alter composite types remain unimplemented
+and can terminate analysis
+([#543](https://github.com/kazuk/sql-fun/issues/543)).
+
 ## Diagnostics
 
 - [base_type_invalid_definition](../../diagnostics/base_type_invalid_definition.md)
-  reports a rejected base definition. An existing shell remains available for
+  reports a rejected base definition or settings change. An existing shell
+  remains available for
   a later valid completion.
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): the
   enum/composite identity conflicts with an existing object in the relevant

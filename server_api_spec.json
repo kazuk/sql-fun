@@ -3116,7 +3116,7 @@
               ]
             },
             "BaseTypeProblem": {
-              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration.",
+              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration or settings change.",
               "type": "object",
               "properties": {
                 "name": {
@@ -3126,6 +3126,19 @@
                 "reason": {
                   "description": "Reason the declaration cannot be applied.",
                   "type": "string"
+                },
+                "altering": {
+                  "type": "boolean"
+                },
+                "span": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StringSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -8638,7 +8651,7 @@
               ]
             },
             "BaseTypeProblem": {
-              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration.",
+              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration or settings change.",
               "type": "object",
               "properties": {
                 "name": {
@@ -8648,6 +8661,19 @@
                 "reason": {
                   "description": "Reason the declaration cannot be applied.",
                   "type": "string"
+                },
+                "altering": {
+                  "type": "boolean"
+                },
+                "span": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StringSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -14052,7 +14078,7 @@
               ]
             },
             "BaseTypeProblem": {
-              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration.",
+              "description": "Diagnostic facts for a rejected PostgreSQL base type declaration or settings change.",
               "type": "object",
               "properties": {
                 "name": {
@@ -14062,6 +14088,19 @@
                 "reason": {
                   "description": "Reason the declaration cannot be applied.",
                   "type": "string"
+                },
+                "altering": {
+                  "type": "boolean"
+                },
+                "span": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StringSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [

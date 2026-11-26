@@ -72,5 +72,209 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "valid_qualified_support_function",
+    "sql": "ALTER TYPE public.base_value SET (SEND = public.base_value_send)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "valid_quoted_support_function",
+    "sql": "ALTER TYPE base_value SET (SEND = 'base_value_send')",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "valid_support_function_removals",
+    "sql": "ALTER TYPE base_value SET (RECEIVE = NONE, SEND = NONE, TYPMOD_IN = NONE, TYPMOD_OUT = NONE, ANALYZE = NONE, SUBSCRIPT = NONE)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "valid_builtin_duplicate_send",
+    "sql": "ALTER TYPE pg_catalog.int4 SET (SEND = NONE, SEND = pg_catalog.int4send)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "unknown_target",
+    "sql": "ALTER TYPE public.missing SET (SEND = NONE)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ineligible_target",
+    "sql": "ALTER TYPE pg_catalog.int4range SET (SEND = NONE)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "unrecognized_setting",
+    "sql": "ALTER TYPE base_value SET (bogus = NONE)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "immutable_setting",
+    "sql": "ALTER TYPE base_value SET (INPUT = NONE)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing_support_function",
+    "sql": "ALTER TYPE base_value SET (SEND = public.missing)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong_support_function_result",
+    "sql": "ALTER TYPE base_value SET (SEND = public.base_value_out)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong_support_function_argument",
+    "sql": "ALTER TYPE base_value SET (SEND = pg_catalog.int4send)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "wrong_subscript_function_result",
+    "sql": "ALTER TYPE base_value SET (SUBSCRIPT = public.base_value_analyze)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "fixed_size_storage",
+    "sql": "ALTER TYPE pg_catalog.int4 SET (STORAGE = extended)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "plain_storage_after_non_plain",
+    "sql": "ALTER TYPE base_value SET (STORAGE = plain)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_storage",
+    "sql": "ALTER TYPE base_value SET (STORAGE = bogus)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing_storage_value",
+    "sql": "ALTER TYPE base_value SET (STORAGE = NONE)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "valid_three_argument_receive",
+    "sql": "ALTER TYPE base_value SET (RECEIVE = public.base_value_recv3, TYPMOD_IN = pg_catalog.varchartypmodin, TYPMOD_OUT = pg_catalog.varchartypmodout, ANALYZE = public.base_value_analyze, SUBSCRIPT = public.base_value_subscript)",
+    "expected": {
+      "diagnostics": [
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ambiguous_receive",
+    "sql": "ALTER TYPE base_value SET (RECEIVE = public.base_value_recv)",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "array_storage_value",
+    "sql": "ALTER TYPE pg_catalog.int4 SET (STORAGE = plain[])",
+    "expected": {
+      "diagnostics": [
+        "base_type_invalid_definition",
+        "query_deparse"
+      ],
+      "columns": []
+    }
   }
 ]

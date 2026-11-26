@@ -30,6 +30,10 @@ SELECT coalesce(json_agg(json_build_object(
   'name', selected.typname,
   'category', CASE WHEN selected.typisdefined THEN selected.typcategory::text ELSE NULL END,
   'length', CASE WHEN selected.typisdefined THEN selected.typlen ELSE NULL END,
+  'alterable_base', selected.typisdefined AND selected.typtype = 'b'
+    AND NOT (selected.typelem <> 0 AND selected.typsubscript =
+      'pg_catalog.array_subscript_handler(internal)'::regprocedure),
+  'storage', CASE WHEN selected.typisdefined THEN selected.typstorage::text ELSE NULL END,
   'alignment', CASE WHEN selected.typisdefined THEN selected.typalign::text ELSE NULL END,
   'by_value', CASE WHEN selected.typisdefined THEN selected.typbyval ELSE NULL END,
   'array_name', CASE WHEN a.oid IS NOT NULL THEN json_build_object(

@@ -28,6 +28,10 @@ impl BaseTypeOption {
     pub(crate) const fn syntax(&self) -> &SyntaxOption {
         &self.syntax
     }
+
+    pub(crate) const fn location(&self) -> Option<StringSpan> {
+        self.location
+    }
 }
 
 impl CreateType {
@@ -158,6 +162,16 @@ CREATE TYPE "App"."Amount" (
 pub(crate) struct AlterTypeSettings {
     name: Name,
     options: Vec<BaseTypeOption>,
+}
+
+impl AlterTypeSettings {
+    pub(crate) const fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn options(&self) -> &[BaseTypeOption] {
+        &self.options
+    }
 }
 
 impl TryFromWithTokens<&syn::AlterTypeStmt> for AlterTypeSettings {

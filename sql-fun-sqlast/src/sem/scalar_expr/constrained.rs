@@ -178,8 +178,10 @@ impl ConstrainedExpr {
         &mut self,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        if let Some(binding) = &mut self.semantic_call {
-            binding.finalize(context, &mut self.arguments, &mut self.not_null)?;
+        if let Some(binding) = &mut self.semantic_call
+            && !binding.finalize(context, &mut self.arguments, &mut self.not_null)?
+        {
+            self.types = ResolvedTypes::types([]);
         }
         if self.binding_validation_pending
             && let Some(binding) = &self.operator_binding

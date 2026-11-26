@@ -12,30 +12,30 @@ use sql_fun_core::IVec;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CreateAggregate {
-    pub(crate) name: Name,
-    pub(crate) replace: bool,
-    pub(crate) arguments: AggregateArguments,
-    pub(crate) options: Vec<AggregateOption>,
+    name: Name,
+    replace: bool,
+    arguments: AggregateArguments,
+    options: Vec<AggregateOption>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum AggregateArguments {
+enum AggregateArguments {
     Legacy,
     Declared(DeclaredAggregateArguments),
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct DeclaredAggregateArguments {
-    pub(crate) parameters: Vec<FunctionParameter>,
+struct DeclaredAggregateArguments {
+    parameters: Vec<FunctionParameter>,
     // Equality with the parameter count denotes a shared variadic parameter.
-    pub(crate) direct_count: Option<usize>,
+    direct_count: Option<usize>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct AggregateOption {
-    pub(crate) key: String,
-    pub(crate) value: Option<AggregateOptionValue>,
-    pub(crate) location: Option<StringSpan>,
+    key: String,
+    value: Option<AggregateOptionValue>,
+    location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
@@ -43,6 +43,39 @@ pub(crate) enum AggregateOptionValue {
     Type(TypeName),
     Name(Name),
     Literal(Literal),
+}
+
+impl CreateAggregate {
+    pub(crate) const fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) const fn replace(&self) -> bool {
+        self.replace
+    }
+
+    pub(crate) fn ordinary_parameters(&self) -> Option<&[FunctionParameter]> {
+        match &self.arguments {
+            AggregateArguments::Declared(arguments) if arguments.direct_count.is_none() => {
+                Some(&arguments.parameters)
+            }
+            _ => None,
+        }
+    }
+
+    pub(crate) fn options(&self) -> &[AggregateOption] {
+        &self.options
+    }
+}
+
+impl AggregateOption {
+    pub(crate) fn key(&self) -> &str {
+        &self.key
+    }
+
+    pub(crate) const fn value(&self) -> Option<&AggregateOptionValue> {
+        self.value.as_ref()
+    }
 }
 
 impl TryFromWithTokens<&syn::DefineStmt> for CreateAggregate {
@@ -104,43 +137,8 @@ impl AggregateArguments {
     }
 }
 
-impl TryFromWithTokens<&syn::Node> for AggregateOption {
-    type Error = AnalysisError;
-
-    fn try_from_with_tokens(
-        node: &syn::Node,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        let option = required(node.as_def_elem().as_inner(), "aggregate option")?;
-        let key = option.get_defname();
-        let value = option
-            .get_arg()
-            .as_inner()
-            .map(|arg| {
-                if let Some(name) = arg.as_type_name().as_inner() {
-                    if matches!(key.as_str(), "stype" | "mstype" | "basetype") {
-                        return TypeName::try_from_with_tokens(&name, tokens)
-                            .map(AggregateOptionValue::Type);
-                    }
-                    return Name::try_from(name.get_names()).map(AggregateOptionValue::Name);
-                }
-                if let Some(name) = arg.as_list().as_inner() {
-                    return Name::try_from(name.get_items()).map(AggregateOptionValue::Name);
-                }
-                required(Option::<Literal>::from(&arg), "aggregate option value")
-                    .map(AggregateOptionValue::Literal)
-            })
-            .transpose()?;
-        Ok(Self {
-            key,
-            value,
-            location: anchored_token_span(option.get_location(), tokens),
-        })
-    }
-}
-
 #[cfg(test)]
-mod tests {
+mod test_aggregate_arguments {
     use crate::{
         ast::{Dialect, StatementNode, create_aggregate::AggregateArguments},
         parse_statements,
@@ -188,6 +186,49 @@ mod tests {
             assert_eq!(actual, expected);
         }
     }
+}
+
+impl TryFromWithTokens<&syn::Node> for AggregateOption {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        node: &syn::Node,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let option = required(node.as_def_elem().as_inner(), "aggregate option")?;
+        let key = option.get_defname();
+        let value = option
+            .get_arg()
+            .as_inner()
+            .map(|arg| {
+                if let Some(name) = arg.as_type_name().as_inner() {
+                    if matches!(key.as_str(), "stype" | "mstype" | "basetype") {
+                        return TypeName::try_from_with_tokens(&name, tokens)
+                            .map(AggregateOptionValue::Type);
+                    }
+                    return Name::try_from(name.get_names()).map(AggregateOptionValue::Name);
+                }
+                if let Some(name) = arg.as_list().as_inner() {
+                    return Name::try_from(name.get_items()).map(AggregateOptionValue::Name);
+                }
+                required(Option::<Literal>::from(&arg), "aggregate option value")
+                    .map(AggregateOptionValue::Literal)
+            })
+            .transpose()?;
+        Ok(Self {
+            key,
+            value,
+            location: anchored_token_span(option.get_location(), tokens),
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_aggregate_options {
+    use crate::{
+        ast::{Dialect, StatementNode},
+        parse_statements,
+    };
 
     #[test]
     fn converts_bundled_aggregate_declarations() {

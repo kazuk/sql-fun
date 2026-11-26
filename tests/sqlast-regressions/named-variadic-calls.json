@@ -1351,5 +1351,83 @@
         }
       ]
     }
+  },
+  {
+    "name": "schema_deferred_named_aggregate_rejected",
+    "sql": "SELECT $1::integer AS input, named_sum(x => $1) AS result",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "input",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_deferred_named_aggregate_window",
+    "sql": "SELECT $1::integer AS input, named_sum(x => $1) OVER () AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "input",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_deferred_named_scalar",
+    "sql": "SELECT $1::text AS input, named_sum(x => $1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "input",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        },
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

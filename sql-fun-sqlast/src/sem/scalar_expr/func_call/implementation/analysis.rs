@@ -18,7 +18,7 @@ use crate::{
 
 use ::sql_fun_core::IVec;
 
-fn aggregate_overload(
+pub(super) fn aggregate_overload(
     context: &impl ContextParseContext,
     name: &FullName,
     overload: &OverloadVariant,

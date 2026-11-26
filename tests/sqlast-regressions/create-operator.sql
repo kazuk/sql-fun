@@ -18,22 +18,18 @@ CREATE OPERATOR public.%% (
     FUNCTION = pg_catalog.int4um
 );
 
-CREATE FUNCTION public.operator_restrict(internal, oid, internal, integer)
-RETURNS double precision LANGUAGE internal AS 'contsel';
-
-CREATE FUNCTION public.operator_join(internal, oid, internal, smallint, internal)
-RETURNS double precision LANGUAGE internal AS 'contjoinsel';
-
 CREATE OPERATOR public.@#@# (
     LEFTARG = integer,
     RIGHTARG = integer,
     FUNCTION = pg_catalog.int4eq,
     COMMUTATOR = '@#@#',
-    RESTRICT = public.operator_restrict,
-    JOIN = public.operator_join,
+    RESTRICT = pg_catalog.contsel,
+    JOIN = contjoinsel,
     HASHES = 'off',
     MERGES
 );
+
+ALTER OPERATOR public.@#@# (integer, integer) SET (JOIN = "Planner"."JoinFn");
 
 -- Supply the prerequisite declarations for the audited extension ALTERs.
 CREATE DOMAIN public.cube AS integer;

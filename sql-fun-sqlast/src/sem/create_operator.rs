@@ -148,7 +148,22 @@ impl OperatorIdentity {
     }
 }
 
-type EstimatorIdentity = (FullName, usize);
+// Written names are planner metadata and carry no SQL routine binding.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum EstimatorSetting {
+    Written(Vec<String>),
+    Builtin(FullName, usize),
+}
+
+impl EstimatorSetting {
+    fn written(parts: &[String]) -> Self {
+        Self::Written(parts.to_vec())
+    }
+
+    const fn builtin(name: FullName, arity: usize) -> Self {
+        Self::Builtin(name, arity)
+    }
+}
 
 /// Operator settings retained for subsequent declarations, including links to shells.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
@@ -156,25 +171,27 @@ pub struct OperatorLinks {
     commutator: Option<OperatorIdentity>,
     negator: Option<OperatorIdentity>,
     // Outer None marks older catalogs that omit the setting entirely.
-    restriction: Option<Option<EstimatorIdentity>>,
-    join: Option<Option<EstimatorIdentity>>,
+    restriction: Option<Option<EstimatorSetting>>,
+    join: Option<Option<EstimatorSetting>>,
     hashes: bool,
     merges: bool,
     flags_and_links_known: bool,
 }
 
 impl OperatorLinks {
-    pub(crate) const fn new(
-        restriction: Option<EstimatorIdentity>,
-        join: Option<EstimatorIdentity>,
+    pub(crate) fn new(
+        restriction: Option<(FullName, usize)>,
+        join: Option<(FullName, usize)>,
         commutator: Option<OperatorIdentity>,
         negator: Option<OperatorIdentity>,
         hashes: bool,
         merges: bool,
     ) -> Self {
         Self {
-            restriction: Some(restriction),
-            join: Some(join),
+            restriction: Some(
+                restriction.map(|(name, arity)| EstimatorSetting::builtin(name, arity)),
+            ),
+            join: Some(join.map(|(name, arity)| EstimatorSetting::builtin(name, arity))),
             commutator,
             negator,
             hashes,
@@ -209,8 +226,6 @@ impl OperatorLinks {
 pub struct CreateOperator {
     identity: Option<OperatorIdentity>,
     implementation: Option<ExactFunction>,
-    restriction: Option<ExactFunction>,
-    join: Option<ExactFunction>,
     links: OperatorLinks,
     applicable: bool,
 }
@@ -258,10 +273,7 @@ impl CreateOperator {
                 visitor.schema_type(operand)?;
             }
         }
-        for function in [&self.implementation, &self.restriction, &self.join]
-            .into_iter()
-            .flatten()
-        {
+        if let Some(function) = &self.implementation {
             visitor.schema_function(function.name())?;
         }
         Ok(())
@@ -279,7 +291,7 @@ impl CreateOperator {
         let function = option(ast, &["function", "procedure"]);
         let implementation = if let Some(function) = function {
             if let Some(identity) = &identity {
-                analysis.function(function, &[&identity.arguments()])?
+                analysis.function(function, &identity.arguments())?
             } else {
                 None
             }
@@ -287,21 +299,19 @@ impl CreateOperator {
             analysis.reject("an implementation function is required", None)?;
             None
         };
-        let restriction = analysis.estimator(option(ast, &["restrict"]), false)?;
-        let join = analysis.estimator(option(ast, &["join"]), true)?;
+        let restriction = analysis.planner_name(option(ast, &["restrict"]))?;
+        let join = analysis.planner_name(option(ast, &["join"]))?;
         let mut links = analysis.attributes(
             ast,
             identity.as_ref(),
             implementation.as_ref(),
-            join.is_some(),
+            option(ast, &["join"]).is_some(),
         )?;
-        links.restriction = Some(restriction.as_ref().map(estimator_identity));
-        links.join = Some(join.as_ref().map(estimator_identity));
+        links.restriction = Some(restriction);
+        links.join = Some(join);
         Ok(Self {
             identity,
             implementation,
-            restriction,
-            join,
             links,
             applicable: analysis.applicable,
         })
@@ -312,10 +322,6 @@ fn option<'a>(ast: &'a ast::CreateOperator, keys: &[&str]) -> Option<&'a Operato
     ast.options()
         .iter()
         .rfind(|option| keys.contains(&option.key()))
-}
-
-fn estimator_identity(function: &ExactFunction) -> EstimatorIdentity {
-    (function.name().clone(), function.overload().params().len())
 }
 
 fn builtin(name: &str) -> TypeReference {
@@ -503,7 +509,7 @@ impl<C: ParseContext> Declaration<'_, C> {
     fn function(
         &mut self,
         option: &OperatorOption,
-        signatures: &[&[Option<TypeReference>]],
+        signature: &[Option<TypeReference>],
     ) -> Result<Option<ExactFunction>, AnalysisError> {
         let name = if let Some(name) = option.name() {
             match name.parts() {
@@ -514,16 +520,11 @@ impl<C: ParseContext> Declaration<'_, C> {
         } else {
             None
         };
-        if let Some(name) = name {
-            let mut matches = signatures
-                .iter()
-                .filter_map(|signature| self.context.find_exact_function(&name, signature));
-            if let Some(function) = matches.next()
-                && matches.next().is_none()
-                && !self.context.is_aggregate_impl(function.name())
-            {
-                return Ok(Some(function));
-            }
+        if let Some(name) = name
+            && let Some(function) = self.context.find_exact_function(&name, signature)
+            && !self.context.is_aggregate_impl(function.name())
+        {
+            return Ok(Some(function));
         }
         self.reject(
             &format!(
@@ -535,37 +536,23 @@ impl<C: ParseContext> Declaration<'_, C> {
         Ok(None)
     }
 
-    fn estimator(
+    fn planner_name(
         &mut self,
         option: Option<&OperatorOption>,
-        join: bool,
-    ) -> Result<Option<ExactFunction>, AnalysisError> {
+    ) -> Result<Option<EstimatorSetting>, AnalysisError> {
         let Some(option) = option else {
             return Ok(None);
         };
-        let mut signature = [
-            "internal",
-            "oid",
-            "internal",
-            if join { "int2" } else { "int4" },
-        ]
-        .map(|name| Some(builtin(name)))
-        .to_vec();
-        let function = if join {
-            signature.push(Some(builtin("internal")));
-            self.function(option, &[&signature, &signature[..4]])?
-        } else {
-            self.function(option, &[&signature])?
-        };
-        if let Some(function) = &function
-            && function.overload().ret_type().as_ref() != Some(&builtin("float8"))
+        if let Some(name) = option.name()
+            && matches!(name.parts(), [_] | [_, _] | [_, _, _])
         {
-            self.reject(
-                "the estimator must return double precision",
-                option.location(),
-            )?;
+            return Ok(Some(EstimatorSetting::written(name.parts())));
         }
-        Ok(function)
+        self.reject(
+            "operator attribute requires a function name",
+            option.location(),
+        )?;
+        Ok(None)
     }
 
     fn flag(&mut self, ast: &ast::CreateOperator, keys: &[&str]) -> Result<bool, AnalysisError> {

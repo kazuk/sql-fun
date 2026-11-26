@@ -221,7 +221,7 @@
   },
   {
     "name": "alter-prefix-estimator",
-    "sql": "ALTER OPERATOR public.?# (NONE, integer) SET (RESTRICT = public.operator_restrict)",
+    "sql": "ALTER OPERATOR public.?# (NONE, integer) SET (RESTRICT = pg_catalog.contsel)",
     "expected": {
       "diagnostics": [],
       "columns": []
@@ -229,7 +229,7 @@
   },
   {
     "name": "alter-prefix-join",
-    "sql": "ALTER OPERATOR public.?# (NONE, integer) SET (JOIN = public.operator_join)",
+    "sql": "ALTER OPERATOR public.?# (NONE, integer) SET (JOIN = pg_catalog.contjoinsel)",
     "expected": {
       "diagnostics": [
         "invalid_operator_declaration"
@@ -302,12 +302,10 @@
     }
   },
   {
-    "name": "alter-missing-estimator",
+    "name": "alter-opaque-estimator",
     "sql": "ALTER OPERATOR public.@#@# (integer, integer) SET (RESTRICT = public.no_estimator)",
     "expected": {
-      "diagnostics": [
-        "invalid_operator_declaration"
-      ],
+      "diagnostics": [],
       "columns": []
     }
   },

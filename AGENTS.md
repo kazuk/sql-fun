@@ -92,9 +92,10 @@ You can build and run tests using the `check-test-flow` script.
 
 ## PostgreSQL Behavioral Oracles
 
-The development builder provides PostgreSQL 15–18 at `postgres15`, `postgres16`,
-`postgres17`, and `postgres18`, each on port 5432. Authentication is preconfigured
-through `PGUSER`, `PGPASSWORD`, and `PGDATABASE`; for example, use
+The development builder provides PostgreSQL 15–19 at `postgres15`, `postgres16`,
+`postgres17`, `postgres18`, and `postgres19`, each on port 5432.
+Authentication is preconfigured through `PGUSER`, `PGPASSWORD`, and
+`PGDATABASE`; for example, use
 `psql -h postgres18` from the builder, explicitly selecting the version to query.
 
 Consult real PostgreSQL behavior when implementing or testing SQL parsing, type

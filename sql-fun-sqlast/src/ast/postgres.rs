@@ -14,6 +14,7 @@ use crate::{
         TryFromWithTokensOpt, TypeName, Update, VariableSet, VariableSetKind as AstVariableSetKind,
         View, ViewCheckOption, Window,
         create_access_method::CreateAccessMethod,
+        create_aggregate::CreateAggregate,
         create_cast::CreateCast,
         create_language::CreateLanguage,
         create_operator::{AlterOperator, DropOperator},
@@ -872,9 +873,7 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(define) = value.as_define_stmt().as_inner() {
             match define.get_kind().as_inner() {
                 Some(syn::ObjectType::ObjectAggregate) => {
-                    let aggregate = super::create_aggregate::CreateAggregate::try_from_with_tokens(
-                        &define, tokens,
-                    )?;
+                    let aggregate = CreateAggregate::try_from_with_tokens(&define, tokens)?;
                     return Ok(Self::CreateAggregate(Box::new(aggregate)));
                 }
                 Some(syn::ObjectType::ObjectOperator) => {

@@ -3,9 +3,9 @@ use crate::{
     context::ParseContext as ContextParseContext,
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, CommonType, FunctionModifiers, FunctionOverloadCollection,
-        FunctionParam, InputTypeConstraint, OverloadVariant, ParseContext, QueryNameResolution,
-        SemScalarExpr, TypeReference,
+        AnalysisError, AnalysisProblem, CommonType, CreateFunction, FunctionModifiers,
+        FunctionOverloadCollection, FunctionParam, InputTypeConstraint, OverloadVariant,
+        ParseContext, QueryNameResolution, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         problem::CallArgumentProblem,
         scalar_expr::{
@@ -24,10 +24,7 @@ fn aggregate_overload(
     overload: &OverloadVariant,
 ) -> bool {
     let definitions = context.routine_definitions(name);
-    if !definitions
-        .iter()
-        .any(crate::sem::CreateFunction::catalog_aggregate)
-    {
+    if !definitions.iter().any(CreateFunction::catalog_aggregate) {
         return context.is_aggregate_impl(name);
     }
     definitions.iter().any(|definition| {

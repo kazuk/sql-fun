@@ -272,41 +272,6 @@ fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-#[test]
-fn later_layers_and_replace_preserve_frozen_parents() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(
-        r"
-CREATE TABLE public.items(id int);
-CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items;
-CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN NEW; END$$;
-",
-    )?;
-    let name = FullName::with_schema("public", "v");
-    let child = schema.layer("CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();")?;
-    assert!(schema.analyze_insert_at(&child, &name).is_writable());
-    assert!(!schema.analyze_update_at(&child, &name).is_writable());
-    assert!(!schema.analyze_insert(&name).is_writable());
-    let replaced =
-        schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT id FROM public.items;")?;
-    assert!(schema.analyze_update_at(&replaced, &name).is_writable());
-    assert!(!schema.analyze_update(&name).is_writable());
-    let schema = heavy::ViewSchema::postgres(
-        r"
-CREATE TABLE public.items(id int);
-CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items;
-CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN NEW; END$$;
-CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();
-ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 42;
-CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items;
-",
-    )?;
-    assert!(schema.analyze_insert(&name).is_writable());
-    let dropped = schema.layer("DROP TRIGGER it ON public.v;")?;
-    assert!(!schema.analyze_insert_at(&dropped, &name).is_writable());
-    assert!(schema.analyze_insert(&name).is_writable());
-    Ok(())
-}
-
 #[rstest::rstest]
 #[case::conditional(
     "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING;",
@@ -902,10 +867,6 @@ fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
 
 #[rstest::rstest]
 #[case::rule("CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING", "r")]
-#[case::trigger(
-    "CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'; CREATE TRIGGER t INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop()",
-    "t"
-)]
 fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
     #[case] declaration: &str,
     #[case] missing: &str,

@@ -85,3 +85,7 @@ Index operator-class binding is tracked in
 [issue #547](https://github.com/kazuk/sql-fun/issues/547). A dependent
 `CHECK` constraint remains in the analysis catalog, as tracked in
 [issue #1146](https://github.com/kazuk/sql-fun/issues/1146).
+
+Rendering a parsed `DROP OPERATOR` statement back to SQL returns an unsupported
+statement error. Rendering support is tracked in
+[issue #1269](https://github.com/kazuk/sql-fun/issues/1269).

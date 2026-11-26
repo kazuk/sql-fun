@@ -1,10 +1,7 @@
 use crate::{
     ast::{
         Literal, Name,
-        create_aggregate::{
-            AggregateArguments, AggregateOption, AggregateOptionValue, CreateAggregate,
-            DeclaredAggregateArguments,
-        },
+        create_aggregate::{AggregateOption, AggregateOptionValue, CreateAggregate},
         ddl::ParameterMode,
     },
     names::{FullName, OperatorName},
@@ -52,20 +49,16 @@ impl CreateFunction {
         ast: &CreateAggregate,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let AggregateArguments::Declared(DeclaredAggregateArguments {
-            parameters,
-            direct_count: None,
-        }) = &ast.arguments
-        else {
+        let Some(parameters) = ast.ordinary_parameters() else {
             todo!("unsupported CREATE AGGREGATE argument form");
         };
         if parameters.is_empty()
             || parameters
                 .iter()
                 .any(|parameter| !matches!(parameter.mode(), ParameterMode::In))
-            || ast.options.iter().any(|option| {
+            || ast.options().iter().any(|option| {
                 !matches!(
-                    option.key.as_str(),
+                    option.key(),
                     "stype"
                         | "sfunc"
                         | "finalfunc"
@@ -78,7 +71,7 @@ impl CreateFunction {
         {
             todo!("unsupported CREATE AGGREGATE form");
         }
-        let name = FullName::from_ast_name(&ast.name)?;
+        let name = FullName::from_ast_name(ast.name())?;
         let mut outcome = FunctionDeclarationOutcome::default();
         let name = match postgres_creation_schema(context, name.schema()) {
             Some(schema) => name.replace_schema(&schema),
@@ -99,12 +92,13 @@ impl CreateFunction {
             .iter()
             .map(|param| param.get_type().cloned())
             .collect::<Vec<_>>();
-        let state = match ast.options.iter().find(|option| option.key == "stype") {
-            Some(AggregateOption {
-                value: Some(AggregateOptionValue::Type(ty)),
-                ..
-            }) => context.canonicalize_type_ref(&TypeReference::from_ast(ty)?),
-            _ => None,
+        let state = if let Some(option) =
+            ast.options().iter().find(|option| option.key() == "stype")
+            && let Some(AggregateOptionValue::Type(ty)) = option.value()
+        {
+            context.canonicalize_type_ref(&TypeReference::from_ast(ty)?)
+        } else {
+            None
         };
         let mut bindings = AggregateSupport {
             state: state.clone(),
@@ -121,7 +115,7 @@ impl CreateFunction {
                 context,
             )?;
         }
-        if !ast.options.iter().any(|option| option.key == "sfunc") {
+        if !ast.options().iter().any(|option| option.key() == "sfunc") {
             outcome.reject(
                 &name,
                 "aggregate transition function is required".to_owned(),
@@ -130,18 +124,18 @@ impl CreateFunction {
         }
         let mut parallel_safety = None;
         let mut seen = std::collections::HashSet::new();
-        for option in &ast.options {
-            if !seen.insert(option.key.as_str()) {
+        for option in ast.options() {
+            if !seen.insert(option.key()) {
                 outcome.reject(
                     &name,
-                    format!("duplicate aggregate option {}", option.key),
+                    format!("duplicate aggregate option {}", option.key()),
                     context,
                 )?;
             }
-            match option.key.as_str() {
+            match option.key() {
                 "sfunc" | "combinefunc" | "finalfunc" => {
                     let mut arguments = vec![state.clone()];
-                    match option.key.as_str() {
+                    match option.key() {
                         "sfunc" => arguments.extend(inputs.iter().cloned()),
                         "combinefunc" => arguments.push(state.clone()),
                         _ => {}
@@ -153,15 +147,15 @@ impl CreateFunction {
                             None => None,
                         };
                         if return_type.is_none()
-                            || (option.key != "finalfunc" && return_type != state)
+                            || (option.key() != "finalfunc" && return_type != state)
                         {
                             outcome.reject(
                                 &name,
-                                format!("invalid aggregate support function for {}", option.key),
+                                format!("invalid aggregate support function for {}", option.key()),
                                 context,
                             )?;
                         }
-                        match option.key.as_str() {
+                        match option.key() {
                             "finalfunc" => {
                                 result = return_type;
                                 bindings.final_function = resolved;
@@ -209,7 +203,7 @@ impl CreateFunction {
         }
         let overload = OverloadVariant::new(&result, &params, false, false);
         let mut definition = Self::new(&name, &FunctionOverloadCollection::new(&[overload]), &None)
-            .with_replace(ast.replace);
+            .with_replace(ast.replace());
         definition.set_builtin_properties(true, false);
         definition.parallel_safety = parallel_safety;
         definition.source = context.get_source_path_with_span().cloned();
@@ -228,7 +222,7 @@ impl CreateFunction {
 }
 
 fn option_name(option: &AggregateOption) -> Option<Name> {
-    match &option.value {
+    match option.value() {
         Some(AggregateOptionValue::Name(name)) => Some(name.clone()),
         Some(AggregateOptionValue::Literal(Literal::String(name))) => Some(Name::local(name)),
         _ => None,

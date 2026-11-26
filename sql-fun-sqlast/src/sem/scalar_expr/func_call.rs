@@ -1,5 +1,6 @@
 mod implementation {
     mod analysis;
+    use self::analysis::aggregate_overload;
 
     use crate::{
         StringSpan,
@@ -7,8 +8,9 @@ mod implementation {
         context::BaseParseContext,
         names::{FullName, TableName},
         sem::{
-            AnalysisError, FunctionModifiers, FunctionOverloadCollection, FunctionParam,
-            NamedArgExpr, OverloadVariant, ParseContext, QueryNameResolution, SemScalarExpr,
+            AnalysisError, AnalysisProblem, FunctionModifiers, FunctionOverloadCollection,
+            FunctionParam, NamedArgExpr, OverloadVariant, ParseContext, QueryNameResolution,
+            SemScalarExpr,
             scalar_expr::SemScalarExprNode,
             traversal::{SemanticVisitor, SemanticVisitorMut},
             type_system::ArgumentBindingCollection,
@@ -413,17 +415,33 @@ mod implementation {
             context: &mut impl ParseContext,
             arguments: &mut Vec<SemScalarExpr>,
             not_null: &mut Option<bool>,
-        ) -> Result<(), AnalysisError> {
+        ) -> Result<bool, AnalysisError> {
             let types = ArgumentBindingCollection::from_expr_list(arguments)
                 .with_explicit_variadic(self.modifiers.variadic());
             if !types.has_call_notation() {
-                return Ok(());
+                return Ok(true);
             }
             if let Some(candidates) = &self.candidates
                 && !arguments.iter().any(SemScalarExpr::requires_argument_type)
                 && let Some((overload, common_inputs)) = FunctionOverloadCollection::new(candidates)
                     .resolve_in_context_with_common_inputs(context, &types)
             {
+                if self.modifiers.over().is_none()
+                    && arguments
+                        .iter()
+                        .any(|argument| argument.as_named_argument().is_some())
+                    && let Some(name) = self.resolution.function_identity()
+                    && aggregate_overload(context, name, &overload)
+                {
+                    context.report_analysis_problem(
+                        AnalysisProblem::function_overload_resolution_failed(&self.name, &types),
+                    )?;
+                    self.overload = None;
+                    self.candidates = Some(Vec::new());
+                    self.argument_definitions.clear();
+                    *not_null = None;
+                    return Ok(false);
+                }
                 let args = FuncCallExpr::cast_common_call_operands(
                     context,
                     &self.name,
@@ -439,7 +457,7 @@ mod implementation {
                     .collect();
             }
             *not_null = self.invocation(arguments).is_not_null();
-            Ok(())
+            Ok(true)
         }
     }
 

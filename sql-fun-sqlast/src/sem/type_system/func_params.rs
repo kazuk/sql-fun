@@ -16,7 +16,7 @@ use crate::{
     names::{FullName, TableName},
     sem::{
         AnalysisError, ColumnCollection, ParseContext, ScalarAnalysisContext, SemScalarExpr,
-        TypeDefinition, TypeReference,
+        TypeReference,
         create_comp_type::CompositeFieldDefinition,
         traversal::SemanticVisitor,
         type_system::{
@@ -540,15 +540,7 @@ impl FunctionParam {
         } else {
             let name = FullName::from_ast_name(type_name.name())?;
             let array = !type_name.array_bounds().is_empty();
-            context
-                .resolve_declared_type_name(&name, !array)
-                .filter(|name| {
-                    !array
-                        || context
-                            .get_declared_type(name)
-                            .is_some_and(TypeDefinition::has_postgres_array_type)
-                })
-                .map(|name| TypeReference::concrete_type_ref(&name, array))
+            context.resolve_signature_type(&name, array, true)
         };
         let default = ast
             .default()

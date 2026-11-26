@@ -35,6 +35,10 @@ impl TypeInfoRead for SchemaCatalog {
         self.types.get_type_impl(key, &self.base)
     }
 
+    fn array_type_by_catalog_name(&self, key: &FullName) -> Option<TypeReference> {
+        self.base.array_type_by_catalog_name(key)
+    }
+
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {
         if type_name.is_array() == Some(true) {
             Some(type_name.element_type())
@@ -55,6 +59,10 @@ impl TypeInfoRead for SchemaFileContext {
 
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         self.catalog.get_type_impl(key)
+    }
+
+    fn array_type_by_catalog_name(&self, key: &FullName) -> Option<TypeReference> {
+        self.catalog.array_type_by_catalog_name(key)
     }
 
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {

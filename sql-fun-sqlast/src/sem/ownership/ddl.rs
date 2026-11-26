@@ -20,9 +20,7 @@ impl OwnershipIdentity {
         context: &mut impl ParseContext,
     ) -> Result<Option<TypeReference>, AnalysisError> {
         let requested = FullName::from_ast_name(ast.name())?;
-        Ok(context
-            .resolve_type_name(&requested)
-            .map(|name| TypeReference::concrete_type_ref(&name, !ast.array_bounds().is_empty())))
+        Ok(context.resolve_signature_type(&requested, !ast.array_bounds().is_empty(), false))
     }
 }
 

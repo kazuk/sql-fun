@@ -618,6 +618,10 @@ impl crate::context::TypeInfoRead for FrozenBaseContext {
         self.catalog().get_type_impl(name)
     }
 
+    fn array_type_by_catalog_name(&self, key: &FullName) -> Option<TypeReference> {
+        self.catalog().array_type_by_catalog_name(key)
+    }
+
     fn get_array_item_type(&self, name: &TypeReference) -> Option<TypeReference> {
         self.catalog().get_array_item_type(name)
     }

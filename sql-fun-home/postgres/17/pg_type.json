@@ -1,6 +1,10 @@
 [
   {
     "alignment": "c",
+    "array_name": {
+      "name": "_bool",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "B",
     "collatable": false,
@@ -10,6 +14,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_bytea",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -19,6 +27,10 @@
   },
   {
     "alignment": "c",
+    "array_name": {
+      "name": "_char",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "Z",
     "collatable": false,
@@ -28,6 +40,10 @@
   },
   {
     "alignment": "c",
+    "array_name": {
+      "name": "_name",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "S",
     "collatable": true,
@@ -37,6 +53,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_int8",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -46,6 +66,10 @@
   },
   {
     "alignment": "s",
+    "array_name": {
+      "name": "_int2",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -55,6 +79,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_int2vector",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "A",
     "collatable": false,
@@ -64,6 +92,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_int4",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -73,6 +105,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regproc",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -82,6 +118,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_text",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "S",
     "collatable": true,
@@ -91,6 +131,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_oid",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -100,6 +144,10 @@
   },
   {
     "alignment": "s",
+    "array_name": {
+      "name": "_tid",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -109,6 +157,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_xid",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "U",
     "collatable": false,
@@ -118,6 +170,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_cid",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "U",
     "collatable": false,
@@ -127,6 +183,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_oidvector",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "A",
     "collatable": false,
@@ -136,6 +196,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -145,6 +206,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_json",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -154,6 +219,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_xml",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -163,6 +232,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": false,
     "category": "Z",
     "collatable": true,
@@ -172,6 +242,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -181,6 +252,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -190,6 +262,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_point",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "G",
     "collatable": false,
@@ -199,6 +275,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_lseg",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "G",
     "collatable": false,
@@ -208,6 +288,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_path",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "G",
     "collatable": false,
@@ -217,6 +301,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_box",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "G",
     "collatable": false,
@@ -226,6 +314,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_polygon",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "G",
     "collatable": false,
@@ -235,6 +327,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_line",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "G",
     "collatable": false,
@@ -244,6 +340,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_cidr",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "I",
     "collatable": false,
@@ -253,6 +353,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_float4",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -262,6 +366,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_float8",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -271,6 +379,7 @@
   },
   {
     "alignment": "c",
+    "array_name": null,
     "by_value": false,
     "category": "X",
     "collatable": false,
@@ -280,6 +389,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_circle",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "G",
     "collatable": false,
@@ -289,6 +402,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_macaddr8",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -298,6 +415,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_money",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -307,6 +428,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_macaddr",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -316,6 +441,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_inet",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "I",
     "collatable": false,
@@ -325,6 +454,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_aclitem",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -334,6 +467,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_bpchar",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "S",
     "collatable": true,
@@ -343,6 +480,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_varchar",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "S",
     "collatable": true,
@@ -352,6 +493,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_date",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "D",
     "collatable": false,
@@ -361,6 +506,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_time",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "D",
     "collatable": false,
@@ -370,6 +519,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_timestamp",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "D",
     "collatable": false,
@@ -379,6 +532,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_timestamptz",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "D",
     "collatable": false,
@@ -388,6 +545,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_interval",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "T",
     "collatable": false,
@@ -397,6 +558,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_timetz",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "D",
     "collatable": false,
@@ -406,6 +571,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_bit",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "V",
     "collatable": false,
@@ -415,6 +584,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_varbit",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "V",
     "collatable": false,
@@ -424,6 +597,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_numeric",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "N",
     "collatable": false,
@@ -433,6 +610,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_refcursor",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -442,6 +623,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regprocedure",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -451,6 +636,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regoper",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -460,6 +649,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regoperator",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -469,6 +662,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regclass",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -478,6 +675,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regtype",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -487,6 +688,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_record",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -496,6 +701,10 @@
   },
   {
     "alignment": "c",
+    "array_name": {
+      "name": "_cstring",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -505,6 +714,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -514,6 +724,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -523,6 +734,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -532,6 +744,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -541,6 +754,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -550,6 +764,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -559,6 +774,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -568,6 +784,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -577,6 +794,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -586,6 +804,10 @@
   },
   {
     "alignment": "c",
+    "array_name": {
+      "name": "_uuid",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -595,6 +817,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_txid_snapshot",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -604,6 +830,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -613,6 +840,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_pg_lsn",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "U",
     "collatable": false,
@@ -622,6 +853,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -631,6 +863,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": false,
     "category": "Z",
     "collatable": true,
@@ -640,6 +873,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": false,
     "category": "Z",
     "collatable": true,
@@ -649,6 +883,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -658,6 +893,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_tsvector",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -667,6 +906,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_tsquery",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -676,6 +919,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_gtsvector",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -685,6 +932,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regconfig",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -694,6 +945,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regdictionary",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -703,6 +958,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_jsonb",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -712,6 +971,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -721,6 +981,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -730,6 +991,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_int4range",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -739,6 +1004,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_numrange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -748,6 +1017,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_tsrange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -757,6 +1030,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_tstzrange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -766,6 +1043,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_daterange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -775,6 +1056,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_int8range",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -784,6 +1069,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_jsonpath",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -793,6 +1082,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regnamespace",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -802,6 +1095,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regrole",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -811,6 +1108,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_regcollation",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "N",
     "collatable": false,
@@ -820,6 +1121,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_int4multirange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -829,6 +1134,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_nummultirange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -838,6 +1147,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_tsmultirange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -847,6 +1160,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_tstzmultirange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -856,6 +1173,10 @@
   },
   {
     "alignment": "i",
+    "array_name": {
+      "name": "_datemultirange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -865,6 +1186,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_int8multirange",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "R",
     "collatable": false,
@@ -874,6 +1199,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -883,6 +1209,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -892,6 +1219,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": false,
     "category": "Z",
     "collatable": true,
@@ -901,6 +1229,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": false,
     "category": "Z",
     "collatable": true,
@@ -910,6 +1239,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": false,
     "category": "Z",
     "collatable": true,
@@ -919,6 +1249,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_pg_snapshot",
+      "schema": "pg_catalog"
+    },
     "by_value": false,
     "category": "U",
     "collatable": false,
@@ -928,6 +1262,10 @@
   },
   {
     "alignment": "d",
+    "array_name": {
+      "name": "_xid8",
+      "schema": "pg_catalog"
+    },
     "by_value": true,
     "category": "U",
     "collatable": false,
@@ -937,6 +1275,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -946,6 +1285,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": false,
     "category": "P",
     "collatable": false,
@@ -955,6 +1295,7 @@
   },
   {
     "alignment": "i",
+    "array_name": null,
     "by_value": true,
     "category": "P",
     "collatable": false,
@@ -964,6 +1305,7 @@
   },
   {
     "alignment": "d",
+    "array_name": null,
     "by_value": false,
     "category": "P",
     "collatable": false,

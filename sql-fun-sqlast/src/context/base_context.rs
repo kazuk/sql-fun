@@ -46,6 +46,7 @@ pub struct BaseContext {
     context_args: SqlFunArgs,
     metadata: SqlFunMetadata,
     types: TrieMap<TypeDefinition>,
+    array_names: TrieMap<TypeReference>,
     binary_ordered_types: std::collections::HashSet<FullName>,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
@@ -68,6 +69,19 @@ struct BuiltinTypeInfo {
     length: Option<i16>,
     alignment: Option<char>,
     by_value: Option<bool>,
+    array_name: Option<BuiltinTypeName>,
+}
+
+#[derive(serde::Deserialize)]
+struct BuiltinTypeName {
+    schema: String,
+    name: String,
+}
+
+#[derive(Debug, Default)]
+struct BuiltinTypes {
+    definitions: TrieMap<TypeDefinition>,
+    array_names: TrieMap<TypeReference>,
 }
 
 #[cfg(test)]
@@ -245,7 +259,8 @@ impl BaseContext {
             functions,
             masters,
             operator_families,
-            types: builtin_type_data,
+            types: builtin_type_data.definitions,
+            array_names: builtin_type_data.array_names,
             binary_ordered_types,
             casts,
             binary_operators,
@@ -279,15 +294,11 @@ impl BaseContext {
         self.masters.declare_sqlite_collation(name)
     }
 
-    fn load_builtin_types(
-        paths: &PostgresBuiltinPaths,
-    ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
+    fn load_builtin_types(paths: &PostgresBuiltinPaths) -> Result<BuiltinTypes, AnalysisError> {
         Self::read_builtin_types(&paths.types()?)
     }
 
-    fn read_builtin_types(
-        builtin_types_path: &Path,
-    ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
+    fn read_builtin_types(builtin_types_path: &Path) -> Result<BuiltinTypes, AnalysisError> {
         let builtin_types: Vec<BuiltinTypeInfo> = serde_json::from_reader(BufReader::new(
             File::open(builtin_types_path)?,
         ))
@@ -297,7 +308,7 @@ impl BaseContext {
                 builtin_types_path.display()
             ))
         })?;
-        let mut builtin_type_data = TrieMap::new();
+        let mut builtin_type_data = BuiltinTypes::default();
         for builtin_type in builtin_types {
             if builtin_type.schema.is_empty()
                 || builtin_type.name.is_empty()
@@ -311,13 +322,26 @@ impl BaseContext {
             }
             let type_definition = TypeDefinition::from(&builtin_type);
             let full_name = type_definition.full_name().expect("catalog type identity");
-            if builtin_type_data.get(&full_name.to_string()).is_some() {
+            if builtin_type_data
+                .definitions
+                .get(&full_name.to_string())
+                .is_some()
+            {
                 return Err(AnalysisError::unexpected_input_error(&format!(
                     "duplicate type {full_name} in {}",
                     builtin_types_path.display()
                 )));
             }
-            builtin_type_data.insert(&full_name.to_string(), type_definition);
+            if let Some(array) = builtin_type.array_name {
+                let alias = FullName::with_schema(&array.schema, &array.name);
+                builtin_type_data.array_names.insert(
+                    &alias.to_string(),
+                    TypeReference::concrete_type_ref(full_name, true),
+                );
+            }
+            builtin_type_data
+                .definitions
+                .insert(&full_name.to_string(), type_definition);
         }
         Ok(builtin_type_data)
     }
@@ -355,7 +379,7 @@ mod read_builtin_types_tests {
         let context = TestParseContext::default();
         for (schema, expected) in [("one", true), ("two", false)] {
             let name = FullName::with_schema(schema, "custom");
-            let loaded = types.get(&name.to_string()).unwrap();
+            let loaded = types.definitions.get(&name.to_string()).unwrap();
             assert_eq!(
                 TypeReference::dynamic(loaded).collation_capability(&context),
                 Some(expected)
@@ -403,6 +427,10 @@ impl TypeInfoRead for BaseContext {
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         tracing::info!("get type {key}");
         self.types.get(&key.to_string())
+    }
+
+    fn array_type_by_catalog_name(&self, key: &FullName) -> Option<TypeReference> {
+        self.array_names.get(&key.to_string()).cloned()
     }
 
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {

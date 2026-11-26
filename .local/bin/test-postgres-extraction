@@ -582,9 +582,10 @@ def validate_shell_selection(identifier):
     rows = json.loads(result.stdout)
     assert rows == [
         {"schema": "pg_catalog", "name": "shell", "category": None, "collatable": None,
-         "length": None, "alignment": None, "by_value": None},
+         "length": None, "alignment": None, "by_value": None, "array_name": None},
         {"schema": "pg_catalog", "name": "defined", "category": "S", "collatable": True,
-         "length": -1, "alignment": "i", "by_value": False},
+         "length": -1, "alignment": "i", "by_value": False,
+         "array_name": {"schema": "pg_catalog", "name": "_defined"}},
     ], "shell-null facts or existing eligibility changed"
 
 

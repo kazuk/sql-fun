@@ -98,6 +98,10 @@ impl TypeInfoRead for ParsedSchemaDump {
         self.base_context().get_type_impl(key)
     }
 
+    fn array_type_by_catalog_name(&self, key: &FullName) -> Option<TypeReference> {
+        self.base_context().array_type_by_catalog_name(key)
+    }
+
     fn get_array_item_type(&self, _type_name: &TypeReference) -> Option<TypeReference> {
         todo!()
     }

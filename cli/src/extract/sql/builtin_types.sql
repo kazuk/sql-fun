@@ -26,17 +26,22 @@ WITH bootstrap AS (
      )
 )
 SELECT coalesce(json_agg(json_build_object(
-  'schema', nspname,
-  'name', typname,
-  'category', CASE WHEN typisdefined THEN typcategory::text ELSE NULL END,
-  'length', CASE WHEN typisdefined THEN typlen ELSE NULL END,
-  'alignment', CASE WHEN typisdefined THEN typalign::text ELSE NULL END,
-  'by_value', CASE WHEN typisdefined THEN typbyval ELSE NULL END,
-  'collatable', CASE WHEN typisdefined THEN typcollation <> 0 ELSE NULL END
+  'schema', selected.nspname,
+  'name', selected.typname,
+  'category', CASE WHEN selected.typisdefined THEN selected.typcategory::text ELSE NULL END,
+  'length', CASE WHEN selected.typisdefined THEN selected.typlen ELSE NULL END,
+  'alignment', CASE WHEN selected.typisdefined THEN selected.typalign::text ELSE NULL END,
+  'by_value', CASE WHEN selected.typisdefined THEN selected.typbyval ELSE NULL END,
+  'array_name', CASE WHEN a.oid IS NOT NULL THEN json_build_object(
+    'schema', an.nspname, 'name', a.typname
+  ) END,
+  'collatable', CASE WHEN selected.typisdefined THEN selected.typcollation <> 0 ELSE NULL END
 ) ORDER BY
   CASE WHEN is_bootstrap THEN 0 ELSE 1 END,
-  CASE WHEN is_bootstrap THEN oid ELSE NULL END,
-  nspname::text COLLATE "C",
-  typname::text COLLATE "C"
+  CASE WHEN is_bootstrap THEN selected.oid ELSE NULL END,
+  selected.nspname::text COLLATE "C",
+  selected.typname::text COLLATE "C"
 ), '[]'::json)
-FROM selected;
+FROM selected
+LEFT JOIN pg_catalog.pg_type a ON a.oid = selected.typarray
+LEFT JOIN pg_catalog.pg_namespace an ON an.oid = a.typnamespace;

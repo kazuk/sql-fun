@@ -82,5 +82,51 @@
       "diagnostics": [],
       "columns": []
     }
+  },
+  {
+    "name": "qualified_array_name_matches_unqualified_declaration",
+    "sql": "ALTER FUNCTION public.array_by_catalog_name(pg_catalog._text) PARALLEL UNSAFE",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "catalog_array_return_type",
+    "sql": "SELECT public.array_by_catalog_name(ARRAY['x'::text]) AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "scalar_shadow_is_distinct_from_builtin_array",
+    "sql": "ALTER FUNCTION public.array_shadow_probe(pg_catalog._text) PARALLEL UNSAFE",
+    "expected": {
+      "diagnostics": [
+        "ownership_target_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "array_catalog_name_has_no_array_type",
+    "sql": "ALTER FUNCTION public.array_by_catalog_name(pg_catalog._text[]) PARALLEL UNSAFE",
+    "expected": {
+      "diagnostics": [
+        "ownership_argument_type_not_found"
+      ],
+      "columns": []
+    }
   }
 ]

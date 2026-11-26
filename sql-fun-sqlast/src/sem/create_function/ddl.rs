@@ -215,10 +215,13 @@ impl CreateFunction {
             return Ok(reference);
         }
         let name = FullName::from_ast_name(result.name())?;
-        if let Some(definition) = context
-            .get_declared_type(&name)
-            .filter(|definition| !array || definition.has_postgres_array_type())
-        {
+        if let Some(reference) = context.resolve_signature_type(&name, array, true) {
+            if reference.is_array() == Some(true) {
+                return Ok(Some(reference));
+            }
+            let definition = context
+                .get_declared_type(reference.full_name().expect("catalog type name"))
+                .expect("resolved catalog type");
             if definition.is_shell() {
                 let reason = if shell_policy == ShellPolicy::Reject {
                     Some(format!("SQL function cannot return shell type {name}"))
@@ -233,11 +236,6 @@ impl CreateFunction {
                     declaration.reject(function, reason, context)?;
                     return Ok(None);
                 }
-            }
-            if array {
-                return Ok(definition
-                    .full_name()
-                    .map(|name| TypeReference::concrete_type_ref(name, true)));
             }
             return Ok(definition.type_reference().cloned());
         }

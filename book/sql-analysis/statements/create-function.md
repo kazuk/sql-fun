@@ -31,6 +31,15 @@ implemented; unresolved polymorphic call signatures retain the limitations
 described at the function-call page. Missing result/parameter facts do not prove
 that every valid routine declaration is rejected or fully checked.
 
+### Builtin array type names
+
+Function signatures can use PostgreSQL's builtin array catalog names. For
+example, `_text` and `pg_catalog._text` denote the same type as `text[]`
+when they resolve to the array in `pg_catalog`. Unqualified names follow the
+configured search path. This lookup requires builtin catalog data that includes
+the array names, such as the updated bundled catalogs. Bracket notation
+continues to work with older catalog data.
+
 ### Implicit shell types
 
 For PostgreSQL schema and extension analysis, a `LANGUAGE C` or

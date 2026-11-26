@@ -12,6 +12,11 @@ pub trait TypeInfoRead {
     /// get type by name
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition>;
 
+    /// Resolve a qualified PostgreSQL array catalog name to its array identity.
+    fn array_type_by_catalog_name(&self, _key: &FullName) -> Option<TypeReference> {
+        None
+    }
+
     /// Whether a builtin has a default B-tree comparison implementation,
     /// including PostgreSQL binary-compatible operator-class input types.
     /// `Some(true)` and `Some(false)` are catalog-backed answers; `None` means

@@ -135,6 +135,33 @@ pub trait BaseParseContext:
         .map(|(key, _)| key)
     }
 
+    /// Resolve a written signature type, including PostgreSQL array catalog names.
+    fn resolve_signature_type(
+        &self,
+        name: &FullName,
+        array: bool,
+        allow_shell: bool,
+    ) -> Option<TypeReference> {
+        expand_type_search_path(self, name, |key| {
+            if let Some(reference) = self.array_type_by_catalog_name(key) {
+                return Some(if array { None } else { Some(reference) });
+            }
+            let definition = self.get_type_impl(key)?;
+            let valid = if array {
+                definition.has_postgres_array_type()
+            } else {
+                allow_shell || !definition.is_shell()
+            };
+            // An unusable type still shadows later schemas.
+            Some(if valid {
+                Some(TypeReference::concrete_type_ref(key, array))
+            } else {
+                None
+            })
+        })
+        .flatten()
+    }
+
     /// get `CREATE TABLE` statement by table name
     fn get_table(&self, name: &TableName) -> Option<&CreateTable> {
         expand_relation_search_path(self, name.full_name(), |key| self.get_table_impl(key))

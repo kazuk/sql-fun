@@ -1,13 +1,16 @@
 use crate::{
-    names::{FullName, OperatorName},
-    sem::{CascadeRemoval, OperatorLinks, TypeReference, parameter_resolution::Signature},
+    names::OperatorName,
+    sem::{
+        CascadeRemoval, CascadeTarget, OperatorLinks, TypeReference,
+        parameter_resolution::Signature,
+    },
 };
 
-type RegisteredRemoval = (FullName, Box<dyn CascadeRemoval>);
+type RegisteredRemovals = Vec<Box<dyn CascadeRemoval>>;
 
 // Catalog dependents do not participate in the identity of a bound expression.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct OperatorDependents(Option<std::sync::Arc<Vec<RegisteredRemoval>>>);
+pub(crate) struct OperatorDependents(Option<std::sync::Arc<RegisteredRemovals>>);
 
 impl PartialEq for OperatorDependents {
     fn eq(&self, _other: &Self) -> bool {
@@ -22,20 +25,20 @@ impl std::hash::Hash for OperatorDependents {
 }
 
 impl OperatorDependents {
-    pub(crate) fn entries(&self) -> &[RegisteredRemoval] {
+    pub(crate) fn entries(&self) -> &[Box<dyn CascadeRemoval>] {
         match &self.0 {
             Some(entries) => entries.as_slice(),
             None => &[],
         }
     }
 
-    pub(crate) fn replace(&mut self, name: &FullName, removal: Option<&dyn CascadeRemoval>) {
+    pub(crate) fn replace(&mut self, target: &CascadeTarget, removal: Option<&dyn CascadeRemoval>) {
         if let Some(entries) = &mut self.0 {
-            std::sync::Arc::make_mut(entries).retain(|(owner, _)| owner != name);
+            std::sync::Arc::make_mut(entries).retain(|action| &action.target() != target);
         }
         if let Some(removal) = removal {
             let entries = self.0.get_or_insert_with(Default::default);
-            std::sync::Arc::make_mut(entries).push((name.clone(), removal.clone_box()));
+            std::sync::Arc::make_mut(entries).push(removal.clone_box());
         }
     }
 }

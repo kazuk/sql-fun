@@ -3,7 +3,7 @@
 mod alter;
 mod drop;
 pub use alter::AlterOperator;
-pub use drop::{CascadeRemoval, DropOperator, DropOperatorTarget};
+pub use drop::{CascadeRemoval, CascadeTarget, DropOperator, DropOperatorTarget};
 
 use crate::{
     StringSpan,
@@ -135,15 +135,6 @@ impl OperatorIdentity {
         }
     }
 
-    pub(crate) fn matches(
-        &self,
-        name: &OperatorName,
-        left: Option<&TypeReference>,
-        right: &TypeReference,
-    ) -> bool {
-        &self.name == name && self.left.as_ref() == left && &self.right == right
-    }
-
     pub(crate) fn dependents<'a>(
         &self,
         definition: &'a OperatorDefinition,
@@ -169,7 +160,7 @@ impl OperatorIdentity {
     pub(crate) fn update_dependent(
         &self,
         definition: &mut OperatorDefinition,
-        view: &FullName,
+        target: &CascadeTarget,
         removal: Option<&dyn CascadeRemoval>,
     ) {
         match definition {
@@ -178,7 +169,7 @@ impl OperatorIdentity {
                     self.left.as_ref() == Some(entry.left_arg_type())
                         && &self.right == entry.right_arg_type()
                 }) {
-                    entry.dependents_mut().replace(view, removal);
+                    entry.dependents_mut().replace(target, removal);
                 }
             }
             OperatorDefinition::RightUnary(entries) => {
@@ -186,7 +177,7 @@ impl OperatorIdentity {
                     .iter_mut()
                     .find(|entry| self.left.is_none() && &self.right == entry.arg_type())
                 {
-                    entry.dependents_mut().replace(view, removal);
+                    entry.dependents_mut().replace(target, removal);
                 }
             }
             OperatorDefinition::LeftUnary(_) => {}

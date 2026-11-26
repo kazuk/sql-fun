@@ -569,10 +569,6 @@ impl crate::context::AccessMethodInfoRead for BaseContext {}
 impl crate::context::TextSearchTemplateInfoRead for BaseContext {}
 impl crate::context::TextSearchDictionaryInfoRead for BaseContext {}
 impl crate::context::OperatorFamilyInfoRead for BaseContext {
-    fn operator_family_keys(&self) -> Vec<OperatorFamilyKey> {
-        self.operator_families.keys().cloned().collect()
-    }
-
     fn operator_classes(&self) -> Vec<&OperatorClassDefinition> {
         self.masters.operator_classes().iter().collect()
     }

@@ -114,6 +114,14 @@ impl OperatorIdentity {
         ))
     }
 
+    pub(crate) fn exists_in(&self, context: &impl crate::context::OperatorInfoRead) -> bool {
+        context
+            .get_operator_op(&self.name, self.binary(), true)
+            .is_some_and(|definition| {
+                definition.has_operands(self.left.as_ref(), Some(&self.right))
+            })
+    }
+
     pub(crate) fn matches(
         &self,
         name: &OperatorName,

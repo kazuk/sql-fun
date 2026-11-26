@@ -167,10 +167,10 @@ impl DropOperator {
                 .any(|target| matches!(target, DropOperatorTarget::Resolved(_)))
         {
             for key in context.operator_family_keys() {
-                let Some(removal) = context
-                    .operator_family(&key)
-                    .and_then(|family| FamilyRemoval::plan(family, &targets))
-                else {
+                let Some(family) = context.operator_family(&key) else {
+                    continue;
+                };
+                let Some(removal) = FamilyRemoval::plan(family, &targets) else {
                     continue;
                 };
                 if ast.behavior != DropBehavior::Cascade
@@ -221,6 +221,12 @@ impl DropOperator {
             && let Some((identity, _)) =
                 OperatorIdentity::resolve(&name, left_type.as_ref(), &right_type, context)
         {
+            if context.operator_is_system_required(&identity) {
+                return Self::reject(
+                    context,
+                    format!("operator {name} is required by the database system"),
+                );
+            }
             if let Some(member) = identity.extension_member()
                 && let Some(extension) = context.extension_membership(&member)
                 && context.active_extension() != Some(extension)
@@ -368,9 +374,11 @@ mod tests {
             "CREATE ACCESS METHOD btree TYPE INDEX HANDLER handler;
              CREATE FUNCTION cmp(integer, integer) RETURNS boolean LANGUAGE sql AS 'SELECT true';
              CREATE OPERATOR %% (LEFTARG = integer, RIGHTARG = integer, FUNCTION = cmp);
-             CREATE OPERATOR CLASS ops FOR TYPE integer USING btree AS OPERATOR 3 %% (integer, integer);",
-        )?.freeze();
-        let class = FullName::with_schema("public", "ops");
+             CREATE OPERATOR CLASS drop_ops FOR TYPE integer USING btree AS OPERATOR 3 %% (integer, integer);",
+        )?;
+        assert!(parent.problems().is_empty(), "{:?}", parent.problems());
+        let parent = parent.freeze();
+        let class = FullName::with_schema("public", "drop_ops");
         let family = OperatorFamilyKey::new(class.clone(), "btree");
         let restricted = apply_ownership_sql(
             schema_layer(Path::new("restrict.sql"), &parent),

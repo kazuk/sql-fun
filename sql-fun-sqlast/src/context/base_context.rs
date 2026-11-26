@@ -503,6 +503,10 @@ impl FunctionInfoRead for BaseContext {
 }
 
 impl OperatorInfoRead for BaseContext {
+    fn operator_is_system_required(&self, identity: &OperatorIdentity) -> bool {
+        identity.exists_in(self)
+    }
+
     fn operator_links(&self, identity: &OperatorIdentity) -> Option<&OperatorLinks> {
         identity.builtin_settings(self)
     }

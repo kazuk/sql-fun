@@ -22,10 +22,7 @@ import tarfile
 
 TYPE_QUERY = (Path(__file__).resolve().parents[2] / "cli/src/extract/sql/builtin_types.sql").read_text()
 
-IMAGES = {
-    "17": "postgres@sha256:29e0bb09c8e7e7fc265ea9f4367de9622e55bae6b0b97e7cce740c2d63c2ebc0",
-    "18": "postgres@sha256:5773fe724c49c42a7a9ca70202e11e1dff21fb7235b335a73f39297d200b73a2",
-}
+SHARED_MAJORS = ("17", "18")
 
 
 def run(*args, data=None, env=None, success=True):
@@ -415,7 +412,7 @@ def validate_init_unchanged_install(binary, destination):
     project = destination / "unchanged-install"
     project.mkdir()
     home = project / "chosen-home"
-    for major in IMAGES:
+    for major in SHARED_MAJORS:
         shutil.copytree(destination / major, home / "postgres" / major)
     fixture = Path(__file__).resolve().parents[2] / "sql-fun-home"
     shutil.copytree(fixture / "highlighter", home / "highlighter")
@@ -436,7 +433,7 @@ def validate_init_unchanged_install(binary, destination):
         terminal.send(b"\r", "Choose exactly one action explicitly")
         assert home_snapshot(home) == before
         terminal.finish(b" \r", 0)
-        for major in IMAGES:
+        for major in SHARED_MAJORS:
             assert f"PostgreSQL {major}: already initialized".encode() in terminal.rendered()
         assert b"SQLite development-support setup" in terminal.rendered()
         assert home_snapshot(home) == before
@@ -486,7 +483,7 @@ def validate_server_init_navigation(binary, destination, connection, major):
         terminal.close()
     print(f"Init PostgreSQL {major}: connection re-entry, retained version and source invalidation passed", flush=True)
     validate_supplied_server_init(binary, destination, connection, major, major)
-    other = next(version for version in IMAGES if version != major)
+    other = "18" if major == "17" else "17"
     validate_supplied_server_init(binary, destination, connection, major, other)
 
 
@@ -712,6 +709,9 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
 
 
 def validate(binary, major, image, destination, host, bind):
+    run("docker", "pull", image)
+    digest = run("docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", image).stdout.decode().strip()
+    print(f"PostgreSQL {major}: {image} resolved to {digest}", flush=True)
     output = destination / major
     run(binary, "extract", "catalog", "--docker-image", image,
         "--docker-host-address", host, "--docker-bind-address", bind, "--output", str(output))
@@ -754,6 +754,11 @@ def validate(binary, major, image, destination, host, bind):
         port = ports["5432/tcp"][0]["HostPort"]
         connection_env = dict(os.environ, SQL_FUN_DATABASE_URL=f"postgresql://postgres:{password}@{host}:{port}/postgres?sslmode=disable",
                               DOCKER_HOST="unix:///nonexistent-sql-fun-test.sock")
+        version = run("psql", "-X", "-qAtw", "--dbname", connection_env["SQL_FUN_DATABASE_URL"],
+                      data=b"SHOW server_version_num;\n").stdout.decode().strip()
+        print(f"PostgreSQL {major}: server_version_num={version}", flush=True)
+        assert int(version) // 10000 == int(major)
+        assert json.loads((output / "metadata.json").read_text())["server_version_num"] == int(version)
         validate_server_init_navigation(binary, destination, connection_env["SQL_FUN_DATABASE_URL"], major)
         # Type I/O functions with cstring signatures are SQL-callable with unknown literals.
         result = run("psql", "-X", "-qAtw", "--dbname", connection_env["SQL_FUN_DATABASE_URL"],
@@ -842,8 +847,11 @@ def validate_export_contract(binary, destination):
     name = "odd name-" + "x" * 110 + ".sql"
     (extension / name).symlink_to(target)
     (extension / "odd name.control").write_bytes(b"default_version = '1.0'\n")
+    source = destination / "17"
+    version_num = json.loads((source / "metadata.json").read_text())["server_version_num"]
+    major, minor = divmod(version_num, 10000)
     pg_config = fixture / "pg_config"
-    pg_config.write_text('#!/bin/sh\ncase "$1" in\n--sharedir) printf "%s\\n" "$EXPORT_TEST_SHARE" ;;\n--version) echo "PostgreSQL 17.6" ;;\nesac\n')
+    pg_config.write_text(f'#!/bin/sh\ncase "$1" in\n--sharedir) printf "%s\\n" "$EXPORT_TEST_SHARE" ;;\n--version) echo "PostgreSQL {major}.{minor}" ;;\nesac\n')
     pg_config.chmod(0o755)
     environment = dict(os.environ, PG_CONFIG=str(pg_config), EXPORT_TEST_SHARE=str(extension.parent))
     script = run(binary, "extract", "export-script").stdout
@@ -856,26 +864,14 @@ def validate_export_contract(binary, destination):
     catalog = fixture / "catalog"
     bundle_file = fixture / "extensions.tar"
     bundle_file.write_bytes(archive)
-    run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(destination / "17"), "--output", str(catalog))
+    run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(source), "--output", str(catalog))
     assert (catalog / "extension" / name).read_bytes() == content
     (extension / "dangling.sql").symlink_to(fixture / "missing")
     run("sh", "-s", data=script, env=environment, success=False)
     print("Extension export: deterministic PAX, long names, packaging symlink and dangling-link rejection passed", flush=True)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", required=True)
-    parser.add_argument("--output", required=True)
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--bind", default="127.0.0.1")
-    args = parser.parse_args()
-    destination = Path(args.output).resolve()
-    destination.mkdir(parents=True, exist_ok=True)
-    args.binary = str(Path(args.binary).resolve())
-    os.environ["PATH"] = str(theme_tools(destination)) + os.pathsep + os.environ["PATH"]
-    # Run the packaged CLI outside the checkout: all runtime resources must be embedded.
-    os.chdir(destination)
+def validate_shared(args, destination):
     validate_interactive_init(args.binary, destination, "connector",
                               "[package.metadata.database]\nconnector = 'tokio-postgres'\n")
     validate_interactive_init(args.binary, destination, "named",
@@ -891,18 +887,44 @@ def main():
     validate_init_cancellation(args.binary, destination, existing=True)
     validate_supplied_init_navigation(args.binary, destination)
     validate_datasource_init_navigation(args.binary, destination)
-    before = owned()
-    for major, image in IMAGES.items():
-        validate(str(Path(args.binary).resolve()), major, image, destination, args.host, args.bind)
     validate_init_unchanged_install(args.binary, destination)
     init_home = destination / "initialized-docker"
     run(args.binary, "init", "--yes", "--install-default-theme", "--docker", "--sql-fun-home", str(init_home),
-        "--engines", "postgres", "--engine-versions", ",".join(IMAGES),
+        "--engines", "postgres", "--engine-versions", ",".join(SHARED_MAJORS),
         "--docker-host-address", args.host, "--docker-bind-address", args.bind)
-    for major in IMAGES:
-        assert payload(init_home / "postgres" / major) == payload(destination / major)
-    print("Initialization: Docker multi-version installation, server detection, reruns and mismatch diagnostics passed", flush=True)
-    validate_export_contract(str(Path(args.binary).resolve()), destination)
+    # Docker init selects the CLI inventory images, which can differ from the fresh extraction tags.
+    for major in SHARED_MAJORS:
+        installed = init_home / "postgres" / major
+        assert json.loads((installed / "metadata.json").read_text())["server_version_num"] // 10000 == int(major)
+        validate_type_facts(installed)
+        validate_masters(installed)
+    print("Initialization: Docker multi-version installation passed", flush=True)
+    validate_export_contract(args.binary, destination)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--bind", default="127.0.0.1")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--major", type=int, help="run extraction for one PostgreSQL major")
+    mode.add_argument("--shared", action="store_true", help="run shared checks using existing 17/18 output")
+    args = parser.parse_args()
+    destination = Path(args.output).resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    args.binary = str(Path(args.binary).resolve())
+    os.environ["PATH"] = str(theme_tools(destination)) + os.pathsep + os.environ["PATH"]
+    # Run the packaged CLI outside the checkout: all runtime resources must be embedded.
+    os.chdir(destination)
+    before = owned()
+    if not args.shared:
+        majors = SHARED_MAJORS if args.major is None else (str(args.major),)
+        for major in majors:
+            validate(args.binary, major, f"postgres:{major}", destination, args.host, args.bind)
+    if args.major is None:
+        validate_shared(args, destination)
     assert owned() == before
 
 

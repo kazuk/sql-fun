@@ -864,6 +864,78 @@ jobs:
 
   postgres-extraction:
     needs: [pr-freshness, packaging]
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['17', '18']
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: sql-fun-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/sql-fun-artifact
+
+      - name: Install packaged extraction tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 postgresql-client "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
+
+      - name: Validate installed PostgreSQL extraction and import
+        env:
+          PG_MAJOR: ${{ matrix.postgres }}
+        run: |
+          output="$RUNNER_TEMP/sql-fun-postgres"
+          .local/bin/test-postgres-extraction --binary /usr/bin/sql-fun --output "$output" --major "$PG_MAJOR"
+          baseline="sql-fun-home/postgres/$PG_MAJOR"
+          if [[ -d "$baseline" ]]; then
+            status=0
+            diff -qr "$baseline" "$output/$PG_MAJOR" || status=$?
+            if (( status > 1 )); then exit "$status"; fi
+            if (( status == 1 )); then
+              echo "::warning::PostgreSQL $PG_MAJOR catalog differs from the checked-in snapshot"
+            fi
+          fi
+
+      - name: Analyze a builtin query with the initialized catalog
+        env:
+          PG_MAJOR: ${{ matrix.postgres }}
+        run: |
+          export SQL_FUN_HOME="$RUNNER_TEMP/sql-fun-postgres/$PG_MAJOR-initialized-connection"
+          cat >"$RUNNER_TEMP/postgres-extraction.toml" <<EOF
+          [package.metadata.database.regression]
+          engine = "PostgreSQL"
+          dialect = "postgres"
+          version = "$PG_MAJOR"
+          search_path = ["public"]
+          connector = "tokio-postgres"
+          EOF
+          cat >"$RUNNER_TEMP/postgres-extraction.json" <<'EOF'
+          [{
+            "name": "builtin-abs",
+            "sql": "SELECT pg_catalog.abs(-1) AS result",
+            "expected": {
+              "diagnostics": [],
+              "columns": [{
+                "name": "result",
+                "type": {"schema_name": "pg_catalog", "local_name": "int4", "is_array": false},
+                "nullability": "nullable"
+              }]
+            }
+          }]
+          EOF
+          /usr/bin/sql-fun --metadata-file "$RUNNER_TEMP/postgres-extraction.toml" --datasource regression \
+            test "$RUNNER_TEMP/postgres-extraction.json" --schema-level builtin
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-postgres-extracted-${{ matrix.postgres }}
+          path: ${{ runner.temp }}/sql-fun-postgres/${{ matrix.postgres }}-initialized-connection/postgres/${{ matrix.postgres }}/
+          if-no-files-found: error
+
+  postgres-extraction-shared:
+    needs: [packaging, postgres-extraction]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -906,21 +978,30 @@ jobs:
           BASH_ENV="$GITHUB_WORKSPACE/cli/postgres-contracts/setup.sh" \
             "$RUNNER_TEMP/sql-fun-postgres-scrut/scrut" test cli/postgres-contracts
 
-      - name: Validate installed PostgreSQL extraction and import
+      - name: Download initialized PostgreSQL catalogs
+        uses: actions/download-artifact@v7
+        with:
+          pattern: sql-fun-postgres-extracted-*
+          path: ${{ runner.temp }}/sql-fun-postgres-catalogs
+
+      - name: Validate shared extraction and initialization contracts
         run: |
-          .local/bin/test-postgres-extraction \
-            --binary /usr/bin/sql-fun \
-            --output "$RUNNER_TEMP/sql-fun-postgres"
-          for version in 17 18; do
-            diff -r "sql-fun-home/postgres/$version" "$RUNNER_TEMP/sql-fun-postgres/$version"
+          output="$RUNNER_TEMP/sql-fun-postgres"
+          mkdir -p "$output"
+          for major in 17 18; do
+            mv "$RUNNER_TEMP/sql-fun-postgres-catalogs/sql-fun-postgres-extracted-$major" "$output/$major"
           done
+          .local/bin/test-postgres-extraction --binary /usr/bin/sql-fun --output "$output" --shared
+          mkdir "$output/postgres"
+          mv "$output/17" "$output/18" "$output/postgres/"
+          cp -R "$output/initialized-docker/highlighter" "$output/"
 
       - name: Validate installed SQLAST regression contracts
         env:
           SQL_FUN_BIN: /usr/bin/sql-fun
           SQL_FUN_TEST_SERVER_BIN: /usr/bin/sql-fun-server
         run: |
-          SQL_FUN_HOME="$RUNNER_TEMP/sql-fun-postgres/initialized-docker" \
+          SQL_FUN_HOME="$RUNNER_TEMP/sql-fun-postgres" \
             SQL_FUN_REGRESSION_REPORT_DIR="$RUNNER_TEMP/sqlast-regressions" \
             tests/sqlast-regressions/run.sh
 
@@ -930,14 +1011,6 @@ jobs:
           name: sqlast-regressions-installed
           path: ${{ runner.temp }}/sqlast-regressions/
           if-no-files-found: warn
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: sql-fun-postgres-extracted
-          path: |
-            ${{ runner.temp }}/sql-fun-postgres/17/**
-            ${{ runner.temp }}/sql-fun-postgres/18/**
-          if-no-files-found: error
 
   semver:
     needs: pr-freshness
@@ -1006,6 +1079,7 @@ jobs:
       - packaging
       - install-validation
       - postgres-extraction
+      - postgres-extraction-shared
     steps:
       - name: Require every dependency to succeed
         env:

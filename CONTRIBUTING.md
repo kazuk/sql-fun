@@ -384,6 +384,10 @@ cargo build -p sql-fun-cli --bin sql-fun
 To check an installed CLI, supply its executable path with `--binary`.
 Use `--host` and `--bind` when the Docker host is reached through a specific
 interface instead of loopback.
+The extraction check pulls each tested PostgreSQL major tag and reports the
+resolved image digest and actual server version. In CI, each extraction lane
+reports differences from the corresponding checked-in catalog, and validates
+that the installed analyzer can use the newly initialized catalog.
 
 ## Inspecting Coverage
 

@@ -936,8 +936,15 @@ jobs:
 
   postgres-extraction:
     needs: [packaging, postgres-extraction-version]
+    # This required check must fail even if a matrix dependency failed.
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     steps:
+      - name: Require every dependency to succeed
+        env:
+          NEEDS_RESULTS: ${{ toJSON(needs) }}
+        run: jq -e 'all(.[]; .result == "success")' <<< "$NEEDS_RESULTS"
+
       - uses: actions/checkout@v5
 
       - uses: actions/download-artifact@v7

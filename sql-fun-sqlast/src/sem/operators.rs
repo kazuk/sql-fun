@@ -1,7 +1,44 @@
 use crate::{
-    names::OperatorName,
-    sem::{OperatorLinks, TypeReference, parameter_resolution::Signature},
+    names::{FullName, OperatorName},
+    sem::{CascadeRemoval, OperatorLinks, TypeReference, parameter_resolution::Signature},
 };
+
+type RegisteredRemoval = (FullName, Box<dyn CascadeRemoval>);
+
+// Catalog dependents do not participate in the identity of a bound expression.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct OperatorDependents(Option<std::sync::Arc<Vec<RegisteredRemoval>>>);
+
+impl PartialEq for OperatorDependents {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for OperatorDependents {}
+
+impl std::hash::Hash for OperatorDependents {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
+}
+
+impl OperatorDependents {
+    pub(crate) fn entries(&self) -> &[RegisteredRemoval] {
+        match &self.0 {
+            Some(entries) => entries.as_slice(),
+            None => &[],
+        }
+    }
+
+    pub(crate) fn replace(&mut self, name: &FullName, removal: Option<&dyn CascadeRemoval>) {
+        if let Some(entries) = &mut self.0 {
+            std::sync::Arc::make_mut(entries).retain(|(owner, _)| owner != name);
+        }
+        if let Some(removal) = removal {
+            let entries = self.0.get_or_insert_with(Default::default);
+            std::sync::Arc::make_mut(entries).push((name.clone(), removal.clone_box()));
+        }
+    }
+}
 
 /// Binary operators
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -12,9 +49,19 @@ pub struct BinaryOperatorDefinition {
     strict: bool,
     #[serde(skip)]
     settings: Option<Box<OperatorLinks>>,
+    #[serde(skip)]
+    dependents: OperatorDependents,
 }
 
 impl BinaryOperatorDefinition {
+    pub(crate) const fn dependents(&self) -> &OperatorDependents {
+        &self.dependents
+    }
+
+    pub(crate) const fn dependents_mut(&mut self) -> &mut OperatorDependents {
+        &mut self.dependents
+    }
+
     pub(crate) fn with_settings(mut self, settings: Option<OperatorLinks>) -> Self {
         self.settings = settings.map(Box::new);
         self
@@ -46,6 +93,7 @@ impl BinaryOperatorDefinition {
             result_type: result_type.clone(),
             strict,
             settings: None,
+            dependents: OperatorDependents::default(),
         }
     }
 
@@ -82,9 +130,19 @@ pub struct UnaryOperatorDefinition {
     strict: bool,
     #[serde(skip)]
     settings: Option<Box<OperatorLinks>>,
+    #[serde(skip)]
+    dependents: OperatorDependents,
 }
 
 impl UnaryOperatorDefinition {
+    pub(crate) const fn dependents(&self) -> &OperatorDependents {
+        &self.dependents
+    }
+
+    pub(crate) const fn dependents_mut(&mut self) -> &mut OperatorDependents {
+        &mut self.dependents
+    }
+
     pub(crate) fn with_settings(mut self, settings: Option<OperatorLinks>) -> Self {
         self.settings = settings.map(Box::new);
         self
@@ -110,6 +168,7 @@ impl UnaryOperatorDefinition {
             result_type: result_type.clone(),
             strict,
             settings: None,
+            dependents: OperatorDependents::default(),
         }
     }
 

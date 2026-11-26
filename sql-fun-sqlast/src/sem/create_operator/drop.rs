@@ -296,7 +296,12 @@ fn registered_operator_removals(
     let mut pending = std::collections::VecDeque::new();
     for target in targets {
         if let DropOperatorTarget::Resolved(identity) = target {
-            pending.extend(context.operator_removals(identity));
+            if let Some(definition) =
+                context.get_operator_op(identity.name(), identity.binary(), true)
+                && let Some(dependents) = identity.dependents(definition)
+            {
+                pending.extend(dependents.entries().iter().cloned());
+            }
         }
     }
     let mut visited = std::collections::HashSet::new();

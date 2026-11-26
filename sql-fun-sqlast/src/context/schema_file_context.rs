@@ -14,8 +14,6 @@ mod func_info;
 #[cfg(test)]
 mod name_identity_tests;
 mod object_info;
-mod operator_removal;
-use operator_removal::OperatorRemovalRegistry;
 mod ownership;
 #[cfg(test)]
 mod row_security_tests;
@@ -130,7 +128,6 @@ pub(super) struct SchemaCatalog {
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
     operator_links: std::collections::HashMap<OperatorIdentity, Option<OperatorLinks>>,
-    operator_removals: OperatorRemovalRegistry,
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
     indexes: TrieMap<CreateIndex>,
@@ -210,7 +207,6 @@ impl SchemaFileContext {
                 casts: TrieMap::default(),
                 binary_operators: TrieMap::default(),
                 operator_links: Default::default(),
-                operator_removals: Default::default(),
                 left_unary_operators: TrieMap::default(),
                 right_unary_operators: TrieMap::default(),
                 indexes: TrieMap::default(),
@@ -555,18 +551,40 @@ impl SchemaFileContext {
     }
 }
 
-impl OperatorInfoRead for SchemaCatalog {
-    fn operator_removals(
-        &self,
+impl SchemaCatalog {
+    fn update_operator_dependent(
+        &mut self,
         identity: &OperatorIdentity,
-    ) -> Vec<(FullName, Box<dyn CascadeRemoval>)> {
-        let mut removals = self.base.operator_removals(identity);
-        removals.retain(|(name, _)| !self.views.has_registered_definition(name));
-        removals.extend(self.operator_removals.for_operator(identity));
-        removals.retain(|(name, _)| self.get_view_impl(name).is_some());
-        removals
+        name: &FullName,
+        removal: Option<&dyn CascadeRemoval>,
+    ) {
+        // Protected builtin overloads cannot participate in a drop.
+        if self.operator_is_system_required(identity) {
+            return;
+        }
+        let definitions = if identity.binary() {
+            &mut self.binary_operators
+        } else {
+            &mut self.right_unary_operators
+        };
+        let key = identity.name().to_name_string();
+        // Write the effective overloads into this layer before changing one.
+        if definitions.get(&key).is_none() {
+            let Some(inherited) =
+                self.base
+                    .get_operator_op(identity.name(), identity.binary(), true)
+            else {
+                return;
+            };
+            definitions.insert(&key, inherited.clone());
+        }
+        if let Some(definition) = definitions.get_mut(&key) {
+            identity.update_dependent(definition, name, removal);
+        }
     }
+}
 
+impl OperatorInfoRead for SchemaCatalog {
     fn operator_is_system_required(&self, identity: &OperatorIdentity) -> bool {
         self.base.operator_is_system_required(identity)
     }

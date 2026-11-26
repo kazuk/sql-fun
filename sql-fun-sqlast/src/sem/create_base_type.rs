@@ -23,7 +23,11 @@ impl CreateType {
         let reference = TypeReference::concrete_type_ref(&name, false);
         let Some(options) = self.definition() else {
             return if context.permits_type_creation(&name)? {
-                Ok(SemAst::CreateBaseType(TypeDefinition::Shell(reference)))
+                Ok(SemAst::CreateBaseType(Box::new(BaseTypeDeclaration {
+                    definition: TypeDefinition::Shell(reference),
+                    options: Vec::new(),
+                    like_type: None,
+                })))
             } else {
                 Ok(SemAst::rejected_base_type(
                     name,
@@ -44,7 +48,7 @@ impl CreateType {
             ));
         }
         match Self::validate_definition(options, &name, &reference, context) {
-            Ok(definition) => Ok(SemAst::CreateBaseType(definition)),
+            Ok(declaration) => Ok(SemAst::CreateBaseType(Box::new(declaration))),
             Err(failure) => {
                 context.report_analysis_problem(AnalysisProblem::invalid_base_type(
                     &(&name).into(),
@@ -60,7 +64,7 @@ impl CreateType {
         name: &FullName,
         reference: &TypeReference,
         context: &impl ParseContext,
-    ) -> Result<TypeDefinition, InvalidDefinition> {
+    ) -> Result<BaseTypeDeclaration, InvalidDefinition> {
         if context.get_type_impl(name).is_none() {
             return Err(invalid("a shell declaration is required"));
         }
@@ -68,7 +72,7 @@ impl CreateType {
         let mut seen = BTreeSet::new();
         let mut category = TypeCategory::try_from('U').expect("valid default category");
         let mut collatable = false;
-        let mut layout = TypeLayout::default();
+        let mut like_type = None;
         for option in options {
             let role = option.role();
             if !seen.insert(role) {
@@ -77,24 +81,28 @@ impl CreateType {
             match role {
                 "input" | "output" | "receive" | "send" | "typmod_in" | "typmod_out"
                 | "analyze" | "subscript" => support.insert(option)?,
-                "like" => layout.inherit(context, option)?,
+                "like" => like_type = Some(option.resolve_like_type(context)?),
                 "element" => option.validate_element(context)?,
                 "category" => category = option.category()?,
                 "collatable" => collatable = option.boolean()?,
                 "preferred" => option.boolean().map(drop)?,
                 "delimiter" | "default" => option.text().map(drop)?,
-                "internallength" => layout.set_length(option)?,
-                "alignment" => layout.set_alignment(option)?,
-                "storage" => layout.set_storage(option)?,
-                "passedbyvalue" => layout.set_passed_by_value(option)?,
+                "internallength" | "alignment" | "storage" | "passedbyvalue" => {}
                 unknown => return Err(invalid(&format!("unrecognized {unknown} option"))),
             }
         }
-        layout.validate()?;
         support.validate(context, reference)?;
-        Ok(TypeDefinition::base(name, category, collatable)
-            .with_physical_layout(layout.physical())
-            .with_storage(Some(layout.storage)))
+        let definition = TypeDefinition::base(name, category, collatable);
+        let definition = if like_type.is_some() {
+            definition
+        } else {
+            TypeLayout::retain_catalog_facts(definition, options)
+        };
+        Ok(BaseTypeDeclaration {
+            definition,
+            options: options.to_vec(),
+            like_type,
+        })
     }
 }
 
@@ -104,11 +112,135 @@ impl CreateType {
         mut context: T,
     ) -> Result<AstAndContextPair<T>, AnalysisError> {
         let statement = self.analyze(&mut context)?;
-        if let SemAst::CreateBaseType(definition) = &statement {
+        if let SemAst::CreateBaseType(declaration) = &statement {
+            let definition = declaration.definition();
             let name = definition.full_name().expect("named definition");
             context.insert_shell_or_base_type(name, definition);
         }
         Ok(AstAndContextPair::new(statement, context))
+    }
+}
+
+#[cfg(test)]
+mod application_tests {
+    use crate::{
+        context::{BaseParseContext, TypeInfoRead},
+        names::FullName,
+        sem::{AnalysisProblem, SemAst, TypeReference, pg_type::TypeStorage},
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[test]
+    fn retains_written_options_and_resolved_like_source() -> testresult::TestResult {
+        let mut context = ownership_context();
+        for sql in [
+            "CREATE TYPE public.source AS ENUM ('value')",
+            "CREATE TYPE public.demo",
+            "CREATE FUNCTION public.demo_in(pg_catalog.cstring) RETURNS public.demo LANGUAGE internal AS 'int4in'",
+            "CREATE FUNCTION public.demo_out(public.demo) RETURNS pg_catalog.cstring LANGUAGE internal AS 'int4out'",
+        ] {
+            context = apply_ownership_sql(context, sql)?.into_context();
+        }
+        let result = apply_ownership_sql(
+            context,
+            "CREATE TYPE public.demo (STORAGE = extended, LIKE = source, INPUT = public.demo_in, OUTPUT = public.demo_out, INTERNALLENGTH = 4)",
+        )?;
+        let SemAst::CreateBaseType(declaration) = result.ast() else {
+            panic!("expected completed base type");
+        };
+        assert_eq!(
+            declaration.option_names().collect::<Vec<_>>(),
+            ["storage", "like", "input", "output", "internallength"]
+        );
+        assert_eq!(
+            declaration.options[0].storage().ok(),
+            Some(TypeStorage::Extended)
+        );
+        assert_eq!(
+            declaration.like_type(),
+            Some(&TypeReference::concrete_type_ref(
+                &FullName::with_schema("public", "source"),
+                false,
+            ))
+        );
+        assert!(declaration.definition().physical_layout().is_none());
+        assert!(
+            result
+                .context()
+                .get_type(&FullName::with_schema("public", "demo"))
+                .is_some()
+        );
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case(
+        "LIKE = public.missing",
+        "type public.missing does not exist or is incomplete"
+    )]
+    #[case(
+        "CATEGORY = ''",
+        "type category must begin with a printable ASCII character"
+    )]
+    fn rejected_completion_retains_shell_and_allows_next_statement(
+        #[case] options: &str,
+        #[case] expected: &str,
+    ) -> testresult::TestResult {
+        let context =
+            apply_ownership_sql(ownership_context(), "CREATE TYPE public.demo")?.into_context();
+        let attempt =
+            apply_ownership_sql(context, &format!("CREATE TYPE public.demo ({options})"))?;
+        let name = FullName::with_schema("public", "demo");
+        assert!(matches!(
+            attempt.ast(),
+            SemAst::RejectedBaseType(rejected)
+                if rejected.name() == &name && rejected.is_completion() && rejected.reason() == expected
+        ));
+        let context = attempt.into_context();
+        assert!(
+            context
+                .problems()
+                .iter()
+                .any(|problem| { matches!(problem, AnalysisProblem::InvalidBaseType(_)) })
+        );
+        assert!(
+            context
+                .get_type_impl(&name)
+                .is_some_and(|definition| definition.is_shell())
+        );
+        assert!(context.get_type(&name).is_none());
+        let next = apply_ownership_sql(context, "CREATE TYPE public.other")?;
+        assert!(matches!(next.ast(), SemAst::CreateBaseType(_)));
+        Ok(())
+    }
+}
+
+/// An analyzed PostgreSQL shell or base type declaration.
+#[derive(Debug, Clone)]
+pub struct BaseTypeDeclaration {
+    definition: TypeDefinition,
+    options: Vec<BaseTypeOption>,
+    like_type: Option<TypeReference>,
+}
+
+impl BaseTypeDeclaration {
+    /// The type definition published by this declaration.
+    #[must_use]
+    pub const fn definition(&self) -> &TypeDefinition {
+        &self.definition
+    }
+
+    /// The resolved source type named in the LIKE clause.
+    #[must_use]
+    pub const fn like_type(&self) -> Option<&TypeReference> {
+        self.like_type.as_ref()
+    }
+
+    /// Names of explicitly written options in declaration order.
+    pub fn option_names(&self) -> impl Iterator<Item = &str> {
+        self.options
+            .iter()
+            .map(|option| option.syntax().name().as_str())
     }
 }
 
@@ -147,57 +279,6 @@ impl SemAst {
             completion,
             reason: failure.0,
         })
-    }
-}
-
-#[cfg(test)]
-mod application_tests {
-    use crate::{
-        context::{BaseParseContext, TypeInfoRead},
-        names::FullName,
-        sem::{AnalysisProblem, SemAst},
-        test_helpers::ownership::{apply_ownership_sql, ownership_context},
-    };
-
-    #[rstest::rstest]
-    #[case(
-        "INTERNALLENGTH = 4, STORAGE = extended",
-        "fixed-size types must have storage PLAIN"
-    )]
-    #[case(
-        "CATEGORY = ''",
-        "type category must begin with a printable ASCII character"
-    )]
-    fn rejected_completion_retains_shell_and_allows_next_statement(
-        #[case] options: &str,
-        #[case] expected: &str,
-    ) -> testresult::TestResult {
-        let context =
-            apply_ownership_sql(ownership_context(), "CREATE TYPE public.demo")?.into_context();
-        let attempt =
-            apply_ownership_sql(context, &format!("CREATE TYPE public.demo ({options})"))?;
-        let name = FullName::with_schema("public", "demo");
-        assert!(matches!(
-            attempt.ast(),
-            SemAst::RejectedBaseType(rejected)
-                if rejected.name() == &name && rejected.is_completion() && rejected.reason() == expected
-        ));
-        let context = attempt.into_context();
-        assert!(
-            context
-                .problems()
-                .iter()
-                .any(|problem| { matches!(problem, AnalysisProblem::InvalidBaseType(_)) })
-        );
-        assert!(
-            context
-                .get_type_impl(&name)
-                .is_some_and(|definition| definition.is_shell())
-        );
-        assert!(context.get_type(&name).is_none());
-        let next = apply_ownership_sql(context, "CREATE TYPE public.other")?;
-        assert!(matches!(next.ast(), SemAst::CreateBaseType(_)));
-        Ok(())
     }
 }
 
@@ -262,7 +343,6 @@ struct TypeLayout {
     length: TypeLength,
     alignment: i16,
     by_value: bool,
-    storage: TypeStorage,
 }
 
 impl Default for TypeLayout {
@@ -271,7 +351,6 @@ impl Default for TypeLayout {
             length: TypeLength::Variable,
             alignment: 4,
             by_value: false,
-            storage: TypeStorage::Plain,
         }
     }
 }
@@ -293,14 +372,32 @@ impl TypeLayout {
         PhysicalTypeLayout::new(length, alignment, self.by_value)
     }
 
-    fn set_length(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
-        self.length = TypeLength::from_option(option)?;
-        Ok(())
+    // Binary casts and ALTER TYPE consume these facts for declarations without LIKE.
+    fn retain_catalog_facts(
+        mut definition: TypeDefinition,
+        options: &[BaseTypeOption],
+    ) -> TypeDefinition {
+        if let Some(layout) = Self::from_options(options) {
+            definition = definition.with_physical_layout(layout.physical());
+        }
+        let storage = options.iter().find(|option| option.role() == "storage");
+        definition.with_storage(match storage {
+            Some(option) => option.storage().ok(),
+            None => Some(TypeStorage::Plain),
+        })
     }
 
-    fn set_alignment(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
-        self.alignment = Self::parse_alignment(option)?;
-        Ok(())
+    fn from_options(options: &[BaseTypeOption]) -> Option<Self> {
+        let mut layout = Self::default();
+        for option in options {
+            match option.role() {
+                "internallength" => layout.length = TypeLength::from_option(option).ok()?,
+                "alignment" => layout.alignment = Self::parse_alignment(option).ok()?,
+                "passedbyvalue" => layout.by_value = option.boolean().ok()?,
+                _ => {}
+            }
+        }
+        Some(layout)
     }
 
     fn parse_alignment(option: &BaseTypeOption) -> Result<i16, InvalidDefinition> {
@@ -311,84 +408,6 @@ impl TypeLayout {
             "double" | "float8" | "pg_catalog.float8" => Ok(8),
             _ => Err(invalid("unrecognized alignment")),
         }
-    }
-
-    fn set_storage(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
-        self.storage = option.storage()?;
-        Ok(())
-    }
-
-    fn set_passed_by_value(&mut self, option: &BaseTypeOption) -> Result<(), InvalidDefinition> {
-        self.by_value = option.boolean()?;
-        Ok(())
-    }
-
-    fn inherit(
-        &mut self,
-        context: &impl ParseContext,
-        option: &BaseTypeOption,
-    ) -> Result<(), InvalidDefinition> {
-        let target = option.qualified_name()?;
-        if context.get_type(&target).is_none() {
-            return Err(invalid(&format!("type {target} does not exist")));
-        }
-        todo!("validate inherited PostgreSQL base type layout (#1211)")
-    }
-
-    fn validate(&self) -> Result<(), InvalidDefinition> {
-        if self.by_value {
-            if !matches!(self.length, TypeLength::Fixed(bytes @ (1 | 2 | 4 | 8)) if bytes == self.alignment)
-            {
-                return Err(invalid(
-                    "invalid length or alignment for a passed-by-value type",
-                ));
-            }
-        } else if (self.length == TypeLength::Variable && self.alignment < 4)
-            || (self.length == TypeLength::NullTerminated && self.alignment != 1)
-        {
-            return Err(invalid("invalid alignment for a variable-length type"));
-        }
-        if self.length != TypeLength::Variable && self.storage != TypeStorage::Plain {
-            return Err(invalid("fixed-size types must have storage PLAIN"));
-        }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod layout_tests {
-    use crate::sem::{
-        create_base_type::{TypeLayout, TypeLength},
-        pg_type::TypeStorage,
-    };
-
-    #[rstest::rstest]
-    #[case(TypeLength::Fixed(4), 4, true, true, true)]
-    #[case(TypeLength::Fixed(4), 8, true, true, false)]
-    #[case(TypeLength::Variable, 4, true, true, false)]
-    #[case(TypeLength::Variable, 2, false, true, false)]
-    #[case(TypeLength::NullTerminated, 1, false, true, true)]
-    #[case(TypeLength::NullTerminated, 4, false, true, false)]
-    #[case(TypeLength::Fixed(4), 4, false, false, false)]
-    #[case(TypeLength::Variable, 8, false, false, true)]
-    fn validates_layout_combinations(
-        #[case] length: TypeLength,
-        #[case] alignment: i16,
-        #[case] by_value: bool,
-        #[case] plain_storage: bool,
-        #[case] valid: bool,
-    ) {
-        let layout = TypeLayout {
-            length,
-            alignment,
-            by_value,
-            storage: if plain_storage {
-                TypeStorage::Plain
-            } else {
-                TypeStorage::Extended
-            },
-        };
-        assert_eq!(layout.validate().is_ok(), valid);
     }
 }
 
@@ -460,6 +479,18 @@ impl BaseTypeOption {
             }
             _ => Err(invalid("expected a qualified name or identifier")),
         }
+    }
+
+    fn resolve_like_type(
+        &self,
+        context: &impl ParseContext,
+    ) -> Result<TypeReference, InvalidDefinition> {
+        let target = self.qualified_name()?;
+        let array =
+            matches!(self.value(), Some(SyntaxValue::Type(ty)) if !ty.array_bounds().is_empty());
+        context
+            .resolve_signature_type(&target, array, false)
+            .ok_or_else(|| invalid(&format!("type {target} does not exist or is incomplete")))
     }
 
     fn validate_element(&self, context: &impl ParseContext) -> Result<(), InvalidDefinition> {

@@ -37,10 +37,23 @@ CREATE FUNCTION public.implicit_value_out(public.implicit_value) RETURNS cstring
 CREATE TYPE public.implicit_value (
   INPUT = public.implicit_value_in,
   OUTPUT = public.implicit_value_out,
-  INTERNALLENGTH = VARIABLE,
+  LIKE = public.base_value,
   STORAGE = extended
 );
 CREATE TABLE public.implicit_values (
   item public.implicit_value,
   items public.implicit_value[]
 );
+
+CREATE FUNCTION public.like_value_in(cstring) RETURNS public.like_value
+  LANGUAGE internal IMMUTABLE STRICT AS 'textin';
+CREATE FUNCTION public.like_value_out(public.like_value) RETURNS cstring
+  LANGUAGE internal IMMUTABLE STRICT AS 'textout';
+CREATE TYPE public.like_value (
+  INPUT = public.like_value_in,
+  STORAGE = external,
+  LIKE = implicit_value,
+  OUTPUT = public.like_value_out
+);
+CREATE TABLE public.like_values (item public.like_value);
+CREATE TYPE public.missing_like;

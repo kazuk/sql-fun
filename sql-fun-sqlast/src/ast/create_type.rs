@@ -102,7 +102,8 @@ mod test_create_type_conversion {
         let sql = r#"CREATE TYPE "App"."Amount";
 CREATE TYPE "App"."Amount" (
     INPUT = "App"."Read", OUTPUT = "App"."Write",
-    INTERNALLENGTH = VARIABLE, DEFAULT = '0', PASSEDBYVALUE
+    INTERNALLENGTH = VARIABLE, DEFAULT = '0', PASSEDBYVALUE,
+    STORAGE = extended, LIKE = pg_catalog.text
 );"#;
 
         let mut statements = parse_statements(sql, Dialect::postgres());
@@ -131,7 +132,9 @@ CREATE TYPE "App"."Amount" (
                 "output",
                 "internallength",
                 "default",
-                "passedbyvalue"
+                "passedbyvalue",
+                "storage",
+                "like"
             ]
         );
         let Some(SyntaxValue::Type(input)) = &options[0].syntax.value else {
@@ -144,6 +147,15 @@ CREATE TYPE "App"."Amount" (
             Some(SyntaxValue::Expression(Expr::Literal(Literal::String(value)))) if value == "0"
         ));
         assert!(options[4].syntax.value.is_none());
+
+        assert!(matches!(
+            &options[5].syntax.value,
+            Some(SyntaxValue::Type(storage)) if storage.name.0 == ["extended"]
+        ));
+        assert!(matches!(
+            &options[6].syntax.value,
+            Some(SyntaxValue::Type(source)) if source.name.0 == ["pg_catalog", "text"]
+        ));
 
         let statement_sql = base.span().get_from(sql).unwrap();
         assert_eq!(

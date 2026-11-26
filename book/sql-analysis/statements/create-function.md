@@ -108,7 +108,9 @@ sql-fun can convert and render PostgreSQL `ALTER FUNCTION` statements with a
 single `PARALLEL SAFE`, `PARALLEL RESTRICTED`, or `PARALLEL UNSAFE` action. It
 preserves the function name and signature, including the distinction between
 an omitted signature and explicit empty parentheses. Statements that combine
-`PARALLEL` with other actions are unsupported in this conversion.
+`PARALLEL` with other actions stop analysis during SQL conversion, including
+the combined volatility and parallel-safety actions in the bundled `isn` 1.3
+update ([#1150](https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7190271178)).
 
 Schema and extension analysis records the requested mode on the selected
 function. An explicit signature matches exact input argument types, including

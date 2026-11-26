@@ -104,6 +104,9 @@ impl RelationAlteration {
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
+        if let Some(rename) = Self::from_ast_type_introducing_rename(ast, context, source)? {
+            return Ok(rename);
+        }
         if ast.kind().supports_table_column_attributes() && AlterConstraint::is_ast_relation(ast) {
             return AlterConstraint::analyze_relation(ast, context, source);
         }
@@ -142,7 +145,91 @@ impl RelationAlteration {
             ast.if_exists(),
         )
     }
+}
 
+impl RelationAlteration {
+    fn from_ast_type_introducing_rename(
+        ast: &AstAlterRelation,
+        context: &mut impl ParseContext,
+        source: Option<&SourcePathWithSpan>,
+    ) -> Result<Option<SemAst>, AnalysisError> {
+        let [AstAlterCommand::Rename(destination)] = ast.commands().as_slice() else {
+            return Ok(None);
+        };
+        match ast.kind() {
+            AstAlterRelationKind::Table
+            | AstAlterRelationKind::View
+            | AstAlterRelationKind::CompositeType
+            | AstAlterRelationKind::Domain => {
+                let name = FullName::from_ast_name(destination)?;
+                context.validate_type_introduction_name(name.name().as_str())?;
+            }
+            _ => return Ok(None),
+        }
+        if matches!(ast.kind(), AstAlterRelationKind::Table) {
+            Self::from_ast_table_rename(ast, context, source).map(Some)
+        } else {
+            Err(AnalysisError::unexpected_input_error(
+                "unsupported PostgreSQL object rename",
+            ))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_analyze_type_introducing_rename {
+    use crate::{
+        ast::{AlterRelationKind, StatementNode},
+        sem::{AnalysisError, RelationAlteration},
+        test_helpers::{ownership::ownership_statement, schema_creation, source_span},
+    };
+
+    #[rstest::rstest]
+    #[case::table("ALTER TABLE public.demo RENAME TO _demo")]
+    #[case::view("ALTER VIEW public.demo RENAME TO _demo")]
+    #[case::named_type("ALTER TYPE public.demo RENAME TO _demo")]
+    #[case::domain("ALTER DOMAIN public.demo RENAME TO _demo")]
+    fn rejects_underscore_prefixed_destination_during_analysis(
+        #[case] sql: &str,
+        #[values(false, true)] builtin: bool,
+    ) -> testresult::TestResult {
+        let StatementNode::AlterRelation(rename) = ownership_statement(sql)? else {
+            panic!("expected converted rename");
+        };
+        let mut context = schema_creation::postgres("CREATE TABLE public.demo (id integer)")?;
+        if builtin {
+            context.mark_postgres_builtin_schema();
+        }
+        let outcome = RelationAlteration::from_ast_type_introducing_rename(
+            &rename,
+            &mut context,
+            Some(&source_span()),
+        );
+        match (builtin, rename.kind()) {
+            (false, _) => assert!(matches!(
+                outcome,
+                Err(AnalysisError::UnsupportedPostgresTypeName(name)) if name == "_demo"
+            )),
+            (true, AlterRelationKind::Table) => {
+                let statement = outcome?.expect("table rename statement");
+                assert!(
+                    statement
+                        .alter_table_statement()
+                        .expect("table rename")
+                        .can_apply()
+                );
+            }
+            (true, _) => assert!(matches!(
+                outcome,
+                Err(AnalysisError::UnexpectedInput(reason))
+                    if reason == "unsupported PostgreSQL object rename"
+            )),
+        }
+        Ok(())
+    }
+}
+
+impl RelationAlteration {
     pub(crate) fn from_ast_kind(
         ast: &AstAlterRelationKind,
         context: &mut impl ParseContext,
@@ -168,6 +255,9 @@ impl RelationAlteration {
                 Self::index_from_ast_commands(context, name, syntax_commands, if_exists)
             }
             AstAlterRelationKind::ForeignTable | AstAlterRelationKind::CompositeType => todo!(),
+            AstAlterRelationKind::Domain => Err(AnalysisError::unexpected_input_error(
+                "unsupported PostgreSQL ALTER DOMAIN",
+            )),
         }
     }
 

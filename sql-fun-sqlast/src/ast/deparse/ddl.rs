@@ -515,6 +515,20 @@ impl SqlEmit for AlterRelation {
     }
 }
 
+#[cfg(test)]
+mod test_deparse_type_introducing_rename {
+    use crate::test_helpers::deparse_statements::assert_native_deparse_round_trip;
+
+    #[rstest::rstest]
+    #[case::table("ALTER TABLE public.demo RENAME TO _demo")]
+    #[case::view("ALTER VIEW public.demo RENAME TO _demo")]
+    #[case::named_type("ALTER TYPE public.demo RENAME TO _demo")]
+    #[case::domain("ALTER DOMAIN public.demo RENAME TO _demo")]
+    fn preserves_underscore_prefixed_destination(#[case] sql: &str) {
+        assert_native_deparse_round_trip(sql);
+    }
+}
+
 impl SqlEmit for AlterRelationKind {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.sql(match self {
@@ -530,6 +544,10 @@ impl SqlEmit for AlterRelationKind {
             Self::CompositeType => {
                 writer.postgres_only("ALTER TYPE")?;
                 "TYPE"
+            }
+            Self::Domain => {
+                writer.postgres_only("ALTER DOMAIN")?;
+                "DOMAIN"
             }
             Self::View => {
                 writer.postgres_only("ALTER VIEW")?;

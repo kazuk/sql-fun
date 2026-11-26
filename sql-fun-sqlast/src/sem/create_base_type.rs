@@ -36,6 +36,7 @@ impl CreateType {
                 ))
             };
         };
+        context.validate_type_introduction_name(name.name().as_str())?;
         if context
             .get_type_impl(&name)
             .is_some_and(|definition| !definition.is_shell())

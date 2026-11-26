@@ -261,6 +261,7 @@ pub(crate) enum AlterRelationKind {
     ForeignTable,
     Index,
     CompositeType,
+    Domain,
     View,
     MaterializedView,
     Sequence,

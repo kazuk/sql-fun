@@ -27,6 +27,7 @@ impl TryFrom<syn::ObjectType> for AstAlterRelationKind {
             syn::ObjectType::ObjectForeignTable => Self::ForeignTable,
             syn::ObjectType::ObjectIndex => Self::Index,
             syn::ObjectType::ObjectType => Self::CompositeType,
+            syn::ObjectType::ObjectDomain => Self::Domain,
             syn::ObjectType::ObjectView => Self::View,
             syn::ObjectType::ObjectMatview => Self::MaterializedView,
             syn::ObjectType::ObjectSequence => Self::Sequence,
@@ -41,27 +42,43 @@ impl TryFromWithTokens<&syn::RenameStmt> for AlterRelation {
         value: &syn::RenameStmt,
         _tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let relation = required(value.get_relation().as_inner(), "rename.relation")?;
-        let (kind, command, only) =
-            match required(value.get_rename_type().as_inner(), "rename.rename_type")? {
-                syn::ObjectType::ObjectTable => (
-                    AstAlterRelationKind::table(),
-                    AstAlterCommand::Rename(Name::from_parts(&[value.get_newname()])),
-                    false,
-                ),
-                syn::ObjectType::ObjectColumn => (
+        let object = required(value.get_rename_type().as_inner(), "rename.rename_type")?;
+        let (kind, name, command, only) = match object {
+            syn::ObjectType::ObjectColumn => {
+                let relation = required(value.get_relation().as_inner(), "rename.relation")?;
+                (
                     AstAlterRelationKind::try_from(required(
                         value.get_relation_type().as_inner(),
                         "rename.relation_type",
                     )?)?,
+                    Name::try_from(&relation)?,
                     AstAlterCommand::RenameColumn(value.get_subname(), value.get_newname()),
                     !relation.get_inh(),
-                ),
-                _ => return AnalysisError::raise_unexpected_input("expected relation rename"),
-            };
+                )
+            }
+            syn::ObjectType::ObjectTable | syn::ObjectType::ObjectView => {
+                let relation = required(value.get_relation().as_inner(), "rename.relation")?;
+                (
+                    AstAlterRelationKind::try_from(object)?,
+                    Name::try_from(&relation)?,
+                    AstAlterCommand::Rename(Name::from_parts(&[value.get_newname()])),
+                    false,
+                )
+            }
+            syn::ObjectType::ObjectType | syn::ObjectType::ObjectDomain => {
+                let target = required(value.get_object().as_inner(), "rename.object")?;
+                (
+                    AstAlterRelationKind::try_from(object)?,
+                    Name::try_from(target.as_list().get_items())?,
+                    AstAlterCommand::Rename(Name::from_parts(&[value.get_newname()])),
+                    false,
+                )
+            }
+            _ => return AnalysisError::raise_unexpected_input("expected relation rename"),
+        };
         Ok(Self {
             only: kind.supports_only() && only,
-            name: Name::try_from(&relation)?,
+            name,
             kind,
             commands: vec![command],
             if_exists: value.get_missing_ok(),

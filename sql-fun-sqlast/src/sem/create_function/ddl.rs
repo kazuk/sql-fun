@@ -279,7 +279,7 @@ impl CreateFunction {
         Ok(Some(reference))
     }
 
-    fn shell_creation_name(
+    pub(super) fn shell_creation_name(
         name: &FullName,
         function: &FullName,
         declaration: &mut FunctionDeclarationOutcome,

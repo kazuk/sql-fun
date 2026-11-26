@@ -59,13 +59,6 @@ pub enum AnalysisError {
     FormattingError(#[from] std::fmt::Error),
 }
 impl AnalysisError {
-    pub(crate) fn check_postgres_type_declaration_name(name: &str) -> Result<(), Self> {
-        if name.starts_with('_') {
-            return Err(Self::UnsupportedPostgresTypeName(name.to_owned()));
-        }
-        Ok(())
-    }
-
     /// raise `UnexpectedNone` error
     pub fn raise_unexpected_none<T>(message: &str) -> Result<T, Self> {
         Err(Self::UnexpectedNone(String::from(message)))

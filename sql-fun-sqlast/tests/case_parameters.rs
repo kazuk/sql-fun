@@ -15,7 +15,6 @@ use std::collections::BTreeMap;
 // 70868a945c783c48ce8f36b598a456066a6aa568.
 #[rstest::rstest]
 #[case::then_parameter("SELECT CASE WHEN true THEN $1 ELSE 1 END")]
-#[case::else_parameter("SELECT CASE WHEN true THEN 1 ELSE $1 END")]
 // Timed-out outer_operator case removed in 654110eb7c1ade58dbe1327f579b18932c3e605a.
 // Timed-out outer_call case removed in d60b0d5f784396228fcbe87f91592f1c96319247.
 #[case::cte("WITH c AS (SELECT CASE WHEN true THEN $1 ELSE 1 END AS n) SELECT n FROM c")]

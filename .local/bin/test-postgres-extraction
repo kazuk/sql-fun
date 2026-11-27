@@ -708,6 +708,36 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     print(f"PostgreSQL {major}: exact schema scope, encoding variants, cross-schema references and extension masters passed", flush=True)
 
 
+def validate_default_extension_lookup(binary, home, major):
+    metadata = home / "extension-check.toml"
+    metadata.write_text(f"""[package.metadata.database.regression]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "{major}"
+search_path = ["public"]
+connector = "tokio-postgres"
+extensions = [{{ name = "uuid-ossp", version = "1.1" }}]
+""")
+    cases = home / "extension-check.json"
+    cases.write_text(json.dumps([{
+        "name": "installed-uuid-ossp",
+        "sql": "SELECT public.uuid_generate_v4() AS result",
+        "expected": {
+            "diagnostics": [],
+            "columns": [{
+                "name": "result",
+                "type": {"schema_name": "pg_catalog", "local_name": "uuid", "is_array": False},
+                "nullability": "nullable",
+            }],
+        },
+    }]))
+    environment = dict(os.environ, SQL_FUN_HOME=str(home))
+    environment.pop("SQL_FUN_EXTENSIONS_DIR", None)
+    result = run(binary, "--metadata-file", str(metadata), "--datasource", "regression",
+                 "test", str(cases), "--schema-level", "extensions", env=environment)
+    print(result.stdout.decode(), end="", flush=True)
+
+
 def validate(binary, major, image, destination, host, bind):
     run("docker", "pull", image)
     digest = run("docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", image).stdout.decode().strip()
@@ -742,7 +772,8 @@ def validate(binary, major, image, destination, host, bind):
             "--engines", "postgres", "--docker", "--engine-versions", major,
             "--docker-host-address", host, "--docker-bind-address", bind)
         assert payload(docker_home / "postgres" / major) == first
-    assert "extension/uuid-ossp.control" in first
+        validate_default_extension_lookup(binary, docker_home, major)
+    assert "extensions/uuid-ossp.control" in first
     assert json.loads((output / "metadata.json").read_text())["server_version_num"] // 10000 == int(major)
     password = secrets.token_hex(24)
     # Only this newly created container is used as the externally supplied server.
@@ -806,7 +837,7 @@ GRANT CONNECT ON DATABASE postgres TO extractor;
         limited_env = dict(connection_env, SQL_FUN_DATABASE_URL=f"postgresql://extractor:extractor-test@{host}:{port}/postgres?sslmode=disable")
         existing = destination / f"{major}-restricted"
         run(binary, "extract", "catalog", "--output", str(existing), env=limited_env)
-        assert not (existing / "extension").exists(), "catalog-only extraction must not retain stale extension files"
+        assert not (existing / "extensions").exists(), "catalog-only extraction must not retain stale extension files"
         run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(existing), "--output", str(destination / f"{major}-restricted-imported"), env=limited_env)
         assert payload(destination / f"{major}-restricted-imported") == first, "user or extension objects contaminated builtin metadata"
         validate_selected_masters(binary, major, destination, limited_env, bundle_file, identifier)
@@ -875,7 +906,7 @@ def validate_export_contract(binary, destination):
     bundle_file = fixture / "extensions.tar"
     bundle_file.write_bytes(archive)
     run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(source), "--output", str(catalog))
-    assert (catalog / "extension" / name).read_bytes() == content
+    assert (catalog / "extensions" / name).read_bytes() == content
     (extension / "dangling.sql").symlink_to(fixture / "missing")
     run("sh", "-s", data=script, env=environment, success=False)
     print("Extension export: deterministic PAX, long names, packaging symlink and dangling-link rejection passed", flush=True)

@@ -115,7 +115,7 @@ mod tests {
     #[tokio::test]
     async fn extension_initialization_applies_updates_and_destination_controls() {
         let project = SchemaProject::new();
-        let directory = project.home().join("postgres/17/extension");
+        let directory = project.home().join("postgres/17/extensions");
         std::fs::create_dir_all(&directory).unwrap();
         std::fs::write(
             directory.join("example.control"),
@@ -156,7 +156,6 @@ mod tests {
         let mut request = project.rpc_request("-- unused");
         request["schema_level"] = serde_json::json!("extensions");
         request["environments"]["SQL_FUN_EXTENSIONS"] = serde_json::json!("example");
-        request["environments"]["SQL_FUN_EXTENSIONS_DIR"] = serde_json::json!(directory);
         let request = serde_json::from_value(request).unwrap();
         let api = Api {
             schema_cache: std::sync::OnceLock::new(),

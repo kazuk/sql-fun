@@ -152,7 +152,9 @@ Version matching cannot prove two vendor builds have identical extension files.
 The importer rejects unsupported formats, duplicate paths, links, special files,
 and unsafe paths. There is no fixed archive-size ceiling; provide enough disk
 space for the bundle, staging files, and candidate output. Importing copies files;
-it does not execute extension SQL or install extensions in PostgreSQL.
+it does not execute extension SQL or install extensions in PostgreSQL. Docker
+extraction and bundle import write extension files under `extensions/` in the
+catalog output.
 
 When configuring an extension for subsequent SQL analysis, specify its installation
 version explicitly (for example, `uuid-ossp@1.1`). Automatic version inference

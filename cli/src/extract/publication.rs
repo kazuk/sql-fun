@@ -51,7 +51,7 @@ impl Publication {
     pub(super) fn copy_catalog(&self, source: &Path) -> Result<(), anyhow::Error> {
         for entry in fs::read_dir(source).context("extract catalogs before importing extensions")? {
             let entry = entry?;
-            if entry.file_name() == "extension" {
+            if matches!(entry.file_name().to_str(), Some("extension" | "extensions")) {
                 continue;
             }
             anyhow::ensure!(

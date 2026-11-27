@@ -115,7 +115,7 @@ mod test_conversion {
     #[case(18, "seg--1.2--1.3")]
     fn converts_bundled_block(#[case] version: u8, #[case] script: &str) {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-            "../sql-fun-home/postgres/{version}/extension/{script}.sql"
+            "../sql-fun-home/postgres/{version}/extensions/{script}.sql"
         ));
         let script = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("{}: {error}", path.display()));

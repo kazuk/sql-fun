@@ -119,7 +119,7 @@ absolute paths. Only the requested datasource's metadata is decoded.
 Initialization currently supports PostgreSQL. Extension scripts and their order
 are selected through core's configuration resolution, including explicit directory
 overrides. The usual extension directory is
-`<SQL_FUN_HOME>/postgresql/<engine-version>/extensions`.
+`<SQL_FUN_HOME>/postgres/<engine-version>/extensions`.
 
 The first successful cache service registration fixes the builtin installation
 for the server lifetime. A later request selecting a different canonical

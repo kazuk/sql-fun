@@ -495,12 +495,8 @@ impl SqlFunArgs {
             Ok(ext_dir.clone())
         } else {
             let home = self.sql_fun_home()?;
-            let dialect = self.sql_dialect(metadata)?;
-            let ver = self.postgres_version(metadata)?;
-            Ok(home
-                .join(dialect.to_string())
-                .join(ver.to_string())
-                .join("extensions"))
+            let version = self.postgres_version(metadata)?;
+            Ok(version.definition_base_path(&home).join("extensions"))
         }
     }
 

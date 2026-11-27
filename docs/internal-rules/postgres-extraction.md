@@ -280,7 +280,9 @@ The importer streams regular-file contents without a fixed size ceiling, checks
 logical-size arithmetic for overflow, requires an exact PostgreSQL release match,
 and rejects missing/unsupported
 versions, duplicate paths, traversal, unexpected paths/suffixes, symlink/hardlink
-entries, and special files. It creates new files in a private staging directory
+entries, and special files. It publishes the bundle members under `extensions/`
+in the catalog directory, matching the default analysis search path. It creates
+new files in a private staging directory
 rather than invoking a general tar unpack operation. Compatibility checks do not
 prove that identically numbered vendor installations are equivalent: selecting
 the corresponding installation remains an administrator responsibility.

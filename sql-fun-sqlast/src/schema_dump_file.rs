@@ -120,7 +120,7 @@ mod test_extension_catalog {
             let path = home
                 .join("postgres")
                 .join(version)
-                .join("extension/plpgsql--1.0.sql");
+                .join("extensions/plpgsql--1.0.sql");
             let script = std::fs::read_to_string(&path)?;
             // The CLI fixture covers the full script, including the configured owner.
             let declarations = script.split_once("ALTER LANGUAGE").unwrap().0;

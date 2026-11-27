@@ -2941,7 +2941,7 @@ fn converts_operator_classes_from_bundled_extension_paths() {
         let extension_dir = Path::new(env!("SQL_FUN_HOME"))
             .join("postgres")
             .join(version)
-            .join("extension");
+            .join("extensions");
         for (script, expected_count) in [
             ("btree_gin--1.0.sql", 23),
             ("btree_gin--1.0--1.1.sql", 1),

@@ -32,7 +32,7 @@ pub(crate) fn extension_initialization_request(
     selected: &str,
     files: &[(&str, &str)],
 ) -> InitializeSchemaArgs {
-    let directory = project.home().join("postgres/17/extension");
+    let directory = project.home().join("postgres/17/extensions");
     std::fs::create_dir_all(&directory).unwrap();
     for (file, text) in files {
         std::fs::write(directory.join(file), text).unwrap();
@@ -41,6 +41,5 @@ pub(crate) fn extension_initialization_request(
     let mut request = project.rpc_request("-- unused");
     request["schema_level"] = ::serde_json::json!("extensions");
     request["environments"]["SQL_FUN_EXTENSIONS"] = ::serde_json::json!(selected);
-    request["environments"]["SQL_FUN_EXTENSIONS_DIR"] = ::serde_json::json!(directory);
     ::serde_json::from_value(request).unwrap()
 }

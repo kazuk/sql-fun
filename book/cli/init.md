@@ -183,6 +183,11 @@ No source or version is selected automatically.
 Each version uses its registered PostgreSQL image and a temporary container.
 Choose `--engine-versions 19` with `--docker` to generate and install the
 PostgreSQL 19 catalog from the official `postgres:19` image.
+Docker initialization writes extension files to
+`<chosen-home>/postgres/<major>/extensions/`, the default analysis path.
+For an existing catalog with files under `extension/`, rename that directory
+to `extensions/` if the destination does not already exist.
+
 The extractor removes its own containers and volumes after completion or a
 handled interruption. Image retrieval requires network access unless the image
 is already present.

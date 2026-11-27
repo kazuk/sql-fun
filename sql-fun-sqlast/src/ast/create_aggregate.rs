@@ -233,10 +233,10 @@ mod test_aggregate_options {
     #[test]
     fn converts_bundled_aggregate_declarations() {
         for script in [
-            include_str!("../../../sql-fun-home/postgres/17/extension/citext--1.4.sql"),
-            include_str!("../../../sql-fun-home/postgres/18/extension/citext--1.4.sql"),
-            include_str!("../../../sql-fun-home/postgres/17/extension/intagg--1.1.sql"),
-            include_str!("../../../sql-fun-home/postgres/18/extension/intagg--1.1.sql"),
+            include_str!("../../../sql-fun-home/postgres/17/extensions/citext--1.4.sql"),
+            include_str!("../../../sql-fun-home/postgres/18/extensions/citext--1.4.sql"),
+            include_str!("../../../sql-fun-home/postgres/17/extensions/intagg--1.1.sql"),
+            include_str!("../../../sql-fun-home/postgres/18/extensions/intagg--1.1.sql"),
         ] {
             let declarations = script
                 .split("CREATE AGGREGATE ")

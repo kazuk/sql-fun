@@ -18,7 +18,7 @@ pub fn index_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
 /// results are not cached or shared between calls or test processes.
 pub fn tablefunc_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
     let prefix = builtin_root()?;
-    let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
+    let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extensions/tablefunc--1.0.sql");
     Ok({
         let (args, selected) = heavy::environment("17")?;
         let analysis_base = &prefix;

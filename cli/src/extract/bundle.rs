@@ -27,7 +27,7 @@ pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> 
     let mut archive = tar::Archive::new(file);
     let mut seen = HashSet::new();
     let mut version = None;
-    let extension = output.join("extension");
+    let extension = output.join("extensions");
     fs::create_dir(&extension)?;
     let mut total = 0u64;
     for entry in archive.entries()? {
@@ -85,7 +85,8 @@ pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> 
                 suffix == "sql" || suffix == "control",
                 "unexpected extension file suffix"
             );
-            let destination = output.join(path);
+            let destination =
+                extension.join(path.file_name().context("missing extension file name")?);
             let mut file = File::options()
                 .write(true)
                 .create_new(true)
@@ -111,7 +112,7 @@ mod import_tests {
         let size = 257 * 1024 * 1024;
         fixture.import_large_extension(size).unwrap();
         assert_eq!(
-            std::fs::metadata(fixture.path().join("extension/large.sql"))
+            std::fs::metadata(fixture.path().join("extensions/large.sql"))
                 .unwrap()
                 .len(),
             size
@@ -128,7 +129,7 @@ mod import_tests {
             ])
             .unwrap();
         assert_eq!(
-            std::fs::read(fixture.path().join("extension/odd name.sql")).unwrap(),
+            std::fs::read(fixture.path().join("extensions/odd name.sql")).unwrap(),
             b"SELECT '<&>';\n"
         );
     }

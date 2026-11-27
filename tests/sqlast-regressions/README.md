@@ -298,6 +298,22 @@ It checks target and sibling builtin overloads, builtin type lookup, and
 privilege diagnostics after extension initialization on PostgreSQL 17/18.
 Declaration history and layer isolation are covered by Rust tests.
 
+The `create-language` fixture explicitly sets `extension_install_owner = "postgres"`
+and includes `postgres` in its role inventory. When rerunning the bundled
+extension audit (#1150), include the chosen installation owner alongside the
+four audit roles:
+
+```toml
+extension_install_owner = "postgres"
+roles = [
+  "pg_monitor",
+  "pg_read_all_stats",
+  "pg_read_server_files",
+  "pg_stat_scan_tables",
+  "postgres",
+]
+```
+
 ## Parallel CI execution
 
 CI runs one shared-server suite using the committed schedule described above.

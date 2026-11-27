@@ -35,16 +35,18 @@ sql-fun also loads dependencies declared in the selected extensions' control
 files. Each script can use the installation schema and definitions of its
 prerequisites, including when an update introduces a new prerequisite.
 
-The PostgreSQL 17 and 18 bundled scripts for `cube@1.2`,
-`earthdistance@1.1`, and `plpgsql@1.0` can still stop initialization during
-SQL analysis. Selecting only `earthdistance` also loads its declared
+The PostgreSQL 17 and 18 bundled scripts for `cube@1.2` and
+`earthdistance@1.1` can still stop initialization during SQL analysis.
+Selecting only `earthdistance` also loads its declared
 prerequisite `cube`. The bundled `cube` script stops at its base-type definition,
 before loading any `earthdistance` script. The `earthdistance` operator
-definition also fails when reached. Selecting `plpgsql` loads the three
-callbacks from its bundled script before declaring the language.
-Initialization can still report an unresolved installation owner at
-`ALTER LANGUAGE plpgsql OWNER TO`. See
-[issue #1266](https://github.com/kazuk/sql-fun/issues/1266).
+definition also fails when reached.
+
+Selecting `plpgsql` loads three callbacks from its bundled script before
+declaring the language.
+Include the assumed installation owner in the datasource role inventory so
+`ALTER LANGUAGE plpgsql OWNER TO` can resolve it. For example, set
+`extension_install_owner = "postgres"` and include `"postgres"` in `roles`.
 
 For `hstore`, the bundled path starts with `hstore--1.4.sql` and reaches
 `1.8` through four updates. Analysis currently stops at the installation script's

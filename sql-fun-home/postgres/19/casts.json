@@ -1,0 +1,1618 @@
+{
+  "bit": {
+    "bit": {
+      "context": "i",
+      "func": "bit(bit,int4,bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "e",
+      "func": "int4(bit)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "e",
+      "func": "int8(bit)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "varbit": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "bool": {
+    "bpchar": {
+      "context": "a",
+      "func": "text(bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "e",
+      "func": "int4(bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "a",
+      "func": "text(bool)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "text(bool)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "box": {
+    "circle": {
+      "context": "e",
+      "func": "circle(box)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "lseg": {
+      "context": "e",
+      "func": "lseg(box)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "point": {
+      "context": "e",
+      "func": "point(box)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "polygon": {
+      "context": "a",
+      "func": "polygon(box)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "bpchar": {
+    "bpchar": {
+      "context": "i",
+      "func": "bpchar(bpchar,int4,bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "char": {
+      "context": "a",
+      "func": "char(text)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "name": {
+      "context": "i",
+      "func": "name(bpchar)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "i",
+      "func": "text(bpchar)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "i",
+      "func": "text(bpchar)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "xml": {
+      "context": "e",
+      "func": "xml(text)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "bytea": {
+    "int2": {
+      "context": "e",
+      "func": "int2(bytea)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "e",
+      "func": "int4(bytea)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "e",
+      "func": "int8(bytea)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "uuid": {
+      "context": "e",
+      "func": "uuid(bytea)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "char": {
+    "bpchar": {
+      "context": "a",
+      "func": "bpchar(char)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "e",
+      "func": "int4(char)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "i",
+      "func": "text(char)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "text(char)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "cidr": {
+    "bpchar": {
+      "context": "a",
+      "func": "text(inet)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "inet": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "text": {
+      "context": "a",
+      "func": "text(inet)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "text(inet)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "circle": {
+    "box": {
+      "context": "e",
+      "func": "box(circle)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "point": {
+      "context": "e",
+      "func": "point(circle)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "polygon": {
+      "context": "e",
+      "func": "polygon(circle)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "date": {
+    "timestamp": {
+      "context": "i",
+      "func": "timestamp(date)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "timestamptz": {
+      "context": "i",
+      "func": "timestamptz(date)",
+      "is_prefferd": true,
+      "method": "f"
+    }
+  },
+  "daterange": {
+    "datemultirange": {
+      "context": "e",
+      "func": "datemultirange(daterange)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "float4": {
+    "float8": {
+      "context": "i",
+      "func": "float8(float4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "a",
+      "func": "numeric(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "float8": {
+    "float4": {
+      "context": "a",
+      "func": "float4(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "a",
+      "func": "numeric(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "inet": {
+    "bpchar": {
+      "context": "a",
+      "func": "text(inet)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "cidr": {
+      "context": "a",
+      "func": "cidr(inet)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "a",
+      "func": "text(inet)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "text(inet)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "int2": {
+    "bytea": {
+      "context": "e",
+      "func": "bytea(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float4": {
+      "context": "i",
+      "func": "float4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(int2)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int4": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "i",
+      "func": "int8(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "oid8": {
+      "context": "i",
+      "func": "int8(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regclass": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regcollation": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regconfig": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regdatabase": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regdictionary": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regnamespace": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regoper": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regoperator": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regproc": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regprocedure": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regrole": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regtype": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "int4": {
+    "bit": {
+      "context": "e",
+      "func": "bit(int4,int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "bool": {
+      "context": "e",
+      "func": "bool(int4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "bytea": {
+      "context": "e",
+      "func": "bytea(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "char": {
+      "context": "e",
+      "func": "char(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float4": {
+      "context": "i",
+      "func": "float4(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(int4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "i",
+      "func": "int8(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "money": {
+      "context": "a",
+      "func": "money(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "oid8": {
+      "context": "i",
+      "func": "int8(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regclass": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regcollation": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regconfig": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regdatabase": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regdictionary": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regnamespace": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regoper": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regoperator": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regproc": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regprocedure": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regrole": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regtype": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "int4range": {
+    "int4multirange": {
+      "context": "e",
+      "func": "int4multirange(int4range)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "int8": {
+    "bit": {
+      "context": "e",
+      "func": "bit(int8,int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "bytea": {
+      "context": "e",
+      "func": "bytea(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float4": {
+      "context": "i",
+      "func": "float4(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(int8)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "money": {
+      "context": "a",
+      "func": "money(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "oid8": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regclass": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regcollation": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regconfig": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regdatabase": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regdictionary": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regnamespace": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regoper": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regoperator": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regproc": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regprocedure": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regrole": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regtype": {
+      "context": "i",
+      "func": "oid(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "int8range": {
+    "int8multirange": {
+      "context": "e",
+      "func": "int8multirange(int8range)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "interval": {
+    "interval": {
+      "context": "i",
+      "func": "interval(interval,int4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "time": {
+      "context": "a",
+      "func": "time(interval)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "json": {
+    "jsonb": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "i"
+    }
+  },
+  "jsonb": {
+    "bool": {
+      "context": "e",
+      "func": "bool(jsonb)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "float4": {
+      "context": "e",
+      "func": "float4(jsonb)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "e",
+      "func": "float8(jsonb)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "e",
+      "func": "int2(jsonb)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "e",
+      "func": "int4(jsonb)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "e",
+      "func": "int8(jsonb)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "json": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "i"
+    },
+    "numeric": {
+      "context": "e",
+      "func": "numeric(jsonb)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "lseg": {
+    "point": {
+      "context": "e",
+      "func": "point(lseg)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "macaddr": {
+    "macaddr8": {
+      "context": "i",
+      "func": "macaddr8(macaddr)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "macaddr8": {
+    "macaddr": {
+      "context": "i",
+      "func": "macaddr(macaddr8)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "money": {
+    "numeric": {
+      "context": "a",
+      "func": "numeric(money)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "name": {
+    "bpchar": {
+      "context": "a",
+      "func": "bpchar(name)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "i",
+      "func": "text(name)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "varchar(name)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "numeric": {
+    "float4": {
+      "context": "i",
+      "func": "float4(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(numeric)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "money": {
+      "context": "a",
+      "func": "money(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(numeric,int4)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "numrange": {
+    "nummultirange": {
+      "context": "e",
+      "func": "nummultirange(numrange)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "oid": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid8": {
+      "context": "a",
+      "func": "oid8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regclass": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regcollation": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regconfig": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regdatabase": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regdictionary": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regnamespace": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regoper": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regoperator": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regproc": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regprocedure": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regrole": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "regtype": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "oid8": {
+    "int8": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "path": {
+    "polygon": {
+      "context": "a",
+      "func": "polygon(path)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "pg_dependencies": {
+    "bytea": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "text": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "i"
+    }
+  },
+  "pg_mcv_list": {
+    "bytea": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "text": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "i"
+    }
+  },
+  "pg_ndistinct": {
+    "bytea": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "text": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "i"
+    }
+  },
+  "pg_node_tree": {
+    "text": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "point": {
+    "box": {
+      "context": "a",
+      "func": "box(point)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "polygon": {
+    "box": {
+      "context": "e",
+      "func": "box(polygon)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "circle": {
+      "context": "e",
+      "func": "circle(polygon)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "path": {
+      "context": "a",
+      "func": "path(polygon)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "point": {
+      "context": "e",
+      "func": "point(polygon)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "regclass": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "regcollation": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "regconfig": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "regdatabase": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "regdictionary": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "regnamespace": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "regoper": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "regoperator": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "regoperator": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "regoper": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "regproc": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "regprocedure": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "regprocedure": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "regproc": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "regrole": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "regtype": {
+    "int4": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(oid)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "oid": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    }
+  },
+  "text": {
+    "bpchar": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "char": {
+      "context": "a",
+      "func": "char(text)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "name": {
+      "context": "i",
+      "func": "name(text)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regclass": {
+      "context": "i",
+      "func": "regclass(text)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "xml": {
+      "context": "e",
+      "func": "xml(text)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "time": {
+    "interval": {
+      "context": "i",
+      "func": "interval(time)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "time": {
+      "context": "i",
+      "func": "time(time,int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "timetz": {
+      "context": "i",
+      "func": "timetz(time)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "timestamp": {
+    "date": {
+      "context": "a",
+      "func": "date(timestamp)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "time": {
+      "context": "a",
+      "func": "time(timestamp)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "timestamp": {
+      "context": "i",
+      "func": "timestamp(timestamp,int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "timestamptz": {
+      "context": "i",
+      "func": "timestamptz(timestamp)",
+      "is_prefferd": true,
+      "method": "f"
+    }
+  },
+  "timestamptz": {
+    "date": {
+      "context": "a",
+      "func": "date(timestamptz)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "time": {
+      "context": "a",
+      "func": "time(timestamptz)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "timestamp": {
+      "context": "a",
+      "func": "timestamp(timestamptz)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "timestamptz": {
+      "context": "i",
+      "func": "timestamptz(timestamptz,int4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "timetz": {
+      "context": "a",
+      "func": "timetz(timestamptz)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "timetz": {
+    "time": {
+      "context": "a",
+      "func": "time(timetz)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "timetz": {
+      "context": "i",
+      "func": "timetz(timetz,int4)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "tsrange": {
+    "tsmultirange": {
+      "context": "e",
+      "func": "tsmultirange(tsrange)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "tstzrange": {
+    "tstzmultirange": {
+      "context": "e",
+      "func": "tstzmultirange(tstzrange)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "uuid": {
+    "bytea": {
+      "context": "e",
+      "func": "bytea(uuid)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "varbit": {
+    "bit": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "varbit": {
+      "context": "i",
+      "func": "varbit(varbit,int4,bool)",
+      "is_prefferd": true,
+      "method": "f"
+    }
+  },
+  "varchar": {
+    "bpchar": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "char": {
+      "context": "a",
+      "func": "char(text)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "name": {
+      "context": "i",
+      "func": "name(varchar)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "regclass": {
+      "context": "i",
+      "func": "regclass(text)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "varchar": {
+      "context": "i",
+      "func": "varchar(varchar,int4,bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "xml": {
+      "context": "e",
+      "func": "xml(text)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "xid8": {
+    "xid": {
+      "context": "e",
+      "func": "xid(xid8)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "xml": {
+    "bpchar": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "text": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  }
+}

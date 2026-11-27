@@ -239,7 +239,7 @@ requires `curl` or `wget` with TLS support and trusted certificates. See
 [initialization](cli/init.md#diagnostic-theme) for retaining or editing a theme.
 
 Choose the PostgreSQL engine or a configured PostgreSQL datasource, the home
-directory, a source, and the versions you need (currently 17 and 18). See the
+directory, a source, and the versions you need (currently 17, 18, and 19). See the
 [init reference](cli/init.md) for non-interactive usage and all options.
 
 Set your datasource's `version` to the matching major. Initialization stores

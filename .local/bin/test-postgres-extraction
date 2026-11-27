@@ -17,6 +17,7 @@ import secrets
 import sys
 import shutil
 import subprocess
+import tempfile
 import time
 import tarfile
 
@@ -733,9 +734,24 @@ extensions = [{{ name = "uuid-ossp", version = "1.1" }}]
     }]))
     environment = dict(os.environ, SQL_FUN_HOME=str(home))
     environment.pop("SQL_FUN_EXTENSIONS_DIR", None)
-    result = run(binary, "--metadata-file", str(metadata), "--datasource", "regression",
-                 "test", str(cases), "--schema-level", "extensions", env=environment)
-    print(result.stdout.decode(), end="", flush=True)
+    with tempfile.TemporaryDirectory(prefix="sql-fun-extension-check-", dir="/tmp") as runtime:
+        environment["USER"] = Path(runtime).name
+        server_binary = Path(binary).with_name("sql-fun-server")
+        environment["SQL_FUN_SERVER"] = str(server_binary)
+        environment.pop("SQL_FUN_SERVER_COMMAND", None)
+        with subprocess.Popen([server_binary], stdin=subprocess.DEVNULL, env=environment) as server:
+            try:
+                registration = Path(runtime) / "sql-fun-server.pid"
+                deadline = time.monotonic() + 10
+                while not registration.is_file():
+                    assert server.poll() is None, "extension check server exited before registration"
+                    assert time.monotonic() < deadline, "extension check server registration timed out"
+                    time.sleep(0.05)
+                result = run(binary, "--metadata-file", str(metadata), "--datasource", "regression",
+                             "test", str(cases), "--schema-level", "extensions", env=environment)
+                print(result.stdout.decode(), end="", flush=True)
+            finally:
+                server.terminate()
 
 
 def validate(binary, major, image, destination, host, bind):

@@ -21,7 +21,9 @@ PostgreSQL's `FirstNormalObjectId` (16384). This boundary separates bootstrap
 catalogs from objects installed later, even inside `pg_catalog`. System schema
 rendering covers
 `pg_catalog` and `information_schema`; function metadata retains the loader's
-SQL-callable scope, excluding internal/trigger signatures. Application schema
+SQL-callable scope, excluding internal/trigger signatures. Both routine artifacts
+exclude members of installed extensions, including those below the bootstrap
+OID cutoff. Extension scripts supply those declarations. Application schema
 SQL and extension scripts remain separate inputs. The type master additionally
 includes persistent installed base types as described below.
 

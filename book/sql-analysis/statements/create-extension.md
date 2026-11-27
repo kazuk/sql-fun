@@ -40,11 +40,12 @@ The PostgreSQL 17 and 18 bundled scripts for `cube@1.2`,
 SQL analysis. Selecting only `earthdistance` also loads its declared
 prerequisite `cube`. The bundled `cube` script stops at its base-type definition,
 before loading any `earthdistance` script. The `earthdistance` operator
-definition also fails when reached. The `plpgsql` script declares
-`pg_catalog.plpgsql_call_handler()` and `pg_catalog.plpgsql_validator(oid)`
-before its language declaration. Those signatures are already present in the
-bundled catalogs, so the script reports duplicate routine declarations.
-The [CREATE LANGUAGE](create-language.md) statement itself is supported.
+definition also fails when reached. Selecting `plpgsql` loads the three
+callbacks from its bundled script before declaring the language.
+Initialization can still report an unresolved installation owner at
+`ALTER LANGUAGE plpgsql OWNER TO`. See
+[issue #1266](https://github.com/kazuk/sql-fun/issues/1266).
+
 For `hstore`, the bundled path starts with `hstore--1.4.sql` and reaches
 `1.8` through four updates. Analysis currently stops at the installation script's
 shell-type declaration

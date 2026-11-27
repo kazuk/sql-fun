@@ -29704,34 +29704,6 @@
     ]
   },
   {
-    "name": "plpgsql_call_handler",
-    "overloads": [
-      {
-        "args": [],
-        "is_strict": false,
-        "kind": "f",
-        "name": "plpgsql_call_handler",
-        "ret": "language_handler",
-        "returns_set": false
-      }
-    ]
-  },
-  {
-    "name": "plpgsql_validator",
-    "overloads": [
-      {
-        "args": [
-          "oid"
-        ],
-        "is_strict": true,
-        "kind": "f",
-        "name": "plpgsql_validator",
-        "ret": "void",
-        "returns_set": false
-      }
-    ]
-  },
-  {
     "name": "point",
     "overloads": [
       {

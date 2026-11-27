@@ -8,6 +8,14 @@ with detail as (
   from pg_catalog.pg_proc p
   join pg_catalog.pg_namespace n on n.oid = p.pronamespace
   where p.oid < 16384 and n.nspname = 'pg_catalog'
+    and not exists (
+      select 1
+      from pg_catalog.pg_depend d
+      where d.classid = 'pg_catalog.pg_proc'::regclass
+        and d.objid = p.oid
+        and d.refclassid = 'pg_catalog.pg_extension'::regclass
+        and d.deptype = 'e'
+    )
     and p.proallargtypes is not null
 ),
 allargs as (

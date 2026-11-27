@@ -37,9 +37,10 @@ must originate in catalog deparsing; never tag arbitrary CLI input as SQL.
 JSON object keys are sorted recursively. Queries explicitly order arrays;
 argument order and view dependency order are meaningful and must not be sorted
 away. PostgreSQL deparsing, collation, exact server build, and installation files
-are extraction inputs. The pinned integration images define the official
-reproduction environment. Verify both payload and metadata against committed
-artifacts in the installed-binary CI job.
+are extraction inputs. The installed-binary CI job pulls the official major tag,
+logs the resolved image digest and server version, and reports drift from the
+committed artifacts. For a snapshot reproduction check, compare payload and
+metadata from runs using the same resolved image and database settings.
 
 Bootstrap access methods are rendered in `schema.sql` from `pg_am`, with
 the method kind and the handler name qualified using its namespace in
@@ -112,8 +113,7 @@ New metadata is serialized without changing the existing nominal-reference shape
 category is an additive optional field. Domain classification is retained through
 serialization, independently of the existing domain identity/equality contract.
 
-Committed generations cover PostgreSQL 17 and 18. The extraction CLI also
-supports PostgreSQL 19.
+Committed generations and the extraction CLI cover PostgreSQL 17, 18, and 19.
 Automated category load/read round-trips use these existing committed catalogs;
 no separate oracle snapshots are maintained. PostgreSQL 15–19 behavior can be
 checked with small development-oracle queries without extending the CLI's
@@ -231,8 +231,8 @@ not a missing reference. Matching and default selection are consumer work.
 
 These payloads use qualified names as portable identities. Database locale/provider,
 server encoding/build, installed definitions and selected namespaces are inputs
-to reproduction. Existing pinned-image CI reproduces these files, alongside
-all previously committed payloads and metadata. Producer-side offline checks
+to reproduction. The installed extraction CI compares these files alongside
+the other committed payloads and metadata. Producer-side offline checks
 cover identity uniqueness/order, relationship shapes and default provenance;
 real-server extraction checks cover explicit scope, legal unusual names,
 encoding properties, cross-schema references and installed extension masters.

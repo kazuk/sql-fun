@@ -1,7 +1,7 @@
 use crate::{
     StringSpan,
     ast::{
-        Access, AlterFunctionParallel, AlterOwner, AlterRelation, AlterSequence, AlterTypeSettings,
+        Access, AlterFunction, AlterOwner, AlterRelation, AlterSequence, AlterTypeSettings,
         BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, CastTarget, Collate,
         Comment, CompositeType, CreateOperator, CreateRule, CreateTrigger, CreateType, CurrentOf,
         DefaultPrivileges, Delete, DomainConstraintTarget, DropBehavior, DropFunction, DropRule,
@@ -909,9 +909,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         if let Some(alter) = value.as_alter_function_stmt().as_inner() {
-            return Ok(Self::alter_function_parallel(
-                AlterFunctionParallel::try_from_with_tokens(&alter, tokens)?,
-            ));
+            return Ok(Self::alter_function(AlterFunction::try_from_with_tokens(
+                &alter, tokens,
+            )?));
         }
         if let Some(drop) = value.as_drop_stmt().as_inner() {
             return match drop.get_remove_type().as_inner() {
@@ -1219,7 +1219,7 @@ impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
     }
 }
 
-impl TryFromWithTokens<&syn::AlterFunctionStmt> for AlterFunctionParallel {
+impl TryFromWithTokens<&syn::AlterFunctionStmt> for AlterFunction {
     type Error = AnalysisError;
 
     fn try_from_with_tokens(
@@ -1235,23 +1235,27 @@ impl TryFromWithTokens<&syn::AlterFunctionStmt> for AlterFunctionParallel {
             return Err(unsupported());
         }
         let actions = value.get_actions().as_inner().unwrap_or_default();
-        let [action] = actions.as_slice() else {
+        if actions.is_empty() {
             return Err(unsupported());
-        };
-        let action = required(action.as_def_elem().as_inner(), "alter function action")?;
-        if action.get_defname() != "parallel" {
-            return Err(unsupported());
+        }
+        let mut options = Vec::with_capacity(actions.len());
+        for action in actions {
+            let action = required(action.as_def_elem().as_inner(), "alter function action")?;
+            if !matches!(action.get_defname().as_str(), "parallel" | "volatility") {
+                return Err(unsupported());
+            }
+            options.push(FunctionOption::try_from_with_tokens(&action, tokens)?);
         }
         let target = required(value.get_func().as_inner(), "alter function target")?;
         Ok(Self {
             target: ObjectTarget::try_from_object_with_args(&target, tokens)?,
-            option: FunctionOption::try_from_with_tokens(&action, tokens)?,
+            options,
         })
     }
 }
 
 #[cfg(test)]
-mod test_alter_function_parallel {
+mod test_alter_function {
     use crate::{ast::Dialect, parse_statements};
 
     #[rstest::rstest]

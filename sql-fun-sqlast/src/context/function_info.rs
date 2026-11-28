@@ -1,8 +1,8 @@
 use crate::{
     names::FullName,
     sem::{
-        AlterFunctionParallel, AnalysisError, CreateFunction, DropFunction,
-        FunctionOverloadCollection, FunctionTombstone, OverloadVariant, OwnershipIdentity,
+        AlterFunction, AnalysisError, CreateFunction, DropFunction, FunctionOverloadCollection,
+        FunctionTombstone, OverloadVariant, OwnershipIdentity,
     },
 };
 
@@ -43,14 +43,11 @@ pub trait FunctionInfoWrite
 where
     Self: Sized,
 {
-    /// Apply an analyzed ALTER FUNCTION PARALLEL to this catalog.
-    fn apply_alter_function_parallel(
-        self,
-        statement: &AlterFunctionParallel,
-    ) -> Result<Self, AnalysisError> {
+    /// Apply an analyzed ALTER FUNCTION attribute change to this catalog.
+    fn apply_alter_function(self, statement: &AlterFunction) -> Result<Self, AnalysisError> {
         if statement.applicable() {
             return AnalysisError::raise_unexpected_input(
-                "catalog does not support ALTER FUNCTION PARALLEL",
+                "catalog does not support ALTER FUNCTION attribute change",
             );
         }
         Ok(self)

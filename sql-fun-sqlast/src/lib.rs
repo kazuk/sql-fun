@@ -341,7 +341,7 @@ impl PostgresDialect {
 }
 
 #[cfg(test)]
-mod test_extension_parallel_safety {
+mod test_extension_function_attributes {
     use crate::{
         PostgresDialect, SqlFileSnapshot,
         ast::ObjectKind,
@@ -349,7 +349,7 @@ mod test_extension_parallel_safety {
             BaseParseContext, ExtensionInfoRead, OwnershipInfoRead, ParseContext, ViewInfoRead,
         },
         names::{FullName, SchemaName},
-        sem::{OwnershipIdentity, ParallelSafety},
+        sem::{FunctionVolatility, OwnershipIdentity, ParallelSafety, PgBuiltInType},
         test_helpers::{ownership::ownership_context, schema_content_hash::schema_file},
     };
 
@@ -360,8 +360,11 @@ mod test_extension_parallel_safety {
         let environment = ownership_context();
         let input = ownership_context().freeze();
         let file = schema_file(
-            "CREATE FUNCTION extension_probe() RETURNS integer LANGUAGE sql AS 'SELECT 1';\n
-             ALTER FUNCTION extension_probe() PARALLEL SAFE;\n
+            "CREATE FUNCTION extension_probe() RETURNS integer LANGUAGE sql VOLATILE PARALLEL UNSAFE AS 'SELECT 1';
+             CREATE FUNCTION extension_probe(integer) RETURNS integer
+             LANGUAGE sql STABLE PARALLEL SAFE AS 'SELECT 2';\n
+             ALTER FUNCTION extension_probe() STABLE PARALLEL SAFE;
+             ALTER FUNCTION extension_probe(integer) VOLATILE PARALLEL UNSAFE;\n
              CREATE VIEW extension_result AS SELECT extension_probe() AS value;",
         );
         let snapshot = SqlFileSnapshot::read(file.path())?;
@@ -373,12 +376,28 @@ mod test_extension_parallel_safety {
             &[SchemaName::from("public")],
             ("parallel_probe", Some("public")),
         )?;
-        assert!(parsed.problems().is_empty());
+        assert!(parsed.problems().is_empty(), "{:?}", parsed.problems());
         let catalog = parsed.base_context();
         let function = FullName::with_schema("public", "extension_probe");
         let identity = OwnershipIdentity::with_arguments(ObjectKind::FUNCTION, &function, &[]);
         let definition = catalog.exact_routine_definition(&identity).unwrap();
         assert_eq!(definition.parallel_safety(), Some(ParallelSafety::Safe));
+        assert_eq!(definition.volatility(), Some(FunctionVolatility::Stable));
+
+        let integer_identity = OwnershipIdentity::with_arguments(
+            ObjectKind::FUNCTION,
+            &function,
+            &[Some(PgBuiltInType::int4())],
+        );
+        let integer_definition = catalog.exact_routine_definition(&integer_identity).unwrap();
+        assert_eq!(
+            integer_definition.parallel_safety(),
+            Some(ParallelSafety::Unsafe)
+        );
+        assert_eq!(
+            integer_definition.volatility(),
+            Some(FunctionVolatility::Volatile)
+        );
         assert_eq!(
             catalog.extension_membership(&identity),
             Some("parallel_probe")

@@ -175,7 +175,7 @@ SOURCE_WITNESS = {
     "sql-fun-sqlast/src/sem/create_language.rs": {
         "OwnershipLookup": 8
     },
-    "sql-fun-sqlast/src/sem/alter_function_parallel.rs": {
+    "sql-fun-sqlast/src/sem/alter_function.rs": {
         "OwnershipLookup": 7,
         "ownership_target": 1
     },

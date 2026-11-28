@@ -11,8 +11,8 @@ use crate::{
     names::{ColumnName, FullName, SchemaName},
     sem::{
         AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, CreateFunction,
-        FunctionOverloadCollection, FunctionParam, OverloadVariant, SemAst, TypeDefinition,
-        TypeReference, problem::CreationProblem,
+        FunctionOverloadCollection, FunctionParam, FunctionVolatility, OverloadVariant,
+        ParallelSafety, SemAst, TypeDefinition, TypeReference, problem::CreationProblem,
     },
 };
 
@@ -71,6 +71,7 @@ impl CreateFunction {
         let mut outcome = FunctionDeclarationOutcome::default();
         let mut function =
             Self::from_ast_inner(ast, context, &mut outcome)?.with_replace(ast.replace());
+        function.record_declared_attributes(ast)?;
         if outcome.shell().is_some() && context.analysis_state().has_errors() {
             outcome = FunctionDeclarationOutcome::Rejected("invalid routine signature".to_owned());
         }
@@ -84,6 +85,21 @@ impl CreateFunction {
         }
         function.outcome = outcome;
         Ok(function)
+    }
+
+    fn record_declared_attributes(&mut self, ast: &AstFunction) -> Result<(), AnalysisError> {
+        for option in ast.options() {
+            match option {
+                AstFunctionOption::Parallel(_) => {
+                    self.parallel_safety = Some(ParallelSafety::try_from(option)?);
+                }
+                AstFunctionOption::Volatility(value) => {
+                    self.volatility = Some(FunctionVolatility::try_from(value.as_str())?);
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     pub(super) fn declaration_conflict(

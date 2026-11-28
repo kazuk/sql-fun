@@ -298,7 +298,7 @@ pub(crate) enum StatementNode {
     Merge(Merge),
     View(View),
     DropRule(DropRule),
-    AlterFunctionParallel(AlterFunctionParallel),
+    AlterFunction(AlterFunction),
     DropFunction(DropFunction),
     CreateTrigger(CreateTrigger),
     CreateRule(CreateRule),
@@ -410,8 +410,8 @@ impl StatementNode {
         Self::ExtensionMembership(value)
     }
 
-    const fn alter_function_parallel(value: AlterFunctionParallel) -> Self {
-        Self::AlterFunctionParallel(value)
+    const fn alter_function(value: AlterFunction) -> Self {
+        Self::AlterFunction(value)
     }
 
     const fn drop_function(value: DropFunction) -> Self {
@@ -1931,9 +1931,9 @@ pub(crate) enum RuleEvent {
 }
 
 #[derive(Clone, Debug, derive_getters::Getters)]
-pub(crate) struct AlterFunctionParallel {
+pub(crate) struct AlterFunction {
     target: ObjectTarget,
-    option: ddl::FunctionOption,
+    options: Vec<ddl::FunctionOption>,
 }
 
 #[derive(Clone, Debug, derive_getters::Getters)]

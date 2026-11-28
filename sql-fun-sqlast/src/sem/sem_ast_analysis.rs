@@ -5,7 +5,7 @@ use crate::{
     ast::{Statement as AstStatement, StatementNode as AstStatementNode},
     context::ParseContext,
     sem::{
-        AlterFunctionParallel, AlterOperator, AlterOperatorFamily, AlterOwner, AlterSequence,
+        AlterFunction, AlterOperator, AlterOperatorFamily, AlterOwner, AlterSequence,
         AnalysisError, AnalysisProblem, Comment, CreateAccessMethod, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateForeignDataWrapper, CreateFunction,
         CreateIndex, CreateLanguage, CreateOperator, CreateOperatorClass, CreateOperatorFamily,
@@ -40,8 +40,8 @@ impl SemAst {
             AstStatementNode::ExtensionMembership(ast) => Ok(Self::ExtensionMembership(Box::new(
                 ExtensionMembershipChange::analyze(ast, context)?,
             ))),
-            AstStatementNode::AlterFunctionParallel(ast) => {
-                AlterFunctionParallel::analyze(ast, context).map(Self::AlterFunctionParallel)
+            AstStatementNode::AlterFunction(ast) => {
+                AlterFunction::analyze(ast, context).map(Self::AlterFunction)
             }
             AstStatementNode::DropFunction(ast) => {
                 DropFunction::analyze(ast, context).map(Self::DropFunction)
@@ -259,11 +259,11 @@ impl SemAst {
             AstStatementNode::Sequence(sequence) => {
                 CreateSequence::from_ast_and_apply(sequence, context)
             }
-            AstStatementNode::AlterFunctionParallel(ast) => {
-                let statement = AlterFunctionParallel::analyze(ast, &mut context)?;
-                let context = context.apply_alter_function_parallel(&statement)?;
+            AstStatementNode::AlterFunction(ast) => {
+                let statement = AlterFunction::analyze(ast, &mut context)?;
+                let context = context.apply_alter_function(&statement)?;
                 Ok(AstAndContextPair::new(
-                    Self::AlterFunctionParallel(statement),
+                    Self::AlterFunction(statement),
                     context,
                 ))
             }

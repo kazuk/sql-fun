@@ -281,7 +281,7 @@ impl RetainSqliteTypes for StatementNode {
             | Self::Do(_)
             | Self::ObjectPrivileges(_)
             | Self::RoleMembership(_)
-            | Self::AlterFunctionParallel(_)
+            | Self::AlterFunction(_)
             | Self::DropFunction(_)
             | Self::DropView(_)
             | Self::ExtensionMembership(_)

@@ -1,5 +1,5 @@
 use crate::ast::{
-    AlterFunctionParallel, AlterOwner, AlterSequence, Comment, Dialect, DropBehavior, DropFunction,
+    AlterFunction, AlterOwner, AlterSequence, Comment, Dialect, DropBehavior, DropFunction,
     DropTable, EnumType, Expr, Extension, Literal, Name, ObjectArgument, ObjectTarget, Role,
     Sequence, SyntaxOption, SyntaxValue, VariableSet, VariableSetKind, View, ViewCheckOption,
     deparse::{DeparseError, SqlEmit, SqlWriter},
@@ -746,48 +746,53 @@ impl SqlEmit for ObjectArgument {
     }
 }
 
-impl SqlEmit for AlterFunctionParallel {
+impl SqlEmit for AlterFunction {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("ALTER FUNCTION")?;
         writer.sql("ALTER FUNCTION ");
         self.target.emit_named_target(writer)?;
-        writer.sql(" ");
-        self.option.emit(writer)
+        for option in &self.options {
+            writer.sql(" ");
+            option.emit(writer)?;
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
-mod test_alter_function_parallel_emit {
+mod test_alter_function_emit {
     use crate::{
         ast::{Dialect, StatementKind},
         parse_statements,
     };
 
     #[rstest::rstest]
-    #[case(r#""My.Schema".f"#, r#""My.Schema"."f""#, "UNSAFE")]
-    #[case("f()", r#""f"()"#, "SAFE")]
-    #[case("f(text, int8)", r#""f"("text", "int8")"#, "RESTRICTED")]
-    #[case("f(text, int4)", r#""f"("text", "int4")"#, "SAFE")]
+    #[case(r#""My.Schema".f"#, r#""My.Schema"."f""#, "PARALLEL UNSAFE")]
+    #[case("f()", r#""f"()"#, "PARALLEL SAFE")]
+    #[case("f(text, int8)", r#""f"("text", "int8")"#, "PARALLEL RESTRICTED")]
+    #[case("f(text, int4)", r#""f"("text", "int4")"#, "PARALLEL SAFE")]
+    #[case("f()", r#""f"()"#, "STABLE PARALLEL SAFE")]
+    #[case("f(bool)", r#""f"("bool")"#, "PARALLEL UNSAFE VOLATILE")]
     fn preserves_function_identity_and_mode(
         #[case] target: &str,
         #[case] rendered_target: &str,
-        #[case] mode: &str,
+        #[case] actions: &str,
     ) -> testresult::TestResult {
         let dialect = Dialect::postgres();
-        let sql = format!("ALTER FUNCTION {target} PARALLEL {mode}");
+        let sql = format!("ALTER FUNCTION {target} {actions}");
         let statement = parse_statements(&sql, dialect)
             .next()
             .expect("one statement")?;
-        assert_eq!(statement.kind(), StatementKind::alter_function_parallel());
+        assert_eq!(statement.kind(), StatementKind::alter_function());
         let rendered = statement.deparse_sql(dialect)?;
         assert_eq!(
             rendered,
-            format!("ALTER FUNCTION {rendered_target} PARALLEL {mode}")
+            format!("ALTER FUNCTION {rendered_target} {actions}")
         );
         let reparsed = parse_statements(&rendered, dialect)
             .next()
             .expect("one statement")?;
-        assert_eq!(reparsed.kind(), StatementKind::alter_function_parallel());
+        assert_eq!(reparsed.kind(), StatementKind::alter_function());
         assert_eq!(reparsed.deparse_sql(dialect)?, rendered);
         Ok(())
     }

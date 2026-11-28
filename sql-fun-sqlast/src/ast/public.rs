@@ -118,7 +118,7 @@ pub enum StatementKind {
     /// An unresolved PostgreSQL DROP RULE statement. Analysis awaits #605.
     DropRule,
     /// PostgreSQL ALTER FUNCTION with a PARALLEL action.
-    AlterFunctionParallel,
+    AlterFunction,
     /// A PostgreSQL DROP FUNCTION statement.
     DropFunction,
     /// A PostgreSQL DROP VIEW statement.
@@ -223,7 +223,7 @@ impl std::fmt::Display for StatementKind {
             Self::Grant => "GRANT",
             Self::Revoke => "REVOKE",
             Self::DropRule => "DROP RULE",
-            Self::AlterFunctionParallel => "ALTER FUNCTION",
+            Self::AlterFunction => "ALTER FUNCTION",
             Self::DropFunction => "DROP FUNCTION",
             Self::DropView => "DROP VIEW",
             Self::AlterExtensionMembership => "ALTER EXTENSION",
@@ -275,9 +275,9 @@ impl std::fmt::Display for StatementKind {
 }
 
 impl StatementKind {
-    /// The PostgreSQL ALTER FUNCTION PARALLEL category.
-    pub const fn alter_function_parallel() -> Self {
-        Self::AlterFunctionParallel
+    /// The PostgreSQL ALTER FUNCTION attribute change category.
+    pub const fn alter_function() -> Self {
+        Self::AlterFunction
     }
 
     /// The category for a PostgreSQL DROP VIEW statement.
@@ -459,7 +459,7 @@ impl StatementNode {
             Self::CreateTrigger(_) => StatementKind::create_trigger(),
             Self::CreateRule(_) => StatementKind::create_rule(),
             Self::DropTrigger(_) => StatementKind::drop_trigger(),
-            Self::AlterFunctionParallel(_) => StatementKind::alter_function_parallel(),
+            Self::AlterFunction(_) => StatementKind::alter_function(),
             Self::DropFunction(_) => StatementKind::DropFunction,
             Self::DropView(_) => StatementKind::drop_view(),
             Self::ExtensionMembership(_) => StatementKind::AlterExtensionMembership,

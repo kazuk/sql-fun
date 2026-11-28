@@ -22,7 +22,7 @@ SQL parser can be analyzed or executed.
   [CREATE OPERATOR](statements/create-operator.md),
   [CREATE ACCESS METHOD](statements/create-access-method.md),
   [CREATE OPERATOR CLASS](statements/create-operator-class.md), and
-  [ALTER FUNCTION PARALLEL](statements/create-function.md#alter-function-parallel).
+  [ALTER FUNCTION](statements/create-function.md#alter-function).
 - Other schema statements: [sequences](statements/sequences.md),
   [CREATE SCHEMA](statements/create-schema.md),
   [ALTER ... OWNER TO](statements/alter-owner.md),

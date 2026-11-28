@@ -64,16 +64,6 @@
     }
   },
   {
-    "name": "unresolved_pseudo_type_array_conflicts_with_existing_builtin",
-    "sql": "CREATE FUNCTION public.bad_array() RETURNS pg_catalog.internal[] LANGUAGE internal AS 'textin'",
-    "expected": {
-      "diagnostics": [
-        "conflicting_creation"
-      ],
-      "columns": []
-    }
-  },
-  {
     "name": "valid_qualified_support_function",
     "sql": "ALTER TYPE public.base_value SET (SEND = public.base_value_send)",
     "expected": {

@@ -102,7 +102,9 @@ drop-operator	project	drop-operator.sql	11	17,18,19
 drop-view	project	drop-view.sql	10	17,18,19
 extension-membership	project	extension-membership.sql	3	17,18,19
 alter-function-parallel	project	alter-function-parallel.sql	14	17,18,19
-schema-base-types	project	schema-base-types.sql	25	17,18,19
+schema-base-types	project	schema-base-types.sql	24	17,18,19
+schema-base-types-array-return-legacy	builtin	-	1	17,18
+schema-base-types-array-return	builtin	-	2	19
 operator-classes	project	operator-classes.sql	13	17,18,19
 text-search-templates	project	text-search-templates.sql	9	17,18,19
 text-search-dictionaries	project	text-search-dictionaries.sql	9	17,18,19

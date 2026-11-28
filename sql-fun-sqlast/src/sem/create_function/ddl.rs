@@ -268,6 +268,20 @@ impl CreateFunction {
             }
             return Ok(None);
         }
+        if array
+            && let Ok(configured) = context.get_args().postgres_version(context.metadata())
+            && configured
+                .to_string()
+                .parse::<::sql_fun_core::PostgresVersion>()
+                .is_ok_and(|version| version.major() >= 19)
+        {
+            declaration.reject(
+                function,
+                format!("return type {name}[] does not exist"),
+                context,
+            )?;
+            return Ok(None);
+        }
         if !result.modifiers().is_empty() {
             declaration.reject(
                 function,

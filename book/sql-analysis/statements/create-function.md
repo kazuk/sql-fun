@@ -54,6 +54,10 @@ declarations such as `RETURNS missing_type[]`. The array fallback registers a
 shell named `missing_type`, and the function's return type refers to that
 shell. An existing array type resolves normally. An existing shell with the
 same name in the creation schema conflicts with the array fallback.
+Starting with PostgreSQL 19, an unresolved array return type such as
+`pg_catalog.internal[]` is reported as missing with
+[`invalid_function_signature`](../../diagnostics/invalid_function_signature.md).
+A missing scalar return type can still introduce a shell.
 
 A later [CREATE TYPE](create-type.md) can complete the shell used by the
 type's input and output routines. Failed function declarations in this path
@@ -91,11 +95,6 @@ set-returning result type rejects the declaration.
 A returned declaration is therefore not proof that all declared type references
 and explicit-versus-derived outputs were validated. The OUT/INOUT/TABLE and
 procedure metadata support described above remains distinct from these gaps.
-
-PostgreSQL 19 reports an undefined type when a routine declares a missing
-pseudotype array such as `pg_catalog.internal[]`. sql-fun still reports a
-conflicting creation for this declaration
-([#1288](https://github.com/kazuk/sql-fun/issues/1288)).
 
 ## Diagnostics
 

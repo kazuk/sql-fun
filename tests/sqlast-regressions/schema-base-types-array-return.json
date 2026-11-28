@@ -1,0 +1,22 @@
+[
+  {
+    "name": "unresolved_pseudo_type_array_is_missing",
+    "sql": "CREATE FUNCTION public.bad_array() RETURNS pg_catalog.internal[] LANGUAGE internal AS 'textin'",
+    "expected": {
+      "diagnostics": [
+        "invalid_function_signature"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "unresolved_array_without_name_collision_is_missing",
+    "sql": "CREATE FUNCTION public.bad_array() RETURNS public.missing_array_element[] LANGUAGE internal AS 'textin'",
+    "expected": {
+      "diagnostics": [
+        "invalid_function_signature"
+      ],
+      "columns": []
+    }
+  }
+]

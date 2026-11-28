@@ -73,7 +73,7 @@ while IFS=$'\t' read -r fixture level schema count versions; do
   fi
   IFS=, read -ra selected_versions <<< "$versions"
   for version in "${selected_versions[@]}"; do
-    [[ "$version" == 17 || "$version" == 18 ]] || exit 1
+    [[ "$version" == 17 || "$version" == 18 || "$version" == 19 ]] || exit 1
     test -s "$SQL_FUN_HOME/postgres/$version/metadata.json"
     jq -e --argjson version "$version" '.server_version_num / 10000 | floor == $version' \
       "$SQL_FUN_HOME/postgres/$version/metadata.json" >/dev/null

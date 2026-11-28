@@ -115,6 +115,11 @@ also retains named NOT NULL declarations (including NOT VALID), WITHOUT OVERLAPS
 keys, and PERIOD foreign-key bindings for subsequent schema analysis. Enforcement
 and inheritance attribute changes remain [#887](https://github.com/kazuk/sql-fun/issues/887).
 
+PostgreSQL 19 rejects adding a separate named NOT NULL constraint with NOT
+VALID when a primary key has already created a NOT NULL constraint for the
+column. sql-fun does not yet check this PostgreSQL 19 restriction
+([#1289](https://github.com/kazuk/sql-fun/issues/1289)).
+
 An invalid CHECK leaves the entire ALTER statement unapplied. Column and table
 renames update retained CHECK bindings. See [table CHECK rules](create-table.md#check-constraints)
 for expression restrictions and NULL behavior. SQLite has no ADD CONSTRAINT

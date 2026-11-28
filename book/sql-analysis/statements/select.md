@@ -8,6 +8,11 @@ make the intended output names clear. [Name resolution](../expressions/names.md)
 owns qualification, alias hiding, composite member access and projection
 expansion; [FROM](../clauses/from.md) owns sources and joins.
 
+Some unaliased PostgreSQL expressions, such as `(ARRAY[1,2])[1]`, have an
+empty result name in sql-fun even when PostgreSQL derives one from the
+expression. Add `AS` to give the result a stable name
+([#1286](https://github.com/kazuk/sql-fun/issues/1286)).
+
 ```sql
 SELECT i.id AS item_id, i.label FROM public.items AS i WHERE i.id = $1;
 ```

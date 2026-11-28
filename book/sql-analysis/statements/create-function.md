@@ -92,6 +92,11 @@ A returned declaration is therefore not proof that all declared type references
 and explicit-versus-derived outputs were validated. The OUT/INOUT/TABLE and
 procedure metadata support described above remains distinct from these gaps.
 
+PostgreSQL 19 reports an undefined type when a routine declares a missing
+pseudotype array such as `pg_catalog.internal[]`. sql-fun still reports a
+conflicting creation for this declaration
+([#1288](https://github.com/kazuk/sql-fun/issues/1288)).
+
 ## Diagnostics
 
 - [invalid_function_signature](../../diagnostics/invalid_function_signature.md)

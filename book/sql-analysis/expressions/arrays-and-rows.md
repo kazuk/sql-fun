@@ -20,6 +20,11 @@ each field's own type and nullability. Anonymous row results have no named
 result type in the analysis API; project fields when you need individual
 result-column types.
 
+PostgreSQL rejects field access through a nested anonymous record, for example
+`((ROW(1, ROW(true, 2))).f2).f1`. sql-fun can still report a result type for
+this expression. Use a named composite for the inner record when you need
+field access ([#1287](https://github.com/kazuk/sql-fun/issues/1287)).
+
 Qualified `ROW(t.*, 42)` expands the source fields before the final element. Use
 `ROW(ROW(t.*), 42)` to retain those fields as a nested row. Existing compatible
 named-row casts and record-accepting functions can consume row constructors.

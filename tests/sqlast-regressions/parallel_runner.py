@@ -43,7 +43,7 @@ def inventory(suite=SUITE):
         if int(count) <= 0 or len(cases) != int(count) or any(not isinstance(n, str) or not n for n in names) or len(set(names)) != len(names):
             raise ValueError(f"Invalid cases/count/names: {fixture}")
         for version in versions.split(","):
-            if version not in ("17", "18"):
+            if version not in ("17", "18", "19"):
                 raise ValueError(f"Invalid version: {version}")
             groups.append(dict(id=f"{fixture}-{version}", fixture=fixture, level=level,
                                schema=schema, count=int(count), version=version,

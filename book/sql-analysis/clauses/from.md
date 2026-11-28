@@ -108,7 +108,11 @@ Ordinary CLI analysis currently lacks sampling-method declarations, including
 for system/bernoulli. It reports unavailable metadata rather than asserting
 those valid PostgreSQL methods do not exist. The library can analyze sampling
 methods when the caller explicitly supplies their declarations; this does not
-establish ordinary CLI support.
+establish ordinary CLI support. Loading the bundled
+[SYSTEM_ROWS](../../postgres-extensions/bundled/tsm_system_rows.md) or
+[SYSTEM_TIME](../../postgres-extensions/bundled/tsm_system_time.md) extension
+does not supply the missing CLI metadata
+([#895](https://github.com/kazuk/sql-fun/issues/895)).
 
 ## Dialect and engine-specific behavior
 

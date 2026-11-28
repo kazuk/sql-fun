@@ -211,6 +211,11 @@ columns, or publish a foreign-table definition for later analysis
 forms, analysis can still terminate without a structured semantic diagnostic.
 These limitations do not make the corresponding SQL invalid in PostgreSQL.
 
+The CLI reports standalone PostgreSQL `CREATE SERVER` as
+`unsupported_statement`, including when the referenced foreign-data wrapper
+was loaded from a bundled extension
+([#1306](https://github.com/kazuk/sql-fun/issues/1306)).
+
 Standalone PostgreSQL `NOTIFY` retains its channel and optional payload during
 syntax conversion, but semantic analysis is unimplemented and can terminate
 analysis ([#1098](https://github.com/kazuk/sql-fun/issues/1098)). Notification

@@ -162,6 +162,9 @@ by the required update scripts. The SQL files must be readable as UTF-8.
 Supported control-file `encoding` declarations are `UTF8` (also `UNICODE`)
 and `SQL_ASCII`.
 
+See [PostgreSQL Extensions](../postgres-extensions/index.md) for the bundled
+inventory, extension-specific analysis limits, and external extension setup.
+
 Selecting an extension also loads the prerequisites declared by its PostgreSQL
 control files. A prerequisite's installation script is loaded before any script
 that needs it. Updates can run between scripts from other extensions. An

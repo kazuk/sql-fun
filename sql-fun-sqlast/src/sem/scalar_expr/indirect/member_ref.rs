@@ -106,7 +106,7 @@ impl MemberRef {
     where
         TParseContext: ParseContext,
     {
-        if let Some(columns) = source.composite_columns(context)
+        if let Some(columns) = source.composite_projection_columns(context)
             && let Some(field) = columns.get_column_def(&ColumnName::from(member))
         {
             Ok((field.get_type_cloned(), field.is_not_null()))
@@ -501,7 +501,11 @@ impl MemberRef {
     pub(super) fn collect_constraints(
         &self,
         parameters: &mut ParameterResolution<'_>,
+        context: &impl ParseContext,
     ) -> Option<SemScalarExpr> {
+        if self.base.is_opaque_record_member(context) {
+            return None;
+        }
         if let Some(row) = self.base.row_constructor()
             && let Some(field) = row.field(&self.member)
             && field.constraint_node().is_some()

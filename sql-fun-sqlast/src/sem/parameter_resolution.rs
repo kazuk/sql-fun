@@ -671,7 +671,6 @@ mod test_parameter_field_remains_connected_to_its_source {
     #[case::later("SELECT (ROW($1, 2)).f1 AS value, $1::integer AS hint", 0)]
     #[case::earlier("SELECT $1::integer AS hint, (ROW($1, 2)).f1 AS value", 1)]
     #[case::record_cast("SELECT (ROW($1,2)::record).f1 AS value, $1::integer AS hint", 0)]
-    #[case::nested("SELECT ((ROW(2, ROW($1))).f2).f1 AS value, $1::integer AS hint", 0)]
     fn parameter_field_remains_connected_to_its_source(#[case] sql: &str, #[case] output: usize) {
         let (query, context) = resolve(sql, Dialect::postgres(), true).unwrap();
         assert_eq!(

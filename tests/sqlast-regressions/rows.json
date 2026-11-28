@@ -168,16 +168,62 @@
     "name": "rows::nested_member",
     "sql": "SELECT ((ROW(1,ROW(true,2))).f2).f1 AS flag",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "composite_type_field_not_found"
+      ],
       "columns": [
         {
           "name": "flag",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::nested_record_value",
+    "sql": "SELECT (ROW(1,ROW(true,2))).f2 AS inner_row",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "inner_row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::nested_named_member",
+    "sql": "SELECT ((ROW(1,ROW(2,3)::pair)).f2).left_value AS left_value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "left_value",
           "type": {
             "schema_name": "pg_catalog",
-            "local_name": "bool",
+            "local_name": "int4",
             "is_array": false
           },
-          "nullability": "not_null"
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::nested_record_star",
+    "sql": "SELECT ((ROW(1,ROW(true,2))).f2).*",
+    "expected": {
+      "diagnostics": [
+        "query_star_projection_requires_composite_type"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "unknown"
         }
       ]
     }

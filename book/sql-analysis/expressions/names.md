@@ -39,6 +39,12 @@ domain identity is preserved. A missing field and member access on a
 non-composite base (such as an integer or an array) produce distinct
 diagnostics.
 
+A row constructor exposes positional fields such as `(ROW(1, true)).f2`.
+PostgreSQL can return an anonymous record selected from a row field.
+Dereferencing that value, as in `((ROW(1, ROW(true, 2))).f2).f1`, produces a
+missing-field diagnostic. Expanding it with `.*` also produces a diagnostic.
+Cast the inner row to a named composite to access its declared fields.
+
 Merged USING/NATURAL join columns and qualified-star nullability are described
 under [FROM](../clauses/from.md). Executable-SQL wildcard expansion is a
 separate explicit [SELECT option](../statements/select.md).

@@ -244,7 +244,7 @@ impl ResultColumnCollection {
             self.push_pending_star(base);
             return Ok(());
         };
-        let Some(fields) = base.composite_columns(context) else {
+        let Some(fields) = base.composite_projection_columns(context) else {
             context.report_analysis_problem(AnalysisProblem::query(
                 QueryProblem::star_projection_requires_composite_type(),
             ))?;

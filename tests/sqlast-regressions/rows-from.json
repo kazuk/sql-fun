@@ -456,7 +456,7 @@
           "nullability": "nullable"
         },
         {
-          "name": "",
+          "name": "int4",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",

@@ -6,7 +6,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "cardinal_number",
           "type": {
             "schema_name": "information_schema",
             "local_name": "cardinal_number",
@@ -24,7 +24,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "cardinal_number",
           "type": {
             "schema_name": "information_schema",
             "local_name": "cardinal_number",
@@ -42,7 +42,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "cardinal_number",
           "type": {
             "schema_name": "information_schema",
             "local_name": "cardinal_number",
@@ -60,7 +60,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "character_data",
           "type": {
             "schema_name": "information_schema",
             "local_name": "character_data",
@@ -78,7 +78,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "sql_identifier",
           "type": {
             "schema_name": "information_schema",
             "local_name": "sql_identifier",
@@ -96,7 +96,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "time_stamp",
           "type": {
             "schema_name": "information_schema",
             "local_name": "time_stamp",
@@ -114,7 +114,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "cardinal_number",
           "type": {
             "schema_name": "information_schema",
             "local_name": "cardinal_number",
@@ -134,7 +134,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "time_stamp",
           "type": {
             "schema_name": "information_schema",
             "local_name": "time_stamp",
@@ -154,7 +154,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "time_stamp",
           "type": {
             "schema_name": "information_schema",
             "local_name": "time_stamp",
@@ -175,7 +175,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "no_such_domain",
           "type": {
             "schema_name": "public",
             "local_name": "no_such_domain",

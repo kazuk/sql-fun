@@ -150,7 +150,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "case",
           "type": {
             "schema_name": "public",
             "local_name": "amount",
@@ -168,7 +168,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "case",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -186,7 +186,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "case",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -204,7 +204,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "case",
           "type": {
             "schema_name": "public",
             "local_name": "mood",
@@ -224,7 +224,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "type": {
             "schema_name": "public",
             "local_name": "amount",
@@ -244,7 +244,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -264,7 +264,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -282,7 +282,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "type": {
             "schema_name": "public",
             "local_name": "mood",

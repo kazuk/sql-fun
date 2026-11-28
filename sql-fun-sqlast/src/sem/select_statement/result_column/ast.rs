@@ -123,7 +123,7 @@ impl ResultColumnCollection {
         let name = ast
             .alias()
             .clone()
-            .unwrap_or_else(|| expression.get_column_name());
+            .unwrap_or_else(|| expression.projection_name(ast.expression(), context));
         results.push_projection(
             &ColumnName::from(name.as_str()),
             expression,
@@ -390,7 +390,7 @@ impl ResultColumnCollection {
         let name = target
             .alias()
             .clone()
-            .unwrap_or_else(|| value.get_column_name());
+            .unwrap_or_else(|| value.projection_name(target.expression(), context));
         self.push_expression(&ColumnName::from(name.as_str()), value);
         Ok(())
     }

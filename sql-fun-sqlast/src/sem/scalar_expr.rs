@@ -1031,6 +1031,42 @@ impl SemScalarExpr {
         }
     }
 
+    pub(crate) fn projection_name(&self, ast: &AstExpr, context: &impl ParseContext) -> String {
+        if context.dialect() == Dialect::postgres() {
+            self.postgres_strong_projection_name().unwrap_or_else(|| {
+                ast.postgres_weak_projection_name()
+                    .unwrap_or_default()
+                    .to_owned()
+            })
+        } else {
+            self.get_column_name()
+        }
+    }
+
+    // PostgreSQL allows a CASE or cast to replace a weak name from its
+    // operand. Names from references, functions and constructors win.
+    fn postgres_strong_projection_name(&self) -> Option<String> {
+        match self {
+            Self::Case(value) => value.postgres_strong_projection_name(),
+            Self::Coalesce(value) => Some(value.join_key_name().unwrap_or("coalesce").to_owned()),
+            Self::TypeCast(value) => value
+                .projection_operand()
+                .0
+                .postgres_strong_projection_name(),
+            Self::Indirection(value) => value.postgres_strong_projection_name(),
+            Self::Collate(value) => value.argument().postgres_strong_projection_name(),
+            Self::ImplicitCast(value) => value
+                .projection_operand()
+                .0
+                .postgres_strong_projection_name(),
+            Self::SqlValue(_) | Self::Unexpected(_) => None,
+            _ => {
+                let name = self.get_column_name();
+                if name.is_empty() { None } else { Some(name) }
+            }
+        }
+    }
+
     pub(super) fn constructor_projection_name(&self) -> Option<&'static str> {
         match self {
             Self::Array(_) | Self::ArraySubquery(_) => Some("array"),

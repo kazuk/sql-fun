@@ -6,7 +6,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "items",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -15,7 +15,7 @@
           "nullability": "nullable"
         },
         {
-          "name": "",
+          "name": "items",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",

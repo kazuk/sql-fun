@@ -6,7 +6,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -60,7 +60,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -78,7 +78,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -96,7 +96,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -114,7 +114,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "int4",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -132,7 +132,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -150,7 +150,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -168,7 +168,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -186,7 +186,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "int4",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -236,7 +236,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -254,11 +254,101 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
             "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "postgres_expression_names_bind_through_a_derived_table",
+    "sql": "SELECT q.array, q.picked, q.x, q.int4, q.\"case\", q.coalesce, q.text, q._int4, q.y FROM (SELECT (ARRAY[1,2])[1], (ARRAY[1,2])[1] AS picked, x::text, 1::integer, CASE WHEN true THEN 1 END, COALESCE(NULL,1), (CASE WHEN true THEN 1 END)::text, NULL::pg_catalog._int4, (CASE WHEN true THEN 1 ELSE y END)::text FROM (VALUES (1,2)) AS t(x,y)) AS q",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "picked",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "x",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "int4",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "case",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "coalesce",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "text",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "_int4",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "y",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
           },
           "nullability": "not_null"
         }

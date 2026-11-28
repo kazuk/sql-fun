@@ -8,10 +8,11 @@ make the intended output names clear. [Name resolution](../expressions/names.md)
 owns qualification, alias hiding, composite member access and projection
 expansion; [FROM](../clauses/from.md) owns sources and joins.
 
-Some unaliased PostgreSQL expressions, such as `(ARRAY[1,2])[1]`, have an
-empty result name in sql-fun even when PostgreSQL derives one from the
-expression. Add `AS` to give the result a stable name
-([#1286](https://github.com/kazuk/sql-fun/issues/1286)).
+For PostgreSQL queries, an unaliased array subscript inherits the base
+expression's name. For example, `(ARRAY[1,2])[1]` yields `array`.
+`COALESCE(NULL,1)` yields `coalesce`, and `CASE WHEN true THEN 1 END`
+yields `case`. The cast `1::integer` yields `int4`, while a cast of a
+column reference keeps the column name. Use `AS` to choose a different name.
 
 ```sql
 SELECT i.id AS item_id, i.label FROM public.items AS i WHERE i.id = $1;

@@ -119,6 +119,13 @@ pub struct CaseExpr {
 }
 
 impl CaseExpr {
+    pub(super) fn postgres_strong_projection_name(&self) -> Option<String> {
+        self.default_expr
+            .as_ref()
+            .as_ref()?
+            .postgres_strong_projection_name()
+    }
+
     /// create a instance
     #[must_use]
     pub const fn new(

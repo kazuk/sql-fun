@@ -28,7 +28,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "int2",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int2",

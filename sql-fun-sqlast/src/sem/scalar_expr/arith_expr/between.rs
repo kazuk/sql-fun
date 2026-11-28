@@ -1,3 +1,4 @@
+use crate::sem::OperatorLookupService;
 use crate::{
     names::OperatorName,
     sem::{
@@ -82,7 +83,7 @@ impl ArithExpr {
         coerce_literals: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let name = OperatorName::from_parts(None, name);
-        let definition = crate::sem::OperatorLookupService::new(context).visible(&name, true, true);
+        let definition = OperatorLookupService::new(context).visible(&name, true, true);
         let binding = ResolvedOperator::from_visible(context, &name, definition.as_ref());
         let (left, right) = if coerce_literals {
             let overloads = match &definition {

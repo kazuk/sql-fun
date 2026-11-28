@@ -1,4 +1,5 @@
 use crate::sem::CommonType;
+use crate::sem::OperatorLookupService;
 use crate::{
     names::OperatorName,
     sem::{
@@ -551,8 +552,7 @@ impl super::ArithExpr {
             AnalysisError::raise_unexpected_none("a_expr.rexpr")?
         };
 
-        let Some(operator_def) = crate::sem::operator_lookup::OperatorLookupService::new(context)
-            .visible(name, true, true)
+        let Some(operator_def) = OperatorLookupService::new(context).visible(name, true, true)
         else {
             return UndefinedOperatorAllCallSite::undefined_operator_all_resolved(
                 context, name, lexpr, rexpr,

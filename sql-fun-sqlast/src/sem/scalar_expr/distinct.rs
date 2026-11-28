@@ -1,4 +1,5 @@
 use crate::sem::CommonType;
+use crate::sem::OperatorLookupService;
 use crate::{
     ast::Dialect,
     names::OperatorName,
@@ -507,7 +508,7 @@ impl DistinctExpr {
         right: SemScalarExpr,
     ) -> Result<DistinctComparison, AnalysisError> {
         let name = OperatorName::from_parts(None, "=");
-        let definition = crate::sem::OperatorLookupService::new(context).visible(&name, true, true);
+        let definition = OperatorLookupService::new(context).visible(&name, true, true);
         let binding = ResolvedOperator::from_visible(context, &name, definition.as_ref());
         if !binding.resolution().is_resolved() {
             self.types = ResolvedTypes::types([]);

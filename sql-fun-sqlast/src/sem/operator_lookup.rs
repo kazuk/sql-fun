@@ -174,6 +174,7 @@ mod tests {
             BinaryOperatorDefinition, OperatorDefinition, OperatorFamilyKey, OperatorLookupService,
             PgBuiltInType, TypeReference,
         },
+        test_helpers::heavy::selected_root::selected_root,
         test_helpers::operator_names::lookup_context,
     };
 
@@ -209,8 +210,7 @@ mod tests {
     #[test]
     fn extracted_catalog_supplies_operator_facts_through_frozen_context() -> testresult::TestResult
     {
-        let catalog = crate::test_helpers::heavy::selected_root::selected_root()
-            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        let catalog = selected_root().map_err(|error| std::io::Error::other(error.to_string()))?;
         let service = OperatorLookupService::new(&catalog);
         for (method, family, name, operand) in [
             ("btree", "integer_ops", "=", "int4"),

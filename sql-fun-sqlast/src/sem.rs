@@ -81,7 +81,7 @@ mod merge_statement;
 mod name_analysis;
 mod object_info;
 mod operator_lookup;
-pub use operator_lookup::OperatorLookupService;
+pub use self::operator_lookup::OperatorLookupService;
 mod operators;
 mod overload_rank;
 mod privileges;

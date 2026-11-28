@@ -1,4 +1,5 @@
 use crate::sem::CommonType;
+use crate::sem::OperatorLookupService;
 use crate::{
     names::OperatorName,
     sem::{
@@ -198,7 +199,7 @@ impl ArithExpr {
         let (Some(left), Some(right)) = (left, right) else {
             return AnalysisError::raise_unexpected_input("pattern operands");
         };
-        let definition = crate::sem::OperatorLookupService::new(context).visible(name, true, true);
+        let definition = OperatorLookupService::new(context).visible(name, true, true);
         let binding = ResolvedOperator::from_visible(context, name, definition.as_ref());
         let unknown = [&left, &right]
             .into_iter()

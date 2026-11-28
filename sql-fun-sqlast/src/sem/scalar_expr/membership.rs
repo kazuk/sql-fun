@@ -1,4 +1,5 @@
 use crate::sem::CommonType;
+use crate::sem::OperatorLookupService;
 use crate::{
     ast::Dialect,
     names::{AliasName, OperatorName, TableName},
@@ -38,8 +39,7 @@ struct MembershipOperator {
 }
 impl MembershipOperator {
     fn resolve(context: &impl ParseContext, name: &OperatorName) -> Self {
-        let definition = crate::sem::operator_lookup::OperatorLookupService::new(context)
-            .visible(name, true, true);
+        let definition = OperatorLookupService::new(context).visible(name, true, true);
         let binding = ResolvedOperator::from_visible(context, name, definition.as_ref());
         let candidates = match definition {
             Some(OperatorDefinition::Binary(candidates)) => Some(candidates),

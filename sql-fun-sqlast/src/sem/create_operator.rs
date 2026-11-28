@@ -5,6 +5,7 @@ mod drop;
 pub use alter::AlterOperator;
 pub use drop::{CascadeRemoval, CascadeTarget, DropOperator, DropOperatorTarget};
 
+use crate::sem::OperatorLookupService;
 use crate::{
     StringSpan,
     ast::{
@@ -46,7 +47,7 @@ impl OperatorIdentity {
         right: &TypeReference,
         context: &'a impl ParseContext,
     ) -> Option<(Self, &'a TypeReference)> {
-        crate::sem::OperatorLookupService::new(context).exact(name, left, right)
+        OperatorLookupService::new(context).exact(name, left, right)
     }
 
     /// The qualified operator name.

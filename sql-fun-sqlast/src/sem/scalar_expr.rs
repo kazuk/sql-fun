@@ -59,6 +59,7 @@ pub use self::{
     whole_row::WholeRowExpr,
 };
 pub(crate) use self::{case_expr::SqliteCaseBuilder, whole_row::WholeRowFields};
+use crate::sem::OperatorIdentity;
 use crate::{
     StringSpan,
     ast::{Dialect, Expr as AstExpr, Name, TypeName, ddl::AlterDefinition as AstAlterDefinition},
@@ -762,7 +763,7 @@ impl SemScalarExpr {
     }
     /// Original PostgreSQL operator declaration when analysis selected an overload.
     #[must_use]
-    pub fn operator_declaration(&self) -> Option<&crate::sem::OperatorIdentity> {
+    pub fn operator_declaration(&self) -> Option<&OperatorIdentity> {
         match self {
             Self::Arith(ArithExpr::OpBinary(value)) => value.declaration(),
             Self::Arith(ArithExpr::OpRightUnary(value)) => value.declaration(),

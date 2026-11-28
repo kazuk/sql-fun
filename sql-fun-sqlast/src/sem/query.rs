@@ -4,6 +4,7 @@ mod ast;
 
 pub(crate) use self::ast::ClauseBinding;
 
+use crate::sem::OperatorLookupService;
 use crate::{
     ast::Dialect,
     names::{AliasName, ColumnName, FullName, OperatorName, TableName},
@@ -1063,8 +1064,7 @@ impl ResolvedOperator {
         left: bool,
         right: bool,
     ) -> Self {
-        let definition = crate::sem::operator_lookup::OperatorLookupService::new(context)
-            .visible(name, left, right);
+        let definition = OperatorLookupService::new(context).visible(name, left, right);
         Self::from_visible(context, name, definition.as_ref())
     }
 

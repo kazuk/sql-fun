@@ -1,9 +1,11 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::{AliasName, ColumnName, FullName, TableName},
     sem::{
         AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, ColumnRename,
         QueryProblem, SemScalarExpr, TypeDefinition, TypeReference,
+        scalar_expr::indirect::IndirectionExpr,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
@@ -197,6 +199,33 @@ impl SemScalarExpr {
         } else {
             Some(columns)
         }
+    }
+
+    /// Columns available to SQL field references and composite star expansion.
+    pub(crate) fn composite_projection_columns(
+        &self,
+        context: &impl ParseContext,
+    ) -> Option<ColumnCollection> {
+        if self.is_opaque_record_member(context) {
+            return None;
+        }
+        self.composite_columns(context)
+    }
+
+    pub(super) fn is_opaque_record_member(&self, context: &impl ParseContext) -> bool {
+        context.dialect() == Dialect::postgres() && self.is_anonymous_record_member()
+    }
+
+    fn is_anonymous_record_member(&self) -> bool {
+        if let Self::TypeCast(cast) = self {
+            return cast
+                .record_operand()
+                .is_some_and(Self::is_anonymous_record_member);
+        }
+        matches!(self.as_indirection(), Some(IndirectionExpr::MemberRef(_)))
+            && self
+                .get_type()
+                .is_some_and(|ty| ty.is_record() && ty.is_array() != Some(true))
     }
 
     /// Completed qualified whole-row binding, including failed lookup outcomes.

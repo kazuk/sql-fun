@@ -204,7 +204,7 @@ impl IndirectionExpr {
             Self::ArrayIndex(value) => Some(value.collect_constraints(parameters, context)),
             Self::ArraySlice(value) => Some(value.collect_constraints(parameters, context)),
             Self::ArraySubscripts(value) => Some(value.collect_constraints(parameters, context)),
-            Self::MemberRef(value) => value.collect_constraints(parameters),
+            Self::MemberRef(value) => value.collect_constraints(parameters, context),
         }
     }
 }

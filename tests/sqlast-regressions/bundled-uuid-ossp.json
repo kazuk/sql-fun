@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT uuid_ns_dns();",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "uuid_ns_dns",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "uuid",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,2 @@
+extensions = [{ name = "pg_buffercache" }]
+roles = ["pg_monitor"]

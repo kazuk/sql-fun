@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT bufferid FROM pg_buffercache;",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "bufferid",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

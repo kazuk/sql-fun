@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT similarity('word', 'words');",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "similarity",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "float4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

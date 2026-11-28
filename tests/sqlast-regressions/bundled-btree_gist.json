@@ -1,0 +1,10 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "CREATE INDEX items_gist_idx ON items USING gist (id);",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

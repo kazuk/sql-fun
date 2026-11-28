@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT cube_dim('(1,2)'::cube);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "cube_dim",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

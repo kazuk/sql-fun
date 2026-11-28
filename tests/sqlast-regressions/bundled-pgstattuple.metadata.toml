@@ -1,0 +1,2 @@
+extensions = [{ name = "pgstattuple" }]
+roles = ["pg_stat_scan_tables"]

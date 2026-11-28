@@ -1,0 +1,29 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT * FROM pg_get_advice_stashes();",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "stash_name",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "num_entries",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

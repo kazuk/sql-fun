@@ -1,0 +1,35 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT ll_to_earth(0, 0);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "ll_to_earth",
+          "type": {
+            "schema_name": "",
+            "local_name": "earth",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "documented-overload-limitation",
+    "sql": "SELECT earth_distance(ll_to_earth(0, 0), ll_to_earth(0, 1));",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "earth_distance",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

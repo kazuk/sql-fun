@@ -62,7 +62,41 @@ run_group() {
   groups=$((groups + 1))
 }
 
+check_bundled_extension_coverage() {
+  local fixture level schema count versions version control extension
+  local -a majors
+  local -A covered=()
+  while IFS=$'\t' read -r fixture level schema count versions; do
+    [[ "$fixture" == bundled-* ]] || continue
+    IFS=, read -ra majors <<< "$versions"
+    for version in "${majors[@]}"; do
+      covered["$version/$fixture"]=1
+    done
+  done <"$suite/manifest.tsv"
+
+  for version in "${!checked_versions[@]}"; do
+    for control in "$SQL_FUN_HOME/postgres/$version/extensions/"*.control; do
+      [[ -f "$control" ]] || {
+        echo "Missing bundled extension controls for PostgreSQL $version" >&2
+        return 1
+      }
+      extension=${control##*/}
+      extension=${extension%.control}
+      [[ "$extension" != *--* ]] || continue  # Version-specific control overrides.
+      fixture="bundled-$extension"
+      if [[ "$version/$extension" == 19/postgres_fdw ]]; then
+        fixture=bundled-postgres_fdw-1_2  # Working pin while #1309 tracks the 1.3 default.
+      fi
+      if [[ ! -v 'covered[$version/$fixture]' ]]; then
+        echo "Missing bundled extension fixture for PostgreSQL $version: $extension" >&2
+        return 1
+      fi
+    done
+  done
+}
+
 run_controls() {
+  check_bundled_extension_coverage
   # Deliberately wrong expectations must fail while an independent later case passes.
   # Keep expected-failure XML apart from positive JUnit reports consumed by CI.
   mkdir -p "$reports/controls"

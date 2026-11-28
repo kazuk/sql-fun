@@ -1,0 +1,1 @@
+extensions = [{ name = "pg_prewarm" }]

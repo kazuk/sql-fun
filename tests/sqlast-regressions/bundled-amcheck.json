@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT bt_index_check(NULL::regclass);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "bt_index_check",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "void",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

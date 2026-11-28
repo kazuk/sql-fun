@@ -1000,7 +1000,12 @@ jobs:
           done
           .local/bin/test-postgres-extraction --binary /usr/bin/sql-fun --output "$output" --shared
           mkdir "$output/postgres"
-          mv "$output/17" "$output/18" "$output/19" "$output/postgres/"
+          for major in 17 18 19; do
+            # Connection-extracted catalogs have no extension files. Test the
+            # checked-in bundles used by the manual and source regression suite.
+            cp -R "sql-fun-home/postgres/$major/extensions" "$output/$major/"
+            mv "$output/$major" "$output/postgres/"
+          done
           cp -R "$output/initialized-docker/highlighter" "$output/"
 
       - name: Validate installed SQLAST regression contracts

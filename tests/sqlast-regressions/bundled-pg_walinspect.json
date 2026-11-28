@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT start_lsn FROM pg_get_wal_records_info('0/0'::pg_lsn, '0/1'::pg_lsn);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "start_lsn",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "pg_lsn",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

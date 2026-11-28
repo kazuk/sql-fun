@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT levenshtein('kitten', 'sitting');",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "levenshtein",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

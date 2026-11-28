@@ -1,0 +1,10 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "CREATE INDEX items_bloom_idx ON items USING bloom (id);",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

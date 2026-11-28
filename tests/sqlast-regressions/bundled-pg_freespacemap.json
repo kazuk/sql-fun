@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT pg_freespace(NULL::regclass, 0);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "pg_freespace",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int2",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

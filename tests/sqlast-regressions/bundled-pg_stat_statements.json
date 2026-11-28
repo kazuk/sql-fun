@@ -1,0 +1,29 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT queryid, calls FROM pg_stat_statements;",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "queryid",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "calls",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

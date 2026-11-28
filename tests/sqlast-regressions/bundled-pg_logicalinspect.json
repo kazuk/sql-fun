@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT state FROM pg_get_logical_snapshot_info(NULL::text);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "state",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

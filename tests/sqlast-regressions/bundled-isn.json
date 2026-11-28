@@ -1,0 +1,29 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT NULL::isbn AS book_number, NULL::ean13 AS barcode;",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "book_number",
+          "type": {
+            "schema_name": "public",
+            "local_name": "isbn",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "barcode",
+          "type": {
+            "schema_name": "public",
+            "local_name": "ean13",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

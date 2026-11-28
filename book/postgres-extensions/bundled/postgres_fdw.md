@@ -33,7 +33,7 @@ On the PostgreSQL 19 snapshot, the default `1.3` upgrade stops at
 `ALTER FOREIGN DATA WRAPPER … CONNECTION` during SQL splitting.
 With `1.2` pinned, the example resolves and
 `SELECT postgres_fdw_disconnect_all();` resolves to `pg_catalog.bool`.
-[Tracking issue #1150](https://github.com/kazuk/sql-fun/issues/1150).
+[Tracking issue #1309](https://github.com/kazuk/sql-fun/issues/1309).
 
 sql-fun loads SQL declarations offline. PostgreSQL installs the extension
 and runs its code. sql-fun does not load the extension binary or verify

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT table_len FROM pgstattuple(NULL::regclass);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "table_len",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

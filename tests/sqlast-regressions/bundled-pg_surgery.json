@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT heap_force_kill(NULL::regclass, ARRAY['(0,1)'::tid]);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "heap_force_kill",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "void",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT normal_rand(1, 0.0, 1.0);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "normal_rand",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "float8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

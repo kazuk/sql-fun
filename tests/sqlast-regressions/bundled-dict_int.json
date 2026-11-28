@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT ts_lexize('intdict'::regdictionary, '123');",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "ts_lexize",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

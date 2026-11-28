@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT pg_catalog.plpgsql_validator(NULL::oid);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "plpgsql_validator",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "void",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

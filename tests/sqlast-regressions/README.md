@@ -37,7 +37,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 320 groups are split 10/155/155.
+in the committed file. The current 462 groups are split 10/226/226.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -104,8 +104,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest selects 1,852 inputs for PostgreSQL 17, 1,857 for PostgreSQL 18, and
-1,858 for PostgreSQL 19 (5,567 total). These count contract inputs separately from
+manifest selects 1,900 inputs for PostgreSQL 17, 1,906 for PostgreSQL 18, and
+1,907 for PostgreSQL 19 (5,713 total). These count contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -541,3 +541,24 @@ Issue #1236 uses the `text-search-templates` project schema on PostgreSQL 17/18.
 The fixture checks exact callback signatures, qualified names, required options,
 and duplicate template diagnostics in the source and installed checks. Rust
 coverage checks binding order and catalog isolation.
+
+## Bundled PostgreSQL extension references (#1150)
+
+Each `bundled-<name>` manifest fixture corresponds to the
+[reference page for that extension](../../book/postgres-extensions/bundled.md).
+The manifest selects the catalogs where the extension ships, and each fixture's
+datasource selects that extension alone. The CLI resolves dependencies and
+loads the installation and update SQL from the matching catalog under
+`SQL_FUN_HOME`. The shared runner checks that every catalog's main control files
+are represented in the manifest. PostgreSQL 19 uses the documented
+`postgres_fdw@1.2` selection while #1309 tracks the 1.3 default.
+
+The `manual-example` cases use the reference SQL verbatim. Trigger pages place
+the example in the corresponding project SQL file, and a `project-schema-loaded`
+query verifies that initialization completed with that trigger definition.
+Other project-level examples share the documented `items` table. Update the
+paired fixture or schema file when changing an example. Version-suffixed fixtures
+cover the documented explicit selections, including `cube@1.2` and
+`earthdistance@1.1` on PostgreSQL 17 and 18. Expectations assert the documented
+result metadata or diagnostic, including the table-sampling metadata limitation
+and the `earth_distance` overload limitation.

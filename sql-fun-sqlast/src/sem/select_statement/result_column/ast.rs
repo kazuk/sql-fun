@@ -260,7 +260,6 @@ impl ResultColumnCollection {
                         "SQLite RETURNING does not permit qualified stars",
                     ))?;
                 }
-                // Unqualified RETURNING * expands only the modified relation.
                 let qualifier = AliasName::from_ast_star_qualifier(name)?;
                 if scope.check_returning_star(context, qualifier.as_ref())? {
                     continue;
@@ -299,7 +298,6 @@ impl ResultColumnCollection {
                         DeleteProblemKind::returning_qualifier(),
                     ))?;
                 }
-                // Unqualified RETURNING * expands only the modified relation.
                 let qualifier = AliasName::from_ast_star_qualifier(name)?;
                 if scope.check_returning_star(context, qualifier.as_ref())? {
                     continue;
@@ -430,8 +428,14 @@ impl ResultColumnCollection {
         projection_qualifier: Option<&AliasName>,
         binding_qualifier: Option<&AliasName>,
     ) -> Result<bool, AnalysisError> {
-        let columns = if projection_qualifier.is_none() || binding_qualifier.is_some() {
+        let columns = if binding_qualifier.is_some() {
             from.destination_wildcard_projection(context, scope.with_clause())?
+        } else if projection_qualifier.is_none() {
+            if context.dialect() == Dialect::postgres() {
+                from.destination_first_wildcard_projection(context, scope.with_clause())?
+            } else {
+                from.destination_wildcard_projection(context, scope.with_clause())?
+            }
         } else {
             from.wildcard_projection(context, scope.with_clause(), projection_qualifier)?
         };

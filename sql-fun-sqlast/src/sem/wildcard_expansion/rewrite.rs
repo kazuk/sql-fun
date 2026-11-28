@@ -119,6 +119,36 @@ mod tests {
     }
 
     #[rstest::rstest]
+    #[case::update_all("UPDATE t AS i SET name = s.value FROM u AS s RETURNING *", true)]
+    #[case::delete_all("DELETE FROM t AS i USING u AS s RETURNING *", true)]
+    #[case::update_destination("UPDATE t AS i SET name = s.value FROM u AS s RETURNING i.*", false)]
+    #[case::delete_destination("DELETE FROM t AS i USING u AS s RETURNING i.*", false)]
+    fn rewrites_returning_with_sources(#[case] sql: &str, #[case] includes_source: bool) {
+        let (rewritten, count) = rewritten(sql);
+        assert_eq!(count, 1);
+        let emitted = rewritten.deparse_sql(Dialect::postgres()).unwrap();
+        let expected = if includes_source {
+            r#""i"."id" AS "id", "i"."name" AS "name", "s"."id" AS "id", "s"."value" AS "value""#
+        } else {
+            r#""i"."id" AS "id", "i"."name" AS "name""#
+        };
+        assert_eq!(emitted.rsplit_once(" RETURNING ").unwrap().1, expected);
+
+        let mut cache_context = create_cache_context();
+        let original = SemAst::from_ast(&statement(sql), catalog(), &mut cache_context).unwrap();
+        let reparsed =
+            SemAst::from_ast(&statement(&emitted), catalog(), &mut cache_context).unwrap();
+        assert!(
+            reparsed.context().reported_problems().is_empty(),
+            "{emitted}: {:?}",
+            reparsed.context().reported_problems()
+        );
+        let before = original.ast().result_columns().unwrap();
+        let after = reparsed.ast().result_columns().unwrap();
+        before.assert_same_result_shape(after, &emitted);
+    }
+
+    #[rstest::rstest]
     #[case::using("SELECT * FROM t FULL JOIN u USING (id)", "COALESCE")]
     #[case::natural("SELECT * FROM t NATURAL FULL JOIN u", "COALESCE")]
     #[case::alias("SELECT joined.* FROM (t FULL JOIN u USING (id)) joined", "joined")]

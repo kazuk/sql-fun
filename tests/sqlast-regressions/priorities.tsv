@@ -8,8 +8,7 @@ heavy	between-symmetric-19
 heavy	bounded-parameter-inference-17
 heavy	bounded-parameter-inference-18
 heavy	bounded-parameter-inference-19
-heavy	project-roles-empty-19
-medium	alter-constraint-18
+heavy	parameter-bindings-17
 medium	alter-constraint-19
 medium	alter-function-parallel-17
 medium	alter-function-parallel-18
@@ -29,6 +28,8 @@ medium	arrays-metadata-19
 medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	arrays-parameters-19
+medium	arrays-records-17
+medium	arrays-records-18
 medium	bundled-btree_gin-17
 medium	bundled-btree_gin-18
 medium	bundled-btree_gin-19
@@ -37,7 +38,7 @@ medium	bundled-btree_gist-18
 medium	bundled-btree_gist-19
 medium	bundled-citext-18
 medium	bundled-citext-19
-medium	bundled-intarray-17
+medium	bundled-cube-17
 medium	bundled-isn-17
 medium	bundled-isn-18
 medium	bundled-isn-19
@@ -62,6 +63,7 @@ medium	bundled-pg_walinspect-17
 medium	case-common-types-17
 medium	case-common-types-18
 medium	case-common-types-19
+medium	case_semantic-18
 medium	collate-17
 medium	collate-18
 medium	collate-19
@@ -95,6 +97,7 @@ medium	drop-function-19
 medium	drop-operator-17
 medium	drop-operator-18
 medium	drop-operator-19
+medium	drop-view-19
 medium	extension-membership-17
 medium	extension-membership-18
 medium	extension-membership-19
@@ -122,7 +125,6 @@ medium	operator-names-19
 medium	output-names-17
 medium	output-names-18
 medium	output-names-19
-medium	parameter-bindings-17
 medium	parameter-bindings-18
 medium	parameter-bindings-19
 medium	patterns-17
@@ -144,9 +146,11 @@ medium	project-roles-18
 medium	project-roles-19
 medium	project-roles-empty-17
 medium	project-roles-empty-18
+medium	project-roles-empty-19
 medium	recursive-ctes-17
 medium	recursive-ctes-18
 medium	recursive-ctes-19
+medium	row-security-18
 medium	rows-17
 medium	rows-18
 medium	rows-19
@@ -213,7 +217,6 @@ medium	schema-views-mechanisms-19
 medium	schema-views-precedence-17
 medium	schema-views-precedence-18
 medium	schema-views-precedence-19
-medium	schema-views-special-19
 medium	serial-family-17
 medium	serial-family-18
 medium	serial-family-19
@@ -232,13 +235,11 @@ medium	table-renames-19
 medium	truth-tests-17
 medium	truth-tests-18
 medium	truth-tests-19
-medium	view-conflict-rules-17
-medium	view-conflict-rules-18
-medium	view-conflict-rules-19
 light	access-methods-17
 light	access-methods-18
 light	access-methods-19
 light	alter-constraint-17
+light	alter-constraint-18
 light	alter-constraint-18-18
 light	alter-constraint-18-19
 light	arrays-names-17
@@ -247,8 +248,6 @@ light	arrays-names-19
 light	arrays-operators-17
 light	arrays-operators-18
 light	arrays-operators-19
-light	arrays-records-17
-light	arrays-records-18
 light	arrays-records-19
 light	bootstrap-array-expressions-18
 light	bootstrap-array-expressions-19
@@ -262,7 +261,6 @@ light	bundled-bloom-17
 light	bundled-bloom-18
 light	bundled-bloom-19
 light	bundled-citext-17
-light	bundled-cube-17
 light	bundled-cube-18
 light	bundled-cube-19
 light	bundled-cube-1_2-17
@@ -296,6 +294,7 @@ light	bundled-insert_username-19
 light	bundled-intagg-17
 light	bundled-intagg-18
 light	bundled-intagg-19
+light	bundled-intarray-17
 light	bundled-intarray-18
 light	bundled-intarray-19
 light	bundled-lo-17
@@ -365,7 +364,6 @@ light	bundled-xml2-17
 light	bundled-xml2-18
 light	bundled-xml2-19
 light	case_semantic-17
-light	case_semantic-18
 light	case_semantic-19
 light	casts-17
 light	casts-18
@@ -384,7 +382,6 @@ light	domain-operators-default-18
 light	domain-operators-default-19
 light	drop-view-17
 light	drop-view-18
-light	drop-view-19
 light	membership-comparisons-17
 light	membership-comparisons-18
 light	membership-comparisons-19
@@ -398,7 +395,6 @@ light	project-roles-omitted-17
 light	project-roles-omitted-18
 light	project-roles-omitted-19
 light	row-security-17
-light	row-security-18
 light	row-security-19
 light	schema-base-types-array-return-19
 light	schema-base-types-array-return-legacy-17
@@ -447,6 +443,7 @@ light	schema-views-automatic-18
 light	schema-views-automatic-19
 light	schema-views-special-17
 light	schema-views-special-18
+light	schema-views-special-19
 light	serial-original-17
 light	serial-original-18
 light	serial-original-19
@@ -461,3 +458,6 @@ light	text-search-templates-18
 light	text-search-templates-19
 light	vectors-18
 light	vectors-19
+light	view-conflict-rules-17
+light	view-conflict-rules-18
+light	view-conflict-rules-19

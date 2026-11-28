@@ -357,7 +357,7 @@
       "columns": [
         {
           "name": "result",
-          "nullability": "nullable",
+          "nullability": "unknown",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "bool",
@@ -375,7 +375,7 @@
       "columns": [
         {
           "name": "result",
-          "nullability": "nullable",
+          "nullability": "unknown",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "bool",

@@ -6,7 +6,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "int8",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int8",
@@ -24,7 +24,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "amount",
           "type": {
             "schema_name": "public",
             "local_name": "amount",
@@ -42,7 +42,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "nested_amount",
           "type": {
             "schema_name": "public",
             "local_name": "nested_amount",
@@ -114,7 +114,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "amount",
           "type": {
             "schema_name": "public",
             "local_name": "amount",
@@ -132,7 +132,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "case",
           "type": {
             "schema_name": "public",
             "local_name": "amount",
@@ -150,7 +150,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "type": {
             "schema_name": "public",
             "local_name": "amount",
@@ -170,7 +170,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "amount",
           "type": {
             "schema_name": "public",
             "local_name": "amount",
@@ -190,7 +190,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "nested_amount",
           "type": {
             "schema_name": "public",
             "local_name": "nested_amount",

@@ -176,7 +176,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "pg_control_version",
           "type": null,
           "nullability": "nullable"
         }

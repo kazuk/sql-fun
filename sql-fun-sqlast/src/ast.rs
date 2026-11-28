@@ -1092,6 +1092,20 @@ impl Literal {
 }
 
 impl Expr {
+    // The parser's cast type spelling can differ from the catalog identity,
+    // for example when a cast uses the array type's catalog name _int4.
+    pub(crate) fn postgres_weak_projection_name(&self) -> Option<&str> {
+        match self {
+            Self::Cast(value) => value.target().name().parts().last().map(String::as_str),
+            Self::Case(_) => Some("case"),
+            Self::Collate(value) => value.argument().postgres_weak_projection_name(),
+            Self::Indirection(value) => value.argument().postgres_weak_projection_name(),
+            _ => None,
+        }
+    }
+}
+
+impl Expr {
     pub(in crate::ast) const fn null() -> Self {
         Self::Literal(Literal::null())
     }

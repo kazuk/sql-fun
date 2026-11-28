@@ -351,7 +351,7 @@
           "nullability": "not_null"
         },
         {
-          "name": "",
+          "name": "int4",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -417,7 +417,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -453,7 +453,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -471,7 +471,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -489,7 +489,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",

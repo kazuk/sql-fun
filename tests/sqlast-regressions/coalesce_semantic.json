@@ -9,7 +9,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "nullability": "nullable"
         }
       ]
@@ -24,7 +24,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "nullability": "nullable"
         }
       ]
@@ -41,7 +41,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "coalesce",
           "nullability": "nullable"
         }
       ]

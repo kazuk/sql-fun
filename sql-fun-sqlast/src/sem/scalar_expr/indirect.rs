@@ -60,6 +60,15 @@ impl IndirectionExpr {
         }
     }
 
+    pub(super) fn postgres_strong_projection_name(&self) -> Option<String> {
+        match self {
+            Self::ArrayIndex(value) => value.array().postgres_strong_projection_name(),
+            Self::ArraySlice(value) => value.array().postgres_strong_projection_name(),
+            Self::ArraySubscripts(value) => value.array().postgres_strong_projection_name(),
+            Self::MemberRef(value) => Some(value.member().to_owned()),
+        }
+    }
+
     pub(super) fn rename_column(&mut self, rename: &ColumnRename) {
         if let Self::MemberRef(value) = self {
             value.rename_column(rename);

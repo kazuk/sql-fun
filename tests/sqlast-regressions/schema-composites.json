@@ -99,7 +99,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "array",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",

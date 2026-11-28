@@ -96,7 +96,7 @@ mod test_extension_catalog {
     use std::path::Path;
 
     // Recover the timed-out bundled PL/pgSQL catalog test from commit
-    // 333199f54a4ce975619adde45e1be1716b560464^, the parent of its removal commit.
+    // d3946324970cac9e1205fa6d7c0891cbce54c65a^, the parent of its removal commit.
 
     #[test]
     fn duplicate_function_preserves_the_original_catalog_definition() -> testresult::TestResult {

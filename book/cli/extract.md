@@ -14,6 +14,13 @@ row-expanding projections. Refresh older builtin generations before relying on
 these view-write capabilities. Application views and their declarations still
 come from your explicitly selected schema inputs.
 
+Refresh the builtin catalog with the matching sql-fun release to obtain
+schema-qualified commutator names and index-method exclusion capability.
+Earlier catalogs can still be read. Missing capability metadata is treated as
+unknown. Supply custom operator declarations through the selected project
+schema or extension SQL. Selecting a definition schema for extraction can
+include its operator class and family registrations.
+
 These commands produce candidate generations in a working directory.
 `$SQL_FUN_HOME` contains installed state; it is not an extraction workspace.
 Installing or upgrading a generation is a separate operation.

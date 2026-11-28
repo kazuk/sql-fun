@@ -2,6 +2,11 @@ use crate::sem::{OperatorClassDefinition, OperatorFamily, OperatorFamilyKey, Typ
 
 /// Read access to the effective operator family catalog.
 pub trait OperatorFamilyInfoRead {
+    /// Families visible in the effective catalog snapshot.
+    fn operator_families(&self) -> Vec<&OperatorFamily> {
+        Vec::new()
+    }
+
     /// Definitions of operator classes in the effective catalog.
     fn operator_classes(&self) -> Vec<&OperatorClassDefinition> {
         Vec::new()

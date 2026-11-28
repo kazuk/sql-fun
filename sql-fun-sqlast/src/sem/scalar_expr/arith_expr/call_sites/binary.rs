@@ -1,8 +1,8 @@
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ParseContext, ResolvedOperator,
-        SemScalarExpr, TypeReference,
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorIdentity, ParseContext,
+        ResolvedOperator, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
         scalar_expr::arith_expr::{ArithExpr, call_sites::binary_is_not_null},
         traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
@@ -14,6 +14,8 @@ pub struct BinaryOpCallSite {
     operator_name: OperatorName,
     #[serde(default)]
     binding: Option<Box<ResolvedOperator>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    declaration: Option<Box<OperatorIdentity>>,
     left_arg: SemScalarExpr,
     left_arg_type: Option<TypeReference>,
     right_arg: SemScalarExpr,
@@ -96,6 +98,11 @@ mod test_binary_op_call_site {
 }
 
 impl BinaryOpCallSite {
+    /// Original declaration selected by overload resolution.
+    pub fn declaration(&self) -> Option<&OperatorIdentity> {
+        self.declaration.as_deref()
+    }
+
     pub(crate) fn from_operator_definition_resolved<'context, TParseContext>(
         context: &'context mut TParseContext,
         name: &OperatorName,
@@ -109,6 +116,7 @@ impl BinaryOpCallSite {
         let call_site = Self {
             operator_name: name.clone(),
             binding: None,
+            declaration: operator_def.declaration().cloned().map(Box::new),
             left_arg_type: Some(operator_def.left_arg_type().clone()),
             right_arg_type: Some(operator_def.right_arg_type().clone()),
             left_arg: lexpr,
@@ -235,13 +243,18 @@ impl BinaryOpCallSite {
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if let (Some(left), Some(right)) = (&self.left_arg_type, &self.right_arg_type) {
-            visitor.operator_overload(
-                self.binding
-                    .as_deref()
-                    .map_or(&self.operator_name, ResolvedOperator::name),
-                Some(left),
-                right,
-            );
+            if let Some(declaration) = self.declaration() {
+                let (left, right) = declaration.operands();
+                visitor.operator_overload(declaration.name(), left, right);
+            } else {
+                visitor.operator_overload(
+                    self.binding
+                        .as_deref()
+                        .map_or(&self.operator_name, ResolvedOperator::name),
+                    Some(left),
+                    right,
+                );
+            }
         }
         self.left_arg.visit(visitor)?;
         self.right_arg.visit(visitor)?;

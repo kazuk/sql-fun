@@ -507,11 +507,18 @@ impl DistinctExpr {
         right: SemScalarExpr,
     ) -> Result<DistinctComparison, AnalysisError> {
         let name = OperatorName::from_parts(None, "=");
-        self.not_null = context.resolved_operator_result_is_not_null(&name);
-        let binding = ResolvedOperator::resolve_comparison(context, &name);
+        let definition = crate::sem::OperatorLookupService::new(context).visible(&name, true, true);
+        let binding = ResolvedOperator::from_visible(context, &name, definition.as_ref());
         if !binding.resolution().is_resolved() {
             self.types = ResolvedTypes::types([]);
         }
+        self.not_null = if let Some(definition) = &definition
+            && let Some(name) = definition.single_declaration_name()
+        {
+            context.operator_result_is_not_null(name)
+        } else {
+            None
+        };
         let has_unknown = [&left, &right]
             .into_iter()
             .any(|value| SemScalarExpr::common_type_input(value) == Some(CommonType::unknown()));
@@ -520,14 +527,18 @@ impl DistinctExpr {
             return Ok(DistinctComparison::deferred(left, right, binding));
         }
 
-        let overloads = if let Some(definition) = context.get_operator(&name, true, true) {
-            definition.binary_overloads()
-        } else {
-            None
+        let overloads = match &definition {
+            Some(definition) => definition.binary_overloads(),
+            None => None,
         };
         let (left, right) =
             SemScalarExpr::comparison_literal_operands(context, overloads, left, right);
-        let mut equality = ArithExpr::build_op(context, &name, Some(left), Some(right))?.0;
+        let mut equality =
+            ArithExpr::build_op_from_visible(context, &name, Some(left), Some(right), definition)?
+                .0;
+        if let Some(declaration) = equality.operator_declaration() {
+            self.not_null = context.operator_result_is_not_null(declaration.name());
+        }
         equality.set_operator_binding(binding);
         if let Some(ty) = equality.get_type() {
             if ty != PgBuiltInType::bool() {

@@ -56,6 +56,13 @@ pub struct BaseContext {
     functions: PgBuiltInFunctions,
     masters: ConflictMasters,
     operator_families: std::collections::HashMap<OperatorFamilyKey, OperatorFamily>,
+    operator_capabilities: OperatorCapabilities,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+struct OperatorCapabilities {
+    #[serde(default)]
+    exclusion_capabilities: std::collections::HashMap<String, Option<bool>>,
 }
 
 #[derive(serde::Deserialize)]
@@ -256,6 +263,11 @@ impl BaseContext {
         };
 
         let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;
+        let operator_capabilities = paths
+            .catalog_metadata()
+            .map(deserialize_from_path)
+            .transpose()?
+            .unwrap_or_default();
         Ok(Self {
             configured_roles: metadata.into(),
             context_args: context_args.clone(),
@@ -263,6 +275,7 @@ impl BaseContext {
             functions,
             masters,
             operator_families,
+            operator_capabilities,
             types: builtin_type_data.definitions,
             array_names: builtin_type_data.array_names,
             binary_ordered_types,
@@ -565,10 +578,22 @@ impl GetSourcePathWithSpanOpt for BaseContext {
 
 impl crate::context::ForeignDataWrapperInfoRead for BaseContext {}
 
-impl crate::context::AccessMethodInfoRead for BaseContext {}
+impl crate::context::AccessMethodInfoRead for BaseContext {
+    fn access_method_can_exclude(&self, name: &str) -> Option<bool> {
+        self.operator_capabilities
+            .exclusion_capabilities
+            .get(name)
+            .copied()
+            .flatten()
+    }
+}
 impl crate::context::TextSearchTemplateInfoRead for BaseContext {}
 impl crate::context::TextSearchDictionaryInfoRead for BaseContext {}
 impl crate::context::OperatorFamilyInfoRead for BaseContext {
+    fn operator_families(&self) -> Vec<&OperatorFamily> {
+        self.operator_families.values().collect()
+    }
+
     fn operator_classes(&self) -> Vec<&OperatorClassDefinition> {
         self.masters.operator_classes().iter().collect()
     }

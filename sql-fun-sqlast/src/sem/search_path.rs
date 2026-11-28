@@ -127,15 +127,23 @@ where
     TContext: BaseParseContext + ?Sized,
     F: Fn(&OperatorName) -> Option<TResult>,
 {
-    if !name.is_valid() {
-        return None;
+    operator_search_keys(context, name).iter().find_map(getter)
+}
+
+pub(crate) fn operator_search_keys(
+    context: &(impl BaseParseContext + ?Sized),
+    name: &OperatorName,
+) -> Vec<OperatorName> {
+    let Some(full_name) = name.full_name() else {
+        return Vec::new();
+    };
+    if full_name.schema().is_some() || Dialect::from(context.metadata()) == Dialect::sqlite() {
+        return vec![name.clone()];
     }
-    if Dialect::from(context.metadata()) == Dialect::sqlite() {
-        return getter(name);
-    }
-    expand_search_path_inst(context, &name.full_name()?, |key| {
-        getter(&OperatorName::from_full_name(key))
-    })
+    search_schemas(context, false)
+        .into_iter()
+        .map(|schema| OperatorName::from_full_name(&full_name.replace_schema(&schema)))
+        .collect()
 }
 
 pub(crate) fn postgres_local_name(

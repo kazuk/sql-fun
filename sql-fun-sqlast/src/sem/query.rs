@@ -9,8 +9,8 @@ use crate::{
     names::{AliasName, ColumnName, FullName, OperatorName, TableName},
     sem::{
         AccessKind, AnalysisError, ArithExpr, BinaryOperatorDefinition, CteStatement,
-        InputTypeConstraint, InsertTarget, OperatorDefinition, ParseContext, QueryProblem,
-        ResultColumnCollection, SelectStatement, SemScalarExpr, TypeReference,
+        InputTypeConstraint, InsertTarget, OperatorDefinition, OperatorIdentity, ParseContext,
+        QueryProblem, ResultColumnCollection, SelectStatement, SemScalarExpr, TypeReference,
         parameter_resolution::{ParameterResolution, Signature},
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
@@ -1063,9 +1063,24 @@ impl ResolvedOperator {
         left: bool,
         right: bool,
     ) -> Self {
-        let resolved = context.resolve_operator_name(name, left, right);
-        let name = resolved.as_ref().unwrap_or(name);
-        Self::from_definition(context, name, context.get_operator_op(name, left, right))
+        let definition = crate::sem::operator_lookup::OperatorLookupService::new(context)
+            .visible(name, left, right);
+        Self::from_visible(context, name, definition.as_ref())
+    }
+
+    pub(crate) fn from_visible(
+        context: &impl ParseContext,
+        name: &OperatorName,
+        definition: Option<&OperatorDefinition>,
+    ) -> Self {
+        let canonical = if let Some(definition) = definition
+            && let Some(declaration_name) = definition.single_declaration_name()
+        {
+            declaration_name
+        } else {
+            name
+        };
+        Self::from_definition(context, canonical, definition)
     }
     /// Complete name binding from an already performed catalog lookup.
     pub(crate) fn from_definition(
@@ -1099,9 +1114,6 @@ impl ResolvedOperator {
             }
         }
     }
-    pub(crate) fn resolve_comparison(context: &impl ParseContext, name: &OperatorName) -> Self {
-        Self::resolve(context, name, true, true)
-    }
     /// Name lookup outcome; overload/type selection is a subsequent operation.
     pub const fn resolution(&self) -> &QueryNameResolution {
         &self.resolution
@@ -1110,7 +1122,7 @@ impl ResolvedOperator {
         &self,
         arguments: &[SemScalarExpr],
         context: &mut impl ParseContext,
-    ) -> Result<Option<InputTypeConstraint>, AnalysisError> {
+    ) -> Result<Option<(InputTypeConstraint, Option<OperatorIdentity>)>, AnalysisError> {
         if let [left, right] = arguments
             && left.get_type().is_some()
             && right.get_type().is_some()
@@ -1124,13 +1136,12 @@ impl ResolvedOperator {
                 right.clone(),
             )?;
             let (value, _) = resolved.into_call_site_expr(context, &self.name)?;
-            return Ok(Some(
-                value
-                    .get_type()
-                    .as_ref()
-                    .map(InputTypeConstraint::exact)
-                    .unwrap_or_else(|| InputTypeConstraint::types([])),
-            ));
+            let types = value
+                .get_type()
+                .as_ref()
+                .map(InputTypeConstraint::exact)
+                .unwrap_or_else(|| InputTypeConstraint::types([]));
+            return Ok(Some((types, value.operator_declaration().cloned())));
         }
         Ok(None)
     }

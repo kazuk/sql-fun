@@ -791,6 +791,18 @@ impl crate::context::ForeignDataWrapperInfoWrite for SchemaFileContext {
 }
 
 impl crate::context::OperatorFamilyInfoRead for SchemaCatalog {
+    fn operator_families(&self) -> Vec<&OperatorFamily> {
+        self.operator_families
+            .values()
+            .chain(
+                self.base
+                    .operator_families()
+                    .into_iter()
+                    .filter(|family| !self.operator_families.contains_key(family.key())),
+            )
+            .collect()
+    }
+
     fn operator_classes(&self) -> Vec<&OperatorClassDefinition> {
         self.operator_classes
             .iter()
@@ -868,6 +880,10 @@ impl crate::context::OperatorFamilyInfoWrite for SchemaFileContext {
 }
 
 impl crate::context::AccessMethodInfoRead for SchemaCatalog {
+    fn access_method_can_exclude(&self, name: &str) -> Option<bool> {
+        self.base.access_method_can_exclude(name)
+    }
+
     fn access_method(&self, name: &str) -> Option<&AccessMethodDefinition> {
         if let Some(definition) = self.access_methods.get(name) {
             Some(definition)

@@ -30,6 +30,13 @@ impl PostgresBuiltinPaths {
         Ok(path)
     }
 
+    /// Path to the selected builtin catalog metadata, when present.
+    #[must_use]
+    pub fn catalog_metadata(&self) -> Option<PathBuf> {
+        let path = self.builtin_base_path.join("metadata.json");
+        if path.is_file() { Some(path) } else { None }
+    }
+
     /// Resolve the selected collation master payload.
     ///
     /// # Errors

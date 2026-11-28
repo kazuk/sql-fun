@@ -1,7 +1,7 @@
 use crate::sem::{
-    AnalysisError, FuncCallExpr, IndirectionExpr, InputTypeConstraint, ParameterConstraints,
-    ParseContext, QueryNameResolution, ResolvedOperator, ResolvedTypes, SemScalarExpr,
-    TypeReference,
+    AnalysisError, FuncCallExpr, IndirectionExpr, InputTypeConstraint, OperatorIdentity,
+    ParameterConstraints, ParseContext, QueryNameResolution, ResolvedOperator, ResolvedTypes,
+    SemScalarExpr, TypeReference,
     scalar_expr::func_call::FunctionBinding,
     traversal::{SemanticVisitor, SemanticVisitorMut},
 };
@@ -13,6 +13,8 @@ pub struct ConstrainedExpr {
     operation: String,
     #[serde(default)]
     operator_binding: Option<Box<ResolvedOperator>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    operator_declaration: Option<Box<OperatorIdentity>>,
     #[serde(skip)]
     binding_validation_pending: bool,
     #[serde(default)]
@@ -42,6 +44,7 @@ impl ConstrainedExpr {
             node: Some(node),
             operation: operation.to_owned(),
             operator_binding: None,
+            operator_declaration: None,
             binding_validation_pending: false,
             cast_binding: None,
             semantic_call: None,
@@ -86,6 +89,10 @@ impl ConstrainedExpr {
     pub fn operator_binding(&self) -> Option<&ResolvedOperator> {
         self.operator_binding.as_deref()
     }
+    pub(crate) fn operator_declaration(&self) -> Option<&OperatorIdentity> {
+        self.operator_declaration.as_deref()
+    }
+
     /// SQL operation represented by this expression.
     pub fn operation(&self) -> &str {
         &self.operation
@@ -185,9 +192,11 @@ impl ConstrainedExpr {
         }
         if self.binding_validation_pending
             && let Some(binding) = &self.operator_binding
-            && let Some(types) = binding.validate_application_inputs(&self.arguments, context)?
+            && let Some((types, declaration)) =
+                binding.validate_application_inputs(&self.arguments, context)?
         {
             self.types = types.into();
+            self.operator_declaration = declaration.map(Box::new);
             self.binding_validation_pending = false;
         }
         Ok(())

@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Exact PostgreSQL operator signature in its creation namespace.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OperatorIdentity {
     name: OperatorName,
     left: Option<TypeReference>,
@@ -46,19 +46,25 @@ impl OperatorIdentity {
         right: &TypeReference,
         context: &'a impl ParseContext,
     ) -> Option<(Self, &'a TypeReference)> {
-        expand_operator_search_path(context, name, |candidate| {
-            let identity = Self {
-                name: candidate.clone(),
-                left: left.cloned(),
-                right: right.clone(),
-            };
-            let result = identity.result_type(context)?;
-            Some((identity, result))
-        })
+        crate::sem::OperatorLookupService::new(context).exact(name, left, right)
     }
 
-    pub(crate) const fn name(&self) -> &OperatorName {
+    /// The qualified operator name.
+    pub const fn name(&self) -> &OperatorName {
         &self.name
+    }
+
+    pub(crate) const fn operands(&self) -> (Option<&TypeReference>, &TypeReference) {
+        (self.left.as_ref(), &self.right)
+    }
+
+    pub(crate) fn matches_binary(
+        &self,
+        name: &OperatorName,
+        left: &TypeReference,
+        right: &TypeReference,
+    ) -> bool {
+        &self.name == name && self.left.as_ref() == Some(left) && &self.right == right
     }
 
     pub(crate) const fn binary(&self) -> bool {
@@ -79,11 +85,19 @@ impl OperatorIdentity {
         left: Option<TypeReference>,
         right: TypeReference,
     ) -> Self {
-        Self {
-            name: OperatorName::from_parts(Some("pg_catalog"), name),
+        Self::from_signature(
+            OperatorName::from_parts(Some("pg_catalog"), name),
             left,
             right,
-        }
+        )
+    }
+
+    pub(crate) const fn from_signature(
+        name: OperatorName,
+        left: Option<TypeReference>,
+        right: TypeReference,
+    ) -> Self {
+        Self { name, left, right }
     }
 
     pub(crate) fn builtin_settings<'a>(
@@ -197,7 +211,10 @@ impl OperatorIdentity {
         }
     }
 
-    fn result_type<'a>(&self, context: &'a impl ParseContext) -> Option<&'a TypeReference> {
+    pub(crate) fn result_type<'a>(
+        &self,
+        context: &'a (impl BaseParseContext + ?Sized),
+    ) -> Option<&'a TypeReference> {
         match context.get_operator_op(&self.name, self.binary(), true)? {
             OperatorDefinition::Binary(overloads) => {
                 let overload = overloads.iter().find(|overload| {
@@ -254,6 +271,7 @@ impl EstimatorSetting {
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct OperatorLinks {
     commutator: Option<OperatorIdentity>,
+    commutator_known: bool,
     negator: Option<OperatorIdentity>,
     // Outer None marks older catalogs that omit the setting entirely.
     restriction: Option<Option<EstimatorSetting>>,
@@ -267,7 +285,7 @@ impl OperatorLinks {
     pub(crate) fn new(
         restriction: Option<(FullName, usize)>,
         join: Option<(FullName, usize)>,
-        commutator: Option<OperatorIdentity>,
+        commutator: Option<Option<OperatorIdentity>>,
         negator: Option<OperatorIdentity>,
         hashes: bool,
         merges: bool,
@@ -277,11 +295,23 @@ impl OperatorLinks {
                 restriction.map(|(name, arity)| EstimatorSetting::builtin(name, arity)),
             ),
             join: Some(join.map(|(name, arity)| EstimatorSetting::builtin(name, arity))),
-            commutator,
+            commutator_known: commutator.is_some(),
+            commutator: commutator.flatten(),
             negator,
             hashes,
             merges,
             flags_and_links_known: true,
+        }
+    }
+
+    /// Whether the declaration is its own commutator. The inner optional
+    /// value distinguishes a missing link from a link to another operator.
+    #[must_use]
+    pub fn self_commutation(&self, identity: &OperatorIdentity) -> Option<Option<bool>> {
+        if self.commutator_known {
+            Some(self.commutator.as_ref().map(|target| target == identity))
+        } else {
+            None
         }
     }
 
@@ -304,6 +334,7 @@ impl OperatorLinks {
 
     pub(crate) fn with_reciprocal(mut self, commutator: bool, identity: &OperatorIdentity) -> Self {
         let link = if commutator {
+            self.commutator_known = true;
             &mut self.commutator
         } else {
             &mut self.negator
@@ -494,6 +525,7 @@ impl<C: ParseContext> Declaration<'_, C> {
             hashes,
             merges,
             flags_and_links_known: true,
+            commutator_known: true,
             ..Default::default()
         };
         if let Some(identity) = identity {

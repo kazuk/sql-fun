@@ -513,6 +513,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::OperatorFamilyInfoRead for $context {
+            fn operator_families(&self) -> Vec<&crate::sem::OperatorFamily> {
+                self.$catalog().operator_families()
+            }
+
             fn operator_classes(&self) -> Vec<&crate::sem::OperatorClassDefinition> {
                 self.$catalog().operator_classes()
             }
@@ -542,6 +546,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::AccessMethodInfoRead for $context {
+            fn access_method_can_exclude(&self, name: &str) -> Option<bool> {
+                self.$catalog().access_method_can_exclude(name)
+            }
+
             fn access_method(&self, name: &str) -> Option<&crate::sem::AccessMethodDefinition> {
                 self.$catalog().access_method(name)
             }

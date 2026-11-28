@@ -1,8 +1,8 @@
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, ParseContext, ResolvedOperator, SemScalarExpr, TypeReference,
-        UnaryOperatorDefinition,
+        AnalysisError, OperatorIdentity, ParseContext, ResolvedOperator, SemScalarExpr,
+        TypeReference, UnaryOperatorDefinition,
         parameter_resolution::ParameterResolution,
         scalar_expr::arith_expr::ArithExpr,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -14,6 +14,8 @@ pub struct RightUnaryCallSite {
     operator_name: OperatorName,
     #[serde(default)]
     binding: Option<Box<ResolvedOperator>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    declaration: Option<Box<OperatorIdentity>>,
     operator_def: UnaryOperatorDefinition,
     arg: SemScalarExpr,
 }
@@ -44,6 +46,13 @@ impl RightUnaryCallSite {
         let call_site = Self {
             operator_name: name.clone(),
             binding: None,
+            declaration: operator_def.declaration_name().map(|name| {
+                Box::new(OperatorIdentity::from_signature(
+                    name.clone(),
+                    None,
+                    operator_def.arg_type().clone(),
+                ))
+            }),
             operator_def,
             arg: rexpr,
         };
@@ -51,6 +60,10 @@ impl RightUnaryCallSite {
             SemScalarExpr::Arith(ArithExpr::OpRightUnary(Box::new(call_site))),
             context,
         ))
+    }
+
+    pub(crate) fn declaration(&self) -> Option<&OperatorIdentity> {
+        self.declaration.as_deref()
     }
 
     pub const fn get_return_type(&self) -> &TypeReference {
@@ -76,9 +89,13 @@ impl RightUnaryCallSite {
     }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.operator_overload(
-            self.binding
-                .as_deref()
-                .map_or(&self.operator_name, ResolvedOperator::name),
+            self.declaration()
+                .map(OperatorIdentity::name)
+                .unwrap_or_else(|| {
+                    self.binding
+                        .as_deref()
+                        .map_or(&self.operator_name, ResolvedOperator::name)
+                }),
             None,
             self.operator_def.arg_type(),
         );

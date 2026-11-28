@@ -7,7 +7,7 @@ use crate::{
     context::ParseContext,
     names::{FullName, OperatorName},
     sem::{
-        AnalysisError, AnalysisProblem, ArithExpr, FunctionModifiers, QueryFrame, QueryFrameBound,
+        AnalysisError, AnalysisProblem, FunctionModifiers, QueryFrame, QueryFrameBound,
         QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder, QueryProblem,
         QueryWindow, ResolvedOperator, ResultColumnCollection, ScalarAnalysisContext,
         SelectDestination, SemScalarExpr,
@@ -22,7 +22,7 @@ impl ResolvedOperator {
         left: bool,
         right: bool,
     ) -> Option<Self> {
-        if ArithExpr::ast_has_named_operator(ast) {
+        if matches!(ast, OperatorKind::Any | OperatorKind::All) {
             Some(Self::resolve(context, name, left, right))
         } else {
             None

@@ -348,5 +348,41 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "cross-schema-distinct-signature",
+    "sql": "SELECT 1 @@ 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified-cross-schema-signature",
+    "sql": "SELECT 1 OPERATOR(public.@@) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

@@ -82,7 +82,7 @@ table-foreign-keys	project	table-foreign-keys.sql	9	17,18,19
 operator-names	builtin	-	21	17,18,19
 create-cast	project	create-cast.sql	22	17,18,19
 create-language	project	create-language.sql	9	17,18,19
-create-operator	project	create-operator.sql	34	17,18,19
+create-operator	project	create-operator.sql	36	17,18,19
 serial-original	project	serial-original.sql	2	17,18,19
 serial-family	project	serial-family.sql	20	17,18,19
 named-variadic-calls	project	named-variadic-calls.sql	80	17,18,19

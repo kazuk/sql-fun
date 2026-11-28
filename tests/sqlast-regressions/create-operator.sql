@@ -65,3 +65,9 @@ CREATE OPERATOR public.<% (LEFTARG=text, RIGHTARG=text, FUNCTION=public.trgm_cmp
 CREATE OPERATOR public.%> (LEFTARG=text, RIGHTARG=text, FUNCTION=public.trgm_cmp);
 CREATE OPERATOR public.<<% (LEFTARG=text, RIGHTARG=text, FUNCTION=public.trgm_cmp);
 CREATE OPERATOR public.%>> (LEFTARG=text, RIGHTARG=text, FUNCTION=public.trgm_cmp);
+
+CREATE FUNCTION public.scalar_match(integer, integer) RETURNS boolean
+LANGUAGE sql AS 'SELECT true';
+CREATE OPERATOR public.@@ (
+    LEFTARG = integer, RIGHTARG = integer, FUNCTION = public.scalar_match
+);

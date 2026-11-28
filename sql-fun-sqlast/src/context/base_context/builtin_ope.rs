@@ -31,17 +31,47 @@ struct OperatorSettingsDecl {
     restriction: Option<String>,
     join: Option<String>,
     join_arity: Option<usize>,
-    commutator: Option<String>,
+    #[serde(default, deserialize_with = "present_commutator")]
+    commutator: Option<Option<CommutatorName>>,
     negator: Option<String>,
     hashes: bool,
     merges: bool,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum CommutatorName {
+    Qualified(String, String),
+    Builtin(String),
+}
+
+impl CommutatorName {
+    fn operator_name(&self) -> OperatorName {
+        match self {
+            Self::Qualified(schema, name) => OperatorName::from_parts(Some(schema), name),
+            Self::Builtin(name) => OperatorName::from_parts(Some("pg_catalog"), name),
+        }
+    }
+}
+
+fn present_commutator<'de, D>(deserializer: D) -> Result<Option<Option<CommutatorName>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    <Option<CommutatorName> as serde::Deserialize>::deserialize(deserializer).map(Some)
+}
+
 impl OperatorSettingsDecl {
     fn resolve(&self, left: Option<&TypeReference>, right: &TypeReference) -> OperatorLinks {
         let function = |name: &str| FullName::with_schema("pg_catalog", name);
-        let commutator = self.commutator.as_deref().zip(left).map(|(name, left)| {
-            OperatorIdentity::builtin_signature(name, Some(right.clone()), left.clone())
+        let commutator = self.commutator.as_ref().map(|commutator| {
+            commutator.as_ref().zip(left).map(|(name, left)| {
+                OperatorIdentity::from_signature(
+                    name.operator_name(),
+                    Some(right.clone()),
+                    left.clone(),
+                )
+            })
         });
         let negator = self
             .negator

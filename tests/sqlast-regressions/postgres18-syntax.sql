@@ -5,3 +5,5 @@ CREATE TABLE public.name_holder (
 );
 CREATE TABLE public.original_key_rows (id integer, PRIMARY KEY (id));
 ALTER TABLE public.original_key_rows RENAME TO renamed_key_rows;
+CREATE TABLE public.late_key_rows (id integer);
+ALTER TABLE public.late_key_rows ADD CONSTRAINT late_key_pk PRIMARY KEY (id);

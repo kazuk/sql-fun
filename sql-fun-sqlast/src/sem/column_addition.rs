@@ -553,6 +553,15 @@ impl AdditionAnalysis {
                 &table,
                 self.staged.as_ref(),
             )?;
+            if self
+                .staged
+                .as_ref()
+                .is_some_and(|table| table.reuses_primary_key_not_null(&constraint))
+            {
+                self.commands
+                    .push(AlterObjSubCommand::add_constraint(&constraint));
+                continue;
+            }
             let duplicate = !self.names.reserve(constraint.name());
             self.applicable &= valid && !duplicate;
             if duplicate && valid {

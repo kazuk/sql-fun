@@ -1216,6 +1216,10 @@ postgres18-syntax-18	table-not-null-reuse	yes	descriptor-agrees	accepted; no res
 postgres18-syntax-18	table-not-null-after-rename	yes	descriptor-agrees	accepted; no result columns	-
 postgres18-syntax-18	table-not-null-after-rename-conflict	yes	server-rejects	"55000 cannot create not-null constraint ""renamed_key_rows_id_not_null"" on column ""id"" of table ""renamed_key_rows"""	-
 postgres18-syntax-18	table-not-null-nullable-column	yes	descriptor-agrees	accepted; no result columns	-
+postgres18-syntax-18	table-not-null-after-add-primary-key-reuse	yes	descriptor-agrees	accepted; no result columns	-
+postgres18-syntax-18	table-not-null-after-add-primary-key-conflict	yes	server-rejects	"55000 cannot create not-null constraint ""replacement"" on column ""id"" of table ""late_key_rows"""	-
+postgres18-syntax-18	table-not-null-with-add-column-reuse	yes	descriptor-agrees	accepted; no result columns	-
+postgres18-syntax-18	table-not-null-with-add-column-conflict	yes	server-rejects	"55000 cannot create not-null constraint ""replacement"" on column ""id"" of table ""late_key_rows"""	-
 rows-from	rows_from::sql_values	yes	descriptor-difference	current_date=pg_catalog.date; current_user=pg_catalog.name; user=pg_catalog.name; current_role=pg_catalog.name; current_time=pg_catalog.timetz; current_timestamp=pg_catalog.timestamptz; localtime=pg_catalog.time; localtimestamp=pg_catalog.timestamp; session_user=pg_catalog.name; current_schema=pg_catalog.name; current_catalog=pg_catalog.name	-
 rows-from	rows_from::current_date	yes	descriptor-difference	current_date=pg_catalog.date	-
 rows-from	rows_from::direct_sql_value	yes	descriptor-difference	value=pg_catalog.date	-

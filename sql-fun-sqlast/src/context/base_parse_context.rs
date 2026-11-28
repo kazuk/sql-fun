@@ -81,6 +81,18 @@ pub trait BaseParseContext:
             .ok()
     }
 
+    /// Whether another relation in the same namespace has this constraint name.
+    fn constraint_name_exists_in_namespace(&self, target: &FullName, name: &str) -> bool {
+        self.relation_names().into_iter().any(|relation| {
+            &relation != target
+                && relation.schema() == target.schema()
+                && relation.catalog() == target.catalog()
+                && self
+                    .get_table_impl(&relation)
+                    .is_some_and(|table| table.has_stored_constraint_name(name))
+        })
+    }
+
     /// get SQL file path
     fn get_source_file_path(&self) -> Option<&Path>;
 

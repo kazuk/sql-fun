@@ -123,6 +123,9 @@ the supplied name must match the existing NOT NULL constraint name.
 sql-fun targets the 18.2 and later behavior for PostgreSQL 18 analysis.
 For primary-key columns, sql-fun reports an error when the names differ.
 Reusing the existing name leaves the original constraint in place.
+For a column outside the primary key with an explicit NOT NULL constraint,
+sql-fun can accept a conflicting name that PostgreSQL rejects
+([#1303](https://github.com/kazuk/sql-fun/issues/1303)).
 Name generation accounts for retained table constraints in the same schema.
 If a domain constraint in that schema occupies the generated name,
 sql-fun can infer a different name from PostgreSQL. See

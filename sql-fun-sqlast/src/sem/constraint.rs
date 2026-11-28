@@ -301,16 +301,9 @@ impl ConstraintNames {
     }
 
     pub(crate) fn supports_named_not_null(context: &impl ParseContext) -> bool {
-        let Some(version) = context.metadata().engine_version() else {
-            return false;
-        };
-        let Ok(version) = version
-            .to_string()
-            .parse::<::sql_fun_core::PostgresVersion>()
-        else {
-            return false;
-        };
-        version.major() >= 18
+        context
+            .postgres_version()
+            .is_some_and(|version| version.major() >= 18)
     }
 }
 

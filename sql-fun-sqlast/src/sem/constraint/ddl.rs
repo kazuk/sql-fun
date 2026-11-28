@@ -61,6 +61,23 @@ impl Constraint {
         Ok(Some(Self::NotNull(value, applicable)))
     }
 
+    fn from_ast_added_not_null(
+        ast: &AstTableConstraint,
+        context: &mut impl ParseContext,
+        target: &TableName,
+        pending: Option<&CreateTable>,
+    ) -> Result<Option<Self>, AnalysisError> {
+        let Some(Self::NotNull(value, mut applicable)) =
+            Self::from_ast_not_null(ast, context, target, pending)?
+        else {
+            return Ok(None);
+        };
+        if applicable && let Some(table) = pending {
+            applicable = table.validate_added_primary_key_not_null(context, target, &value)?;
+        }
+        Ok(Some(Self::NotNull(value, applicable)))
+    }
+
     fn validate_temporal_key(
         context: &mut impl ParseContext,
         table: &CreateTable,
@@ -101,7 +118,7 @@ impl Constraint {
                 CheckConstraint::from_ast_table_constraint(ast, context, target, pending, true)?;
             return Ok((Self::check(&check), check.can_apply()));
         }
-        if let Some(constraint) = Self::from_ast_not_null(ast, context, target, pending)? {
+        if let Some(constraint) = Self::from_ast_added_not_null(ast, context, target, pending)? {
             let applicable = constraint.references_can_apply();
             return Ok((constraint, applicable));
         }
@@ -186,14 +203,10 @@ impl Constraint {
             AstColumnConstraint::Nullability(true, _, _)
         ) {
             let definition = context.get_table(table).cloned();
-            if let Some(Self::NotNull(value, mut applicable)) =
-                Self::from_ast_not_null(ast, context, table, definition.as_ref())?
+            if let Some(constraint) =
+                Self::from_ast_added_not_null(ast, context, table, definition.as_ref())?
             {
-                if applicable && let Some(definition) = &definition {
-                    applicable =
-                        definition.validate_added_primary_key_not_null(context, table, &value)?;
-                }
-                return Ok(Self::NotNull(value, applicable));
+                return Ok(constraint);
             }
         }
         let keys = Self::columns_from_ast(ast);

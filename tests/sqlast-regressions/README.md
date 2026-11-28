@@ -104,8 +104,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest selects 1,852 inputs for PostgreSQL 17, 1,853 for PostgreSQL 18, and
-1,854 for PostgreSQL 19 (5,559 total). These count contract inputs separately from
+manifest selects 1,852 inputs for PostgreSQL 17, 1,857 for PostgreSQL 18, and
+1,858 for PostgreSQL 19 (5,567 total). These count contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -356,7 +356,7 @@ legal SQLite tuple assignments. Bare relation-name whole-row binding remains
 
 Issue #885 adds paired `postgres18-syntax-17.json` and
 `postgres18-syntax-18.json` fixtures for implemented behavior and engine-version
-diagnostics (39 cases on 17, 18 each on 18 and 19). Missing common-AST
+diagnostics (39 cases on 17, 22 each on 18 and 19). Missing common-AST
 conversion or analysis
 retains explicit `todo!()` panics; focused Rust tests verify those markers rather
 than terminating the shared CLI regression server. Issue #891 adds the three

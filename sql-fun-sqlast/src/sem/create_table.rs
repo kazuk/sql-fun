@@ -895,7 +895,6 @@ impl CreateTable {
     ) -> String {
         let table_name = identity.local_name();
         let column_name = column.as_str();
-        let relations = context.relation_names();
         for pass in 0.. {
             let label = if pass == 0 {
                 "not_null".to_owned()
@@ -916,14 +915,7 @@ impl CreateTable {
             let column = &column_name[..column_name.floor_char_boundary(column_len)];
             let candidate = format!("{table}_{column}_{label}");
             if !self.has_stored_constraint_name(&candidate)
-                && !relations.iter().any(|relation| {
-                    relation != identity
-                        && relation.schema() == identity.schema()
-                        && relation.catalog() == identity.catalog()
-                        && context
-                            .get_table_impl(relation)
-                            .is_some_and(|table| table.has_stored_constraint_name(&candidate))
-                })
+                && !context.constraint_name_exists_in_namespace(identity, &candidate)
             {
                 return candidate;
             }
@@ -931,7 +923,7 @@ impl CreateTable {
         unreachable!()
     }
 
-    fn has_stored_constraint_name(&self, name: &str) -> bool {
+    pub(crate) fn has_stored_constraint_name(&self, name: &str) -> bool {
         self.constraint(name).is_some() || self.named_inline_constraints(name).next().is_some()
     }
 

@@ -216,5 +216,41 @@
       "diagnostics": [],
       "columns": []
     }
+  },
+  {
+    "name": "table-not-null-after-add-primary-key-reuse",
+    "sql": "ALTER TABLE late_key_rows ADD CONSTRAINT late_key_rows_id_not_null NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-after-add-primary-key-conflict",
+    "sql": "ALTER TABLE late_key_rows ADD CONSTRAINT replacement NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [
+        "alter_column_not_null_conflict"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-with-add-column-reuse",
+    "sql": "ALTER TABLE late_key_rows ADD COLUMN other integer, ADD CONSTRAINT late_key_rows_id_not_null NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-with-add-column-conflict",
+    "sql": "ALTER TABLE late_key_rows ADD COLUMN other integer, ADD CONSTRAINT replacement NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [
+        "alter_column_not_null_conflict"
+      ],
+      "columns": []
+    }
   }
 ]

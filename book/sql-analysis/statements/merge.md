@@ -8,9 +8,9 @@ actions. PostgreSQL 17 adds NOT MATCHED BY SOURCE, RETURNING and MERGE inside
 nonrecursive data-modifying CTEs. The configured engine version governs these
 features; SQLite does not support MERGE.
 
-PostgreSQL accepts integer constants such as `ON 1`. sql-fun can report
-`query_analysis` for this condition. Use an explicit Boolean condition when
-analyzing these statements ([#1290](https://github.com/kazuk/sql-fun/issues/1290)).
+MERGE ON accepts analyzable expressions of non-Boolean types, including
+integer literals and integer column references. Additional `WHEN … AND`
+conditions are checked as Boolean conditions.
 
 MATCHED conditions and UPDATE values can reference both target and source. NOT
 MATCHED (BY TARGET) can reference only the source; NOT MATCHED BY SOURCE can

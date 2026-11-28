@@ -381,7 +381,7 @@ impl MergeStatement {
     pub const fn from(&self) -> &FromClause {
         &self.from
     }
-    /// Boolean ON expression.
+    /// Resolved ON expression.
     pub const fn on(&self) -> &SemScalarExpr {
         &self.on
     }
@@ -429,7 +429,6 @@ impl MergeStatement {
         QueryCte::walk_all(&mut self.with, visitor)?;
         self.from.walk(visitor)?;
         self.on.walk(visitor)?;
-        visitor.predicate(&self.on);
         // PostgreSQL transforms RETURNING before WHEN action expressions.
         visitor.dml_returning(&mut self.returning)?;
         self.clauses.walk(visitor)
@@ -446,7 +445,6 @@ impl MergeStatement {
         self.from.visit(visitor)?;
         visitor.access_purpose(AccessKind::merge_join());
         self.on.visit(visitor)?;
-        visitor.predicate(&self.on);
         // PostgreSQL transforms RETURNING before WHEN action expressions.
         visitor.access_purpose(AccessKind::merge_returning());
         visitor.dml_returning(&self.returning)?;

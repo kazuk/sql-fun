@@ -42,7 +42,7 @@ schema-expressions-record-scalar	project	schema-expressions-record-scalar.sql	1	
 schema-expressions	project	schema-expressions.sql	72	17,18,19
 schema-insert	project	schema-insert.sql	33	17,18,19
 schema-join	project	schema-join.sql	1	17,18,19
-schema-merge	project	schema-merge.sql	31	17,18,19
+schema-merge	project	schema-merge.sql	33	17,18,19
 schema-qualified	project	schema-qualified.sql	25	17,18,19
 schema-table-functions	project	schema-table-functions.sql	20	17,18,19
 schema-update	project	schema-update.sql	32	17,18,19

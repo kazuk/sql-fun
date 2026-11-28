@@ -596,8 +596,8 @@ def validate_installed_type_facts(builtin, baseline, schema, other, extension_sc
     assert facts[(schema, "Base 雪")] is True
     assert facts[(other, "Base 雪")] is False
     assert facts[("pg_catalog", "Normal OID Type")] is True
-    assert facts[(extension_schema, "citext")] is True
-    assert facts[(extension_schema, "hstore")] is False
+    assert (extension_schema, "citext") not in facts
+    assert (extension_schema, "hstore") not in facts
     assert (schema, "_Base 雪") not in facts, "ordinary arrays must retain their existing representation"
     baseline_identities = {(row["schema"], row["name"]) for row in
                            json.loads((baseline / "pg_type.json").read_text())}

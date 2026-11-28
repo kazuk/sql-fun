@@ -9,10 +9,10 @@ and PostgreSQL 18 builtin catalog. Use a build that includes the
 ## Stage the extension files
 
 Start in a scratch directory. Set `sql_fun_home` to the absolute path of
-your sql-fun home containing the PostgreSQL 18 catalog. Use a clean builtin
-catalog. If you extract it from an existing server, select a database
-without pgvector installed to avoid
-[conflicting type definitions](https://github.com/kazuk/sql-fun/issues/1294).
+your sql-fun home containing the PostgreSQL 18 builtin catalog. If an
+older catalog was extracted from a database with pgvector installed,
+regenerate it with an updated sql-fun in a fresh home before staging the
+extension files.
 
 Obtain the files from the
 [pgvector v0.8.7 source](https://github.com/pgvector/pgvector/tree/v0.8.7)

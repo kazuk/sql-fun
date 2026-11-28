@@ -115,10 +115,18 @@ also retains named NOT NULL declarations (including NOT VALID), WITHOUT OVERLAPS
 keys, and PERIOD foreign-key bindings for subsequent schema analysis. Enforcement
 and inheritance attribute changes remain [#887](https://github.com/kazuk/sql-fun/issues/887).
 
-PostgreSQL 19 rejects adding a separate named NOT NULL constraint with NOT
-VALID when a primary key has already created a NOT NULL constraint for the
-column. sql-fun does not yet check this PostgreSQL 19 restriction
-([#1289](https://github.com/kazuk/sql-fun/issues/1289)).
+PostgreSQL 18.1 accepted adding a named NOT NULL constraint with NOT VALID
+under a different name when a primary key had already created a NOT NULL
+constraint for the column. Starting with
+[PostgreSQL 18.2](https://www.postgresql.org/docs/18/release-18-2.html),
+the supplied name must match the existing NOT NULL constraint name.
+sql-fun targets the 18.2 and later behavior for PostgreSQL 18 analysis.
+For primary-key columns, sql-fun reports an error when the names differ.
+Reusing the existing name leaves the original constraint in place.
+Name generation accounts for retained table constraints in the same schema.
+If a domain constraint in that schema occupies the generated name,
+sql-fun can infer a different name from PostgreSQL. See
+[#548](https://github.com/kazuk/sql-fun/issues/548) for domain-constraint analysis.
 
 An invalid CHECK leaves the entire ALTER statement unapplied. Column and table
 renames update retained CHECK bindings. See [table CHECK rules](create-table.md#check-constraints)

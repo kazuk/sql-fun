@@ -138,6 +138,13 @@ impl ColumnDefinition {
         self.declaration.get_or_insert_default().rejected = true;
     }
 
+    pub(super) fn named_not_null(&self) -> Option<&ColumnNullabilityConstraint> {
+        self.constraints
+            .iter()
+            .filter_map(ColumnConstraint::as_nullability)
+            .find(|constraint| constraint.is_not_null() && constraint.name().is_some())
+    }
+
     pub(crate) fn has_check_name(&self, name: &str) -> bool {
         self.constraints.iter().any(|constraint| {
             constraint

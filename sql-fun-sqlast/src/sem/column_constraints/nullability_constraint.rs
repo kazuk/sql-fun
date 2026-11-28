@@ -58,7 +58,7 @@ impl ColumnNullabilityConstraint {
         self.no_inherit = no_inherit;
     }
 
-    /// Explicit SQL constraint name.
+    /// SQL constraint name, when known.
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
@@ -79,6 +79,12 @@ impl ColumnNullabilityConstraint {
                 .as_ref()
                 .is_none_or(|validity| !validity.skips_validation())
         })
+    }
+
+    pub(crate) fn accepts_redeclaration(&self, requested: &Self) -> bool {
+        self.name == requested.name
+            && self.no_inherit == requested.no_inherit
+            && (self.is_validated() || !requested.is_validated())
     }
 
     /// get nullability

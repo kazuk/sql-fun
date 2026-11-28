@@ -74,6 +74,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [alter_column_invalid_option](alter_column_invalid_option.md)
 - [alter_column_missing_column](alter_column_missing_column.md)
 - [alter_column_missing_relation](alter_column_missing_relation.md)
+- [alter_column_not_null_conflict](alter_column_not_null_conflict.md)
 - [alter_column_not_stored_generated](alter_column_not_stored_generated.md)
 - [alter_column_primary_key](alter_column_primary_key.md)
 - [alter_column_reset_value](alter_column_reset_value.md)

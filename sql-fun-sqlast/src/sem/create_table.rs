@@ -9,12 +9,13 @@ use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, CheckConstraint, ColumnAttributeAction,
-        ColumnConstraint, ColumnDrop, ColumnRename, Constraint, ConstraintNames, CreateIndex,
-        CreateSequence, ForeignKeyConstraint, ImplicitChange, IndirectionExpr, InsertArbiter, Kind,
-        ObjectPrivilegeDeclaration, OwnerSpecification, RuleIdentity, RuleReferences,
-        SemScalarExpr, SourcePathWithSpan, TriggerReferences, TypeReference,
+        ColumnConstraint, ColumnDrop, ColumnNullabilityConstraint, ColumnRename, Constraint,
+        ConstraintNames, CreateIndex, CreateSequence, ForeignKeyConstraint, ImplicitChange,
+        IndirectionExpr, InsertArbiter, Kind, ObjectPrivilegeDeclaration, OwnerSpecification,
+        RuleIdentity, RuleReferences, SemScalarExpr, SourcePathWithSpan, TriggerReferences,
+        TypeReference,
         alter_table::AlterObjSubCommand,
-        problem::CreationProblem,
+        problem::{AlterColumnProblem, CreationProblem},
         traversal::{RelationRenamer, SemanticVisitor, SemanticVisitorMut},
     },
 };
@@ -814,6 +815,9 @@ impl CreateTable {
                 }
                 AlterObjSubCommand::DropColumnDefault(_) => todo!(),
                 AlterObjSubCommand::AddConstraint(constraint) => {
+                    if self.reuses_primary_key_not_null(constraint) {
+                        continue;
+                    }
                     if alter_table.addition_indexes().is_some() {
                         self.apply_not_null_constraint(constraint);
                         self.record_declared_constraint(constraint)?;
@@ -856,6 +860,131 @@ impl CreateTable {
                 column.set_not_null(Some(true));
             }
         }
+    }
+
+    pub(crate) fn retain_primary_key_not_null_names(
+        &mut self,
+        context: &impl ParseContext,
+        identity: &FullName,
+    ) -> Result<(), AnalysisError> {
+        if context.dialect() != Dialect::postgres()
+            || !ConstraintNames::supports_named_not_null(context)
+        {
+            return Ok(());
+        }
+        let keys: Vec<_> = self.primary_key_columns().into_iter().cloned().collect();
+        for column in keys {
+            if self.named_not_null(&column).is_some() {
+                continue;
+            }
+            let name = self.choose_not_null_name(context, identity, &column);
+            let mut value = ColumnNullabilityConstraint::new(&self.name, &column, true, None, None);
+            value.retain_declaration(Some(&name), false);
+            let constraint = Constraint::NotNull(value, true);
+            self.apply_not_null_constraint(&constraint);
+            self.record_declared_constraint(&constraint)?;
+        }
+        Ok(())
+    }
+
+    fn choose_not_null_name(
+        &self,
+        context: &impl ParseContext,
+        identity: &FullName,
+        column: &ColumnName,
+    ) -> String {
+        let table_name = identity.local_name();
+        let column_name = column.as_str();
+        let relations = context.relation_names();
+        for pass in 0.. {
+            let label = if pass == 0 {
+                "not_null".to_owned()
+            } else {
+                format!("not_null{pass}")
+            };
+            let mut table_len = table_name.len();
+            let mut column_len = column_name.len();
+            let available = 63 - label.len() - 2;
+            while table_len + column_len > available {
+                if table_len > column_len {
+                    table_len -= 1;
+                } else {
+                    column_len -= 1;
+                }
+            }
+            let table = &table_name[..table_name.floor_char_boundary(table_len)];
+            let column = &column_name[..column_name.floor_char_boundary(column_len)];
+            let candidate = format!("{table}_{column}_{label}");
+            if !self.has_stored_constraint_name(&candidate)
+                && !relations.iter().any(|relation| {
+                    relation != identity
+                        && relation.schema() == identity.schema()
+                        && relation.catalog() == identity.catalog()
+                        && context
+                            .get_table_impl(relation)
+                            .is_some_and(|table| table.has_stored_constraint_name(&candidate))
+                })
+            {
+                return candidate;
+            }
+        }
+        unreachable!()
+    }
+
+    fn has_stored_constraint_name(&self, name: &str) -> bool {
+        self.constraint(name).is_some() || self.named_inline_constraints(name).next().is_some()
+    }
+
+    fn named_not_null(&self, column: &ColumnName) -> Option<&ColumnNullabilityConstraint> {
+        if let Some(definition) = self.get_column_def(column)
+            && let Some(constraint) = definition.named_not_null()
+        {
+            return Some(constraint);
+        }
+        self.constraints
+            .values()
+            .find_map(|constraint| match constraint {
+                Constraint::NotNull(value, true)
+                    if value.column_name() == column && value.name().is_some() =>
+                {
+                    Some(value)
+                }
+                _ => None,
+            })
+    }
+
+    fn primary_key_not_null(&self, column: &ColumnName) -> Option<&ColumnNullabilityConstraint> {
+        if !self.primary_key_columns().contains(&column) {
+            return None;
+        }
+        self.named_not_null(column)
+    }
+
+    pub(crate) fn validate_added_primary_key_not_null(
+        &self,
+        context: &mut impl ParseContext,
+        target: &TableName,
+        value: &ColumnNullabilityConstraint,
+    ) -> Result<bool, AnalysisError> {
+        if ConstraintNames::supports_named_not_null(context)
+            && let Some(name) = value.name()
+            && let Some(existing) = self.primary_key_not_null(value.column_name())
+            && !existing.accepts_redeclaration(value)
+        {
+            context.report_analysis_problem(AnalysisProblem::alter_column(
+                target,
+                value.column_name(),
+                &AlterColumnProblem::not_null_conflict(name),
+            ))?;
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    pub(crate) fn reuses_primary_key_not_null(&self, constraint: &Constraint) -> bool {
+        matches!(constraint, Constraint::NotNull(value, true)
+            if self.primary_key_not_null(value.column_name()).is_some_and(|existing|
+                existing.accepts_redeclaration(value)))
     }
 
     pub(crate) fn apply_not_null_constraint(&mut self, constraint: &Constraint) {

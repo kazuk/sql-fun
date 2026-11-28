@@ -172,5 +172,49 @@
         }
       ]
     }
+  },
+  {
+    "name": "table-not-null-not-valid",
+    "sql": "ALTER TABLE migration_rows ADD CONSTRAINT id_required NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [
+        "alter_column_not_null_conflict"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-reuse",
+    "sql": "ALTER TABLE migration_rows ADD CONSTRAINT migration_rows_id_not_null NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-after-rename",
+    "sql": "ALTER TABLE renamed_key_rows ADD CONSTRAINT original_key_rows_id_not_null1 NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-after-rename-conflict",
+    "sql": "ALTER TABLE renamed_key_rows ADD CONSTRAINT renamed_key_rows_id_not_null NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [
+        "alter_column_not_null_conflict"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-nullable-column",
+    "sql": "ALTER TABLE nullable_rows ADD CONSTRAINT id_required NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
   }
 ]

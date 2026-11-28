@@ -186,10 +186,14 @@ impl Constraint {
             AstColumnConstraint::Nullability(true, _, _)
         ) {
             let definition = context.get_table(table).cloned();
-            if let Some(constraint) =
+            if let Some(Self::NotNull(value, mut applicable)) =
                 Self::from_ast_not_null(ast, context, table, definition.as_ref())?
             {
-                return Ok(constraint);
+                if applicable && let Some(definition) = &definition {
+                    applicable =
+                        definition.validate_added_primary_key_not_null(context, table, &value)?;
+                }
+                return Ok(Self::NotNull(value, applicable));
             }
         }
         let keys = Self::columns_from_ast(ast);

@@ -225,6 +225,14 @@ impl AlterTable {
                 || matches!(command, AlterObjSubCommand::ChangeConstraint(_))
         })
     }
+    pub(crate) fn adds_primary_key(&self) -> bool {
+        self.commands.iter().any(|command| {
+            command
+                .added_constraint()
+                .is_some_and(Constraint::is_primary_key_constraint)
+        })
+    }
+
     pub(crate) fn has_constraint_changes(&self) -> bool {
         self.commands
             .iter()
@@ -297,7 +305,9 @@ impl AlterTable {
     pub(crate) fn conflicting_constraint(&self, table: &CreateTable) -> Option<String> {
         let mut names = ConstraintNames::default();
         for command in &self.commands {
-            if let Some(constraint) = command.added_constraint() {
+            if let Some(constraint) = command.added_constraint()
+                && !table.reuses_primary_key_not_null(constraint)
+            {
                 let name = constraint.name();
                 if !name.is_empty() && (table.constraint(name).is_some() || !names.reserve(name)) {
                     return Some(name.to_owned());

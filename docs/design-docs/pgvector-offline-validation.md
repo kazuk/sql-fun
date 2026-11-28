@@ -148,7 +148,7 @@ analyze dimensions.sql
 analyze distance.sql
 ```
 
-## Observed results
+## Initial results
 
 The CLI and server ran from the extracted archive in the scratch directory.
 The PostgreSQL instance was stopped during analysis. A system call trace of
@@ -171,9 +171,34 @@ reported `binary_operator_overload_resolution_failed` and
 `SELECT '[1,2,3]'::vector OPERATOR(public.<->) '[4,5,6]'::vector AS distance;`
 resolved to `pg_catalog.float8` offline. PostgreSQL has `<->` overloads in
 both `pg_catalog` and `public`; the qualified control confirms that
-initialization registered the extension operator. The unqualified case
-remains open under [#797], so the complete working example for [#1277] is
-still pending.
+initialization registered the extension operator. This identified the
+unqualified lookup gap tracked in [#797].
+
+## Verification after the operator lookup fix
+
+[PR #1297][lookup-fix] changed PostgreSQL operator lookup to consider visible
+overloads across schemas. The CLI and server were packaged again with
+`.local/bin/check-test-flow --step=packaging` from commit
+`4217e971260ef7dfbe787007bec1a160ef3dd1de` for
+`x86_64-unknown-linux-gnu`. Both binaries reported version 0.2.0.
+
+The new archive was unpacked in a fresh directory outside the checkout.
+The rerun reused the clean PostgreSQL 18.3 catalog, the datasource above,
+and the same three SQL files. The staged control file, installation script,
+and all 41 update scripts were checked byte-for-byte against the pinned
+pgvector source. PostgreSQL was stopped. A trace showed the packaged
+server opening `postgres/18/extensions/vector--0.8.7.sql` with the
+unversioned selection and the CLI connecting to the local sql-fun server.
+
+| Probe | Offline exit | Offline result column | PostgreSQL result column |
+| --- | --- | --- | --- |
+| Cast | 0 | `embedding public.vector` | `embedding vector` |
+| Function | 0 | `dimensions pg_catalog.int4` | `dimensions integer` |
+| Unqualified distance operator | 0 | `distance pg_catalog.float8` | `distance double precision` |
+
+All three probes completed without diagnostics and matched the recorded
+PostgreSQL 18.3 column names and types for the same SQL and pgvector release.
+This is the working example for [#1277].
 
 [#797]: https://github.com/kazuk/sql-fun/issues/797
 [#1294]: https://github.com/kazuk/sql-fun/issues/1294
@@ -182,3 +207,4 @@ still pending.
 [pgvector]: https://github.com/pgvector/pgvector/tree/v0.8.7
 [pgvector-makefile]: https://github.com/pgvector/pgvector/blob/v0.8.7/Makefile
 [postgresql-source]: https://ftp.postgresql.org/pub/source/v18.3/
+[lookup-fix]: https://github.com/kazuk/sql-fun/pull/1297

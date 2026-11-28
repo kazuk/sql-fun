@@ -6,8 +6,8 @@ Code: `column_cross_database`. Severity: Error.
 
 ## When it is reported
 
-A database-qualified PostgreSQL column reference names a database different from
-the explicitly configured `database-name`.
+A database-qualified PostgreSQL column reference names a configured related
+database. PostgreSQL disallows the direct cross-database reference.
 
 ## What analysis knows and does not know
 
@@ -24,19 +24,18 @@ the diagnostic.
 ## Example
 
 Illustrative PostgreSQL input: selected schema contains `docs_items(id integer)`
-and analysis metadata explicitly sets `database-name = "sample"`. This code
+and analysis metadata explicitly sets `database-name = "sample"` and
+`related-database-names = ["other"]`. This code
 requires that metadata to reach the resolver.
 
 ```sql
 SELECT other.public.docs_items.id FROM docs_items;
 ```
 
-`other` differs from `sample`. This is an analysis boundary, not evidence about
-whether another database contains the table.
+The reference fails before any lookup of the table in `other`.
 
 ## Related diagnostics
 
-[column_database_name_required](column_database_name_required.md) reports no
-database identity is available.
+[unknown_database](unknown_database.md) reports an unrecognized qualifier.
 [column_qualification_invalid](column_qualification_invalid.md) reports
 qualification is invalid for the selected dialect.

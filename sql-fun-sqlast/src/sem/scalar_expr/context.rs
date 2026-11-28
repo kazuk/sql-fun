@@ -13,6 +13,7 @@ use crate::{
             column_ref::{QualifiedColumnFailure, UndefinedAliasColumnRef},
             grouping::GroupingScope,
         },
+        search_path::{DatabaseNameError, postgres_database},
     },
 };
 
@@ -1016,11 +1017,14 @@ impl ScalarAnalysisContext<'_> {
             if context.dialect() == Dialect::sqlite() {
                 return QualifiedColumnFailure::invalid(context, qualifier, column);
             }
-            let Some(database) = context.metadata().database_name() else {
-                return QualifiedColumnFailure::database_required(context, qualifier, column);
-            };
-            if catalog.as_str() != database {
-                return QualifiedColumnFailure::cross_database(context, qualifier, column);
+            match postgres_database(Some(catalog.as_str()), context) {
+                Ok(()) => {}
+                Err(DatabaseNameError::Related(_)) => {
+                    return QualifiedColumnFailure::cross_database(context, qualifier, column);
+                }
+                Err(_) => {
+                    return QualifiedColumnFailure::unknown_database(context, qualifier, column);
+                }
             }
             relation = FullName::new(&None, &qualifier.schema().cloned(), qualifier.name());
         }
@@ -1852,11 +1856,12 @@ impl ScalarAnalysisContext<'_> {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut relation = requested.clone();
         if let Some(catalog) = requested.catalog() {
-            let Some(database) = context.metadata().database_name() else {
-                return WholeRowExpr::database_required(context, requested);
-            };
-            if catalog.as_str() != database {
-                return WholeRowExpr::cross_database(context, requested);
+            match postgres_database(Some(catalog.as_str()), context) {
+                Ok(()) => {}
+                Err(DatabaseNameError::Related(_)) => {
+                    return WholeRowExpr::cross_database(context, requested);
+                }
+                Err(_) => return WholeRowExpr::unknown_database(context, requested),
             }
             relation = FullName::new(&None, &requested.schema().cloned(), requested.name());
         }

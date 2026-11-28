@@ -17,7 +17,7 @@ pub struct QualifiedColumnFailure {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 enum FailureKind {
-    DatabaseNameRequired,
+    UnknownDatabase,
     CrossDatabase,
     InvalidQualification,
     SourceNotFound,
@@ -25,8 +25,8 @@ enum FailureKind {
 }
 
 impl FailureKind {
-    const fn database_required() -> Self {
-        Self::DatabaseNameRequired
+    const fn unknown_database() -> Self {
+        Self::UnknownDatabase
     }
 
     const fn cross_database() -> Self {
@@ -47,7 +47,7 @@ impl FailureKind {
 
     const fn code(&self) -> &'static str {
         match self {
-            Self::DatabaseNameRequired => "column_database_name_required",
+            Self::UnknownDatabase => "unknown_database",
             Self::CrossDatabase => "column_cross_database",
             Self::InvalidQualification => "column_qualification_invalid",
             Self::SourceNotFound => "column_source_not_found",
@@ -57,7 +57,7 @@ impl FailureKind {
 
     fn problem(&self, reference: &str) -> QueryProblem {
         match self {
-            Self::DatabaseNameRequired => QueryProblem::column_database_name_required(reference),
+            Self::UnknownDatabase => QueryProblem::unknown_database(reference),
             Self::CrossDatabase => QueryProblem::column_cross_database(reference),
             Self::InvalidQualification => QueryProblem::column_qualification_invalid(reference),
             Self::SourceNotFound => QueryProblem::column_source_not_found(reference),
@@ -99,12 +99,12 @@ impl QualifiedColumnFailure {
         ))
     }
 
-    pub(crate) fn database_required(
+    pub(crate) fn unknown_database(
         context: &mut impl ParseContext,
         qualifier: &FullName,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        Self::report(context, qualifier, column, FailureKind::database_required())
+        Self::report(context, qualifier, column, FailureKind::unknown_database())
     }
     pub(crate) fn cross_database(
         context: &mut impl ParseContext,

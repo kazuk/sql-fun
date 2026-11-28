@@ -3084,6 +3084,58 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "The related database cannot be referenced by the routine clause.",
+                  "type": "object",
+                  "properties": {
+                    "CrossDatabaseRoutine": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "CrossDatabaseRoutine"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The routine refers to an unknown database.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownRoutineDatabase": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnknownRoutineDatabase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "No visible function matches the requested name and exact signature.",
                   "type": "object",
                   "properties": {
@@ -3731,6 +3783,19 @@
                     "DropCrossDatabase"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "description": "DROP VIEW referenced an unknown database.",
+                  "type": "object",
+                  "properties": {
+                    "DropUnknownDatabase": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropUnknownDatabase"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },
@@ -4096,15 +4161,15 @@
                   "const": "ScalarValueRequired"
                 },
                 {
-                  "description": "Database-name metadata is required for column reference.",
+                  "description": "The database qualifier does not identify a configured database.",
                   "type": "object",
                   "properties": {
-                    "ColumnDatabaseNameRequired": {
+                    "UnknownDatabase": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "ColumnDatabaseNameRequired"
+                    "UnknownDatabase"
                   ],
                   "additionalProperties": false
                 },
@@ -8660,6 +8725,58 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "The related database cannot be referenced by the routine clause.",
+                  "type": "object",
+                  "properties": {
+                    "CrossDatabaseRoutine": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "CrossDatabaseRoutine"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The routine refers to an unknown database.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownRoutineDatabase": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnknownRoutineDatabase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "No visible function matches the requested name and exact signature.",
                   "type": "object",
                   "properties": {
@@ -9307,6 +9424,19 @@
                     "DropCrossDatabase"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "description": "DROP VIEW referenced an unknown database.",
+                  "type": "object",
+                  "properties": {
+                    "DropUnknownDatabase": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropUnknownDatabase"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },
@@ -9672,15 +9802,15 @@
                   "const": "ScalarValueRequired"
                 },
                 {
-                  "description": "Database-name metadata is required for column reference.",
+                  "description": "The database qualifier does not identify a configured database.",
                   "type": "object",
                   "properties": {
-                    "ColumnDatabaseNameRequired": {
+                    "UnknownDatabase": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "ColumnDatabaseNameRequired"
+                    "UnknownDatabase"
                   ],
                   "additionalProperties": false
                 },
@@ -14128,6 +14258,58 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "The related database cannot be referenced by the routine clause.",
+                  "type": "object",
+                  "properties": {
+                    "CrossDatabaseRoutine": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "CrossDatabaseRoutine"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The routine refers to an unknown database.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownRoutineDatabase": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/FdwRoutineKind"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnknownRoutineDatabase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "No visible function matches the requested name and exact signature.",
                   "type": "object",
                   "properties": {
@@ -14775,6 +14957,19 @@
                     "DropCrossDatabase"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "description": "DROP VIEW referenced an unknown database.",
+                  "type": "object",
+                  "properties": {
+                    "DropUnknownDatabase": {
+                      "$ref": "#/$defs/FullName"
+                    }
+                  },
+                  "required": [
+                    "DropUnknownDatabase"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },
@@ -15140,15 +15335,15 @@
                   "const": "ScalarValueRequired"
                 },
                 {
-                  "description": "Database-name metadata is required for column reference.",
+                  "description": "The database qualifier does not identify a configured database.",
                   "type": "object",
                   "properties": {
-                    "ColumnDatabaseNameRequired": {
+                    "UnknownDatabase": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "ColumnDatabaseNameRequired"
+                    "UnknownDatabase"
                   ],
                   "additionalProperties": false
                 },

@@ -110,7 +110,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [collation_not_found](collation_not_found.md)
 - [column_already_exists](column_already_exists.md)
 - [column_cross_database](column_cross_database.md)
-- [column_database_name_required](column_database_name_required.md)
+- [unknown_database](unknown_database.md)
 - [column_not_found_in_cte](column_not_found_in_cte.md)
 - [column_not_found_in_source](column_not_found_in_source.md)
 - [column_not_found_in_sub_query](column_not_found_in_sub_query.md)

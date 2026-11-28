@@ -1,10 +1,12 @@
 use crate::{
     ast::{self, ObjectKind},
     context::ParseContext,
-    names::{FullName, TableName, ViewName},
+    names::{CatalogName, FullName, TableName, ViewName},
     sem::{
         AnalysisError, AnalysisProblem, DropDependencyBehavior, Kind, OwnershipIdentity,
-        SourcePathWithSpan, problem::ViewProblem, search_path::expand_relation_search_path,
+        SourcePathWithSpan,
+        problem::ViewProblem,
+        search_path::{DatabaseNameError, expand_relation_search_path, postgres_database},
     },
 };
 
@@ -19,6 +21,8 @@ pub enum DropViewLookup {
     WrongKind(FullName, Kind),
     /// The explicit database is outside the current catalog.
     CrossDatabase,
+    /// The explicit database is not recognized.
+    UnknownDatabase,
 }
 
 /// The written target and its completed catalog lookup.
@@ -100,6 +104,9 @@ impl DropView {
             DropViewLookup::WrongKind(name, kind) => Some(AnalysisProblem::view(
                 &ViewProblem::drop_wrong_kind(name, *kind),
             )),
+            DropViewLookup::UnknownDatabase => Some(AnalysisProblem::view(
+                &ViewProblem::DropUnknownDatabase((&request).into()),
+            )),
             DropViewLookup::CrossDatabase => Some(AnalysisProblem::view(
                 &ViewProblem::drop_cross_database(&request),
             )),
@@ -116,10 +123,10 @@ impl DropView {
     }
 
     fn lookup(request: &FullName, context: &impl ParseContext) -> DropViewLookup {
-        if let Some(database) = request.catalog()
-            && context.metadata().database_name() != Some(database.as_str())
-        {
-            return DropViewLookup::CrossDatabase;
+        match postgres_database(request.catalog().map(CatalogName::as_str), context) {
+            Ok(()) => {}
+            Err(DatabaseNameError::Related(_)) => return DropViewLookup::CrossDatabase,
+            Err(_) => return DropViewLookup::UnknownDatabase,
         }
         let name = FullName::new(&None, &request.schema().cloned(), request.name());
         match expand_relation_search_path(context, &name, |key| {

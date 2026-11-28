@@ -151,9 +151,10 @@ PostgreSQL checks the creator's superuser status and runs any specified
 validator at execution time. Offline analysis retains the option values for
 the wrapper and leaves their runtime acceptance to PostgreSQL.
 
-The CLI analysis server currently lacks the configured `database-name` when
-resolving database-qualified routine names. Use a schema-qualified routine name
-in project and extension SQL. See [#1181](https://github.com/kazuk/sql-fun/issues/1181).
+Analysis supplied with selected datasource metadata can resolve a routine
+qualified with the local `database-name`. PostgreSQL rejects a routine
+reference to a related database. Use a schema-qualified routine name in SQL
+analyzed through the CLI server.
 
 Direct `analyze` and `test` inputs can report the semantic outcome and also
 emit `query_deparse` because executable SQL rendering for this statement

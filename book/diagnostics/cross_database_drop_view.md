@@ -6,8 +6,8 @@ Code: `cross_database_drop_view`. Severity: Error.
 
 ## When it is reported
 
-A PostgreSQL `DROP VIEW` contains a database qualifier that does not match the
-analysis database.
+A PostgreSQL `DROP VIEW` contains a qualifier that names a configured related
+database. PostgreSQL disallows this cross-database reference.
 
 ## What analysis knows and does not know
 
@@ -20,6 +20,8 @@ Select the intended database or qualify the view with its schema in the current
 database.
 
 ## Example
+
+Assume the analysis environment lists `another_database` as a related name.
 
 ```sql
 DROP VIEW another_database.public.v;

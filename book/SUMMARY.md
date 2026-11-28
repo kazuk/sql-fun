@@ -199,7 +199,7 @@
   - [collation_not_found](diagnostics/collation_not_found.md)
   - [column_already_exists](diagnostics/column_already_exists.md)
   - [column_cross_database](diagnostics/column_cross_database.md)
-  - [column_database_name_required](diagnostics/column_database_name_required.md)
+  - [unknown_database](diagnostics/unknown_database.md)
   - [column_not_found_in_cte](diagnostics/column_not_found_in_cte.md)
   - [column_not_found_in_source](diagnostics/column_not_found_in_source.md)
   - [column_not_found_in_sub_query](diagnostics/column_not_found_in_sub_query.md)

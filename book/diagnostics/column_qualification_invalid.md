@@ -35,7 +35,7 @@ qualification. An alias such as `t.id` avoids that form.
 
 ## Related diagnostics
 
-[column_database_name_required](column_database_name_required.md) reports
-PostgreSQL needs an explicit database identity.
+[unknown_database](unknown_database.md) reports an unrecognized PostgreSQL
+database qualifier.
 [column_source_not_found](column_source_not_found.md) reports valid
 qualification has no matching source.

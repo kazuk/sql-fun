@@ -13,7 +13,9 @@ use crate::{
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, OwnedObjectDefinition, OwnerSpecification,
-        OwnershipIdentity, PgBuiltInType, SemAst, TypeReference, traversal::SemanticVisitor,
+        OwnershipIdentity, PgBuiltInType, SemAst, TypeReference,
+        search_path::{DatabaseNameError, postgres_local_name},
+        traversal::SemanticVisitor,
     },
 };
 
@@ -360,6 +362,10 @@ pub enum FdwRoutineOutcome {
     ExplicitNone,
     /// The identifier components could not be resolved in the selected database.
     InvalidName(Vec<String>),
+    /// The routine qualifier names an unrecognized database.
+    UnknownDatabase(Vec<String>),
+    /// The routine qualifier names a related database whose schema is unavailable.
+    RelatedDatabase(Vec<String>),
     /// No visible function matched the requested identifier and this clause's signature.
     NotFound(FullName),
     /// The exact qualified function selected by lookup, even if validation rejected it.
@@ -385,22 +391,24 @@ impl FdwRoutineOutcome {
         let Some(parts) = parts else {
             return (Self::ExplicitNone, None);
         };
-        let requested = match parts {
-            [local] => FullName::from_local_name(local),
-            [schema, local] => FullName::with_schema(schema, local),
-            [database, schema, local]
-                if context.metadata().database_name() == Some(database.as_str()) =>
-            {
-                FullName::with_schema(schema, local)
-            }
-            _ => {
-                return (
-                    Self::InvalidName(parts.to_vec()),
-                    Some(ForeignDataWrapperFailure::InvalidRoutineName(
-                        kind,
-                        parts.to_vec(),
-                    )),
-                );
+        let requested = match postgres_local_name(parts, context) {
+            Ok(name) => name,
+            Err(error) => {
+                let (outcome, failure) = match error {
+                    DatabaseNameError::InvalidName => (
+                        Self::InvalidName(parts.to_vec()),
+                        ForeignDataWrapperFailure::InvalidRoutineName(kind, parts.to_vec()),
+                    ),
+                    DatabaseNameError::Related(_) => (
+                        Self::RelatedDatabase(parts.to_vec()),
+                        ForeignDataWrapperFailure::CrossDatabaseRoutine(kind, parts.to_vec()),
+                    ),
+                    DatabaseNameError::Unknown(_) => (
+                        Self::UnknownDatabase(parts.to_vec()),
+                        ForeignDataWrapperFailure::UnknownRoutineDatabase(kind, parts.to_vec()),
+                    ),
+                };
+                return (outcome, Some(failure));
             }
         };
         let arguments = match kind {

@@ -429,6 +429,7 @@ impl MergeStatement {
         QueryCte::walk_all(&mut self.with, visitor)?;
         self.from.walk(visitor)?;
         self.on.walk(visitor)?;
+        visitor.merge_on(&self.on);
         // PostgreSQL transforms RETURNING before WHEN action expressions.
         visitor.dml_returning(&mut self.returning)?;
         self.clauses.walk(visitor)
@@ -445,6 +446,7 @@ impl MergeStatement {
         self.from.visit(visitor)?;
         visitor.access_purpose(AccessKind::merge_join());
         self.on.visit(visitor)?;
+        visitor.predicate(&self.on);
         // PostgreSQL transforms RETURNING before WHEN action expressions.
         visitor.access_purpose(AccessKind::merge_returning());
         visitor.dml_returning(&self.returning)?;
@@ -466,5 +468,56 @@ impl MergeStatement {
             columns.get_column_with_skip_count(column, skip)
         };
         result.map(|column| column.create_column_definition())
+    }
+}
+
+#[cfg(test)]
+mod test_on_predicate_traversal {
+    use crate::{
+        sem::{
+            PgBuiltInType, SemScalarExpr, TypeReference,
+            traversal::{SemanticVisitor, SemanticVisitorMut},
+        },
+        test_helpers::{document_merge::catalog, statements::resolve_postgres},
+    };
+
+    #[derive(Default)]
+    struct Predicates(Vec<Option<TypeReference>>);
+
+    impl SemanticVisitor for Predicates {
+        fn predicate(&mut self, value: &SemScalarExpr) {
+            self.0.push(value.get_type());
+        }
+    }
+
+    impl SemanticVisitorMut for Predicates {
+        fn predicate(&mut self, value: &SemScalarExpr) {
+            self.0.push(value.get_type());
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::boolean("t.id = s.sid", PgBuiltInType::bool())]
+    #[case::integer("s.sid", PgBuiltInType::int4())]
+    #[case::cast_parameter("$1::integer", PgBuiltInType::int4())]
+    fn reports_on_to_both_visitors(#[case] on: &str, #[case] ty: TypeReference) {
+        let mut context = catalog(17);
+        let mut merge = resolve_postgres(
+            &format!("MERGE INTO items t USING incoming s ON {on} WHEN MATCHED THEN DELETE"),
+            &mut context,
+        )
+        .unwrap()
+        .as_merge()
+        .unwrap()
+        .clone();
+        assert_eq!(context.reported_problem_count(), 0);
+
+        let mut read = Predicates::default();
+        merge.visit(&mut read).unwrap();
+        assert_eq!(read.0, [Some(ty.clone())]);
+
+        let mut rewrite = Predicates::default();
+        merge.walk(&mut rewrite).unwrap();
+        assert_eq!(rewrite.0, [Some(ty)]);
     }
 }

@@ -284,6 +284,10 @@ pub(crate) trait SemanticVisitorMut {
     fn source_binding(&mut self, _relation: &FullName, _alias: &AliasSpec) {}
 
     fn predicate(&mut self, _value: &SemScalarExpr) {}
+    /// MERGE ON is a predicate without a required Boolean type.
+    fn merge_on(&mut self, value: &SemScalarExpr) {
+        self.predicate(value);
+    }
     fn order_operator(
         &mut self,
         _value: &SemScalarExpr,

@@ -1924,6 +1924,11 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Collector<'_
                 .require(self.context, value, &PgBuiltInType::bool(), false);
         }
     }
+    fn merge_on(&mut self, value: &SemScalarExpr) {
+        if value.get_type().as_ref() == Some(&PgBuiltInType::bool()) {
+            self.predicate(value);
+        }
+    }
     fn order_operator(
         &mut self,
         value: &SemScalarExpr,

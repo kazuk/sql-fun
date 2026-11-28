@@ -71,6 +71,16 @@ pub trait BaseParseContext:
     /// get context args
     fn get_args(&self) -> &SqlFunArgs;
 
+    /// The selected `PostgreSQL` major and optional prerelease, when known.
+    fn postgres_version(&self) -> Option<::sql_fun_core::PostgresVersion> {
+        self.get_args()
+            .postgres_version(self.metadata())
+            .ok()?
+            .to_string()
+            .parse()
+            .ok()
+    }
+
     /// get SQL file path
     fn get_source_file_path(&self) -> Option<&Path>;
 

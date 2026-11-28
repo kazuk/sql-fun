@@ -10,8 +10,8 @@ pub enum QueryProblem {
     SetType(SetTypeProblem),
     /// An internal list or dialect-specific row value cannot be consumed as a scalar.
     ScalarValueRequired,
-    /// Database-name metadata is required for column reference.
-    ColumnDatabaseNameRequired(String),
+    /// The database qualifier does not identify a configured database.
+    UnknownDatabase(String),
     /// Cross-database column reference is not supported.
     ColumnCrossDatabase(String),
     /// Column qualification is invalid for the selected dialect.
@@ -91,10 +91,10 @@ impl QueryProblem {
         Self::ScalarValueRequired
     }
 
-    /// Database-name metadata is required for column reference.
+    /// The database qualifier does not identify a configured database.
     #[must_use]
-    pub fn column_database_name_required(reference: &str) -> Self {
-        Self::ColumnDatabaseNameRequired(reference.to_owned())
+    pub fn unknown_database(reference: &str) -> Self {
+        Self::UnknownDatabase(reference.to_owned())
     }
     /// Cross-database column reference is not supported.
     #[must_use]
@@ -183,7 +183,7 @@ impl QueryProblem {
             Self::SetWidth(_) => "query_set_column_count",
             Self::SetType(_) => "query_set_column_type",
             Self::ScalarValueRequired => "query_scalar_value_required",
-            Self::ColumnDatabaseNameRequired(_) => "column_database_name_required",
+            Self::UnknownDatabase(_) => "unknown_database",
             Self::ColumnCrossDatabase(_) => "column_cross_database",
             Self::ColumnQualificationInvalid(_) => "column_qualification_invalid",
             Self::ColumnSourceNotFound(_) => "column_source_not_found",
@@ -210,7 +210,7 @@ impl QueryProblem {
             Self::SetWidth(problem) => format!("{} requires equal column counts (left {}, right {})", problem.operation, problem.left, problem.right),
             Self::SetType(problem) => format!("{} column {}: {}", problem.operation, problem.column, problem.problem.message_for(&problem.operation)),
             Self::ScalarValueRequired => "expression requires a scalar value".to_owned(),
-            Self::ColumnDatabaseNameRequired(reference) => format!("database-name metadata is required for column reference: {reference}"),
+            Self::UnknownDatabase(reference) => format!("unknown database in reference: {reference}"),
             Self::ColumnCrossDatabase(reference) => format!("cross-database column reference is not supported: {reference}"),
             Self::ColumnQualificationInvalid(reference) => format!("column qualification is invalid for the selected dialect: {reference}"),
             Self::ColumnSourceNotFound(reference) => format!("visible source not found for column reference: {reference}"),

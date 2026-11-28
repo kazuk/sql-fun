@@ -286,6 +286,9 @@ impl DiagnosticMessage for ViewProblem {
                 name.into(),
                 " because an extension requires it".into(),
             ],
+            Self::DropUnknownDatabase(name) => {
+                vec!["unknown database in DROP VIEW target: ".into(), name.into()]
+            }
             Self::DropCrossDatabase(name) => vec![
                 "cross-database DROP VIEW target is unsupported: ".into(),
                 name.into(),
@@ -324,7 +327,7 @@ impl DiagnosticMessage for QueryProblem {
         match self {
             Self::SetWidth(_) | Self::SetType(_) => self.render_metadata().message().to_owned(),
             Self::ScalarValueRequired => "expression requires a scalar value".to_owned(),
-            Self::ColumnDatabaseNameRequired(reference) => format!("database-name metadata is required for column reference: {reference}"),
+            Self::UnknownDatabase(reference) => format!("unknown database in reference: {reference}"),
             Self::ColumnCrossDatabase(reference) => format!("cross-database column reference is not supported: {reference}"),
             Self::ColumnQualificationInvalid(reference) => format!("column qualification is invalid for the selected dialect: {reference}"),
             Self::ColumnSourceNotFound(reference) => format!("visible source not found for column reference: {reference}"),

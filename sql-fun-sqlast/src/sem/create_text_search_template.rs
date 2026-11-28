@@ -12,7 +12,7 @@ use crate::{
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, SemAst, TypeReference,
-        search_path::{postgres_creation_schema, postgres_local_name},
+        search_path::{DatabaseNameError, postgres_creation_schema, postgres_local_name},
     },
 };
 
@@ -44,6 +44,10 @@ impl TextSearchTemplateDefinition {
 /// Reason a text search template declaration cannot be applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TextSearchTemplateFailure {
+    /// The requested database name is unknown.
+    UnknownDatabase,
+    /// The requested related database has no available schema.
+    RelatedDatabase,
     /// The written target cannot be used in this database.
     InvalidTarget,
     /// The requested schema does not exist or the search path has no creation schema.
@@ -335,13 +339,13 @@ fn analyze_option(
     let (requested, callback) = match option.value() {
         Some(TextSearchOptionValue::Name(name)) => (
             Some(name.parts().to_vec()),
-            postgres_local_name(name, context),
+            postgres_local_name(name.parts(), context).map(Some),
         ),
         Some(TextSearchOptionValue::Literal(Literal::String(name))) => (
             Some(vec![name.clone()]),
-            Some(FullName::from_local_name(name)),
+            Ok(Some(FullName::from_local_name(name))),
         ),
-        _ => (None, None),
+        _ => (None, Ok(None)),
     };
     let mut option_outcome = TextSearchTemplateOption {
         key: option.key().to_owned(),
@@ -362,7 +366,7 @@ fn analyze_option(
 
 fn bind_callback(
     option: &mut TextSearchTemplateOption,
-    callback: Option<FullName>,
+    callback: Result<Option<FullName>, DatabaseNameError<'_>>,
     context: &impl ParseContext,
 ) -> Result<(), (Failure, String)> {
     let key = option.key();
@@ -376,6 +380,12 @@ fn bind_callback(
             ));
         }
     };
+    let callback = callback.map_err(|error| {
+        (
+            Failure::from_name_error(&error, Failure::InvalidCallbackName),
+            error.to_string(),
+        )
+    })?;
     let callback = callback.ok_or_else(|| {
         (
             Failure::InvalidCallbackName,
@@ -405,9 +415,9 @@ fn bind_callback(
 }
 
 fn creation_name(written: &Name, context: &impl ParseContext) -> Result<FullName, ValidationError> {
-    let name = postgres_local_name(written, context).ok_or_else(|| ValidationError {
-        failure: Failure::InvalidTarget,
-        message: "invalid text search template name for this database".to_owned(),
+    let name = postgres_local_name(written.parts(), context).map_err(|error| ValidationError {
+        failure: Failure::from_name_error(&error, Failure::InvalidTarget),
+        message: error.to_string(),
         location: None,
     })?;
     if let Some(schema) = postgres_creation_schema(context, name.schema()) {
@@ -421,4 +431,14 @@ fn creation_name(written: &Name, context: &impl ParseContext) -> Result<FullName
         ),
         location: None,
     })
+}
+
+impl TextSearchTemplateFailure {
+    const fn from_name_error(error: &DatabaseNameError<'_>, invalid: Self) -> Self {
+        match error {
+            DatabaseNameError::InvalidName => invalid,
+            DatabaseNameError::Unknown(_) => Self::UnknownDatabase,
+            DatabaseNameError::Related(_) => Self::RelatedDatabase,
+        }
+    }
 }

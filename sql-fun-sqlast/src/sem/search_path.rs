@@ -1,6 +1,6 @@
 use crate::{
-    ast::{Dialect, Name},
-    context::BaseParseContext,
+    ast::Dialect,
+    context::{BaseParseContext, ParseContext},
     names::{FullName, OperatorName, SchemaName},
 };
 
@@ -146,16 +146,49 @@ pub(crate) fn operator_search_keys(
         .collect()
 }
 
-pub(crate) fn postgres_local_name(
-    name: &Name,
-    context: &impl BaseParseContext,
-) -> Option<FullName> {
-    match name.parts() {
-        [local] => Some(FullName::from_local_name(local)),
-        [schema, local] => Some(FullName::with_schema(schema, local)),
-        [database, schema, local] if context.metadata().database_name() == Some(database) => {
-            Some(FullName::with_schema(schema, local))
+/// Failure to select the local database namespace.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum DatabaseNameError<'a> {
+    #[error("invalid qualified name")]
+    InvalidName,
+    #[error("cross-database reference to related database {0} is not supported")]
+    Related(&'a str),
+    #[error("unknown database {0}")]
+    Unknown(&'a str),
+}
+
+pub(crate) fn postgres_database<'a>(
+    database: Option<&'a str>,
+    context: &impl ParseContext,
+) -> Result<(), DatabaseNameError<'a>> {
+    let Some(database) = database else {
+        return Ok(());
+    };
+    let metadata = context.metadata();
+    if metadata.database_name() == Some(database) {
+        Ok(())
+    } else if metadata
+        .related_database_names()
+        .iter()
+        .any(|name| name == database)
+    {
+        Err(DatabaseNameError::Related(database))
+    } else {
+        Err(DatabaseNameError::Unknown(database))
+    }
+}
+
+pub(crate) fn postgres_local_name<'a>(
+    parts: &'a [String],
+    context: &impl ParseContext,
+) -> Result<FullName, DatabaseNameError<'a>> {
+    match parts {
+        [local] => Ok(FullName::from_local_name(local)),
+        [schema, local] => Ok(FullName::with_schema(schema, local)),
+        [database, schema, local] => {
+            postgres_database(Some(database), context)?;
+            Ok(FullName::with_schema(schema, local))
         }
-        _ => None,
+        _ => Err(DatabaseNameError::InvalidName),
     }
 }

@@ -81,6 +81,21 @@
     }
   },
   {
+    "name": "qualified_columns::omitted_database_settings_leave_catalog_qualifier_unknown",
+    "sql": "SELECT chosen.a.t.id FROM a.t",
+    "expected": {
+      "diagnostics": [
+        "unknown_database"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
     "name": "qualified_columns::retains_failed_qualified_lookup::alias",
     "sql": "SELECT a.t.id FROM a.t AS other",
     "expected": {

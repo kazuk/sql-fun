@@ -56,15 +56,28 @@ pub(crate) fn analyze(
     sql: &str,
     database: Option<&str>,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+    analyze_with_related(sql, database, &[])
+}
+
+pub(crate) fn analyze_with_related(
+    sql: &str,
+    database: Option<&str>,
+    related: &[&str],
+) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     let metadata = ::tempfile::NamedTempFile::new()?;
     let database = database
         .map(|name| format!("database-name = {name:?}\n"))
         .unwrap_or_default();
+    let related = if related.is_empty() {
+        String::new()
+    } else {
+        format!("related-database-names = {related:?}\n")
+    };
     std::fs::write(
         metadata.path(),
         format!(
-            "[package.metadata.database.default]\nengine = 'postgres'\ndialect = 'postgres'\nconnector = 'sqlx'\nsearch_path = ['a', 'public']\n{database}"
+            "[package.metadata.database.default]\nengine = 'postgres'\ndialect = 'postgres'\nconnector = 'sqlx'\nsearch_path = ['a', 'public']\n{database}{related}"
         ),
     )?;
     let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([

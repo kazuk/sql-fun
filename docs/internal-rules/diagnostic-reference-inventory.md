@@ -106,7 +106,7 @@ have owned stage codes.
 | `collation_not_found` | Error | name_resolution | `sql-fun-core/src/analysis_problem/name_resolution.rs:258` |
 | `column_already_exists` | Error | name_resolution | `sql-fun-core/src/analysis_problem/name_resolution.rs:243` |
 | `column_cross_database` | Error | query | `sql-fun-core/src/analysis_problem/query.rs:180` |
-| `column_database_name_required` | Error | query | `sql-fun-core/src/analysis_problem/query.rs:179` |
+| `unknown_database` | Error | query | `sql-fun-core/src/analysis_problem/query.rs:179` |
 | `column_not_found_in_cte` | Error | name_resolution | `sql-fun-core/src/analysis_problem/name_resolution.rs:244` |
 | `column_not_found_in_source` | Error | name_resolution | `sql-fun-core/src/analysis_problem/name_resolution.rs:246` |
 | `column_not_found_in_sub_query` | Error | name_resolution | `sql-fun-core/src/analysis_problem/name_resolution.rs:245` |

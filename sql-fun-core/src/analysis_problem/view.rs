@@ -20,6 +20,8 @@ pub enum ViewProblem {
     DropExtensionMember(FullName),
     /// DROP VIEW referenced another database.
     DropCrossDatabase(FullName),
+    /// DROP VIEW referenced an unknown database.
+    DropUnknownDatabase(FullName),
 }
 impl ViewProblem {
     /// Exact catalog identity whose required semantic definition is absent.
@@ -87,6 +89,7 @@ impl ViewProblem {
             Self::DropDependency(_) => "drop_view_dependency",
             Self::DropWrongKind(..) => "drop_view_wrong_kind",
             Self::DropExtensionMember(_) => "drop_view_extension_member",
+            Self::DropUnknownDatabase(_) => "unknown_database",
             Self::DropCrossDatabase(_) => "cross_database_drop_view",
         }
     }

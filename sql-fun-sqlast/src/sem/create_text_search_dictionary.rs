@@ -11,7 +11,10 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, SemAst, TextSearchTemplateDefinition,
         problem::CreationProblem,
-        search_path::{expand_search_path_inst, postgres_creation_schema, postgres_local_name},
+        search_path::{
+            DatabaseNameError, expand_search_path_inst, postgres_creation_schema,
+            postgres_local_name,
+        },
     },
 };
 
@@ -37,6 +40,10 @@ impl TextSearchDictionaryDefinition {
 /// Reason an analyzed text search dictionary cannot be applied.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TextSearchDictionaryFailure {
+    /// The requested database name is unknown.
+    UnknownDatabase,
+    /// The requested related database has no available schema.
+    RelatedDatabase,
     /// The dictionary name is outside the current database.
     InvalidName,
     /// The creation schema could not be resolved.
@@ -246,11 +253,12 @@ fn resolve_definition(
     resolved_name: &mut Option<FullName>,
     resolved_template: &mut Option<FullName>,
 ) -> Result<TextSearchDictionaryDefinition, Rejection> {
-    let target = postgres_local_name(syntax.name(), context).ok_or_else(|| {
-        TextSearchDictionaryFailure::InvalidName.problem(
-            "invalid text search dictionary name for this database",
-            None,
+    let target = postgres_local_name(syntax.name().parts(), context).map_err(|error| {
+        TextSearchDictionaryFailure::from_name_error(
+            &error,
+            TextSearchDictionaryFailure::InvalidName,
         )
+        .problem(error.to_string(), None)
     })?;
     let schema = postgres_creation_schema(context, target.schema()).ok_or_else(|| {
         let message = target.schema().map_or_else(
@@ -318,15 +326,18 @@ fn resolve_template<'a>(
     context: &'a impl ParseContext,
 ) -> Result<&'a TextSearchTemplateDefinition, Rejection> {
     let name = match option.value() {
-        Some(TextSearchOptionValue::Name(name)) => postgres_local_name(name, context),
+        Some(TextSearchOptionValue::Name(name)) => postgres_local_name(name.parts(), context),
         Some(TextSearchOptionValue::Literal(Literal::String(name))) => {
-            Some(FullName::from_local_name(name))
+            Ok(FullName::from_local_name(name))
         }
-        _ => None,
+        _ => Err(DatabaseNameError::InvalidName),
     }
-    .ok_or_else(|| {
-        TextSearchDictionaryFailure::InvalidTemplateName
-            .problem("TEMPLATE requires a valid template name", option.location())
+    .map_err(|error| {
+        TextSearchDictionaryFailure::from_name_error(
+            &error,
+            TextSearchDictionaryFailure::InvalidTemplateName,
+        )
+        .problem(error.to_string(), option.location())
     })?;
     expand_search_path_inst(context, &name, |key| context.text_search_template(key)).ok_or_else(
         || {
@@ -339,6 +350,14 @@ fn resolve_template<'a>(
 }
 
 impl TextSearchDictionaryFailure {
+    const fn from_name_error(error: &DatabaseNameError<'_>, invalid: Self) -> Self {
+        match error {
+            DatabaseNameError::InvalidName => invalid,
+            DatabaseNameError::Unknown(_) => Self::UnknownDatabase,
+            DatabaseNameError::Related(_) => Self::RelatedDatabase,
+        }
+    }
+
     fn problem(self, message: impl Into<String>, location: Option<StringSpan>) -> Rejection {
         (
             self,

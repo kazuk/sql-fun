@@ -77,7 +77,7 @@ fn same_named_relations_keep_distinct_qualified_bindings() -> testresult::TestRe
     "column_source_not_found"
 )]
 #[case::duplicate_source("SELECT a.t.id FROM a.t, a.t", "column_source_ambiguous")]
-#[case::cross_database("SELECT other.a.t.id FROM a.t", "column_cross_database")]
+#[case::unknown_database("SELECT other.a.t.id FROM a.t", "unknown_database")]
 fn retains_failed_qualified_lookup(
     #[case] sql: &str,
     #[case] code: &str,
@@ -98,7 +98,7 @@ fn retains_failed_qualified_lookup(
 }
 
 #[test]
-fn catalog_qualification_requires_explicit_database_identity() -> testresult::TestResult {
+fn omitted_database_settings_leave_catalog_qualifier_unknown() -> testresult::TestResult {
     let analyzed = heavy::analyze("SELECT chosen.a.t.id FROM a.t", None)?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let failure = query
@@ -109,10 +109,70 @@ fn catalog_qualification_requires_explicit_database_identity() -> testresult::Te
         .unwrap()
         .qualification_failure()
         .unwrap();
-    assert_eq!(failure.code(), "column_database_name_required");
+    assert_eq!(failure.code(), "unknown_database");
     assert_eq!(
         failure.qualifier(),
         &FullName::with_catalog("chosen", "a", "t")
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::related(r#"SELECT "Other.DB".a.t.id FROM a.t"#, None, "column_cross_database")]
+#[case::unknown(r#"SELECT "other.db".a.t.id FROM a.t"#, None, "unknown_database")]
+#[case::local(r#"SELECT "Other.DB".a.t.id FROM a.t"#, Some("Other.DB"), "")]
+fn checks_exact_database_names_before_local_binding(
+    #[case] sql: &str,
+    #[case] database: Option<&str>,
+    #[case] code: &str,
+) -> testresult::TestResult {
+    let analyzed = heavy::analyze_with_related(sql, database, &["Other.DB"])?;
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let result = query.result_columns().get_column_at(0).unwrap();
+    let expression = result.expression().unwrap();
+    if code.is_empty() {
+        assert!(analyzed.context().problems().is_empty());
+        assert_eq!(
+            expression.table_column_reference().unwrap().relation(),
+            &FullName::with_schema("a", "t")
+        );
+        assert_eq!(
+            result.col_type(),
+            &Some(::sql_fun_sqlast::sem::PgBuiltInType::int4())
+        );
+    } else {
+        assert_problem_code(analyzed.context(), code);
+        assert_eq!(expression.qualification_failure().unwrap().code(), code);
+        assert!(result.col_type().is_none());
+    }
+    Ok(())
+}
+
+#[test]
+fn related_database_does_not_resolve_or_publish_wrapper() -> testresult::TestResult {
+    use ::sql_fun_sqlast::{
+        context::ForeignDataWrapperInfoRead,
+        sem::{FdwRoutineOutcome, SemAst},
+    };
+
+    let analyzed = heavy::analyze_with_related(
+        "CREATE FOREIGN DATA WRAPPER rejected VALIDATOR other.pg_catalog.postgresql_fdw_validator",
+        Some("chosen"),
+        &["other"],
+    )?;
+    let SemAst::CreateForeignDataWrapper(wrapper) = analyzed.ast() else {
+        panic!("expected a wrapper declaration");
+    };
+    assert!(matches!(
+        wrapper.routines()[0].outcome(),
+        FdwRoutineOutcome::RelatedDatabase(_)
+    ));
+    assert!(!wrapper.is_applicable());
+    assert!(
+        analyzed
+            .context()
+            .foreign_data_wrapper("rejected")
+            .is_none()
     );
     Ok(())
 }

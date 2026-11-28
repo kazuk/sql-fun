@@ -242,7 +242,7 @@ impl SemScalarExpr {
 enum RowFailure {
     NotFound,
     Ambiguous,
-    DatabaseRequired,
+    UnknownDatabase,
     CrossDatabase,
 }
 impl RowFailure {
@@ -252,8 +252,8 @@ impl RowFailure {
     const fn ambiguous() -> Self {
         Self::Ambiguous
     }
-    const fn database_required() -> Self {
-        Self::DatabaseRequired
+    const fn unknown_database() -> Self {
+        Self::UnknownDatabase
     }
     const fn cross_database() -> Self {
         Self::CrossDatabase
@@ -263,7 +263,7 @@ impl RowFailure {
         match self {
             Self::NotFound => QueryProblem::column_source_not_found(&reference),
             Self::Ambiguous => QueryProblem::column_source_ambiguous(&reference),
-            Self::DatabaseRequired => QueryProblem::column_database_name_required(&reference),
+            Self::UnknownDatabase => QueryProblem::unknown_database(&reference),
             Self::CrossDatabase => QueryProblem::column_cross_database(&reference),
         }
     }
@@ -271,7 +271,7 @@ impl RowFailure {
         match self {
             Self::NotFound => "column_source_not_found",
             Self::Ambiguous => "column_source_ambiguous",
-            Self::DatabaseRequired => "column_database_name_required",
+            Self::UnknownDatabase => "unknown_database",
             Self::CrossDatabase => "column_cross_database",
         }
     }
@@ -297,11 +297,11 @@ impl WholeRowExpr {
     ) -> Result<SemScalarExpr, AnalysisError> {
         Self::failed(context, qualifier, RowFailure::ambiguous())
     }
-    pub(crate) fn database_required(
+    pub(crate) fn unknown_database(
         context: &mut impl ParseContext,
         qualifier: &FullName,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        Self::failed(context, qualifier, RowFailure::database_required())
+        Self::failed(context, qualifier, RowFailure::unknown_database())
     }
     pub(crate) fn cross_database(
         context: &mut impl ParseContext,

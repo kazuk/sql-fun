@@ -104,10 +104,23 @@ version = "17"
 connector = "tokio-postgres"
 ```
 
-For PostgreSQL queries using `database.schema.table.column`, configure
-`database-name` explicitly as described in
-[qualified column references](sql-analysis/expressions/names.md).
-The datasource selection name does not supply the database identity.
+For analysis that receives the selected PostgreSQL datasource metadata
+directly, `database-name` identifies the local database and the optional
+`related-database-names` array names other databases with unavailable schemas.
+
+```toml
+database-name = "my_app"
+related-database-names = ["reporting", "Archive.DB"]
+```
+
+Place these settings in the selected datasource table. Use exact logical
+names without SQL quoting. Names must be nonempty and contain no NUL character.
+The datasource selection name is independent of the local database name.
+Omitting the list declares no related databases. A matching local name takes
+precedence if it also appears in the list. PostgreSQL still disallows direct
+cross-database references. See
+[qualified column references](sql-analysis/expressions/names.md) for CLI server
+availability.
 
 - `default`: default database for this application
 - `engine`: identifies the database engine. Use "PostgreSQL" for PostgreSQL or

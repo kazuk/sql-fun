@@ -38,6 +38,10 @@ pub enum ForeignDataWrapperFailure {
     ConflictingClause(FdwRoutineKind),
     /// The routine identifier components cannot be resolved in the selected database.
     InvalidRoutineName(FdwRoutineKind, Vec<String>),
+    /// The related database cannot be referenced by the routine clause.
+    CrossDatabaseRoutine(FdwRoutineKind, Vec<String>),
+    /// The routine refers to an unknown database.
+    UnknownRoutineDatabase(FdwRoutineKind, Vec<String>),
     /// No visible function matches the requested name and exact signature.
     RoutineNotFound(FdwRoutineKind, FullName),
     /// The resolved handler has an incompatible or unknown return type.
@@ -89,6 +93,16 @@ impl DiagnosticMessage for ForeignDataWrapperProblem {
             }
             ForeignDataWrapperFailure::InvalidRoutineName(kind, parts) => format!(
                 "cannot resolve foreign-data wrapper {} name {} in the selected database",
+                kind.label(),
+                parts.join("."),
+            ),
+            ForeignDataWrapperFailure::CrossDatabaseRoutine(kind, parts) => format!(
+                "cross-database foreign-data wrapper {} reference is not supported: {}",
+                kind.label(),
+                parts.join("."),
+            ),
+            ForeignDataWrapperFailure::UnknownRoutineDatabase(kind, parts) => format!(
+                "unknown database in foreign-data wrapper {} reference: {}",
                 kind.label(),
                 parts.join("."),
             ),

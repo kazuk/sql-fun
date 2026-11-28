@@ -51,23 +51,18 @@ separate explicit [SELECT option](../statements/select.md).
 
 ## Dialect and engine-specific behavior
 
-To analyze PostgreSQL database-qualified columns, explicitly configure the
-actual `database-name` in the selected datasource's
-[installation metadata](../../installation.md).
+For analysis that receives the selected PostgreSQL datasource metadata
+directly through the Rust analysis API, configure database names in the
+[installation metadata](../../installation.md). A reference with no database
+qualifier or with a qualifier matching `database-name` uses the local schema
+and object.
+Names are exact logical identifiers without SQL quoting. A qualifier outside
+the configured names produces `unknown_database`. Related names identify
+databases whose schemas are unavailable. PostgreSQL rejects a direct column
+reference to a related database with `column_cross_database`.
 
-`database-name` is the exact logical database identifier, without SQL quoting;
-it must be nonempty and contain no NUL character. It is independent of the
-metadata datasource name (the configured datasource key), and is never inferred
-from a connection or a query. If a database-qualified column is used without
-this setting, analysis retains a `column_database_name_required` failure. A
-different database name produces `column_cross_database`; PostgreSQL
-cross-database column references are unsupported.
-
-The CLI analysis server currently drops the configured database name from
-the schema context. Database-qualified columns can then produce
-`column_database_name_required` even when the selected datasource sets
-`database-name`. Use a schema-qualified column reference in that path.
-See [#1181](https://github.com/kazuk/sql-fun/issues/1181).
+The CLI analysis server uses database-independent schema metadata. Use a
+schema-qualified column reference or a visible alias on that path.
 
 With the `sqlite` feature, SQLite uses `database.table_or_alias.column`, where
 `database` is an explicitly referenced SQLite namespace such as `main`.
@@ -88,9 +83,8 @@ extend support for schema- or database-qualified star expansion.
 - [column_source_not_found]: a qualified source is not visible.
 - [column_qualification_invalid]: the qualification shape is not valid for the
 selected dialect.
-- [column_database_name_required]: a PostgreSQL database-qualified reference
-lacks explicit database-name metadata.
-- [column_cross_database]: a PostgreSQL column requests a different database.
+- [unknown_database]: a PostgreSQL reference uses an unrecognized database qualifier.
+- [column_cross_database]: a PostgreSQL column refers directly to a related database.
 - [column_not_found_in_table]: the resolved table has no requested column.
 - [column_not_found_in_view]: the resolved view has no requested column.
 - [column_not_found_in_cte]: the selected CTE has no requested column.
@@ -114,7 +108,7 @@ projection target.
 [column_source_ambiguous]: ../../diagnostics/column_source_ambiguous.md
 [column_source_not_found]: ../../diagnostics/column_source_not_found.md
 [column_qualification_invalid]: ../../diagnostics/column_qualification_invalid.md
-[column_database_name_required]: ../../diagnostics/column_database_name_required.md
+[unknown_database]: ../../diagnostics/unknown_database.md
 [column_cross_database]: ../../diagnostics/column_cross_database.md
 [column_not_found_in_table]: ../../diagnostics/column_not_found_in_table.md
 [column_not_found_in_view]: ../../diagnostics/column_not_found_in_view.md

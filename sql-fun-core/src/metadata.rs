@@ -399,6 +399,14 @@ pub struct SqlFunMetadata {
     )]
     database_name: Option<String>,
 
+    /// Explicit names of related databases whose schemas are unavailable.
+    #[serde(
+        rename = "related-database-names",
+        default,
+        deserialize_with = "SqlFunMetadata::deserialize_related_database_names"
+    )]
+    related_database_names: Vec<String>,
+
     /// Explicit exact-name role inventory for offline ownership analysis.
     roles: Option<RoleInventory>,
 
@@ -619,7 +627,7 @@ impl SqlFunMetadata {
         let name = <Option<String> as serde::Deserialize>::deserialize(deserializer)?;
         if name
             .as_ref()
-            .is_some_and(|name| name.is_empty() || name.contains('\0'))
+            .is_some_and(|name| !Self::valid_database_name(name))
         {
             return Err(serde::de::Error::custom(
                 "database-name must be a nonempty identifier without NUL",
@@ -628,6 +636,77 @@ impl SqlFunMetadata {
         Ok(name)
     }
 
+    fn deserialize_related_database_names<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Vec<String>, D::Error> {
+        let names = <Vec<String> as serde::Deserialize>::deserialize(deserializer)?;
+        if names.iter().any(|name| !Self::valid_database_name(name)) {
+            return Err(serde::de::Error::custom(
+                "related-database-names entries must be nonempty identifiers without NUL",
+            ));
+        }
+        Ok(names)
+    }
+
+    fn valid_database_name(name: &str) -> bool {
+        !name.is_empty() && !name.contains('\0')
+    }
+
+    /// Explicit database identity, independent of the datasource selection name.
+    #[must_use]
+    pub fn database_name(&self) -> Option<&str> {
+        self.database_name.as_deref()
+    }
+
+    /// Explicit names of related databases with unavailable schemas.
+    #[must_use]
+    pub fn related_database_names(&self) -> &[String] {
+        &self.related_database_names
+    }
+}
+
+#[cfg(test)]
+mod test_database_name {
+    use crate::test_helpers::metadata_with_codegen_options;
+
+    #[rstest::rstest]
+    #[case::absent("", None)]
+    #[case::explicit("database-name = 'my.db'", Some("my.db"))]
+    #[case::case_sensitive("database-name = 'My DB'", Some("My DB"))]
+    fn retains_only_explicit_identity(#[case] input: &str, #[case] expected: Option<&str>) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        assert_eq!(selected.database_name(), expected);
+        assert_eq!(selected.name(), "default");
+    }
+
+    #[rstest::rstest]
+    #[case::empty("database-name = ''")]
+    #[case::wrong_type("database-name = 42")]
+    #[case::nul(r#"database-name = "bad\u0000name""#)]
+    fn rejects_invalid_identity(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
+    }
+
+    #[rstest::rstest]
+    #[case::omitted("", &[])]
+    #[case::exact("related-database-names = ['My DB', 'other.db']", &["My DB", "other.db"])]
+    fn retains_related_names(#[case] input: &str, #[case] expected: &[&str]) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        assert_eq!(selected.related_database_names(), expected);
+    }
+
+    #[rstest::rstest]
+    #[case::empty("related-database-names = ['']")]
+    #[case::wrong_type("related-database-names = ['valid', 42]")]
+    #[case::nul(r#"related-database-names = ["bad\u0000name"]"#)]
+    fn rejects_invalid_related_names(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
+    }
+}
+
+impl SqlFunMetadata {
     /// Explicit role inventory; omission differs from an explicitly empty list.
     #[must_use]
     pub const fn roles(&self) -> Option<&RoleInventory> {
@@ -685,12 +764,6 @@ impl SqlFunMetadata {
         } else {
             "default"
         }
-    }
-
-    /// Explicit database identity, independent of the datasource selection name.
-    #[must_use]
-    pub fn database_name(&self) -> Option<&str> {
-        self.database_name.as_deref()
     }
 
     /// get CTE catalog directory path
@@ -799,30 +872,6 @@ mod test_rewrite_metadata {
     #[case::string(r#"rewrite_options = { expand_asterisk = "true" }"#)]
     #[case::number("rewrite_options = { expand_asterisk = 1 }")]
     fn rejects_invalid_rewrite_options(#[case] input: &str) {
-        assert!(metadata_with_codegen_options(input).is_err());
-    }
-}
-
-#[cfg(test)]
-mod test_database_name {
-    use crate::test_helpers::metadata_with_codegen_options;
-
-    #[rstest::rstest]
-    #[case::absent("", None)]
-    #[case::explicit("database-name = 'my.db'", Some("my.db"))]
-    #[case::case_sensitive("database-name = 'My DB'", Some("My DB"))]
-    fn retains_only_explicit_identity(#[case] input: &str, #[case] expected: Option<&str>) {
-        let metadata = metadata_with_codegen_options(input).unwrap();
-        let selected = metadata.get("default").unwrap();
-        assert_eq!(selected.database_name(), expected);
-        assert_eq!(selected.name(), "default");
-    }
-
-    #[rstest::rstest]
-    #[case::empty("database-name = ''")]
-    #[case::wrong_type("database-name = 42")]
-    #[case::nul(r#"database-name = "bad\u0000name""#)]
-    fn rejects_invalid_identity(#[case] input: &str) {
         assert!(metadata_with_codegen_options(input).is_err());
     }
 }

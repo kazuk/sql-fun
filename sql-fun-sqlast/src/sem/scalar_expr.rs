@@ -1047,6 +1047,8 @@ impl SemScalarExpr {
     // operand. Names from references, functions and constructors win.
     fn postgres_strong_projection_name(&self) -> Option<String> {
         match self {
+            // PostgreSQL treats a scalar subquery's default label as strong too.
+            Self::SubLink(query) => Some(query.output_name()),
             Self::Case(value) => value.postgres_strong_projection_name(),
             Self::Coalesce(value) => Some(value.join_key_name().unwrap_or("coalesce").to_owned()),
             Self::TypeCast(value) => value

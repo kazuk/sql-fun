@@ -80,7 +80,8 @@ impl CreateTable {
                 context,
             ));
         }
-        let table = Self::from_ast_with_names(ast, &mut context, source, &mut names)?;
+        let mut table = Self::from_ast_with_names(ast, &mut context, source, &mut names)?;
+        table.retain_primary_key_not_null_names(&context, &name)?;
         let context = context.apply_create_table(&table)?;
         Ok(AstAndContextPair::new(
             SemAst::create_table(&table),

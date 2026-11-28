@@ -300,7 +300,7 @@ impl ConstraintNames {
         }
     }
 
-    fn supports_named_not_null(context: &impl ParseContext) -> bool {
+    pub(crate) fn supports_named_not_null(context: &impl ParseContext) -> bool {
         let Some(version) = context.metadata().engine_version() else {
             return false;
         };

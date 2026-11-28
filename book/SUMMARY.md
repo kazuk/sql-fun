@@ -115,6 +115,7 @@
   - [alter_column_invalid_option](diagnostics/alter_column_invalid_option.md)
   - [alter_column_missing_column](diagnostics/alter_column_missing_column.md)
   - [alter_column_missing_relation](diagnostics/alter_column_missing_relation.md)
+  - [alter_column_not_null_conflict](diagnostics/alter_column_not_null_conflict.md)
   - [alter_column_not_stored_generated](diagnostics/alter_column_not_stored_generated.md)
   - [alter_column_primary_key](diagnostics/alter_column_primary_key.md)
   - [alter_column_reset_value](diagnostics/alter_column_reset_value.md)

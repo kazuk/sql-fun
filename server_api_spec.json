@@ -2547,6 +2547,19 @@
                   "const": "PrimaryKey"
                 },
                 {
+                  "description": "An existing NOT NULL constraint conflicts with the requested declaration.",
+                  "type": "object",
+                  "properties": {
+                    "NotNullConflict": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "NotNullConflict"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An identity column must remain NOT NULL.",
                   "type": "string",
                   "const": "Identity"
@@ -8110,6 +8123,19 @@
                   "const": "PrimaryKey"
                 },
                 {
+                  "description": "An existing NOT NULL constraint conflicts with the requested declaration.",
+                  "type": "object",
+                  "properties": {
+                    "NotNullConflict": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "NotNullConflict"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An identity column must remain NOT NULL.",
                   "type": "string",
                   "const": "Identity"
@@ -13563,6 +13589,19 @@
                   "description": "A primary key requires the column to remain NOT NULL.",
                   "type": "string",
                   "const": "PrimaryKey"
+                },
+                {
+                  "description": "An existing NOT NULL constraint conflicts with the requested declaration.",
+                  "type": "object",
+                  "properties": {
+                    "NotNullConflict": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "NotNullConflict"
+                  ],
+                  "additionalProperties": false
                 },
                 {
                   "description": "An identity column must remain NOT NULL.",

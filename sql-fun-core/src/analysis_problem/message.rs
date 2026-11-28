@@ -107,6 +107,7 @@ impl DiagnosticMessage for AlterColumnProblem {
             Self::MissingRelation => "ALTER COLUMN target is absent or is not a table".to_owned(),
             Self::MissingColumn => "ALTER COLUMN target column does not exist".to_owned(),
             Self::PrimaryKey => "a primary-key column must remain NOT NULL".to_owned(),
+            Self::NotNullConflict(name) => format!("cannot add NOT NULL constraint {name} because a conflicting NOT NULL constraint already exists"),
             Self::Identity => "an identity column must remain NOT NULL".to_owned(),
             Self::NotStoredGenerated => {
                 "DROP EXPRESSION requires a stored generated column".to_owned()

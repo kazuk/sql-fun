@@ -36,6 +36,8 @@ pub enum AlterColumnProblem {
     MissingColumn,
     /// A primary key requires the column to remain NOT NULL.
     PrimaryKey,
+    /// An existing NOT NULL constraint conflicts with the requested declaration.
+    NotNullConflict(String),
     /// An identity column must remain NOT NULL.
     Identity,
     /// DROP EXPRESSION requires a stored generated column.
@@ -135,6 +137,11 @@ impl AlterColumnProblem {
     pub const fn primary_key() -> Self {
         Self::PrimaryKey
     }
+    /// Diagnostic for a conflicting NOT NULL declaration.
+    #[must_use]
+    pub fn not_null_conflict(name: &str) -> Self {
+        Self::NotNullConflict(name.to_owned())
+    }
     /// Diagnostic identity.
     #[must_use]
     pub const fn identity() -> Self {
@@ -219,6 +226,7 @@ impl AlterColumnProblem {
             Self::MissingRelation => "alter_column_missing_relation",
             Self::MissingColumn => "alter_column_missing_column",
             Self::PrimaryKey => "alter_column_primary_key",
+            Self::NotNullConflict(_) => "alter_column_not_null_conflict",
             Self::Identity => "alter_column_identity",
             Self::NotStoredGenerated => "alter_column_not_stored_generated",
             Self::VirtualGenerated => "alter_column_virtual_generated",
@@ -254,6 +262,7 @@ impl AlterColumnProblem {
             Self::MissingRelation => "ALTER COLUMN target is absent or is not a table".to_owned(),
             Self::MissingColumn => "ALTER COLUMN target column does not exist".to_owned(),
             Self::PrimaryKey => "a primary-key column must remain NOT NULL".to_owned(),
+            Self::NotNullConflict(name) => format!("cannot add NOT NULL constraint {name} because a conflicting NOT NULL constraint already exists"),
             Self::Identity => "an identity column must remain NOT NULL".to_owned(),
             Self::NotStoredGenerated => {
                 "DROP EXPRESSION requires a stored generated column".to_owned()

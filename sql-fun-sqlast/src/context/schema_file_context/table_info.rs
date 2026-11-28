@@ -138,6 +138,9 @@ impl TableInfoWrite for SchemaFileContext {
             return Ok(self);
         }
         let implicit_changes = table.apply_alter(alter_table)?;
+        if alter_table.adds_primary_key() {
+            table.retain_primary_key_not_null_names(&self, &key)?;
+        }
         let Some(indexes) = self.alter_indexes(alter_table, &key, implicit_changes)? else {
             return Ok(self);
         };
@@ -172,6 +175,43 @@ impl TableInfoWrite for SchemaFileContext {
     fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
         self.catalog.store_table(name, create_table);
         self.record_named_extension_member(ObjectKind::TABLE, name);
+    }
+}
+
+#[cfg(test)]
+mod test_not_null_constraint_application {
+    use crate::{
+        context::{ParseContext, TableInfoRead},
+        names::{FullName, SchemaName},
+        sem::PgBuiltInType,
+        test_helpers::{TestParseContext, schema_creation},
+    };
+
+    #[test]
+    fn rejected_not_null_name_leaves_the_table_unchanged() -> testresult::TestResult {
+        let mut base = TestParseContext::default().with_postgres_version("18");
+        base.set_search_path(&[SchemaName::from("public")]);
+        base.setup_type(PgBuiltInType::int4());
+        let context = schema_creation::apply(
+            schema_creation::child(base.freeze()),
+            "CREATE TABLE t (id integer PRIMARY KEY, other integer)",
+        )?;
+        let name = FullName::with_schema("public", "t");
+        let context = schema_creation::apply(
+            context,
+            "ALTER TABLE t ADD CONSTRAINT other_name NOT NULL id NOT VALID, ADD CONSTRAINT sibling NOT NULL other NOT VALID",
+        )?;
+        assert_eq!(context.problems().len(), 1, "{:?}", context.problems());
+        assert_eq!(
+            context.problems()[0].code(),
+            "alter_column_not_null_conflict"
+        );
+        let table = context.get_table_impl(&name).expect("original table");
+        assert!(table.constraint("t_id_not_null").is_some());
+        assert!(table.constraint("other_name").is_none());
+        assert!(table.constraint("sibling").is_none());
+        assert!(table.alter_statements().is_empty());
+        Ok(())
     }
 }
 

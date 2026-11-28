@@ -156,12 +156,9 @@ subqueries do not yet have complete operand and comparison-operator checking
 ([#571](https://github.com/kazuk/sql-fun/issues/571)). The membership path used
 for IN and supported equality-ANY forms is a separate implemented case; do not
 infer general quantified-comparison support from it. Multi-column ordered row
-comparisons additionally lack the catalog-backed B-tree operator-family
-membership and strategy facts required to establish their semantics
-([#792](https://github.com/kazuk/sql-fun/issues/792)). Identifying the
-applicable operator by its qualified name and declared operand types remains
-incomplete ([#797](https://github.com/kazuk/sql-fun/issues/797)); an operator
-spelling or boolean result alone does not establish a valid row comparison.
+comparisons still require analysis of how the selected operator's B-tree
+family and strategy apply to the operands
+([#571](https://github.com/kazuk/sql-fun/issues/571)).
 
 Schema-qualified PostgreSQL operator names such as `OPERATOR(pg_catalog.+)`
 retain their schema identity and participate in ordinary operator resolution.
@@ -169,18 +166,6 @@ Quoted identifiers preserve case and embedded punctuation. Operator references
 with three or more components can be parsed and rendered, but analysis reports
 [cross_database_operator_reference](../../diagnostics/cross_database_operator_reference.md);
 it does not resolve operators in another database.
-
-For an unqualified PostgreSQL operator, an earlier schema containing the same
-operator name can hide a matching signature in a later schema. For example,
-the builtin `@@` can hide the `intarray` signature installed in `public`.
-Use `OPERATOR(public.@@)` to select that schema explicitly
-([#797](https://github.com/kazuk/sql-fun/issues/797)).
-
-With pgvector 0.8.7 loaded in `public` and a PostgreSQL 18 catalog, the
-same lookup limitation affects `'[1,2,3]'::vector <-> '[4,5,6]'::vector`.
-PostgreSQL resolves this expression to `double precision`. sql-fun reports
-`binary_operator_overload_resolution_failed` and `undefined_operator`
-([#797](https://github.com/kazuk/sql-fun/issues/797)).
 
 ## Diagnostics
 

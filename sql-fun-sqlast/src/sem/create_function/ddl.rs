@@ -269,11 +269,9 @@ impl CreateFunction {
             return Ok(None);
         }
         if array
-            && let Ok(configured) = context.get_args().postgres_version(context.metadata())
-            && configured
-                .to_string()
-                .parse::<::sql_fun_core::PostgresVersion>()
-                .is_ok_and(|version| version.major() >= 19)
+            && context
+                .postgres_version()
+                .is_some_and(|version| version.major() >= 19)
         {
             declaration.reject(
                 function,

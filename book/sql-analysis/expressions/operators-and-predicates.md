@@ -171,6 +171,12 @@ the builtin `@@` can hide the `intarray` signature installed in `public`.
 Use `OPERATOR(public.@@)` to select that schema explicitly
 ([#797](https://github.com/kazuk/sql-fun/issues/797)).
 
+With pgvector 0.8.7 loaded in `public` and a PostgreSQL 18 catalog, the
+same lookup limitation affects `'[1,2,3]'::vector <-> '[4,5,6]'::vector`.
+PostgreSQL resolves this expression to `double precision`. sql-fun reports
+`binary_operator_overload_resolution_failed` and `undefined_operator`
+([#797](https://github.com/kazuk/sql-fun/issues/797)).
+
 ## Diagnostics
 
 - [undefined_operator]: the selected catalog does not establish the requested

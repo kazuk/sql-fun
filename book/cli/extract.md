@@ -85,9 +85,13 @@ Docker image retrieval/creation and cleanup have separate bounded operations.
 Connection diagnostics omit credentials and server-provided error text.
 
 Builtin metadata covers bootstrap objects in `pg_catalog` and
-`information_schema`. User-created objects and installed extension objects are
-not added to builtin catalogs. Export your application schema separately using
-your normal schema workflow.
+`information_schema`. In existing-server extraction, installed extension base
+types can currently appear in `pg_type.json`. If you then select the same
+extension for offline analysis, initialization can fail with conflicting type
+definitions. For example, this affects pgvector 0.8.7 on PostgreSQL 18.
+Use a database without the extension when extracting its builtin catalog
+([#1294](https://github.com/kazuk/sql-fun/issues/1294)).
+Export your application schema separately using your normal schema workflow.
 
 ## Include additional master definitions
 

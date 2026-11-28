@@ -354,5 +354,38 @@
         }
       ]
     }
+  },
+  {
+    "name": "scalar_subquery_default_name_takes_precedence_over_cast",
+    "sql": "SELECT (SELECT 1)::text",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "scalar_subquery_cast_does_not_expose_type_as_column_name",
+    "sql": "SELECT q.text FROM (SELECT (SELECT 1)::text) AS q",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_sub_query"
+      ],
+      "columns": [
+        {
+          "name": "text",
+          "nullability": "unknown"
+        }
+      ]
+    }
   }
 ]

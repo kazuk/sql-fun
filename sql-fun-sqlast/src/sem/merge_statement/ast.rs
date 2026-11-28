@@ -134,7 +134,8 @@ impl MergeStatement {
             context.report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
         }
         let on_scope = ScalarAnalysisContext::for_merge_on(&with, &target, &source);
-        let on = SemScalarExpr::from_ast_merge_predicate(ast.join_condition(), context, &on_scope)?;
+        // PostgreSQL resolves MERGE ON without a Boolean coercion.
+        let on = SemScalarExpr::from_ast_in(ast.join_condition(), context, &on_scope)?;
         let clauses =
             Self::from_ast_clauses(ast, context, &with, &target, &source, &table, &alias)?;
         if let Some(support) = table.view_support()

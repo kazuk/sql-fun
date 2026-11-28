@@ -292,8 +292,24 @@
     }
   },
   {
-    "name": "merge::rejects_invalid_merge::nonboolean",
+    "name": "merge::resolves_on::integer_literal",
     "sql": "MERGE INTO items t USING incoming s ON 1 WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_on::integer_column",
+    "sql": "MERGE INTO items t USING incoming s ON s.sid WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::nonboolean_when",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED AND 1 THEN DELETE",
     "expected": {
       "diagnostics": [
         "query_analysis"

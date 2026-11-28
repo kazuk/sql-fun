@@ -407,7 +407,9 @@ schema-merge	merge::rejects_invalid_merge::nested_source_by_source	yes	server-re
 schema-merge	merge::rejects_invalid_merge::target_in_source	yes	server-rejects	"42P01 invalid reference to FROM-clause entry for table ""t"""	-
 schema-merge	merge::rejects_invalid_merge::hidden_alias	yes	server-rejects	"42P01 invalid reference to FROM-clause entry for table ""items"""	-
 schema-merge	merge::rejects_invalid_merge::unreachable	yes	server-rejects	42601 unreachable WHEN clause specified after unconditional WHEN clause	-
-schema-merge	merge::rejects_invalid_merge::nonboolean	yes	analyzer-rejects-valid-sql	EXPLAIN produces a MERGE plan	#1290
+schema-merge	merge::resolves_on::integer_literal	yes	descriptor-agrees	accepted; no result columns	-
+schema-merge	merge::resolves_on::integer_column	yes	descriptor-agrees	accepted; no result columns	-
+schema-merge	merge::rejects_invalid_merge::nonboolean_when	yes	server-rejects	42804 argument of WHEN must be type boolean, not type integer	-
 schema-merge	merge::rejects_invalid_merge::action_in_on	yes	server-rejects	42601 MERGE_ACTION() can only be used in the RETURNING list of a MERGE command	-
 schema-merge	merge::rejects_invalid_merge::action_in_when	yes	server-rejects	42601 MERGE_ACTION() can only be used in the RETURNING list of a MERGE command	-
 schema-merge	merge::rejects_invalid_merge::action_in_assignment	yes	server-rejects	42601 MERGE_ACTION() can only be used in the RETURNING list of a MERGE command	-

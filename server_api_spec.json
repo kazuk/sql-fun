@@ -754,6 +754,11 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "An ALTER FUNCTION attribute was specified more than once.",
+                  "type": "string",
+                  "const": "AlterFunctionDuplicateAttribute"
+                },
+                {
                   "description": "Invalid rule definition.",
                   "type": "object",
                   "properties": {
@@ -6312,6 +6317,11 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "An ALTER FUNCTION attribute was specified more than once.",
+                  "type": "string",
+                  "const": "AlterFunctionDuplicateAttribute"
+                },
+                {
                   "description": "Invalid rule definition.",
                   "type": "object",
                   "properties": {
@@ -11760,6 +11770,11 @@
                     "DropFunctionDependency"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "description": "An ALTER FUNCTION attribute was specified more than once.",
+                  "type": "string",
+                  "const": "AlterFunctionDuplicateAttribute"
                 },
                 {
                   "description": "Invalid rule definition.",

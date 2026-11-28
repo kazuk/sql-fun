@@ -66,6 +66,7 @@ pub struct AlterFunction {
     parallel_safety: Option<ParallelSafety>,
     volatility: Option<FunctionVolatility>,
     target: OwnershipLookup,
+    duplicate_attribute: bool,
     source: Option<SourcePathWithSpan>,
 }
 
@@ -76,6 +77,7 @@ impl AlterFunction {
     ) -> Result<Self, AnalysisError> {
         let mut parallel_safety = None;
         let mut volatility = None;
+        let mut duplicate_attribute = false;
         for option in ast.options() {
             match option {
                 FunctionOption::Parallel(_) if parallel_safety.is_none() => {
@@ -84,9 +86,12 @@ impl AlterFunction {
                 FunctionOption::Volatility(value) if volatility.is_none() => {
                     volatility = Some(FunctionVolatility::try_from(value.as_str())?);
                 }
+                FunctionOption::Parallel(_) | FunctionOption::Volatility(_) => {
+                    duplicate_attribute = true;
+                }
                 _ => {
                     return AnalysisError::raise_unexpected_input(
-                        "conflicting or redundant ALTER FUNCTION actions",
+                        "unsupported ALTER FUNCTION action",
                     );
                 }
             }
@@ -105,10 +110,14 @@ impl AlterFunction {
         if target.identity().is_none() {
             context.report_analysis_problem(AnalysisProblem::ownership_target(&target))?;
         }
+        if duplicate_attribute {
+            context.report_analysis_problem(AnalysisProblem::AlterFunctionDuplicateAttribute)?;
+        }
         Ok(Self {
             parallel_safety,
             volatility,
             target,
+            duplicate_attribute,
             source: context.get_source_path_with_span().cloned(),
         })
     }
@@ -220,14 +229,14 @@ impl AlterFunction {
         self.volatility
     }
 
-    /// Completed target binding or the reason the change was rejected.
+    /// Completed target binding or its failure outcome.
     pub const fn target(&self) -> &OwnershipLookup {
         &self.target
     }
 
     /// Whether the catalog change can be applied.
     pub const fn applicable(&self) -> bool {
-        self.target.identity().is_some()
+        !self.duplicate_attribute && self.target.identity().is_some()
     }
 
     /// Location of the original ALTER statement, when supplied.

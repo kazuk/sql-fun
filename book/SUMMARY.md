@@ -191,6 +191,7 @@
   - [call_argument_assigned_twice](diagnostics/call_argument_assigned_twice.md)
   - [function_overload_resolution_failed](diagnostics/function_overload_resolution_failed.md)
   - [invalid_function_signature](diagnostics/invalid_function_signature.md)
+  - [alter_function_duplicate_attribute](diagnostics/alter_function_duplicate_attribute.md)
   - [invalid_operator_declaration](diagnostics/invalid_operator_declaration.md)
   - [invalid_cast_declaration](diagnostics/invalid_cast_declaration.md)
   - [invalid_language_declaration](diagnostics/invalid_language_declaration.md)

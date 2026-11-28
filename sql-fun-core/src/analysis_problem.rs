@@ -383,6 +383,8 @@ pub enum AnalysisProblem {
     Creation(CreationProblem),
     /// A dependent view prevents DROP FUNCTION.
     DropFunctionDependency(FullName),
+    /// An ALTER FUNCTION attribute was specified more than once.
+    AlterFunctionDuplicateAttribute,
     /// Invalid rule definition.
     Rule(RuleProblem),
     /// Invalid foreign-data wrapper declaration.
@@ -822,6 +824,7 @@ impl AnalysisProblem {
             Self::AlterColumn(problem) => problem.code(),
             Self::Serial(problem) => problem.code(),
             Self::Creation(_) => "conflicting_creation",
+            Self::AlterFunctionDuplicateAttribute => "alter_function_duplicate_attribute",
             Self::DropFunctionDependency(_) => "drop_function_dependency",
             Self::Ownership(problem) => problem.code(),
             Self::Privilege(_) => "invalid_privilege_declaration",
@@ -934,6 +937,7 @@ impl AnalysisProblem {
             | Self::InferenceCandidateSpaceUnsupported(_)
             | Self::CoalesceExprTypeUnknown(..)
             | Self::OperatorNameSyntax(_)
+            | Self::AlterFunctionDuplicateAttribute
             | Self::DropFunctionDependency(_)
             | Self::ForeignDataWrapper(_)
             | Self::InvalidFunctionSignature(_)
@@ -1105,6 +1109,9 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::CallArgument(problem) => problem.diagnostic_message(),
             Self::Serial(problem) => problem.diagnostic_message(),
             Self::Creation(problem) => problem.diagnostic_message(),
+            Self::AlterFunctionDuplicateAttribute => {
+                "conflicting or redundant ALTER FUNCTION attributes".to_owned()
+            }
             Self::DropFunctionDependency(view) => {
                 format!("cannot drop function because view {view} depends on it")
             }

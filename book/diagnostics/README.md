@@ -145,6 +145,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [call_argument_assigned_twice](call_argument_assigned_twice.md)
 - [function_overload_resolution_failed](function_overload_resolution_failed.md)
 - [invalid_function_signature](invalid_function_signature.md)
+- [alter_function_duplicate_attribute](alter_function_duplicate_attribute.md)
 - [ignored_domain_cast](ignored_domain_cast.md)
 - [unverified_binary_cast_compatibility](unverified_binary_cast_compatibility.md)
 - [opaque_do_body](opaque_do_body.md)

@@ -164,5 +164,13 @@
         }
       ]
     }
+  },
+  {
+    "name": "duplicate_volatility_reports_a_semantic_diagnostic",
+    "sql": "ALTER FUNCTION public.parallel_probe() STABLE IMMUTABLE",
+    "expected": {
+      "diagnostics": ["alter_function_duplicate_attribute"],
+      "columns": []
+    }
   }
 ]

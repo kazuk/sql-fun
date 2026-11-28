@@ -190,6 +190,7 @@ fn extraction_sql(schemas: &DefinitionSchemas) -> Result<String, anyhow::Error> 
         include_str!("sql/collations.sql"),
         include_str!("sql/operator_classes.sql"),
         include_str!("sql/operator_families.sql"),
+        include_str!("sql/exclusion_capabilities.sql"),
     ];
     let mut sql = String::from(
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL search_path = pg_catalog; SET LOCAL standard_conforming_strings = on; SET LOCAL extra_float_digits = 3; SET LOCAL timezone = 'UTC'; SET LOCAL statement_timeout = '60s';\nSHOW server_version_num;\n",
@@ -261,10 +262,12 @@ fn write_catalogs(
         &output.join("operator_families.json"),
         &next_catalog(&mut lines)?,
     )?;
+    let exclusion_capabilities = next_catalog(&mut lines)?;
     anyhow::ensure!(lines.next().is_none(), "unexpected psql catalog result");
     let mut metadata = serde_json::json!({
         "format_version": 1, "server_version_num": version,
         "provenance": provenance,
+        "exclusion_capabilities": exclusion_capabilities,
         "scope": "bootstrap-pg_catalog-and-information_schema"
     });
     schemas.record_scope(&mut metadata);
@@ -304,6 +307,7 @@ mod test_write_catalogs {
             catalogs.push(serde_json::json!({"catalog":marker}));
         }
         catalogs.push(serde_json::json!([{"name":"family","operators":[]}]));
+        catalogs.push(serde_json::json!({"gist": true, "gin": false}));
         let results = extraction_results(170_002, true, &catalogs);
         let directory = tempfile::tempdir().unwrap();
         let provenance = serde_json::json!({"source":"unit test"});
@@ -334,7 +338,8 @@ mod test_write_catalogs {
             serde_json::json!({
                 "format_version":1, "server_version_num":170_002,
                 "provenance":provenance, "scope":"bootstrap-pg_catalog-and-information_schema",
-                "definition_schemas":["a","z"]
+                "definition_schemas":["a","z"],
+                "exclusion_capabilities":{"gist":true,"gin":false}
             })
         );
         assert_eq!(
@@ -352,7 +357,7 @@ mod test_write_catalogs {
         #[case] prerelease: bool,
     ) {
         let directory = tempfile::tempdir().unwrap();
-        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 15]);
+        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 16]);
         let version: PostgresVersion = identity.parse().unwrap();
         write_catalogs(
             &results,
@@ -398,7 +403,7 @@ mod test_write_catalogs {
 
     #[rstest::rstest]
     fn rejects_each_truncated_catalog(
-        #[values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)] count: usize,
+        #[values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)] count: usize,
     ) {
         let directory = tempfile::tempdir().unwrap();
         let results = extraction_results(170_000, true, &vec![serde_json::json!([]); count]);
@@ -420,7 +425,7 @@ mod test_write_catalogs {
     #[test]
     fn rejects_surplus_results_before_writing_metadata() {
         let directory = tempfile::tempdir().unwrap();
-        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 16]);
+        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 17]);
         assert_eq!(
             write_catalogs(
                 &results,
@@ -452,7 +457,7 @@ mod test_write_catalogs {
             )
             .is_err()
         );
-        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 15]);
+        let results = extraction_results(170_000, true, &vec![serde_json::json!([]); 16]);
         let error = write_catalogs(
             &results,
             &identity,

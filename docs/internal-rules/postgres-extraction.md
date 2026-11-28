@@ -179,6 +179,16 @@ No schema is inferred from the connection search path, extension files, or
 application metadata. Referenced identities outside the selection are included
 inline, without selecting further definitions.
 
+### Operator declaration facts
+
+The operator master stores an optional commutator as a two-element array
+`[schema, operator]`. Its declared operand types follow by reversing the
+original declaration's operand types. The reader also accepts short
+commutator names from older builtin masters, which use the builtin namespace.
+The optional `exclusion_capabilities` field in `metadata.json` maps extracted
+index methods to the result of `pg_indexam_has_property(..., 'can_exclude')`.
+Absent or null capability information stays unknown.
+
 ### Collations
 
 `collations.json` is an object with `database` and `collations` members.

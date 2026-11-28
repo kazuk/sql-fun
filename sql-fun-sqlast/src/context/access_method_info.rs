@@ -2,6 +2,11 @@ use crate::sem::AccessMethodDefinition;
 
 /// Reads from the effective database-wide access-method catalog.
 pub trait AccessMethodInfoRead {
+    /// Authoritative exclusion capability, when supplied by the catalog source.
+    fn access_method_can_exclude(&self, _name: &str) -> Option<bool> {
+        None
+    }
+
     /// Look up an access method by its normalized SQL identifier.
     fn access_method(&self, _name: &str) -> Option<&AccessMethodDefinition> {
         None

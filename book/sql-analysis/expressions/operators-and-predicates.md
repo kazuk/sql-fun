@@ -8,6 +8,11 @@ joint constraints; see [parameter inference](parameters.md). Nullability
 describes static knowledge, not execution of an operator or predicate. Custom
 catalog functions/operators may leave nullability unknown.
 
+For an unqualified PostgreSQL operator, overloads with different operand
+signatures can be visible from multiple schemas on the search path. When two
+schemas declare the same signature, the earlier declaration takes precedence.
+Use `OPERATOR(schema.symbol)` to search a specific schema.
+
 ### BETWEEN
 
 Analysis supports `BETWEEN`, `NOT BETWEEN`, and their explicit `ASYMMETRIC`

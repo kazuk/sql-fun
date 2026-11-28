@@ -198,11 +198,12 @@ impl ArithExpr {
         let (Some(left), Some(right)) = (left, right) else {
             return AnalysisError::raise_unexpected_input("pattern operands");
         };
+        let definition = crate::sem::OperatorLookupService::new(context).visible(name, true, true);
+        let binding = ResolvedOperator::from_visible(context, name, definition.as_ref());
         let unknown = [&left, &right]
             .into_iter()
             .any(|value| SemScalarExpr::common_type_input(value) == Some(CommonType::unknown()));
         if unknown && (left.requires_argument_type() || right.requires_argument_type()) {
-            let binding = ResolvedOperator::resolve(context, name, true, true);
             return Ok(SemScalarExpr::arithmetic(Self::Pattern(Box::new(
                 PatternExpr {
                     operands: [left, right],
@@ -210,14 +211,16 @@ impl ArithExpr {
                 },
             ))));
         }
-        let overloads = if let Some(definition) = context.get_operator(name, true, true) {
-            definition.binary_overloads()
-        } else {
-            None
+        let overloads = match &definition {
+            Some(definition) => definition.binary_overloads(),
+            None => None,
         };
         let (left, right) =
             SemScalarExpr::comparison_literal_operands(context, overloads, left, right);
-        Ok(Self::build_op(context, name, Some(left), Some(right))?.0)
+        let (mut expression, _) =
+            Self::build_op_from_visible(context, name, Some(left), Some(right), definition)?;
+        expression.set_operator_binding(binding);
+        Ok(expression)
     }
 }
 

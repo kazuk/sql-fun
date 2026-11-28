@@ -38,15 +38,15 @@ struct MembershipOperator {
 }
 impl MembershipOperator {
     fn resolve(context: &impl ParseContext, name: &OperatorName) -> Self {
-        let resolved = context.resolve_operator_name(name, true, true);
-        let name = resolved.as_ref().unwrap_or(name);
-        let definition = context.get_operator_op(name, true, true);
+        let definition = crate::sem::operator_lookup::OperatorLookupService::new(context)
+            .visible(name, true, true);
+        let binding = ResolvedOperator::from_visible(context, name, definition.as_ref());
         let candidates = match definition {
-            Some(OperatorDefinition::Binary(candidates)) => Some(candidates.clone()),
+            Some(OperatorDefinition::Binary(candidates)) => Some(candidates),
             _ => None,
         };
         Self {
-            binding: ResolvedOperator::from_definition(context, name, definition),
+            binding,
             candidates,
         }
     }
@@ -301,10 +301,20 @@ impl MembershipExpr {
         } else {
             PgBuiltInType::bool()
         };
-        let comparison_not_null = if binding.is_none() {
-            Some(true)
+        let comparison_not_null = if let Some(operator) = &binding {
+            if let Some(candidates) = &operator.candidates
+                && let Some(first) = candidates.first()
+                && let Some(name) = first.declaration_name()
+                && candidates
+                    .iter()
+                    .all(|entry| entry.declaration_name() == Some(name))
+            {
+                context.operator_result_is_not_null(name)
+            } else {
+                None
+            }
         } else {
-            context.resolved_operator_result_is_not_null(&name)
+            Some(true)
         };
         Self {
             left: left.clone(),

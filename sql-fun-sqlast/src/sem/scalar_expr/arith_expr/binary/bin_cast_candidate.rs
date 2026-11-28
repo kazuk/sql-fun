@@ -110,12 +110,7 @@ impl BinaryCastCandidate {
                 substitution.apply(ty);
             }
         }
-        Some(BinaryOperatorDefinition::new(
-            &left,
-            &right,
-            &result,
-            overload.is_strict(),
-        ))
+        Some(overload.instantiate(left, right, result))
     }
 
     fn argument_rank(

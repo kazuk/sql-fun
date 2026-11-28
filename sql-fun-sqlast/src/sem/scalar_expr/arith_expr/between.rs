@@ -82,12 +82,12 @@ impl ArithExpr {
         coerce_literals: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let name = OperatorName::from_parts(None, name);
-        let binding = ResolvedOperator::resolve(context, &name, true, true);
+        let definition = crate::sem::OperatorLookupService::new(context).visible(&name, true, true);
+        let binding = ResolvedOperator::from_visible(context, &name, definition.as_ref());
         let (left, right) = if coerce_literals {
-            let overloads = if let Some(definition) = context.get_operator(&name, true, true) {
-                definition.binary_overloads()
-            } else {
-                None
+            let overloads = match &definition {
+                Some(definition) => definition.binary_overloads(),
+                None => None,
             };
             SemScalarExpr::comparison_literal_operands(
                 context,
@@ -98,7 +98,8 @@ impl ArithExpr {
         } else {
             (left.clone(), right.clone())
         };
-        let (mut expression, _) = Self::build_op(context, &name, Some(left), Some(right))?;
+        let (mut expression, _) =
+            Self::build_op_from_visible(context, &name, Some(left), Some(right), definition)?;
         expression.set_operator_binding(binding);
         Ok(expression)
     }

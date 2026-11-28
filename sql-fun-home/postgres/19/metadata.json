@@ -1,9 +1,17 @@
 {
-  "format_version": 1,
-  "server_version_num": 190000,
-  "provenance": {
-    "source": "docker",
-    "image_id": "sha256:d4bc84774caeb69f85d1453368c340824392d6ca9bca20ba8594b7f47ffa39e2"
+  "exclusion_capabilities": {
+    "brin": false,
+    "btree": true,
+    "gin": false,
+    "gist": true,
+    "hash": true,
+    "spgist": true
   },
-  "scope": "bootstrap-pg_catalog-and-information_schema"
+  "format_version": 1,
+  "provenance": {
+    "image_id": "sha256:d4bc84774caeb69f85d1453368c340824392d6ca9bca20ba8594b7f47ffa39e2",
+    "source": "docker"
+  },
+  "scope": "bootstrap-pg_catalog-and-information_schema",
+  "server_version_num": 190000
 }

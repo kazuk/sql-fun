@@ -1,7 +1,7 @@
 use crate::{
     names::OperatorName,
     sem::{
-        CascadeRemoval, CascadeTarget, OperatorLinks, TypeReference,
+        CascadeRemoval, CascadeTarget, OperatorIdentity, OperatorLinks, TypeReference,
         parameter_resolution::Signature,
     },
 };
@@ -51,12 +51,45 @@ pub struct BinaryOperatorDefinition {
     result_type: TypeReference,
     strict: bool,
     #[serde(skip)]
+    declaration: Option<Box<OperatorIdentity>>,
+    #[serde(skip)]
     settings: Option<Box<OperatorLinks>>,
     #[serde(skip)]
     dependents: OperatorDependents,
 }
 
 impl BinaryOperatorDefinition {
+    pub(crate) fn with_declaration_name(mut self, name: &OperatorName) -> Self {
+        self.declaration = Some(Box::new(OperatorIdentity::from_signature(
+            name.clone(),
+            Some(self.left_arg_type.clone()),
+            self.right_arg_type.clone(),
+        )));
+        self
+    }
+
+    pub(crate) fn declaration_name(&self) -> Option<&OperatorName> {
+        self.declaration().map(OperatorIdentity::name)
+    }
+
+    pub(crate) fn declaration(&self) -> Option<&OperatorIdentity> {
+        self.declaration.as_deref()
+    }
+
+    pub(crate) fn instantiate(
+        &self,
+        left: TypeReference,
+        right: TypeReference,
+        result: TypeReference,
+    ) -> Self {
+        Self {
+            left_arg_type: left,
+            right_arg_type: right,
+            result_type: result,
+            ..self.clone()
+        }
+    }
+
     pub(crate) const fn dependents(&self) -> &OperatorDependents {
         &self.dependents
     }
@@ -95,6 +128,7 @@ impl BinaryOperatorDefinition {
             right_arg_type: right_arg_type.clone(),
             result_type: result_type.clone(),
             strict,
+            declaration: None,
             settings: None,
             dependents: OperatorDependents::default(),
         }
@@ -132,12 +166,23 @@ pub struct UnaryOperatorDefinition {
     result_type: TypeReference,
     strict: bool,
     #[serde(skip)]
+    declaration_name: Option<Box<OperatorName>>,
+    #[serde(skip)]
     settings: Option<Box<OperatorLinks>>,
     #[serde(skip)]
     dependents: OperatorDependents,
 }
 
 impl UnaryOperatorDefinition {
+    pub(crate) fn with_declaration_name(mut self, name: &OperatorName) -> Self {
+        self.declaration_name = Some(Box::new(name.clone()));
+        self
+    }
+
+    pub(crate) fn declaration_name(&self) -> Option<&OperatorName> {
+        self.declaration_name.as_deref()
+    }
+
     pub(crate) const fn dependents(&self) -> &OperatorDependents {
         &self.dependents
     }
@@ -170,6 +215,7 @@ impl UnaryOperatorDefinition {
             arg_type: arg_type.clone(),
             result_type: result_type.clone(),
             strict,
+            declaration_name: None,
             settings: None,
             dependents: OperatorDependents::default(),
         }
@@ -206,6 +252,32 @@ pub enum OperatorDefinition {
 }
 
 impl OperatorDefinition {
+    pub(crate) fn single_declaration_name(&self) -> Option<&OperatorName> {
+        fn shared_name<'a>(
+            mut names: impl Iterator<Item = Option<&'a OperatorName>>,
+        ) -> Option<&'a OperatorName> {
+            let first = names.next()??;
+            if names.all(|name| name == Some(first)) {
+                Some(first)
+            } else {
+                None
+            }
+        }
+
+        match self {
+            Self::Binary(entries) => shared_name(
+                entries
+                    .iter()
+                    .map(BinaryOperatorDefinition::declaration_name),
+            ),
+            Self::LeftUnary(entries) | Self::RightUnary(entries) => shared_name(
+                entries
+                    .iter()
+                    .map(UnaryOperatorDefinition::declaration_name),
+            ),
+        }
+    }
+
     pub(crate) const fn is_empty(&self) -> bool {
         match self {
             Self::Binary(entries) => entries.is_empty(),

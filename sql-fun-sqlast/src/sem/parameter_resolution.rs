@@ -2682,7 +2682,9 @@ impl<'cache> ParameterResolution<'cache> {
             return Ok(Some(self.sqlite_operator(name, left, right)));
         }
         let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();
-        if let Some(operator) = context.get_operator(name, left.is_some(), right.is_some()) {
+        if let Some(operator) = crate::sem::operator_lookup::OperatorLookupService::new(context)
+            .visible(name, left.is_some(), right.is_some())
+        {
             let signatures = operator.parameter_signatures();
             return Ok(Some(self.call_with_diagnostic_name(
                 context,

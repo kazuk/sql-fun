@@ -1,7 +1,8 @@
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, ParseContext, SemScalarExpr,
+        AnalysisError, OperatorDefinition, OperatorLookupService, ParseContext, ResolvedOperator,
+        SemScalarExpr,
         scalar_expr::arith_expr::{ArithExpr, UndefinedOperatorCallSite},
     },
 };
@@ -16,7 +17,23 @@ impl ArithExpr {
     where
         TParseContext: ParseContext,
     {
-        if let Some(operator_def) = context.get_operator(name, lexpr.is_some(), rexpr.is_some()) {
+        let definition =
+            OperatorLookupService::new(context).visible(name, lexpr.is_some(), rexpr.is_some());
+        let binding = ResolvedOperator::from_visible(context, name, definition.as_ref());
+        let (mut expression, context) =
+            Self::build_op_from_visible(context, name, lexpr, rexpr, definition)?;
+        expression.set_operator_binding(binding);
+        Ok((expression, context))
+    }
+
+    pub(crate) fn build_op_from_visible<'context, TParseContext: ParseContext>(
+        context: &'context mut TParseContext,
+        name: &OperatorName,
+        lexpr: Option<SemScalarExpr>,
+        rexpr: Option<SemScalarExpr>,
+        definition: Option<OperatorDefinition>,
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError> {
+        if let Some(operator_def) = definition {
             if lexpr
                 .as_ref()
                 .is_some_and(|value| value.get_type().is_none())
@@ -26,7 +43,6 @@ impl ArithExpr {
             {
                 return Ok((Self::deferred_operator(name, lexpr, rexpr), context));
             }
-            let operator_def = operator_def.clone();
             match (lexpr, rexpr) {
                 (Some(l), Some(r)) => {
                     Self::build_binary_op_resolved(context, name, l, r, operator_def)

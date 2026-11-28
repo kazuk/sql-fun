@@ -760,6 +760,19 @@ impl SemScalarExpr {
             _ => None,
         }
     }
+    /// Original PostgreSQL operator declaration when analysis selected an overload.
+    #[must_use]
+    pub fn operator_declaration(&self) -> Option<&crate::sem::OperatorIdentity> {
+        match self {
+            Self::Arith(ArithExpr::OpBinary(value)) => value.declaration(),
+            Self::Arith(ArithExpr::OpRightUnary(value)) => value.declaration(),
+            Self::Arith(ArithExpr::OpAnyBinary(value)) => value.declaration(),
+            Self::Arith(ArithExpr::OpAllBinary(value)) => value.declaration(),
+            Self::Constrained(value) => value.operator_declaration(),
+            _ => None,
+        }
+    }
+
     pub(crate) fn set_operator_binding(&mut self, binding: ResolvedOperator) {
         if let Self::Arith(call) = self {
             call.set_binding(binding);

@@ -384,5 +384,41 @@
         }
       ]
     }
+  },
+  {
+    "name": "membership-retains-builtin-guarantee",
+    "sql": "SELECT 1 IN (1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "membership-custom-guarantee-is-unknown",
+    "sql": "SELECT 'x'::text IN (1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

@@ -126,4 +126,6 @@ An unknown input type reports
 [`ownership_argument_type_not_found`](../../diagnostics/ownership_argument_type_not_found.md).
 An explicitly matched procedure or a selected aggregate reports
 [`ownership_invalid_target_kind`](../../diagnostics/ownership_invalid_target_kind.md).
+Specifying the same attribute more than once reports
+[`alter_function_duplicate_attribute`](../../diagnostics/alter_function_duplicate_attribute.md).
 Analysis continues after a rejected change using the existing definition.

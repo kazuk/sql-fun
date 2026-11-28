@@ -232,7 +232,11 @@ mod test_expression_classification {
 
 impl FunctionInfoWrite for SchemaFileContext {
     fn apply_alter_function(mut self, statement: &AlterFunction) -> Result<Self, AnalysisError> {
-        let Some(identity) = statement.target().identity() else {
+        let Some(identity) = statement
+            .target()
+            .identity()
+            .filter(|_| statement.applicable())
+        else {
             return Ok(self);
         };
         let Some(mut definition) = self.exact_routine_definition(identity) else {
@@ -444,8 +448,23 @@ mod test_parallel_safety_catalog_transition {
         Ok(())
     }
 
-    #[test]
-    fn discarded_diagnostics_do_not_apply_rejected_change() -> testresult::TestResult {
+    #[rstest::rstest]
+    #[case(
+        "ALTER FUNCTION public.f VOLATILE PARALLEL UNSAFE",
+        "ownership_target_ambiguous"
+    )]
+    #[case(
+        "ALTER FUNCTION public.f() VOLATILE IMMUTABLE PARALLEL UNSAFE",
+        "alter_function_duplicate_attribute"
+    )]
+    #[case(
+        "ALTER FUNCTION public.f() VOLATILE PARALLEL UNSAFE PARALLEL UNSAFE",
+        "alter_function_duplicate_attribute"
+    )]
+    fn discarded_diagnostics_do_not_apply_rejected_change(
+        #[case] sql: &str,
+        #[case] diagnostic: &str,
+    ) -> testresult::TestResult {
         let mut context = ownership_context();
         for sql in [
             "CREATE FUNCTION public.f() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
@@ -454,14 +473,16 @@ mod test_parallel_safety_catalog_transition {
         ] {
             context = apply_ownership_sql(context, sql)?.into_context();
         }
-        let syntax = ownership_statement("ALTER FUNCTION public.f VOLATILE PARALLEL UNSAFE")?;
+        let syntax = ownership_statement(sql)?;
         let StatementNode::AlterFunction(ast) = syntax else {
             panic!("expected ALTER FUNCTION");
         };
         context.begin_parameter_type_analysis();
         let rejected = AlterFunction::analyze(&ast, &mut context)?;
         assert!(!rejected.applicable());
-        assert_eq!(context.analysis_state_mut().take_problems().len(), 1);
+        let problems = context.analysis_state_mut().take_problems();
+        assert_eq!(problems.len(), 1);
+        assert_eq!(problems[0].code(), diagnostic);
         let context = context.apply_alter_function(&rejected)?;
         let subsequent = apply_ownership_sql(context, "SELECT public.f()")?;
         assert!(subsequent.context().problems().is_empty());

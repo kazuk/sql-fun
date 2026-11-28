@@ -2,7 +2,7 @@
 
 Use this guide to make pgvector v0.8.7 types, functions, and operators
 available to offline SQL analysis. Follow the
-[installation guide](installation.md) to set up the sql-fun CLI, server,
+[installation guide](../installation.md) to set up the sql-fun CLI, server,
 and PostgreSQL 18 builtin catalog. Use a build that includes the
 [operator lookup fix](https://github.com/kazuk/sql-fun/pull/1297).
 
@@ -30,7 +30,7 @@ cp pgvector/sql/vector.sql "$extension_dir/vector--0.8.7.sql"
 For another catalog major, use the corresponding directory under
 `<sql-fun-home>/postgres/<major>/extensions/`. To select a different
 directory explicitly, use `--postgres-extensions-dir` or
-`SQL_FUN_EXTENSIONS_DIR`. See the [CLI common options](cli/index.md).
+`SQL_FUN_EXTENSIONS_DIR`. See the [CLI common options](../cli/index.md).
 
 ## Select pgvector in a datasource
 
@@ -56,7 +56,7 @@ installation script and any updates needed to reach the selected version.
 
 ## Analyze a distance expression
 
-Save the query and run [`analyze` at the extensions schema level](cli/analyze.md#schema-loading).
+Save the query and run [`analyze` at the extensions schema level](../cli/analyze.md#schema-loading).
 
 ```sh
 printf '%s\n' "SELECT '[1,2,3]'::vector <-> '[4,5,6]'::vector AS distance;" > distance.sql
@@ -72,5 +72,5 @@ also shows the cast and function probes for this setup.
 sql-fun interprets the extension's SQL declarations offline to resolve
 types, functions, and operators. Installing the extension in a database
 and executing its functions are PostgreSQL operations. See the
-[CREATE EXTENSION reference](sql-analysis/statements/create-extension.md)
+[CREATE EXTENSION reference](../sql-analysis/statements/create-extension.md)
 for the scope of extension analysis.

@@ -40,6 +40,11 @@ behavior is invented. `IF EXISTS` retains an explicit no-op when lookup finds no
 definition. After a successful drop, the trigger is no longer available to
 subsequent statements in the same schema analysis.
 
+The CLI can load PostgreSQL trigger definitions from the project schema.
+Passing `CREATE TRIGGER` as the top-level `analyze` input currently fails
+during SQL rendering
+([#1305](https://github.com/kazuk/sql-fun/issues/1305)).
+
 ## Dialect and engine-specific behavior
 
 PostgreSQL trigger functions and SQLite trigger bodies are different analysis

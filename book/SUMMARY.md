@@ -15,6 +15,7 @@
 - [sql-fun-collector](./collector.md)
   - [Collecting ordered rows](./sql_fun_collector.md)
 - [SQL Analysis Configuration](./analysis-configuration.md)
+  - [Configure a non-bundled PostgreSQL extension](./postgres-external-extensions.md)
 - [SQL Analysis Reference](./sql-analysis.md)
   - [Top-level statements](./sql-analysis/statements.md)
     - [SELECT](./sql-analysis/statements/select.md)

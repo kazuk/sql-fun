@@ -44,6 +44,10 @@ impl IndirectionExpr {
         ))))
     }
 
+    pub(super) const fn is_member_reference(&self) -> bool {
+        matches!(self, Self::MemberRef(_))
+    }
+
     pub(super) fn row_constructor(&self) -> Option<&RowExpr> {
         if let Self::MemberRef(value) = self {
             value.row_constructor()

@@ -222,7 +222,8 @@ impl SemScalarExpr {
                 .record_operand()
                 .is_some_and(Self::is_anonymous_record_member);
         }
-        matches!(self.as_indirection(), Some(IndirectionExpr::MemberRef(_)))
+        self.as_indirection()
+            .is_some_and(IndirectionExpr::is_member_reference)
             && self
                 .get_type()
                 .is_some_and(|ty| ty.is_record() && ty.is_array() != Some(true))

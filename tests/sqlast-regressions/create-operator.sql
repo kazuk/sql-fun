@@ -71,3 +71,9 @@ LANGUAGE sql AS 'SELECT true';
 CREATE OPERATOR public.@@ (
     LEFTARG = integer, RIGHTARG = integer, FUNCTION = public.scalar_match
 );
+
+CREATE FUNCTION public.membership_custom_eq(text, integer) RETURNS boolean
+LANGUAGE sql AS 'SELECT NULL::boolean';
+CREATE OPERATOR public.= (
+    LEFTARG = text, RIGHTARG = integer, FUNCTION = public.membership_custom_eq
+);

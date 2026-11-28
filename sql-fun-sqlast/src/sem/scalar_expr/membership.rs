@@ -301,21 +301,6 @@ impl MembershipExpr {
         } else {
             PgBuiltInType::bool()
         };
-        let comparison_not_null = if let Some(operator) = &binding {
-            if let Some(candidates) = &operator.candidates
-                && let Some(first) = candidates.first()
-                && let Some(name) = first.declaration_name()
-                && candidates
-                    .iter()
-                    .all(|entry| entry.declaration_name() == Some(name))
-            {
-                context.operator_result_is_not_null(name)
-            } else {
-                None
-            }
-        } else {
-            Some(true)
-        };
         Self {
             left: left.clone(),
             right,
@@ -324,7 +309,7 @@ impl MembershipExpr {
             comparisons: Vec::new(),
             types: ResolvedTypes::exact(&result),
             invalid: false,
-            comparison_not_null,
+            comparison_not_null: None,
             node: None,
         }
     }
@@ -502,9 +487,26 @@ impl MembershipExpr {
         self.comparisons.clear();
         let values = self.right.values();
         if self.right.as_query().is_some() {
-            return self.compare_query_outputs(context, &values, parameters);
+            self.compare_query_outputs(context, &values, parameters)?;
+        } else {
+            self.analyze_list(context, &values, parameters)?;
         }
-        self.analyze_list(context, &values, parameters)
+        self.update_comparison_nullability(context);
+        Ok(())
+    }
+
+    fn update_comparison_nullability(&mut self, context: &impl ParseContext) {
+        self.comparison_not_null = if self.binding.is_none() {
+            Some(true)
+        } else {
+            self.comparisons
+                .iter()
+                .try_fold(true, |guaranteed, comparison| {
+                    let declaration = comparison.expression()?.operator_declaration()?;
+                    let not_null = context.operator_result_is_not_null(declaration.name())?;
+                    Some(guaranteed && not_null)
+                })
+        };
     }
 
     fn compare_query_outputs(
@@ -837,6 +839,19 @@ impl MembershipExpr {
 }
 
 impl MembershipExpr {
+    pub(super) fn finalize_comparisons(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        for comparison in &mut self.comparisons {
+            if let Some(expression) = &mut comparison.expression {
+                expression.finalize_call(context)?;
+            }
+        }
+        self.update_comparison_nullability(context);
+        Ok(())
+    }
+
     pub(crate) fn finish_comparisons<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,

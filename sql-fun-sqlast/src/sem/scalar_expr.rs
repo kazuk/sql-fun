@@ -2010,8 +2010,10 @@ impl SemScalarExpr {
         &mut self,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        if let Self::Constrained(value) = self {
-            value.finalize_call(context)?;
+        match self {
+            Self::Constrained(value) => value.finalize_call(context)?,
+            Self::Membership(value) => value.finalize_comparisons(context)?,
+            _ => {}
         }
         Ok(())
     }

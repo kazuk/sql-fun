@@ -1,0 +1,22 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT id FROM items TABLESAMPLE SYSTEM_TIME (1);",
+    "expected": {
+      "diagnostics": [
+        "tablesample_metadata_unavailable"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

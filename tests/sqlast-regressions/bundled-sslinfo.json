@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT ssl_is_used();",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "ssl_is_used",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

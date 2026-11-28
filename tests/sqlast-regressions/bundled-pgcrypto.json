@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT digest('example', 'sha256');",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "digest",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bytea",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

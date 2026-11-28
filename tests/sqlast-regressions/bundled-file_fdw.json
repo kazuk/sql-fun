@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT file_fdw_handler();",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "file_fdw_handler",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "fdw_handler",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

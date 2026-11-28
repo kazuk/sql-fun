@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT dblink_get_connections();",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "dblink_get_connections",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

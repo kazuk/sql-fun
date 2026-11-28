@@ -1,0 +1,10 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "CREATE INDEX items_gin_idx ON items USING gin (id);",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

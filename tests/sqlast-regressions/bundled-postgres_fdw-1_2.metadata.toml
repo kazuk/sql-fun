@@ -1,0 +1,1 @@
+extensions = [{ name = "postgres_fdw", version = "1.2" }]

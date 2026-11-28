@@ -1,0 +1,2 @@
+extensions = [{ name = "pg_stat_statements" }]
+roles = ["pg_read_all_stats"]

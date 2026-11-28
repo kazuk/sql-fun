@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT ll_to_earth(0, 0);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "ll_to_earth",
+          "type": {
+            "schema_name": "",
+            "local_name": "earth",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT 'Example'::citext = 'example'::citext;",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

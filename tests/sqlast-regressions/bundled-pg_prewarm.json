@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT pg_prewarm(NULL::regclass);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "pg_prewarm",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

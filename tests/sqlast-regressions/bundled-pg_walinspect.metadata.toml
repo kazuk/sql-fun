@@ -1,0 +1,2 @@
+extensions = [{ name = "pg_walinspect" }]
+roles = ["pg_read_server_files"]

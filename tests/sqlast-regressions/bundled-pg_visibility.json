@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT all_visible FROM pg_visibility_map(NULL::regclass, 0);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "all_visible",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

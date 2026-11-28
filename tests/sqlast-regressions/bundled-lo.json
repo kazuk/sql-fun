@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT NULL::lo AS large_object;",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "large_object",
+          "type": {
+            "schema_name": "public",
+            "local_name": "lo",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

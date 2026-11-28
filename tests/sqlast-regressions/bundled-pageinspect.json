@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT get_raw_page('items', 0);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "get_raw_page",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bytea",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

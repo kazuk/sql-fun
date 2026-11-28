@@ -1,0 +1,3 @@
+extensions = [{ name = "plpgsql" }]
+roles = ["postgres"]
+extension_install_owner = "postgres"

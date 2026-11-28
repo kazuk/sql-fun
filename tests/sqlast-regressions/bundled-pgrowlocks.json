@@ -1,0 +1,20 @@
+[
+  {
+    "name": "manual-example",
+    "sql": "SELECT locked_row FROM pgrowlocks('items');",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "locked_row",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "tid",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

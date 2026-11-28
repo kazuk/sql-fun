@@ -914,8 +914,8 @@ mod test_star_preserves_occurrences_and_output_order {
     #[case::join("SELECT * FROM a.t CROSS JOIN b.t", &["a", "a", "b", "b"])]
     #[case::left("SELECT * FROM a.t LEFT JOIN b.t ON true", &["a", "a", "b", "b"])]
     #[case::right("SELECT * FROM a.t RIGHT JOIN b.t ON true", &["a", "a", "b", "b"])]
-    #[case::update("UPDATE a.t SET id=1 FROM b.t RETURNING *", &["a", "a"])]
-    #[case::delete("DELETE FROM a.t USING b.t RETURNING *", &["a", "a"])]
+    #[case::update("UPDATE a.t SET id=1 FROM b.t RETURNING *", &["a", "a", "b", "b"])]
+    #[case::delete("DELETE FROM a.t USING b.t RETURNING *", &["a", "a", "b", "b"])]
     fn star_preserves_occurrences_and_output_order(#[case] sql: &str, #[case] schemas: &[&str]) {
         let analyzed = source_namespace_statement(sql);
         assert!(

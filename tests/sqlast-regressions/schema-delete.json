@@ -111,6 +111,15 @@
             "local_name": "text",
             "is_array": false
           }
+        },
+        {
+          "name": "n",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
         }
       ]
     }

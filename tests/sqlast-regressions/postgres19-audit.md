@@ -77,7 +77,8 @@ fixture-defined catalogs and extensions.
 - PostgreSQL plans a MERGE with `ON 1`; the fixture expects a query analysis
   error. [#1290](https://github.com/kazuk/sql-fun/issues/1290)
 - PostgreSQL describes FROM/USING source columns in UPDATE/DELETE RETURNING
-  `*`. The fixtures describe only the destination columns.
+  `*`. At the audited commit the fixtures described only the destination
+  columns. The corrected fixtures include the source columns.
   [#1291](https://github.com/kazuk/sql-fun/issues/1291)
 
 Existing rendering gaps are recorded in the ledger with their tracking issues.

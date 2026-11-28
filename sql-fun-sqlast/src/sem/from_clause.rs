@@ -51,14 +51,39 @@ impl FromClause {
                 Err(()) => WildcardProjection::ambiguous_alias(context, qualifier),
             };
         }
+        Self::wildcard_projection_in_order(context, with, self.0.iter())
+    }
+
+    /// Project the DML destination first. UPDATE and DELETE append it to their binding scope.
+    pub(crate) fn destination_first_wildcard_projection(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
+        let Some((destination, sources)) = self.0.split_last() else {
+            return Ok(WildcardProjection::unresolved());
+        };
+        Self::wildcard_projection_in_order(
+            context,
+            with,
+            std::iter::once(destination).chain(sources),
+        )
+    }
+
+    fn wildcard_projection_in_order<'a>(
+        context: &impl ParseContext,
+        with: &WithClause,
+        mut sources: impl Iterator<Item = &'a DataSource> + Clone,
+    ) -> Result<WildcardProjection<'a>, AnalysisError> {
         let mut columns = Vec::new();
         let mut table_dependent = false;
-        for source in &self.0 {
+        for source in sources.clone() {
             columns.extend(source.projection_names(context, with, None)?);
             table_dependent |= source.projection_is_table_dependent(context);
         }
         let source_found = !columns.is_empty()
-            || (!self.0.is_empty() && self.0.iter().all(DataSource::projection_shape_is_resolved));
+            || (sources.clone().next().is_some()
+                && sources.all(DataSource::projection_shape_is_resolved));
         Ok(WildcardProjection::new(
             &columns,
             source_found,

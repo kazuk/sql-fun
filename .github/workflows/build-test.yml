@@ -995,12 +995,12 @@ jobs:
         run: |
           output="$RUNNER_TEMP/sql-fun-postgres"
           mkdir -p "$output"
-          for major in 17 18; do
+          for major in 17 18 19; do
             mv "$RUNNER_TEMP/sql-fun-postgres-catalogs/sql-fun-postgres-extracted-$major" "$output/$major"
           done
           .local/bin/test-postgres-extraction --binary /usr/bin/sql-fun --output "$output" --shared
           mkdir "$output/postgres"
-          mv "$output/17" "$output/18" "$output/postgres/"
+          mv "$output/17" "$output/18" "$output/19" "$output/postgres/"
           cp -R "$output/initialized-docker/highlighter" "$output/"
 
       - name: Validate installed SQLAST regression contracts

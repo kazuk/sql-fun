@@ -7,10 +7,13 @@ executing the write. Without RETURNING, an analyzed INSERT, UPDATE, DELETE or
 MERGE has no result columns. Expressions and nested subqueries share the
 statement's parameter analysis. Explicit output aliases choose result names.
 
-For INSERT/UPDATE/DELETE, an unqualified star expands only the destination.
-PostgreSQL INSERT accepts a destination-qualified star. UPDATE/DELETE can also
-reference applicable FROM/USING sources and their qualified stars. An explicit
-target alias hides its original table name.
+For INSERT/UPDATE/DELETE, sql-fun expands an unqualified star to the
+destination columns. PostgreSQL also includes FROM/USING source columns for
+UPDATE and DELETE, which sql-fun currently omits
+([#1291](https://github.com/kazuk/sql-fun/issues/1291)). PostgreSQL INSERT
+accepts a destination-qualified star. UPDATE/DELETE can reference applicable
+FROM/USING sources and their qualified stars. An explicit target alias hides
+its original table name.
 [MERGE](../statements/merge.md) owns its statement-specific source ordering,
 merge_action(), action-dependent nullability and row-image scope.
 

@@ -25,7 +25,7 @@ SQL-callable scope, excluding internal/trigger signatures. Both routine artifact
 exclude members of installed extensions, including those below the bootstrap
 OID cutoff. Extension scripts supply those declarations. Application schema
 SQL and extension scripts remain separate inputs. The type master additionally
-includes persistent installed base types as described below.
+includes persistent non-extension base types as described below.
 
 SQL identifiers are tagged as identifiers and rendered only through `ident`.
 Server-rendered expressions, types, argument declarations, and definitions are
@@ -77,10 +77,10 @@ with `category`. Qualified identity is the exact `(schema, name)` pair. For
 defined types, `category` is
 exactly `pg_type.typcategory`, a single printable ASCII code, including uncommon
 builtin and user-defined codes. Shell types emit null because PostgreSQL does
-not guarantee their classification. The existing bootstrap eligibility is
-unchanged, including eligible undefined shells. In addition, normal extraction
-unconditionally includes persistent installed base types (`typtype = 'b'`),
-including extension/user types and normal-OID definitions in `pg_catalog`.
+not guarantee their classification. Eligible bootstrap types include undefined
+shells. Normal extraction also includes persistent user-defined base types
+(`typtype = 'b'`), including normal-OID definitions in `pg_catalog`. Both
+selections exclude extension members through `pg_depend`.
 Exclude `pg_toast` and temporary/toast-temporary namespaces; identify generated
 ordinary array rows by another type's `typarray` relationship and omit them from
 this additional selection. Do not infer arrays from names or generic `typelem`.

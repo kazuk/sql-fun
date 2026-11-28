@@ -14,16 +14,26 @@ WITH bootstrap AS (
   FROM pg_catalog.pg_type t
   JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
   LEFT JOIN bootstrap b ON b.oid = t.oid
-  WHERE b.oid IS NOT NULL
-     OR (
-       t.typtype = 'b'
-       AND n.nspname <> 'pg_toast'
-       AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'
-       AND NOT EXISTS (
-         SELECT 1 FROM pg_catalog.pg_type element
-         WHERE element.typarray = t.oid
-       )
-     )
+  WHERE (
+    b.oid IS NOT NULL
+    OR (
+      t.typtype = 'b'
+      AND n.nspname <> 'pg_toast'
+      AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_catalog.pg_type element
+        WHERE element.typarray = t.oid
+      )
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_depend d
+    WHERE d.classid = 'pg_catalog.pg_type'::regclass
+      AND d.objid = t.oid
+      AND d.objsubid = 0
+      AND d.refclassid = 'pg_catalog.pg_extension'::regclass
+      AND d.deptype = 'e'
+  )
 )
 SELECT coalesce(json_agg(json_build_object(
   'schema', selected.nspname,

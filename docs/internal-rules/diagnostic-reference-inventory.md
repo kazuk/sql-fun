@@ -36,7 +36,7 @@ reported target problems only when `target.identity().is_none()`. That analysis
 now lives in `sem/alter_owner/ddl.rs`; `OwnershipLookup::identity` in
 `sem/alter_owner.rs` returns Some only for `Resolved`. All four failure outcomes
 have production lookup branches and flow through the ownership target adapter.
-`sem/alter_function_parallel.rs` reports through the same adapter only when its
+`sem/alter_function.rs` reports through the same adapter only when its
 target identity is absent. Missing role is separately produced by
 `Role::resolve_owner`.
 

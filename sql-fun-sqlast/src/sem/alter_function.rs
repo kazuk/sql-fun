@@ -1,4 +1,4 @@
-//! Interpret PostgreSQL function parallel-safety changes.
+//! Interpret PostgreSQL function attribute changes.
 
 use crate::{
     ast::{self, ObjectKind, ddl::FunctionOption},
@@ -36,20 +36,61 @@ impl TryFrom<&FunctionOption> for ParallelSafety {
     }
 }
 
-/// Analyzed ALTER FUNCTION PARALLEL and its catalog applicability.
+/// PostgreSQL volatility classification of a function.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FunctionVolatility {
+    /// May change on every call.
+    Volatile,
+    /// Returns consistent results within a statement.
+    Stable,
+    /// Returns consistent results for the same arguments.
+    Immutable,
+}
+
+impl TryFrom<&str> for FunctionVolatility {
+    type Error = AnalysisError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "volatile" => Ok(Self::Volatile),
+            "stable" => Ok(Self::Stable),
+            "immutable" => Ok(Self::Immutable),
+            _ => AnalysisError::raise_unexpected_input("invalid function volatility"),
+        }
+    }
+}
+
+/// Analyzed ALTER FUNCTION and its catalog applicability.
 #[derive(Clone, Debug)]
-pub struct AlterFunctionParallel {
-    mode: ParallelSafety,
+pub struct AlterFunction {
+    parallel_safety: Option<ParallelSafety>,
+    volatility: Option<FunctionVolatility>,
     target: OwnershipLookup,
     source: Option<SourcePathWithSpan>,
 }
 
-impl AlterFunctionParallel {
+impl AlterFunction {
     pub(crate) fn analyze(
-        ast: &ast::AlterFunctionParallel,
+        ast: &ast::AlterFunction,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let mode = ParallelSafety::try_from(ast.option())?;
+        let mut parallel_safety = None;
+        let mut volatility = None;
+        for option in ast.options() {
+            match option {
+                FunctionOption::Parallel(_) if parallel_safety.is_none() => {
+                    parallel_safety = Some(ParallelSafety::try_from(option)?);
+                }
+                FunctionOption::Volatility(value) if volatility.is_none() => {
+                    volatility = Some(FunctionVolatility::try_from(value.as_str())?);
+                }
+                _ => {
+                    return AnalysisError::raise_unexpected_input(
+                        "conflicting or redundant ALTER FUNCTION actions",
+                    );
+                }
+            }
+        }
         let request =
             RequestedIdentity::from_ast_object_target(ast.target(), ObjectKind::FUNCTION, context)?;
         let target = match request.resolve_routine(context) {
@@ -65,7 +106,8 @@ impl AlterFunctionParallel {
             context.report_analysis_problem(AnalysisProblem::ownership_target(&target))?;
         }
         Ok(Self {
-            mode,
+            parallel_safety,
+            volatility,
             target,
             source: context.get_source_path_with_span().cloned(),
         })
@@ -78,7 +120,7 @@ mod test_target_resolution {
         ast::StatementNode,
         context::ParseContext,
         names::{FullName, SchemaName},
-        sem::{AlterFunctionParallel, OwnershipLookup, PgBuiltInType},
+        sem::{AlterFunction, OwnershipLookup, PgBuiltInType},
         test_helpers::ownership::{apply_ownership_sql, ownership_context, ownership_statement},
     };
 
@@ -108,10 +150,10 @@ mod test_target_resolution {
             .into_context();
         }
         let sql = format!("ALTER FUNCTION {target} PARALLEL SAFE");
-        let StatementNode::AlterFunctionParallel(ast) = ownership_statement(&sql)? else {
+        let StatementNode::AlterFunction(ast) = ownership_statement(&sql)? else {
             panic!("expected ALTER FUNCTION");
         };
-        let statement = AlterFunctionParallel::analyze(&ast, &mut context)?;
+        let statement = AlterFunction::analyze(&ast, &mut context)?;
         let identity = statement.target().identity().unwrap();
         assert_eq!(identity.name(), &FullName::with_schema(schema, "f"));
         let expected = if zero_arguments {
@@ -152,10 +194,10 @@ mod test_target_resolution {
             .into_context();
         }
         let sql = format!("ALTER FUNCTION {target} PARALLEL UNSAFE");
-        let StatementNode::AlterFunctionParallel(ast) = ownership_statement(&sql)? else {
+        let StatementNode::AlterFunction(ast) = ownership_statement(&sql)? else {
             panic!("expected ALTER FUNCTION");
         };
-        let statement = AlterFunctionParallel::analyze(&ast, &mut context)?;
+        let statement = AlterFunction::analyze(&ast, &mut context)?;
         assert!(!statement.applicable());
         assert_eq!(statement.target().code(), expected);
         assert_eq!(context.problems().len(), 1);
@@ -167,10 +209,15 @@ mod test_target_resolution {
     }
 }
 
-impl AlterFunctionParallel {
-    /// The requested classification.
-    pub const fn mode(&self) -> ParallelSafety {
-        self.mode
+impl AlterFunction {
+    /// The requested parallel safety, if supplied.
+    pub const fn parallel_safety(&self) -> Option<ParallelSafety> {
+        self.parallel_safety
+    }
+
+    /// The requested volatility, if supplied.
+    pub const fn volatility(&self) -> Option<FunctionVolatility> {
+        self.volatility
     }
 
     /// Completed target binding or the reason the change was rejected.

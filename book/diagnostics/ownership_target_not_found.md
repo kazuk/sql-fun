@@ -7,7 +7,7 @@ Code: `ownership_target_not_found`. Severity: Error.
 ## When it is reported
 
 `ALTER OWNER`, PostgreSQL `ALTER EXTENSION ... ADD/DROP`, or
-`ALTER FUNCTION ... PARALLEL` cannot find a catalog object matching the
+`ALTER FUNCTION` cannot find a catalog object matching the
 requested kind, visible name and supplied input signature.
 
 ## What analysis knows and does not know

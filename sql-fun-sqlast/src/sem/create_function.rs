@@ -5,7 +5,7 @@ use crate::{
     ast::ObjectKind,
     names::{FullName, TableName},
     sem::{
-        AlterFunctionParallel, ColumnCollection, FunctionOverloadCollection,
+        AlterFunction, ColumnCollection, FunctionOverloadCollection, FunctionVolatility,
         ObjectPrivilegeDeclaration, OverloadVariant, OwnerSpecification, OwnershipIdentity,
         ParallelSafety, ParseContext, SourcePathWithSpan, TypeDefinition,
         type_system::ArgumentBindingCollection,
@@ -18,7 +18,8 @@ pub struct CreateFunction {
     replace: bool,
     outcome: FunctionDeclarationOutcome,
     parallel_safety: Option<ParallelSafety>,
-    parallel_changes: Vec<AlterFunctionParallel>,
+    volatility: Option<FunctionVolatility>,
+    parallel_changes: Vec<AlterFunction>,
     source: Option<SourcePathWithSpan>,
 
     owner: Option<OwnerSpecification>,
@@ -115,13 +116,23 @@ impl CreateFunction {
     }
 
     /// Applied ALTER FUNCTION PARALLEL statements in source order.
-    pub fn parallel_changes(&self) -> &[AlterFunctionParallel] {
+    pub fn parallel_changes(&self) -> &[AlterFunction] {
         &self.parallel_changes
     }
 
-    pub(crate) fn change_parallel_safety(&mut self, statement: &AlterFunctionParallel) {
-        self.parallel_safety = Some(statement.mode());
-        self.parallel_changes.push(statement.clone());
+    /// Volatility recorded for this definition, if available.
+    pub const fn volatility(&self) -> Option<FunctionVolatility> {
+        self.volatility
+    }
+
+    pub(crate) fn apply_attributes(&mut self, statement: &AlterFunction) {
+        if let Some(mode) = statement.parallel_safety() {
+            self.parallel_safety = Some(mode);
+            self.parallel_changes.push(statement.clone());
+        }
+        if let Some(volatility) = statement.volatility() {
+            self.volatility = Some(volatility);
+        }
     }
 
     /// Source of the declaration, when the catalog supplies one.
@@ -157,6 +168,7 @@ impl CreateFunction {
             replace: false,
             outcome: FunctionDeclarationOutcome::default(),
             parallel_safety: None,
+            volatility: None,
             parallel_changes: Vec::new(),
             source: None,
             builtin_properties: None,

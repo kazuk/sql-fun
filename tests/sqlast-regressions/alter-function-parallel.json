@@ -37,7 +37,7 @@
   },
   {
     "name": "missing_exact_signature",
-    "sql": "ALTER FUNCTION public.parallel_probe(integer) PARALLEL UNSAFE",
+    "sql": "ALTER FUNCTION public.parallel_probe(integer) VOLATILE PARALLEL UNSAFE",
     "expected": {
       "diagnostics": [
         "ownership_target_not_found"

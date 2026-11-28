@@ -8,9 +8,8 @@ use crate::{
     },
     names::FullName,
     sem::{
-        AlterFunctionParallel, AnalysisError, CreateFunction, DropFunction,
-        FunctionOverloadCollection, FunctionTombstone, OverloadVariant, OwnershipIdentity,
-        ViewTombstone,
+        AlterFunction, AnalysisError, CreateFunction, DropFunction, FunctionOverloadCollection,
+        FunctionTombstone, OverloadVariant, OwnershipIdentity, ViewTombstone,
     },
 };
 
@@ -232,10 +231,7 @@ mod test_expression_classification {
 }
 
 impl FunctionInfoWrite for SchemaFileContext {
-    fn apply_alter_function_parallel(
-        mut self,
-        statement: &AlterFunctionParallel,
-    ) -> Result<Self, AnalysisError> {
+    fn apply_alter_function(mut self, statement: &AlterFunction) -> Result<Self, AnalysisError> {
         let Some(identity) = statement.target().identity() else {
             return Ok(self);
         };
@@ -244,7 +240,7 @@ impl FunctionInfoWrite for SchemaFileContext {
                 "ALTER FUNCTION definition missing from catalog",
             );
         };
-        definition.change_parallel_safety(statement);
+        definition.apply_attributes(statement);
         self.catalog.functions.insert(identity.name(), &definition);
         Ok(self)
     }
@@ -346,8 +342,8 @@ mod test_parallel_safety_catalog_transition {
         context::{FunctionInfoWrite, MutSourcePathWithSpan, OwnershipInfoRead, ParseContext},
         names::FullName,
         sem::{
-            AlterFunctionParallel, OwnershipIdentity, ParallelSafety, PgBuiltInType, SemAst,
-            SourcePathWithSpan,
+            AlterFunction, FunctionVolatility, OwnershipIdentity, ParallelSafety, PgBuiltInType,
+            SemAst, SourcePathWithSpan,
         },
         test_helpers::{
             ownership::{apply_ownership_sql, ownership_context, ownership_statement},
@@ -400,11 +396,11 @@ mod test_parallel_safety_catalog_transition {
             let source = SourcePathWithSpan::new(path, &span);
             context.set_source_path_with_span(&source);
             let result = apply_ownership_sql(context, sql)?;
-            let SemAst::AlterFunctionParallel(statement) = result.ast() else {
+            let SemAst::AlterFunction(statement) = result.ast() else {
                 panic!("expected analyzed ALTER FUNCTION");
             };
             assert_eq!(statement.target().identity(), Some(&identity));
-            assert_eq!(statement.mode(), mode);
+            assert_eq!(statement.parallel_safety(), Some(mode));
             let location = statement.source().unwrap();
             assert_eq!(location.source_path(), path);
             assert_eq!(location.span(), &span);
@@ -437,9 +433,12 @@ mod test_parallel_safety_catalog_transition {
 
         let changes = definition.parallel_changes();
         assert_eq!(changes.len(), 3);
-        assert_eq!(changes[0].mode(), ParallelSafety::Safe);
-        assert_eq!(changes[1].mode(), ParallelSafety::Restricted);
-        assert_eq!(changes[2].mode(), ParallelSafety::Unsafe);
+        assert_eq!(changes[0].parallel_safety(), Some(ParallelSafety::Safe));
+        assert_eq!(
+            changes[1].parallel_safety(),
+            Some(ParallelSafety::Restricted)
+        );
+        assert_eq!(changes[2].parallel_safety(), Some(ParallelSafety::Unsafe));
         assert_eq!(changes[1].source().unwrap().span().offset(), 10);
         assert_eq!(changes[2].source().unwrap().span().offset(), 90);
         Ok(())
@@ -451,19 +450,19 @@ mod test_parallel_safety_catalog_transition {
         for sql in [
             "CREATE FUNCTION public.f() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
             "CREATE FUNCTION public.f(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
-            "ALTER FUNCTION public.f() PARALLEL SAFE",
+            "ALTER FUNCTION public.f() STABLE PARALLEL SAFE",
         ] {
             context = apply_ownership_sql(context, sql)?.into_context();
         }
-        let syntax = ownership_statement("ALTER FUNCTION public.f PARALLEL UNSAFE")?;
-        let StatementNode::AlterFunctionParallel(ast) = syntax else {
+        let syntax = ownership_statement("ALTER FUNCTION public.f VOLATILE PARALLEL UNSAFE")?;
+        let StatementNode::AlterFunction(ast) = syntax else {
             panic!("expected ALTER FUNCTION");
         };
         context.begin_parameter_type_analysis();
-        let rejected = AlterFunctionParallel::analyze(&ast, &mut context)?;
+        let rejected = AlterFunction::analyze(&ast, &mut context)?;
         assert!(!rejected.applicable());
         assert_eq!(context.analysis_state_mut().take_problems().len(), 1);
-        let context = context.apply_alter_function_parallel(&rejected)?;
+        let context = context.apply_alter_function(&rejected)?;
         let subsequent = apply_ownership_sql(context, "SELECT public.f()")?;
         assert!(subsequent.context().problems().is_empty());
         let identity =
@@ -473,6 +472,7 @@ mod test_parallel_safety_catalog_transition {
             .exact_routine_definition(&identity)
             .unwrap();
         assert_eq!(definition.parallel_safety(), Some(ParallelSafety::Safe));
+        assert_eq!(definition.volatility(), Some(FunctionVolatility::Stable));
         assert_eq!(definition.parallel_changes().len(), 1);
         Ok(())
     }

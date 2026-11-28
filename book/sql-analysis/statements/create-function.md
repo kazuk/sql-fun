@@ -102,17 +102,15 @@ procedure metadata support described above remains distinct from these gaps.
 Defaults use shared expression diagnostics. A missing set-returning result type
 reports `invalid_function_signature` when the declaration cannot create a shell.
 
-## ALTER FUNCTION PARALLEL
+## ALTER FUNCTION
 
-sql-fun can convert and render PostgreSQL `ALTER FUNCTION` statements with a
-single `PARALLEL SAFE`, `PARALLEL RESTRICTED`, or `PARALLEL UNSAFE` action. It
-preserves the function name and signature, including the distinction between
-an omitted signature and explicit empty parentheses. Statements that combine
-`PARALLEL` with other actions stop analysis during SQL conversion, including
-the combined volatility and parallel-safety actions in the bundled `isn` 1.3
-update ([#1150](https://github.com/kazuk/sql-fun/issues/1150#issuecomment-7190271178)).
+sql-fun can convert and render PostgreSQL `ALTER FUNCTION` statements with
+volatility (`VOLATILE`, `STABLE`, or `IMMUTABLE`) and parallel safety
+(`PARALLEL SAFE`, `PARALLEL RESTRICTED`, or `PARALLEL UNSAFE`). A statement
+can set either attribute or both, in either order. Other action types
+combined with these attributes stop analysis during SQL conversion.
 
-Schema and extension analysis records the requested mode on the selected
+Schema and extension analysis records the requested attributes on the selected
 function. An explicit signature matches exact input argument types, including
 `INOUT` and `VARIADIC` arguments. Argument names and `OUT`-only arguments do
 not participate in matching. Empty parentheses select a zero-input function.

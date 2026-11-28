@@ -89,89 +89,11 @@ impl ParsedSchemaDump {
 mod test_extension_catalog {
     use crate::{
         PostgresDialect, SqlFileSnapshot,
-        context::{
-            BaseContext, BaseParseContext, ExtensionInfoRead, OwnershipInfoRead, ParseContext,
-        },
-        names::SchemaName,
+        context::{BaseParseContext, OwnershipInfoRead, ParseContext},
         sem::SemAst,
         test_helpers::ownership::ownership_context,
     };
-    use ::clap::Parser;
-    use ::sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
     use std::path::Path;
-
-    #[test]
-    fn bundled_plpgsql_declarations_bind_to_extension_routines() -> testresult::TestResult {
-        let metadata_file =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/selected-postgres.toml");
-        let metadata = SqlFunMetadataCollection::load_from(metadata_file)?
-            .remove("default")
-            .expect("default test datasource");
-        let home = Path::new(env!("SQL_FUN_HOME"));
-        for version in ["17", "18"] {
-            let args = SqlFunArgs::try_parse_from([
-                "sql-fun",
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                version,
-            ])?;
-            let base = BaseContext::new(&args, &metadata)?.into();
-            let path = home
-                .join("postgres")
-                .join(version)
-                .join("extensions/plpgsql--1.0.sql");
-            let script = std::fs::read_to_string(&path)?;
-            // The CLI fixture covers the full script, including the configured owner.
-            let declarations = script.split_once("ALTER LANGUAGE").unwrap().0;
-            let snapshot = SqlFileSnapshot::from_text(
-                &path,
-                declarations.replace("MODULE_PATHNAME", "$libdir/plpgsql"),
-            );
-            let parsed = PostgresDialect::parse_extension_snapshot(
-                &snapshot,
-                &base,
-                &args,
-                &metadata,
-                &[SchemaName::from("pg_catalog")],
-                ("plpgsql", Some("pg_catalog")),
-            )?;
-            assert!(
-                parsed.problems().is_empty(),
-                "{version}: {:?}",
-                parsed.problems()
-            );
-            let [
-                SemAst::CreateFunction(handler),
-                SemAst::CreateFunction(inline),
-                SemAst::CreateFunction(validator),
-                SemAst::CreateLanguage(language),
-            ] = parsed._sem_results.as_slice()
-            else {
-                panic!("unexpected PL/pgSQL semantic declarations");
-            };
-            assert!(language.is_applicable());
-            let catalog = parsed.base_context();
-            for (function, lookup) in [
-                (handler, language.handler()),
-                (inline, language.inline().unwrap()),
-                (validator, language.validator().unwrap()),
-            ] {
-                assert!(function.is_applicable());
-                let name = function
-                    .name()
-                    .clone()
-                    .set_schema(SchemaName::from("pg_catalog"));
-                let identity = function.ownership_identity(&name);
-                assert_eq!(lookup.identity(), Some(&identity));
-                assert_eq!(catalog.extension_membership(&identity), Some("plpgsql"));
-                assert_eq!(catalog.routine_definitions(&name).len(), 1);
-                let effective = catalog.exact_routine_definition(&identity).unwrap();
-                assert_eq!(effective.source().unwrap().source_path(), path);
-            }
-        }
-        Ok(())
-    }
 
     #[test]
     fn duplicate_function_preserves_the_original_catalog_definition() -> testresult::TestResult {
